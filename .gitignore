@@ -1,0 +1,44 @@
+# Dependencias
+node_modules/
+.npm/
+
+# Entornos
+.env
+.env.local
+.env.production
+.env.*
+!.env.example
+
+# Build
+dist/
+build/
+.vite/
+coverage/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SQLite database
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Archivos privados generados en runtime
+*.xlsx
+*.pbix
+backend/uploads/
+scratch/
+backend/scratch/
