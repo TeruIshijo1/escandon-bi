@@ -4,6 +4,8 @@
 -- Cada fila = un cuadro/indicador en la plataforma
 -- ═══════════════════════════════════════════════════════════════════
 
+DROP TABLE IF EXISTS KPIConfig;
+
 CREATE TABLE IF NOT EXISTS KPIConfig (
   KPIId         INTEGER PRIMARY KEY AUTOINCREMENT,
   ElementoId    TEXT    NOT NULL UNIQUE,   -- 'directivo.ocupacion'
@@ -12,57 +14,68 @@ CREATE TABLE IF NOT EXISTS KPIConfig (
   NombreCustom  TEXT    NULL,              -- Lo que escribe el Admin (NULL = usa NombreDefault)
   Icono         TEXT    NOT NULL DEFAULT '📊',
   PBIUrl        TEXT    NULL,              -- URL completa del reporte Power BI al que navega al hacer click
+  PBIUrl2       TEXT    NULL,              -- URL de la página 2 (opcional)
+  PBIUrl3       TEXT    NULL,              -- URL de la página 3 (opcional)
   Activo        INTEGER NOT NULL DEFAULT 1,
   FechaModif    TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
--- ── Seed: Dashboard Directivo (9) ─────────────────────────────────
-INSERT OR IGNORE INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
-  ('directivo.ocupacion',       'directivo', 'Ocupación Hospitalaria',  '🏥'),
-  ('directivo.quirofanos',      'directivo', 'Quirófanos Activos',      '🔪'),
-  ('directivo.censo',           'directivo', 'Censo Actual',            '📊'),
-  ('directivo.mortalidad',      'directivo', 'Tasa de Mortalidad',      '❤️'),
-  ('directivo.estancia',        'directivo', 'Estancia Promedio',       '📅'),
-  ('directivo.egresos',         'directivo', 'Egresos Mes',             '🚪'),
-  ('directivo.costo_insumos',   'directivo', 'Costo de Insumos',        '📦'),
-  ('directivo.margen_operativo','directivo', 'Margen Operativo',        '💼'),
-  ('directivo.atencion_activa', 'directivo', 'Atención Real Activa',    '❤️');
 
--- ── Seed: Panel de Mando (4) ──────────────────────────────────────
-INSERT OR IGNORE INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
-  ('mando.eficiencia_global',   'mando', 'Eficiencia Global',       '⚙️'),
-  ('mando.eficacia_clinica',    'mando', 'Eficacia Clínica',        '🎯'),
-  ('mando.satisfaccion',        'mando', 'Satisfacción del Paciente','⭐'),
-  ('mando.presupuesto_ejec',    'mando', 'Presupuesto Ejecutado',    '💼');
 
--- ── Seed: Dashboard por Área (4 genéricos) ────────────────────────
-INSERT OR IGNORE INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
-  ('area.ocupacion',       'area', 'Ocupación',         '🏥'),
-  ('area.egresos',         'area', 'Egresos Mes',        '🚪'),
-  ('area.estancia',        'area', 'Estancia Promedio',  '📅'),
-  ('area.rotacion_camas',  'area', 'Rotación de Camas',  '🔄');
-
--- ── Seed: Estadísticas Demográficas (6) ──────────────────────────
-INSERT OR IGNORE INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
+-- ── Seed: Estadísticas Demográficas (8) ──────────────────────────
+INSERT INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
   ('stats.egresos_total',   'stats', 'Total Egresos',          '📋'),
   ('stats.promedio_edad',   'stats', 'Promedio de Edad',       '👤'),
   ('stats.genero_femenino', 'stats', '% Género Femenino',      '♀️'),
   ('stats.defunciones',     'stats', 'Defunciones',            '📉'),
   ('stats.nacimientos',     'stats', 'Nacimientos',            '👶'),
-  ('stats.estancia_global', 'stats', 'Estancia Promedio Global','📅');
+  ('stats.estancia_global', 'stats', 'Estancia Promedio Global','📅'),
+  ('stats.top_diagnosticos', 'stats', 'Top Diagnósticos del Período', '📊'),
+  ('stats.egresos_servicio', 'stats', 'Egresos por Servicio', '📊');
 
--- ── Seed: Auditoría Inventarios (4) ──────────────────────────────
-INSERT OR IGNORE INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
-  ('audit.total_partidas',  'audit', 'Total Partidas Auditadas','📋'),
-  ('audit.coincidencias',   'audit', 'Coincidencias',          '✅'),
-  ('audit.diferencias',     'audit', 'Con Diferencia',         '⚠️'),
-  ('audit.monto_disputa',   'audit', 'Monto en Disputa',       '💰');
+-- ── Seed: Dashboard por Área (36 para las 9 áreas) ──────────────────
+INSERT INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
+  ('area.quirofano.ocupacion', 'area', 'Ocupación - Quirófano', '🏥'),
+  ('area.quirofano.egresos', 'area', 'Egresos Mes - Quirófano', '🚪'),
+  ('area.quirofano.estancia', 'area', 'Estancia Promedio - Quirófano', '📅'),
+  ('area.quirofano.rotacion_camas', 'area', 'Rotación de Camas - Quirófano', '🔄'),
 
--- ── Seed: Home Mini-Stats (6) ────────────────────────────────────
-INSERT OR IGNORE INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
-  ('home.censo_actual',    'home', 'Censo Actual',        '🏥'),
-  ('home.camas_ocupadas',  'home', 'Camas Ocupadas',      '🛏️'),
-  ('home.cirugias_hoy',    'home', 'Cirugías Hoy',        '🔪'),
-  ('home.estancia_prom',   'home', 'Estancia Promedio',   '📅'),
-  ('home.mortalidad',      'home', 'Mortalidad',          '❤️'),
-  ('home.egresos_mes',     'home', 'Egresos Mes',         '🚪');
+  ('area.uci.ocupacion', 'area', 'Ocupación - UCI', '🏥'),
+  ('area.uci.egresos', 'area', 'Egresos Mes - UCI', '🚪'),
+  ('area.uci.estancia', 'area', 'Estancia Promedio - UCI', '📅'),
+  ('area.uci.rotacion_camas', 'area', 'Rotación de Camas - UCI', '🔄'),
+
+  ('area.urgencias.ocupacion', 'area', 'Ocupación - Urgencias', '🏥'),
+  ('area.urgencias.egresos', 'area', 'Egresos Mes - Urgencias', '🚪'),
+  ('area.urgencias.estancia', 'area', 'Estancia Promedio - Urgencias', '📅'),
+  ('area.urgencias.rotacion_camas', 'area', 'Rotación de Camas - Urgencias', '🔄'),
+
+  ('area.cuneros.ocupacion', 'area', 'Ocupación - Cuneros', '🏥'),
+  ('area.cuneros.egresos', 'area', 'Egresos Mes - Cuneros', '🚪'),
+  ('area.cuneros.estancia', 'area', 'Estancia Promedio - Cuneros', '📅'),
+  ('area.cuneros.rotacion_camas', 'area', 'Rotación de Camas - Cuneros', '🔄'),
+
+  ('area.imagenologia.ocupacion', 'area', 'Ocupación - Imagenología', '🏥'),
+  ('area.imagenologia.egresos', 'area', 'Egresos Mes - Imagenología', '🚪'),
+  ('area.imagenologia.estancia', 'area', 'Estancia Promedio - Imagenología', '📅'),
+  ('area.imagenologia.rotacion_camas', 'area', 'Rotación de Camas - Imagenología', '🔄'),
+
+  ('area.laboratorio.ocupacion', 'area', 'Ocupación - Laboratorio', '🏥'),
+  ('area.laboratorio.egresos', 'area', 'Egresos Mes - Laboratorio', '🚪'),
+  ('area.laboratorio.estancia', 'area', 'Estancia Promedio - Laboratorio', '📅'),
+  ('area.laboratorio.rotacion_camas', 'area', 'Rotación de Camas - Laboratorio', '🔄'),
+
+  ('area.consulta_externa.ocupacion', 'area', 'Ocupación - Consulta Externa', '🏥'),
+  ('area.consulta_externa.egresos', 'area', 'Egresos Mes - Consulta Externa', '🚪'),
+  ('area.consulta_externa.estancia', 'area', 'Estancia Promedio - Consulta Externa', '📅'),
+  ('area.consulta_externa.rotacion_camas', 'area', 'Rotación de Camas - Consulta Externa', '🔄'),
+
+  ('area.cardiologia.ocupacion', 'area', 'Ocupación - Cardiología', '🏥'),
+  ('area.cardiologia.egresos', 'area', 'Egresos Mes - Cardiología', '🚪'),
+  ('area.cardiologia.estancia', 'area', 'Estancia Promedio - Cardiología', '📅'),
+  ('area.cardiologia.rotacion_camas', 'area', 'Rotación de Camas - Cardiología', '🔄'),
+
+  ('area.hospitalizacion.ocupacion', 'area', 'Ocupación - Hospitalización', '🏥'),
+  ('area.hospitalizacion.egresos', 'area', 'Egresos Mes - Hospitalización', '🚪'),
+  ('area.hospitalizacion.estancia', 'area', 'Estancia Promedio - Hospitalización', '📅'),
+  ('area.hospitalizacion.rotacion_camas', 'area', 'Rotación de Camas - Hospitalización', '🔄');

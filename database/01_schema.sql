@@ -241,8 +241,13 @@ CREATE TABLE IF NOT EXISTS ConfiguracionBI (
     PowerBIWorkspace TEXT         NULL,
     PowerBIReportId TEXT          NULL,
     LookerDashboard TEXT          NULL,
+    LookerDashboard2 TEXT         NULL,
+    LookerDashboard3 TEXT         NULL,
     RolesPermitidos TEXT          NOT NULL,  -- JSON array de roles
     AreaRequerida   TEXT          NULL,
     Activo          INTEGER       NOT NULL DEFAULT 1,
-    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime'))
+    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime')),
+    PbixPath        TEXT          NULL,
+    ExcelPath       TEXT          NULL,
+    ThumbnailPath   TEXT          NULL
 );

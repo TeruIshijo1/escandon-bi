@@ -22,7 +22,7 @@ const ALWAYS_AUDIT = [
 
 async function auditMiddleware(req, res, next) {
   const start    = Date.now();
-  const userId   = null; // Se completa tras authenticate
+
   const method   = req.method;
   const path     = req.path;
 

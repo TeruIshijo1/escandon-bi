@@ -10,10 +10,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { API_BASE } from '../../api/config';
 
-export default function EmbeddedBI({ reportId, height = 480, filters = {} }) {
+export default function EmbeddedBI({ reportId, height = 480, filters = {}, multiPagina = false }) {
   const containerRef = useRef(null);
   const [state, setState] = useState('loading'); // loading | ready | error
   const [embedUrl, setEmbedUrl] = useState('');
+  const [isMultiPage, setIsMultiPage] = useState(multiPagina);
   const [refreshKey, setRefreshKey] = useState(0); // Para forzar recarga del iframe
 
   // Función para decodificar URL si viene ofuscada (Base64)
@@ -31,6 +32,7 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {} }) {
   useEffect(() => {
     const decoded = getDecodedUrl(reportId);
     setEmbedUrl(decoded);
+    setIsMultiPage(multiPagina);
 
     if (decoded.startsWith('http')) {
       setState('ready');
@@ -58,6 +60,9 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {} }) {
             setEmbedUrl(data.embedUrl);
           } else {
             setEmbedUrl(''); // Blank state if invalid
+          }
+          if (data.multiPagina !== undefined) {
+            setIsMultiPage(!!data.multiPagina);
           }
           
           setState('ready');
@@ -268,10 +273,11 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {} }) {
             {/* 
                Contenedor del Iframe con "Recorte" (Cropping)
                Aumentamos el height del iframe y lo desplazamos para ocultar la barra inferior de PBI (aprox 36px)
+               No se recorta si es multipágina para permitir la barra de navegación nativa.
             */}
             <div style={{
               width: '100%',
-              height: 'calc(100% + 36px)', // Más alto para que la barra quede fuera
+              height: isMultiPage ? '100%' : 'calc(100% + 36px)',
               position: 'absolute',
               top: 0,
               left: 0
@@ -299,6 +305,26 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {} }) {
               pointerEvents: 'none',
               background: 'transparent'
             }} />
+
+            {/* Máscaras de seguridad para ocultar Logo y Compartir de Power BI si es multipágina */}
+            {isMultiPage && (
+              <>
+                {/* Esquina Inferior Izquierda (Oculta "Microsoft Power BI") */}
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0,
+                  width: '180px', height: '38px',
+                  background: '#f3f2f1', zIndex: 10,
+                  pointerEvents: 'auto',
+                }} />
+                {/* Esquina Inferior Derecha (Oculta Compartir, Facebook, Twitter y Ampliar) */}
+                <div style={{
+                  position: 'absolute', bottom: 0, right: 0,
+                  width: '200px', height: '38px',
+                  background: '#f3f2f1', zIndex: 10,
+                  pointerEvents: 'auto',
+                }} />
+              </>
+            )}
           </div>
         )}
       </div>

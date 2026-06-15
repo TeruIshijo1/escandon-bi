@@ -28,14 +28,14 @@ export default function AdminConfiguracion() {
     id: null, reportId: '', name: '', 
     workspaceId: '', pbiReportId: '', lookerUrl: '', 
     pbixPath: '', excelPath: '', thumbnailPath: '',
-    roles: [], area: '', active: true 
+    roles: [], area: '', multiPagina: false, active: true 
   });
 
   // KPI CONFIG STATE
   const [kpiList,         setKPIList]        = useState([]);
   const [kpiFilter,       setKPIFilter]      = useState('all');
   const [kpiEditing,      setKPIEditing]     = useState(null); // elementoId en edición
-  const [kpiEditForm,     setKPIEditForm]    = useState({ nombreCustom: '', icono: '', pbiUrl: '' });
+  const [kpiEditForm,     setKPIEditForm]    = useState({ nombreCustom: '', icono: '', pbiUrl: '', multiPagina: false });
   const [kpiSaving,       setKPISaving]      = useState(false);
 
   const [connectors, setConnectors] = useState([]);
@@ -100,6 +100,7 @@ export default function AdminConfiguracion() {
       nombreCustom: kpi.NombreCustom || '',
       icono:        kpi.Icono || '📊',
       pbiUrl:       kpi.PBIUrl || '',
+      multiPagina:  kpi.MultiPagina === 1 || !!kpi.multiPagina,
     });
   };
 
@@ -114,6 +115,7 @@ export default function AdminConfiguracion() {
           nombreCustom: kpiEditForm.nombreCustom.trim() || null,
           icono:        kpiEditForm.icono,
           pbiUrl:       kpiEditForm.pbiUrl.trim() || null,
+          multiPagina:  kpiEditForm.multiPagina ? 1 : 0,
         }),
       });
       const json = await res.json();
@@ -215,13 +217,16 @@ export default function AdminConfiguracion() {
       id: null, reportId: '', name: '', 
       workspaceId: '', pbiReportId: '', lookerUrl: '', 
       pbixPath: '', excelPath: '', thumbnailPath: '',
-      roles: [], area: '', active: true 
+      roles: [], area: '', multiPagina: false, active: true 
     });
     setModalReportOpen(true);
   };
 
   const handleOpenConfig = (r) => {
-    setCurrentReport({ ...r });
+    setCurrentReport({ 
+      ...r,
+      multiPagina: r.multiPagina === 1 || !!r.multiPagina
+    });
     setModalReportOpen(true);
   };
 
@@ -691,22 +696,39 @@ export default function AdminConfiguracion() {
                     {/* URL PBI */}
                     <td style={{ padding: '0.75rem 0.75rem', maxWidth: 220 }}>
                       {isEditing ? (
-                        <input
-                          type="url"
-                          value={kpiEditForm.pbiUrl}
-                          onChange={e => setKPIEditForm(f => ({ ...f, pbiUrl: e.target.value }))}
-                          placeholder="https://app.powerbi.com/..."
-                          className="config-input-field"
-                          style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: 8, padding: '0.45rem 0.75rem', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', outline: 'none', minWidth: 200, background: '#F8FAFC', transition: 'all var(--transition-fast)' }}
-                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <input
+                            type="url"
+                            value={kpiEditForm.pbiUrl}
+                            onChange={e => setKPIEditForm(f => ({ ...f, pbiUrl: e.target.value }))}
+                            placeholder="https://app.powerbi.com/..."
+                            className="config-input-field"
+                            style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: 8, padding: '0.45rem 0.75rem', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', outline: 'none', minWidth: 200, background: '#F8FAFC', transition: 'all var(--transition-fast)' }}
+                          />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-azul-fuerte)', cursor: 'pointer', marginTop: '0.2rem' }}>
+                            <input
+                              type="checkbox"
+                              checked={kpiEditForm.multiPagina}
+                              onChange={e => setKPIEditForm(f => ({ ...f, multiPagina: e.target.checked }))}
+                            />
+                            Tiene Múltiples Páginas
+                          </label>
+                        </div>
                       ) : (
                         kpi.PBIUrl ? (
-                          <span style={{ color: 'var(--color-verde-e)', fontSize: '0.74rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'var(--font-body)' }}>
-                            <span style={{ fontSize: '0.8rem' }}>✓</span>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, display: 'inline-block' }} title={kpi.PBIUrl}>
-                              Asignado
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <span style={{ color: 'var(--color-verde-e)', fontSize: '0.74rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'var(--font-body)' }}>
+                              <span style={{ fontSize: '0.8rem' }}>✓</span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, display: 'inline-block' }} title={kpi.PBIUrl}>
+                                Asignado
+                              </span>
                             </span>
-                          </span>
+                            {kpi.MultiPagina === 1 && (
+                              <span style={{ fontSize: '0.65rem', color: 'var(--color-azul-fuerte)', fontWeight: 700, paddingLeft: '1.1rem' }}>
+                                (Multinavegación activa)
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontFamily: 'var(--font-body)' }}>⚪ Sin asignar</span>
                         )
@@ -789,6 +811,16 @@ export default function AdminConfiguracion() {
                 <div>
                   <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: '0.25rem' }}>Looker Studio / Public IFrame URL</label>
                   <input value={currentReport.lookerUrl || ''} onChange={e => setCurrentReport({...currentReport, lookerUrl:e.target.value})} placeholder="https://lookerstudio.google.com/embed/..." className="config-input-field" style={{ width:'100%', border:'1px solid #CBD5E0', borderRadius:8, padding:'0.45rem', fontSize:'0.78rem', fontFamily: 'var(--font-body)', outline: 'none', background: '#FFFFFF' }} />
+                </div>
+                <div style={{ marginTop: '0.65rem' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:'0.5rem', fontSize:'0.78rem', cursor:'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, color: 'var(--color-azul-fuerte)' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={currentReport.multiPagina || false} 
+                      onChange={e => setCurrentReport({...currentReport, multiPagina: e.target.checked})} 
+                    />
+                    Habilitar navegación nativa (Tiene Múltiples Páginas)
+                  </label>
                 </div>
               </div>
               

@@ -6,11 +6,9 @@
  *   /login                → Pública
  *   /                     → Todos los roles autenticados
  *   /dashboard/directivo  → ADMIN, DIRECTOR
- *   /dashboard/mando      → ADMIN, DIRECTOR
  *   /dashboard/area       → Todos (filtrado por área)
  *   /auditoria/*          → ADMIN, DIRECTOR
  *   /estadisticas         → ADMIN, DIRECTOR, JEFE_AREA
- *   /reportes             → Todos
  *   /admin/*              → ADMIN solamente
  *   /sin-acceso           → Pública (error 403)
  */
@@ -28,12 +26,10 @@ import './styles/globals.css';
 const LoginPage           = lazy(() => import('./pages/LoginPage'));
 const HomePage            = lazy(() => import('./pages/HomePage'));
 const DashboardDirectivo  = lazy(() => import('./components/dashboard/DashboardDirectivo'));
-const DashboardMando      = lazy(() => import('./pages/DashboardMando'));
 const DashboardArea       = lazy(() => import('./pages/DashboardArea'));
 const AuditoriaInventarios = lazy(() => import('./components/audit/InventarioVsCargos'));
 const AuditoriaCargos     = lazy(() => import('./pages/AuditoriaCargos'));
 const Estadisticas        = lazy(() => import('./pages/Estadisticas'));
-const Reportes            = lazy(() => import('./pages/Reportes'));
 const AdminUsuarios       = lazy(() => import('./pages/AdminUsuarios'));
 const AdminAuditoriaLog   = lazy(() => import('./pages/AdminAuditoriaLog'));
 const AdminConfiguracion  = lazy(() => import('./pages/AdminConfiguracion'));
@@ -152,15 +148,6 @@ export default function App() {
                 }
               />
 
-              {/* Panel de Mando — ADMIN + DIRECTOR */}
-              <Route
-                path="dashboard/mando"
-                element={
-                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
-                    <DashboardMando />
-                  </ProtectedRoute>
-                }
-              />
 
               {/* Dashboard por Área — Todos (filtrado por área del usuario) */}
               <Route
@@ -200,15 +187,6 @@ export default function App() {
                 }
               />
 
-              {/* Reportes — Todos */}
-              <Route
-                path="reportes"
-                element={
-                  <ProtectedRoute allowedRoles={Object.values(ROLES)}>
-                    <Reportes />
-                  </ProtectedRoute>
-                }
-              />
 
               {/* Administración — Solo ADMIN */}
               <Route

@@ -36,12 +36,10 @@ export const AREAS = {
 export const ROUTE_PERMISSIONS = {
   '/':                      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
   '/dashboard/directivo':   [ROLES.ADMIN, ROLES.DIRECTOR],
-  '/dashboard/mando':       [ROLES.ADMIN, ROLES.DIRECTOR],
   '/dashboard/area':        [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
   '/auditoria/inventarios': [ROLES.ADMIN, ROLES.DIRECTOR],
   '/auditoria/cargos':      [ROLES.ADMIN, ROLES.DIRECTOR],
   '/estadisticas':          [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
-  '/reportes':              [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
   '/admin/usuarios':        [ROLES.ADMIN],
   '/admin/auditoria-log':   [ROLES.ADMIN],
   '/admin/configuracion':   [ROLES.ADMIN],
@@ -162,13 +160,6 @@ export function getNavItems(role, area = null) {
       path:    '/dashboard/directivo',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
-    {
-      section: 'Dirección',
-      icon:    '🎯',
-      label:   'Panel de Mando',
-      path:    '/dashboard/mando',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
-    },
     // Área
     {
       section: 'Mi Área',
@@ -192,14 +183,7 @@ export function getNavItems(role, area = null) {
       path:    '/auditoria/inventarios',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
-    // Reportes
-    {
-      section: 'Reportes',
-      icon:    '📄',
-      label:   'Exportar Reportes',
-      path:    '/reportes',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
-    },
+
     // Administración
     {
       section: 'Administración',

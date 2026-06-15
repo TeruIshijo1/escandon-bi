@@ -13,19 +13,6 @@ const { authenticate, authorize } = require('../middleware/auth.middleware');
 
 const { getDb } = require('../config/db');
 
-/* Fallback para reportes demo (V1.0) */
-const BI_REPORTS = {
-  'directivo-main': {
-    workspaceId: process.env.PBI_WORKSPACE_ID || 'workspace-demo-001',
-    reportId:    process.env.PBI_REPORT_DIRECTIVO || 'report-directivo-001',
-    embedUrl:    'https://app.powerbi.com/reportEmbed?reportId=report-directivo-001',
-  },
-  'area-quirofano': {
-    workspaceId: process.env.PBI_WORKSPACE_ID || 'workspace-demo-001',
-    reportId:    process.env.PBI_REPORT_QUIROFANO || 'report-quirofano-001',
-    embedUrl:    'https://app.powerbi.com/reportEmbed?reportId=report-quirofano-001',
-  },
-};
 
 /**
  * GET /api/bi/available-reports
@@ -42,10 +29,8 @@ router.get('/available-reports', authenticate, (req, res, next) => {
       reports = reports.filter(r => allowedIds.includes(r.ReporteId));
     }
     
-    console.log(`[BI DEBUG] Usuario: ${req.user.username}, Rol: ${req.user.role}, Reportes encontrados: ${reports.length}`);
     res.json({ ok: true, data: reports });
   } catch (err) {
-    console.error('[BI DEBUG ERROR]', err);
     next(err);
   }
 });
@@ -72,12 +57,7 @@ router.get(
         embedUrl    = config.LookerDashboard || `https://app.powerbi.com/reportEmbed?reportId=${config.PowerBIReportId}`;
         pbiReportId = config.PowerBIReportId;
         workspaceId = config.PowerBIWorkspace;
-      } else if (BI_REPORTS[reportId]) {
-        // Fallback a estáticos
-        const reportConfig = BI_REPORTS[reportId];
-        embedUrl    = reportConfig.embedUrl;
-        pbiReportId = reportConfig.reportId;
-        workspaceId = reportConfig.workspaceId;
+
       } else {
         return res.status(404).json({ error: `Reporte '${reportId}' no encontrado.` });
       }
@@ -90,6 +70,9 @@ router.get(
       res.json({
         embedToken,
         embedUrl,
+        embedUrl2:   (config && config.LookerDashboard2) || null,
+        embedUrl3:   (config && config.LookerDashboard3) || null,
+        multiPagina: (config && config.MultiPagina === 1) || false,
         reportId:    pbiReportId,
         workspaceId: workspaceId,
         expiresIn:   3600,

@@ -11,15 +11,6 @@ const ExcelJS     = require('exceljs');
 const { authenticate, authorize, authorizeCapability } = require('../middleware/auth.middleware');
 const { getInventariosVsCargos } = require('../services/etl.service');
 
-/* ── Paleta institucional ──────────────────────────────────── */
-const COLORS = {
-  azulFuerte: '#004687',
-  azulClaro:  '#0088C9',
-  azulCruz:   '#005FA9',
-  verdeE:     '#00974A',
-  grisClaro:  '#F4F6F9',
-  grisTexto:  '#4A5568',
-};
 
 /**
  * GET /api/export/excel/:reportId
@@ -275,7 +266,93 @@ async function resolveReportData(reportId, filters) {
         columnas: [{ header:'ID', key:'id', width:10 }, { header:'Valor', key:'valor', width:20 }],
         filas:    [],
       };
-  }
 }
+}
+
+/**
+ * POST /api/export/convert-json
+ * Extrae JSON de una URL (API) y lo convierte a Excel (.xlsx)
+ */
+router.post(
+  '/convert-json',
+  authenticate,
+  async (req, res, next) => {
+    try {
+      const { url } = req.body;
+      if (!url) return res.status(400).json({ error: 'URL es requerida' });
+
+      // Hacer fetch de la API externa
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`La API externa respondió con estado ${response.status}`);
+      }
+      const data = await response.json();
+
+      // Encontrar el arreglo principal de datos
+      let rows = [];
+      if (Array.isArray(data)) {
+        rows = data;
+      } else if (typeof data === 'object') {
+        // Buscar la primera propiedad que sea un arreglo
+        const key = Object.keys(data).find(k => Array.isArray(data[k]));
+        if (key) rows = data[key];
+        else rows = [data]; // Si no hay arreglos, exportamos el objeto único
+      }
+
+      if (rows.length === 0) {
+        return res.status(400).json({ error: 'El JSON devuelto por la API está vacío o no contiene una lista de datos.' });
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Hospital Escandón — Herramienta de Conversión API';
+      const sheet = workbook.addWorksheet('Datos Exportados');
+
+      // Extraer columnas únicas
+      const colSet = new Set();
+      rows.forEach(row => {
+        if (typeof row === 'object' && row !== null) {
+          Object.keys(row).forEach(k => colSet.add(k));
+        }
+      });
+      const colArray = Array.from(colSet);
+
+      if (colArray.length === 0) {
+        sheet.columns = [{ header: 'Valor', key: 'valor', width: 30 }];
+        rows.forEach(val => sheet.addRow({ valor: String(val) }));
+      } else {
+        sheet.columns = colArray.map(key => ({
+          header: key.toUpperCase(),
+          key: key,
+          width: 20
+        }));
+
+        sheet.getRow(1).eachCell(cell => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF004687' } };
+          cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+        });
+
+        rows.forEach(row => {
+          const flatRow = {};
+          colArray.forEach(k => {
+            let val = row[k];
+            if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+            flatRow[k] = val;
+          });
+          sheet.addRow(flatRow);
+        });
+      }
+
+      const filename = `api_extract_${Date.now()}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (err) {
+      console.error('Error convirtiendo JSON a Excel:', err);
+      res.status(500).json({ error: 'Error conectando con la API: ' + err.message });
+    }
+  }
+);
 
 module.exports = router;

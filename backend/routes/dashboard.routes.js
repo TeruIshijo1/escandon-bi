@@ -181,40 +181,7 @@ router.get(
   }
 );
 
-/**
- * GET /api/dashboard/censo
- * Censo hospitalario actual (pacientes admitidos por área)
- * Roles: todos los autenticados
- */
-router.get(
-  '/censo',
-  authenticate,
-  async (req, res, next) => {
-    try {
-      const db     = getDb();
-      const rows   = db.prepare(`
-        SELECT
-          a.AreaActual AS Area,
-          COUNT(*) AS Pacientes
-        FROM Admisiones a
-        WHERE a.Estado = 'ACTIVA'
-        GROUP BY a.AreaActual
-        ORDER BY Pacientes DESC
-      `).all();
 
-      const totalActivos = rows.reduce((sum, r) => sum + r.Pacientes, 0);
-
-      res.json({
-        ok:           true,
-        totalActivos,
-        porArea:      rows,
-        timestamp:    new Date().toISOString(),
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
 
 /**
  * GET /api/dashboard/stats
@@ -313,18 +280,21 @@ router.get('/kpi-config', authenticate, (req, res, next) => {
     const kpis = db.prepare(`
       SELECT ElementoId, Seccion,
              COALESCE(NombreCustom, NombreDefault) AS Nombre,
-             NombreDefault, NombreCustom, Icono, PBIUrl
+             NombreDefault, NombreCustom, Icono, PBIUrl, PBIUrl2, PBIUrl3, MultiPagina
       FROM KPIConfig
       WHERE Activo = 1
     `).all();
 
-    // Convertir a mapa { elementoId: { nombre, icono, pbiUrl } } para acceso O(1) en el frontend
+    // Convertir a mapa { elementoId: { nombre, icono, pbiUrl, pbiUrl2, pbiUrl3, multiPagina } } para acceso O(1) en el frontend
     const map = {};
     for (const kpi of kpis) {
       map[kpi.ElementoId] = {
         nombre:       kpi.Nombre,
         icono:        kpi.Icono,
         pbiUrl:       kpi.PBIUrl || null,
+        pbiUrl2:      kpi.PBIUrl2 || null,
+        pbiUrl3:      kpi.PBIUrl3 || null,
+        multiPagina:  kpi.MultiPagina === 1,
         nombreDefault: kpi.NombreDefault,
         nombreCustom:  kpi.NombreCustom,
       };

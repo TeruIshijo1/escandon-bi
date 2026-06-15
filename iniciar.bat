@@ -26,5 +26,11 @@ ping 127.0.0.1 -n 4 > nul
 :: Iniciar Frontend con acceso por IP
 start "HE-BI Frontend" cmd /k "cd /d "%~dp0frontend" && npx vite --host"
 
-echo  Servidores iniciados.
+:: Esperar un par de segundos para asegurar que Vite arranque
+ping 127.0.0.1 -n 3 > nul
+
+:: Iniciar Ngrok (Túnel Público)
+start "HE-BI Ngrok" cmd /k "ngrok http 5173 --host-header=localhost"
+
+echo  Servidores y Tunel iniciados.
 echo.

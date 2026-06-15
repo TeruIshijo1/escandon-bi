@@ -39,11 +39,16 @@ const CONFIG = {
   },
 };
 
-export default function ExportButton({ type = 'pdf', reportId, directUrl = null, compact = false }) {
+export default function ExportButton({ type = 'pdf', reportId, directUrl = null, compact = false, onClickOverride }) {
   const [loading, setLoading] = useState(false);
   const cfg = CONFIG[type] || CONFIG.pdf;
 
   const handleExport = async () => {
+    if (onClickOverride) {
+      onClickOverride();
+      return;
+    }
+
     if (loading) return;
 
     if (type === 'pdf') {

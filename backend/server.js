@@ -19,7 +19,6 @@ const multer        = require('multer');
 const { connectDB }         = require('./config/db');
 const authRoutes             = require('./routes/auth.routes');
 const dashboardRoutes        = require('./routes/dashboard.routes');
-const auditRoutes            = require('./routes/audit.routes');
 const exportRoutes           = require('./routes/export.routes');
 const aiRoutes               = require('./routes/ai.routes');
 const biRoutes               = require('./routes/bi.routes');
@@ -44,7 +43,7 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin:      true, // Permitir cualquier origen en la red local
+  origin:      process.env.CORS_ORIGIN || 'http://localhost:5173', // Solo orígenes configurados
   credentials: true,
   methods:     ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
@@ -103,7 +102,7 @@ const { authenticate } = require('./middleware/auth.middleware');
 app.post('/upload-assets', authenticate, (req, res) => {
   upload.single('file')(req, res, (err) => {
     if (err) {
-      console.error('[UPLOAD ERROR]', err);
+      console.error('[UPLOAD ERROR]', err.message);
       return res.status(500).json({ error: 'Error de subida: ' + err.message });
     }
     if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' });
@@ -115,7 +114,6 @@ app.post('/upload-assets', authenticate, (req, res) => {
 /* ── Rutas ──────────────────────────────────────────────────── */
 app.use('/api/auth',       authLimiter, authRoutes);
 app.use('/api/dashboard',  dashboardRoutes);
-app.use('/api/audit',      auditRoutes);
 app.use('/api/export',     exportRoutes);
 app.use('/api/ai',         aiRoutes);
 app.use('/api/bi',         biRoutes);
@@ -124,7 +122,7 @@ app.use('/api/files',      express.static(path.join(__dirname, 'uploads')));
 
 /* ── Manejo de errores global ───────────────────────────────── */
 app.use((err, req, res, next) => {
-  console.error('[ERROR]', err.message, err.stack);
+  console.error('[ERROR]', err.message);
 
   // Error de validación JWT
   if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {

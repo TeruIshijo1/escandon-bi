@@ -12,9 +12,7 @@
 import { useState, useEffect } from 'react';
 import EmbeddedBI    from './EmbeddedBI';
 import ExportButton  from '../shared/ExportButton';
-import KPICard       from '../shared/KPICard';
-import PBIModal      from '../shared/PBIModal';
-import EditableKPIWrapper from '../shared/EditableKPIWrapper';
+import ExportApiModal from '../shared/ExportApiModal';
 import { useAuth }   from '../../context/AuthContext';
 
 import { API_BASE } from '../../api/config';
@@ -43,32 +41,14 @@ function SectionHeader({ title, subtitle, accent = '#004687' }) {
   );
 }
 
-function StatusPill({ label, value, color }) {
-  return (
-    <div style={{
-      display:       'flex',
-      alignItems:    'center',
-      justifyContent:'space-between',
-      padding:       '0.5rem 0.875rem',
-      background:    `${color}0D`,
-      borderRadius:  8,
-      border:        `1px solid ${color}22`,
-    }}>
-      <span style={{ fontSize: '0.8rem', color: '#4A5568', fontWeight: 500 }}>{label}</span>
-      <span style={{ fontSize: '0.82rem', color: color, fontWeight: 700 }}>{value}</span>
-    </div>
-  );
-}
 
-/* ── Componente principal ────────────────────────────────────── */
 export default function DashboardDirectivo() {
   const { user }             = useAuth();
-  const isAdmin              = user?.role === 'ADMIN';
-  const [pbiModal, setPBIModal] = useState(null); // { url, title }
   const [fecha,  setFecha]   = useState('');
   const [loading, setLoad]   = useState(true);
   const [activeTab, setTab]  = useState('eficiencia');
-  const [data, setData]      = useState({ eficiencia: [], eficacia: [], financiero: [], censo: [] });
+  const [data, setData]      = useState({ censo: [] });
+  const [showExportApi, setShowExportApi] = useState(false);
 
   useEffect(() => {
     const now = new Date();
@@ -88,20 +68,6 @@ export default function DashboardDirectivo() {
         const { ocupacion, eficacia, produccion, financiero, censo } = json.data;
         
         setData({
-          eficiencia: [
-            { id: 'ocu', elementoId: 'directivo.ocupacion',        value: ocupacion.PctOcupacion != null ? `${ocupacion.PctOcupacion}%` : null, type: 'info',    desc: ocupacion.TotalCamas ? `${ocupacion.Ocupadas}/${ocupacion.TotalCamas} camas` : null },
-            { id: 'qx',  elementoId: 'directivo.quirofanos',        value: produccion.Realizadas != null ? `${produccion.Realizadas}/${produccion.CirugiasHoy || 0}` : null, type: 'info',    desc: produccion.Realizadas != null ? 'cirugías hoy' : null },
-            { id: 'cen', elementoId: 'directivo.censo',             value: censo.length > 0 ? censo.reduce((s, a) => s + a.Ocupadas, 0) : null, type: 'success', desc: censo.length > 0 ? 'pacientes admitidos' : null },
-          ],
-          eficacia: [
-            { id: 'mort', elementoId: 'directivo.mortalidad',       value: eficacia.TasaMortalidad != null ? `${eficacia.TasaMortalidad}%` : null, type: 'success', desc: eficacia.TasaMortalidad != null ? 'mensual ajustada' : null },
-            { id: 'est',  elementoId: 'directivo.estancia',         value: eficacia.EstanciaPromedio != null ? `${eficacia.EstanciaPromedio} d` : null, type: 'success', desc: eficacia.EstanciaPromedio != null ? 'días promedio' : null },
-            { id: 'egr',  elementoId: 'directivo.egresos',          value: eficacia.TotalEgresos || null, type: 'info', desc: eficacia.TotalEgresos ? 'altas registradas' : null },
-          ],
-          financiero: [
-            { id: 'inv', elementoId: 'directivo.costo_insumos',    value: financiero.costoInsumos ? `$${financiero.costoInsumos.toLocaleString('es-MX')}` : null, type: 'warning', desc: financiero.costoInsumos ? 'mes en curso' : null },
-            { id: 'mar', elementoId: 'directivo.margen_operativo', value: null, type: 'neutral', desc: null },
-          ],
           censo: censo
         });
       }
@@ -124,6 +90,7 @@ export default function DashboardDirectivo() {
 
   return (
     <div style={{ maxWidth: 1300, margin: '0 auto' }}>
+      {/* <ExportApiModal isOpen={showExportApi} onClose={() => setShowExportApi(false)} /> */}
 
       {/* ── Header del dashboard ── */}
       <div style={{
@@ -197,12 +164,17 @@ export default function DashboardDirectivo() {
       </div>
 
       {/* ── Tabs de categoría ── */}
-      <div style={{ display:'flex', gap:'0.5rem', marginBottom:'1.25rem', flexWrap:'wrap' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '0.75rem',
+        marginBottom: '1.5rem',
+        width: '100%'
+      }}>
         {[
-          { key:'eficiencia', label:'⚙️  Eficiencia Operativa', count: data.eficiencia.length },
-          { key:'eficacia',   label:'🎯  Eficacia Clínica',     count: data.eficacia.length   },
-          { key:'financiero', label:'💼  Macropanel Financiero', count: data.financiero.length },
-          { key:'embedded',   label:'📊  Tablero BI Embedded',  count: null },
+          { key:'eficiencia', label:'⚙️  Eficiencia Operativa' },
+          { key:'eficacia',   label:'🎯  Eficacia Clínica' },
+          { key:'financiero', label:'💼  Macropanel Financiero' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -210,167 +182,48 @@ export default function DashboardDirectivo() {
             style={{
               display:       'flex',
               alignItems:    'center',
-              gap:           '0.4rem',
-              padding:       '0.5rem 1rem',
-              borderRadius:  8,
+              justifyContent:'center',
+              gap:           '0.75rem',
+              padding:       '1.25rem 2rem',
+              borderRadius:  12,
               border:        activeTab === tab.key ? '1.5px solid #005FA9' : '1px solid rgba(0,70,135,0.12)',
               background:    activeTab === tab.key ? '#005FA9' : 'white',
               color:         activeTab === tab.key ? 'white' : '#4A5568',
               fontFamily:    "'DM Sans', sans-serif",
-              fontSize:      '0.83rem',
-              fontWeight:    activeTab === tab.key ? 600 : 400,
+              fontSize:      '1.1rem',
+              fontWeight:    700,
               cursor:        'pointer',
               transition:    'all 150ms ease',
-              boxShadow:     activeTab === tab.key ? '0 2px 10px rgba(0,95,169,0.3)' : 'none',
+              boxShadow:     activeTab === tab.key ? '0 4px 15px rgba(0,95,169,0.2)' : '0 2px 5px rgba(0,0,0,0.02)',
+              minHeight:     '60px'
             }}
           >
             {tab.label}
-            {tab.count && (
-              <span style={{
-                background:  activeTab === tab.key ? 'rgba(255,255,255,0.25)' : 'rgba(0,70,135,0.08)',
-                borderRadius: 100,
-                padding:     '1px 7px',
-                fontSize:    '0.7rem',
-                fontWeight:  700,
-              }}>{tab.count}</span>
-            )}
           </button>
         ))}
       </div>
 
       {/* ── Contenido de tabs ── */}
-      {/* Modal Power BI */}
-      {pbiModal && (
-        <PBIModal url={pbiModal.url} title={pbiModal.title} onClose={() => setPBIModal(null)} />
-      )}
 
       {activeTab === 'eficiencia' && (
         <div>
           <SectionHeader
-            title="Indicadores de Eficiencia Operativa"
-            subtitle="Ocupación, rotación, tiempos de respuesta y uso de recursos"
+            title="Tablero de Eficiencia Operativa"
+            subtitle="Acceso seguro a analítica avanzada de ocupación, tiempos y recursos"
             accent="#0088C9"
           />
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(210px, 1fr))', gap:'0.875rem' }}>
-            {data.eficiencia.map(kpi => (
-              <KPICard
-                key={kpi.id}
-                elementoId={kpi.elementoId}
-                value={kpi.value}
-                subtitle={kpi.desc}
-                accentColor={TIPO_COLOR[kpi.type] || '#0088C9'}
-                isAdmin={isAdmin}
-                onKPIClick={(url, title) => setPBIModal({ url, title })}
-              />
-            ))}
-          </div>
-
-          {/* Panel de detalle adicional */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', marginTop:'1.25rem' }}>
-            <EditableKPIWrapper elementoId="directivo.estado_area" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#0088C9">
-              <div style={{ background:'white', borderRadius:14, padding:'1.25rem', border:'1px solid rgba(0,70,135,0.07)', boxShadow:'0 2px 8px rgba(0,70,135,0.06)', height: '100%', boxSizing: 'border-box' }}>
-                <SectionHeader title="Estado por Área" accent="#0088C9" />
-                <div style={{ display:'flex', flexDirection:'column', gap:'0.5rem' }}>
-                  {data.censo.map(s => <StatusPill key={s.Area} label={s.Area} value={`${s.Ocupadas} ocupadas`} color="#0088C9" />)}
-                  {data.censo.length === 0 && <p style={{ fontSize:'0.8rem', color:'#8A97A8', textAlign:'center' }}>Sin datos disponibles</p>}
-                </div>
-              </div>
-            </EditableKPIWrapper>
-
-            <EditableKPIWrapper elementoId="directivo.tiempos_proceso" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#004687">
-              <div style={{ background:'white', borderRadius:14, padding:'1.25rem', border:'1px solid rgba(0,70,135,0.07)', boxShadow:'0 2px 8px rgba(0,70,135,0.06)', height: '100%', boxSizing: 'border-box' }}>
-                <SectionHeader title="Tiempos de Proceso" accent="#004687" />
-                <div style={{ display:'flex', flexDirection:'column', gap:'0.625rem' }}>
-                  {[
-                    { proceso:'Triaje → Atención', tiempo:'-- min',  meta:'< 20 min', ok: true  },
-                    { proceso:'Laboratorio',        tiempo:'-- min',  meta:'< 60 min', ok: true  },
-                    { proceso:'Imagenología',        tiempo:'-- min',  meta:'< 60 min', ok: true },
-                    { proceso:'Egreso programado',   tiempo:'-- hrs', meta:'< 4 hrs',  ok: true  },
-                    { proceso:'Quirófano → UCPA',    tiempo:'-- min',  meta:'< 60 min', ok: true  },
-                  ].map(t => (
-                    <div key={t.proceso} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.45rem 0', borderBottom:'1px solid rgba(0,70,135,0.05)' }}>
-                      <span style={{ fontSize:'0.82rem', color:'#4A5568' }}>{t.proceso}</span>
-                      <div style={{ display:'flex', alignItems:'center', gap:'0.625rem' }}>
-                        <span style={{ fontSize:'0.82rem', fontWeight:600, color: t.ok ? '#00974A' : '#EF4444' }}>{t.tiempo}</span>
-                        <span style={{ fontSize:'0.7rem', color:'#8A97A8' }}>meta: {t.meta}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </EditableKPIWrapper>
-          </div>
+          <EmbeddedBI reportId="directivo-eficiencia" height="calc(100vh - 140px)" />
         </div>
       )}
 
       {activeTab === 'eficacia' && (
         <div>
           <SectionHeader
-            title="Indicadores de Eficacia Clínica"
-            subtitle="Resultados de salud, tasas de mortalidad, readmisión y satisfacción"
+            title="Tablero de Eficacia Clínica"
+            subtitle="Acceso seguro a analítica avanzada de eficacia y calidad médica"
             accent="#00974A"
           />
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(210px, 1fr))', gap:'0.875rem' }}>
-            {data.eficacia.map(kpi => (
-              <KPICard
-                key={kpi.id}
-                elementoId={kpi.elementoId}
-                value={kpi.value}
-                subtitle={kpi.desc}
-                accentColor={TIPO_COLOR[kpi.type] || '#00974A'}
-                isAdmin={isAdmin}
-                onKPIClick={(url, title) => setPBIModal({ url, title })}
-              />
-            ))}
-          </div>
-
-          {/* Alerta de atención */}
-          <EditableKPIWrapper elementoId="directivo.alerta_readmision" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#F59E0B">
-            <div style={{
-              marginTop:     '1.25rem',
-              background:    'rgba(245,158,11,0.08)',
-              border:        '1px solid rgba(245,158,11,0.3)',
-              borderRadius:  12,
-              padding:       '1rem 1.25rem',
-              display:       'flex',
-              alignItems:    'center',
-              gap:           '0.75rem',
-            }}>
-              <span style={{ fontSize:'1.4rem' }}>⚠️</span>
-              <div>
-                <div style={{ fontWeight:600, color:'#92400E', fontSize:'0.88rem' }}>Readmisión en seguimiento</div>
-                <div style={{ color:'#78350F', fontSize:'0.8rem', marginTop:'0.2rem' }}>
-                  La tasa de readmisión a 30 días se mantiene dentro de los parámetros esperados. Monitoreo constante activo.
-                </div>
-              </div>
-            </div>
-          </EditableKPIWrapper>
-
-          {/* Vidas Salvadas — indicador especial verde */}
-          <EditableKPIWrapper 
-            elementoId="directivo.vidas_salvadas" 
-            isAdmin={isAdmin} 
-            onKPIClick={(url, title) => setPBIModal({ url, title })}
-            accentColor="#00974A"
-          >
-            <div style={{
-              marginTop:   '1rem',
-              background:  'linear-gradient(135deg, #00974A 0%, #00c060 100%)',
-              borderRadius: 14,
-              padding:     '1.25rem 1.5rem',
-              color:        'white',
-              display:     'flex',
-              alignItems:  'center',
-              gap:         '1.25rem',
-            }}>
-              <span style={{ fontSize:'2.5rem' }}>❤️</span>
-              <div>
-                <div style={{ fontSize:'0.72rem', fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', opacity:0.8 }}>Métrica de Impacto</div>
-                <div style={{ fontFamily:"var(--font-display)", fontSize:'1.6rem', fontWeight:800, lineHeight:1.1 }}>Atención Real Activa</div>
-                <div style={{ fontSize:'0.82rem', opacity:0.85, marginTop:'0.2rem' }}>Monitoreo en tiempo real de la actividad hospitalaria</div>
-              </div>
-            </div>
-          </EditableKPIWrapper>
+          <EmbeddedBI reportId="directivo-eficacia" height="calc(100vh - 140px)" />
         </div>
       )}
 
@@ -378,61 +231,10 @@ export default function DashboardDirectivo() {
         <div>
           <SectionHeader
             title="Macropanel Financiero"
-            subtitle="Ingresos, egresos y margen operativo del mes en curso"
+            subtitle="Acceso seguro a analítica financiera y presupuestos"
             accent="#005FA9"
           />
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(210px, 1fr))', gap:'0.875rem' }}>
-            {data.financiero.map(kpi => (
-              <KPICard
-                key={kpi.id}
-                elementoId={kpi.elementoId}
-                value={kpi.value}
-                subtitle={kpi.desc}
-                accentColor={TIPO_COLOR[kpi.type] || '#005FA9'}
-                isAdmin={isAdmin}
-                onKPIClick={(url, title) => setPBIModal({ url, title })}
-              />
-            ))}
-          </div>
-
-          {/* Barra de progreso presupuestal */}
-          <EditableKPIWrapper elementoId="directivo.ejecucion_presupuestal" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#005FA9">
-            <div style={{ background:'white', borderRadius:14, padding:'1.25rem', marginTop:'1.25rem', border:'1px solid rgba(0,70,135,0.07)', boxShadow:'0 2px 8px rgba(0,70,135,0.06)' }}>
-              <SectionHeader title="Ejecución Presupuestal por Centro de Costo" accent="#005FA9" />
-              {[
-                { area:'Hospitalización',  ejecutado:0, presupuesto:'$0'  },
-                { area:'Urgencias',        ejecutado:0, presupuesto:'$0'  },
-                { area:'Quirófano',        ejecutado:0, presupuesto:'$0'  },
-              ].map(b => {
-                const color = b.ejecutado > 85 ? '#EF4444' : b.ejecutado > 70 ? '#F59E0B' : '#00974A';
-                return (
-                  <div key={b.area} style={{ marginBottom:'0.75rem' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'0.25rem' }}>
-                      <span style={{ fontSize:'0.82rem', color:'#4A5568', fontWeight:500 }}>{b.area}</span>
-                      <span style={{ fontSize:'0.82rem', fontWeight:600, color }}>
-                        {b.ejecutado}% de {b.presupuesto}
-                      </span>
-                    </div>
-                    <div style={{ height:7, background:'rgba(0,70,135,0.08)', borderRadius:100, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${b.ejecutado}%`, background:color, borderRadius:100, transition:'width 0.8s ease' }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </EditableKPIWrapper>
-        </div>
-      )}
-
-      {activeTab === 'embedded' && (
-        <div>
-          <SectionHeader
-            title="Tablero de Inteligencia de Negocios"
-            subtitle="Acceso seguro a analítica avanzada y proyecciones"
-            accent="#0088C9"
-          />
-          {/* URL ofuscada en Base64 para mayor seguridad */}
-          <EmbeddedBI reportId="aHR0cHM6Ly9hcHAucG93ZXJiaS5jb20vbGlua3MvaldKc3NHRWphVz9jdGlkPTYzMTA1NTAyLTc0YmItNGQ1ZC04NjE3LTExMWI2NmYxOTljMCZwYmlfc291cmNlPWxpbmtTaGFyZQ==" height="calc(100vh - 140px)" />
+          <EmbeddedBI reportId="directivo-financiero" height="calc(100vh - 140px)" />
         </div>
       )}
     </div>

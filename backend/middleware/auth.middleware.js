@@ -11,8 +11,12 @@
 
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET  = process.env.JWT_SECRET  || 'CHANGE_ME_IN_PRODUCTION_MIN_256_BITS';
-const JWT_REFRESH = process.env.JWT_REFRESH || 'CHANGE_REFRESH_SECRET';
+const JWT_SECRET  = process.env.JWT_SECRET;
+const JWT_REFRESH = process.env.JWT_REFRESH;
+
+if (!JWT_SECRET || !JWT_REFRESH) {
+  throw new Error('JWT_SECRET and JWT_REFRESH must be set in environment variables.');
+}
 
 /* ── Roles válidos del sistema ─────────────────────────────── */
 const VALID_ROLES = new Set([
@@ -106,7 +110,6 @@ function authorize(allowedRoles = []) {
       return res.status(403).json({
         error: `Acceso no autorizado. Se requiere uno de los roles: ${allowedRoles.join(', ')}`,
         code:  'INSUFFICIENT_ROLE',
-        yourRole: role,
       });
     }
 

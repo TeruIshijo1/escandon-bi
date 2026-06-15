@@ -16,9 +16,12 @@ const { getDb } = require('../config/db');
 const { buildSystemPrompt, buildUserMessage, ROLE_DATA_ACCESS } = require('./prompts/ai.system.prompt');
 const ExcelJS = require('exceljs');
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL   = process.env.OPENAI_MODEL || 'gpt-4o';
-const OPENAI_BASE    = process.env.AZURE_OPENAI_ENDPOINT || 'https://api.openai.com/v1';
+const LLM_API_KEY = process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
+const LLM_MODEL   = process.env.GEMINI_MODEL || process.env.DEEPSEEK_MODEL || process.env.OPENAI_MODEL || 
+  (process.env.GEMINI_API_KEY ? 'gemini-2.0-flash' : (process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o'));
+const LLM_BASE    = process.env.LLM_BASE_URL || 
+  (process.env.GEMINI_API_KEY ? 'https://generativelanguage.googleapis.com/v1beta/openai' : 
+  (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' : (process.env.AZURE_OPENAI_ENDPOINT || 'https://api.openai.com/v1')));
 
 /* ── Mapeo de intenciones → permisos por rol ─────────────── */
 const INTENT_PERMISSIONS = {
@@ -336,38 +339,23 @@ async function generateAnswer({ question, data, intent, userRole, userName, syst
 
 /* ── Cliente OpenAI / Azure OpenAI ──────────────────────── */
 async function callLLM(messages, options = {}) {
-  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'sk-...') {
-    // Modo demo sin API key — Mar-IA simula respuestas
-    let question = messages[messages.length - 1]?.content || '';
-    if (Array.isArray(question)) {
-      const textObj = question.find(item => item.type === 'text');
-      question = textObj ? textObj.text : '';
-    }
-
-    // Intentamos extraer el contexto de pantalla del system prompt
-    const systemContent = messages.find(m => m.role === 'system')?.content || '';
-    let screenContext = '';
-    if (systemContent.includes('## CONTEXTO DE PANTALLA ACTUAL')) {
-      const parts = systemContent.split('## CONTEXTO DE PANTALLA ACTUAL');
-      if (parts[1]) {
-        screenContext = parts[1].split('##')[0].trim();
-      }
-    }
-
-    return generateDemoResponse(question, screenContext);
+  if (!LLM_API_KEY || LLM_API_KEY.startsWith('sk-...')) {
+    throw new Error('LLM API error: No se ha configurado la API Key de Gemini/DeepSeek/OpenAI en el servidor.');
   }
 
-  const response = await fetch(`${OPENAI_BASE}/chat/completions`, {
+  const endpoint = LLM_BASE.endsWith('/chat/completions') ? LLM_BASE : `${LLM_BASE}/chat/completions`;
+
+  const response = await fetch(endpoint, {
     method:  'POST',
     headers: {
       'Content-Type':  'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      ...(process.env.AZURE_OPENAI_ENDPOINT
-        ? { 'api-key': OPENAI_API_KEY }
+      'Authorization': `Bearer ${LLM_API_KEY}`,
+      ...(process.env.AZURE_OPENAI_ENDPOINT && !process.env.DEEPSEEK_API_KEY
+        ? { 'api-key': LLM_API_KEY }
         : {}),
     },
     body: JSON.stringify({
-      model:       OPENAI_MODEL,
+      model:       LLM_MODEL,
       messages,
       max_tokens:  options.max_tokens  || 800,
       temperature: options.temperature ?? 0.3,
@@ -383,55 +371,6 @@ async function callLLM(messages, options = {}) {
   return json.choices?.[0]?.message?.content?.trim() || 'Disculpa, no pude generar una respuesta. ¿Podrías reformular tu pregunta?';
 }
 
-/* ── Respuestas demo cuando no hay API key ────────────────── */
-function generateDemoResponse(message, screenContext = '') {
-  let actualQuestion = typeof message === 'string' ? message : '';
-  if (Array.isArray(message)) {
-    const textObj = message.find(item => item.type === 'text');
-    actualQuestion = textObj ? textObj.text : '';
-  }
 
-  // Si el mensaje es el prompt formateado, extraemos la pregunta original
-  if (actualQuestion.includes('## PREGUNTA DEL USUARIO')) {
-    const parts = actualQuestion.split('## PREGUNTA DEL USUARIO');
-    if (parts[1]) {
-      const subParts = parts[1].split('## DATOS RECUPERADOS');
-      if (subParts[0]) {
-        const lines = subParts[0].trim().split('\n');
-        if (lines.length > 1) {
-          actualQuestion = lines.slice(1).join('\n').trim();
-        } else {
-          actualQuestion = lines[0].trim();
-        }
-      }
-    }
-  }
-
-  const lower = actualQuestion.toLowerCase();
-  const contextLower = screenContext.toLowerCase();
-
-  // 1. COMPROBAR PRIMERO CONSULTAS DE TEMAS O PANTALLAS ESPECÍFICAS
-  const isHospitalizacion = lower.includes('hospitalizacion') || lower.includes('hospitalización') || contextLower.includes('hospitalizacion') || contextLower.includes('hospitalización');
-  const isQuirofano = lower.includes('quirofano') || lower.includes('quirófano') || lower.includes('cirugia') || lower.includes('cirugía') || contextLower.includes('quirofano') || contextLower.includes('quirófano') || contextLower.includes('cirugia') || contextLower.includes('cirugía');
-  const isUrgencias = lower.includes('urgencia') || contextLower.includes('urgencia');
-  const isAuditoria = lower.includes('auditor') || lower.includes('cargos') || lower.includes('inventario') || contextLower.includes('auditor') || contextLower.includes('cargos') || contextLower.includes('inventario');
-
-  if (isHospitalizacion) {
-    return '🏥 **Explicación del Dashboard de Hospitalización** (Modo Demo)\n\nEste tablero muestra las métricas de hospitalización activa del Hospital Escandón:\n\n• **Pacientes Totales**: 417 pacientes atendidos en el periodo actual.\n• **Habitaciones**: 51 habitaciones operativas en el censo.\n• **Suma de Abonos**: $9.83 millones de pesos registrados por abonos de pacientes.\n• **Distribución por Sexo**: Mayoría femenina (59.6% FEM vs. 40.4% MAS).\n• **Tipo de Paciente**: División entre ingresos eventuales (habituales) e ingresos de tipo recurrente.\n\nPuedes filtrar la información usando las listas desplegables superiores por Sexo, Convenio o Tipo de Paciente.';
-  }
-
-  // 2. COMPROBAR PREGUNTAS GENERALES DE NAVEGACIÓN
-  const hasPlatformKeyword = ['plataforma', 'donde', 'buscar', 'encontrar', 'tabler', 'explic', 'pantalla', 'modul', 'módul', 'report'].some(kw => lower.includes(kw));
-
-  if (hasPlatformKeyword) {
-    return '📍 **Guía de la Plataforma**\n\n• **Dashboard Directivo**: Menú lateral → "Dashboard"\n• **Áreas Clínicas**: Menú lateral → selecciona tu área\n• **Auditoría**: Menú lateral → "Auditoría"\n• **Exportar**: Botón de descarga en cada tablero (PDF/Excel)\n• **Power BI**: Los tableros interactivos se cargan automáticamente\n\n¿Necesitas ayuda con algo más? 😊';
-  }
-
-  if (lower.includes('saludo') || lower.includes('hola') || lower.includes('buenos') || lower.includes('buena')) {
-    return '¡Hola! 👋 Soy Mar-IA, tu asistente de inteligencia analítica del Hospital Escandón. ¿En qué puedo ayudarte hoy? Puedo consultar datos de ocupación, cirugías, indicadores y más. 📊';
-  }
-
-  return '🤖 Soy Mar-IA en modo demostración. Para habilitar respuestas completas con IA, configure OPENAI_API_KEY en el archivo .env del backend.\n\n¿En qué más puedo orientarte sobre la plataforma? 😊';
-}
 
 module.exports = { processRAGQuery };

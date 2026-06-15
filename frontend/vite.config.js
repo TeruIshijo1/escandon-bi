@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true, // Permitir acceso desde la red local (IP)
+    allowedHosts: true, // Permitir túneles como ngrok o localtunnel
     proxy: {
       '/api': {
         target:       'http://localhost:4000',

@@ -10,12 +10,10 @@ import { useAuth } from '../../context/AuthContext';
 const ROUTE_TITLES = {
   '/':                      'Inicio',
   '/dashboard/directivo':   'Dashboard Directivo',
-  '/dashboard/mando':       'Panel de Mando',
   '/dashboard/area':        'Tablero de Área',
   '/auditoria/inventarios': 'Inventarios y Consumos Clínicos',
   '/auditoria/cargos':      'Discrepancias en Consumos',
   '/estadisticas':          'Estadísticas',
-  '/reportes':              'Exportar Reportes',
   '/admin/usuarios':        'Gestión de Usuarios',
   '/admin/auditoria-log':   'Log de Auditoría',
   '/admin/configuracion':   'Configuración del Sistema',

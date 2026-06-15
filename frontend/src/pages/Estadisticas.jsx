@@ -8,14 +8,17 @@ import { useAuth }  from '../context/AuthContext';
 import { AREAS_LABELS } from '../utils/rbac';
 import EditableKPIWrapper from '../components/shared/EditableKPIWrapper';
 import PBIModal from '../components/shared/PBIModal';
+import { useKPIConfig } from '../hooks/useKPIConfig';
 
 export default function Estadisticas() {
   const { user }              = useAuth();
+  const { getKPI }            = useKPIConfig();
   const [periodo, setPeriodo] = useState('mes');
   const [loading, setLoading] = useState(false);
   const [toast, setToast]     = useState(null);
   const [data, setData]       = useState({ stats: [], dx: [], areas: [], totalEgresos: 0, maxDx: 0, maxArea: 0 });
   const [pbiModal, setPBIModal] = useState(null);
+  const handleKPIClick = (url, title, url2, url3, multiPagina) => setPBIModal({ url, title, url2, url3, multiPagina });
 
   const isRestricted = user?.role === 'JEFE_AREA';
   const areaLabel    = user?.area ? AREAS_LABELS[user.area] : '';
@@ -42,12 +45,12 @@ export default function Estadisticas() {
         const { general, diagnosticos, servicios } = json.data;
 
         const newStats = [
-          { label:`Egresos (${periodo})`, value: general.TotalEgresos, pct: 'Total real', up: null },
-          { label:'Promedio Edad', value: (general.PromedioEdad || 0) + ' a', pct: 'Basado en Pacientes', up: null },
-          { label:'% Género Femenino', value: (general.pctFemenino || 0) + '%', pct: 'Distribución real', up: null },
-          { label:'Defunciones', value: general.Defunciones || 0, pct: 'Egresos mortandad', up: false },
-          { label:'Nacimientos', value: general.Nacimientos || 0, pct: 'Servicio Cuneros', up: true },
-          { label:'Estancia Prom. Global', value: (general.EstanciaPromedio || 0) + ' d', pct: 'Días cama', up: null },
+          { id: 'stats.egresos_total',   label:`Egresos (${periodo})`, value: general.TotalEgresos, pct: 'Total real', up: null },
+          { id: 'stats.promedio_edad',   label:'Promedio Edad', value: (general.PromedioEdad || 0) + ' a', pct: 'Basado en Pacientes', up: null },
+          { id: 'stats.genero_femenino', label:'% Género Femenino', value: (general.pctFemenino || 0) + '%', pct: 'Distribución real', up: null },
+          { id: 'stats.defunciones',     label:'Defunciones', value: general.Defunciones || 0, pct: 'Egresos mortandad', up: false },
+          { id: 'stats.nacimientos',     label:'Nacimientos', value: general.Nacimientos || 0, pct: 'Servicio Cuneros', up: true },
+          { id: 'stats.estancia_global', label:'Estancia Prom. Global', value: (general.EstanciaPromedio || 0) + ' d', pct: 'Días cama', up: null },
         ];
 
         setData({
@@ -82,7 +85,7 @@ export default function Estadisticas() {
       `}</style>
 
       {pbiModal && (
-        <PBIModal url={pbiModal.url} title={pbiModal.title} onClose={() => setPBIModal(null)} />
+        <PBIModal {...pbiModal} onClose={() => setPBIModal(null)} />
       )}
 
       {/* Header */}
@@ -151,13 +154,16 @@ export default function Estadisticas() {
       {/* KPIs demográficos */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:'1rem', marginBottom:'2rem', opacity: loading ? 0.55 : 1, transition: 'opacity 0.3s ease' }}>
         {data.stats.map(s => {
+          const kpiConfig = getKPI(s.id);
+          const displayName = kpiConfig?.nombre || s.label;
+          const displayIcon = kpiConfig?.icono;
           const accentColor = s.up === true ? 'var(--color-verde-e)' : s.up === false ? 'var(--color-danger)' : 'var(--color-azul-fuerte)';
           return (
             <EditableKPIWrapper 
-              key={s.label} 
-              elementoId={`est.${s.label.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}`} 
+              key={s.id} 
+              elementoId={s.id} 
               isAdmin={user?.role === 'ADMIN'} 
-              onKPIClick={(url, title) => setPBIModal({url, title})}
+              onKPIClick={handleKPIClick}
               accentColor={accentColor}
               style={{height: '100%'}}
             >
@@ -171,9 +177,13 @@ export default function Estadisticas() {
                   height: '100%', boxSizing: 'border-box',
                   display: 'flex', flexDirection: 'column', justifyContent: 'center',
                   transition: 'all var(--transition-base)',
+                  position: 'relative',
                 }}
               >
-                <div style={{ fontFamily: 'var(--font-display)', fontSize:'0.64rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.35rem' }}>{s.label}</div>
+                {displayIcon && (
+                  <div style={{ position: 'absolute', right: 12, top: 12, fontSize: '1.2rem', opacity: 0.1, pointerEvents: 'none' }}>{displayIcon}</div>
+                )}
+                <div style={{ fontFamily: 'var(--font-display)', fontSize:'0.64rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:'0.35rem' }}>{displayName}</div>
                 <div style={{ fontFamily:"var(--font-mono)", fontSize:'1.65rem', fontWeight:700, color:'var(--text-primary)', lineHeight:1, marginBottom:'0.25rem', letterSpacing: '-0.02em' }}>{s.value}</div>
                 <div style={{ fontFamily: 'var(--font-body)', fontSize:'0.72rem', fontWeight:600, color: s.up===true ? 'var(--color-verde-e)' : s.up===false ? 'var(--color-danger)' : 'var(--text-muted)' }}>
                   {s.up===true ? '▲ ' : s.up===false ? '▼ ' : '● '}{s.pct}
@@ -188,11 +198,11 @@ export default function Estadisticas() {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(450px, 1fr))', gap:'1.5rem', opacity: loading ? 0.55 : 1, transition: 'opacity 0.3s ease' }}>
         
         {/* Diagnósticos top */}
-        <EditableKPIWrapper elementoId="est.top_diagnosticos" isAdmin={user?.role === 'ADMIN'} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="var(--color-azul-fuerte)">
+        <EditableKPIWrapper elementoId="stats.top_diagnosticos" isAdmin={user?.role === 'ADMIN'} onKPIClick={handleKPIClick} accentColor="var(--color-azul-fuerte)">
           <div style={{ background:'#FFFFFF', borderRadius:'16px', padding:'1.5rem', border:'1px solid rgba(0,70,135,0.05)', boxShadow:'var(--shadow-xs)', height: '100%', boxSizing: 'border-box' }}>
             <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1.25rem' }}>
               <div style={{ width:4, height:18, background:'var(--color-azul-fuerte)', borderRadius:2 }}/>
-              <span style={{ fontFamily:"var(--font-display)", fontSize:'0.95rem', fontWeight:700, color: 'var(--text-primary)' }}>Top Diagnósticos del Período</span>
+              <span style={{ fontFamily:"var(--font-display)", fontSize:'0.95rem', fontWeight:700, color: 'var(--text-primary)' }}>{getKPI('stats.top_diagnosticos')?.nombre || "Top Diagnósticos del Período"}</span>
             </div>
             {data.dx.length > 0 ? data.dx.map((d, i) => (
               <div key={d.dx} style={{ marginBottom:'0.875rem' }}>
@@ -219,11 +229,11 @@ export default function Estadisticas() {
         </EditableKPIWrapper>
 
         {/* Distribución por área */}
-        <EditableKPIWrapper elementoId="est.egresos_servicio" isAdmin={user?.role === 'ADMIN'} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="var(--color-azul-claro)">
+        <EditableKPIWrapper elementoId="stats.egresos_servicio" isAdmin={user?.role === 'ADMIN'} onKPIClick={handleKPIClick} accentColor="var(--color-azul-claro)">
           <div style={{ background:'#FFFFFF', borderRadius:'16px', padding:'1.5rem', border:'1px solid rgba(0,70,135,0.05)', boxShadow:'var(--shadow-xs)', height: '100%', boxSizing: 'border-box' }}>
             <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1.25rem' }}>
               <div style={{ width:4, height:18, background:'var(--color-azul-claro)', borderRadius:2 }}/>
-              <span style={{ fontFamily:"var(--font-display)", fontSize:'0.95rem', fontWeight:700, color: 'var(--text-primary)' }}>Egresos por Servicio</span>
+              <span style={{ fontFamily:"var(--font-display)", fontSize:'0.95rem', fontWeight:700, color: 'var(--text-primary)' }}>{getKPI('stats.egresos_servicio')?.nombre || "Egresos por Servicio"}</span>
             </div>
             {data.areas.length > 0 ? data.areas.map(a => (
               <div key={a.area} style={{ marginBottom:'0.875rem' }}>

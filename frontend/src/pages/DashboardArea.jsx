@@ -9,7 +9,16 @@ import EmbeddedBI      from '../components/dashboard/EmbeddedBI';
 import ExportButton    from '../components/shared/ExportButton';
 import EditableKPIWrapper from '../components/shared/EditableKPIWrapper';
 import PBIModal        from '../components/shared/PBIModal';
+import ExportApiModal  from '../components/shared/ExportApiModal';
 import { AREAS, AREAS_LABELS, can } from '../utils/rbac';
+import { useKPIConfig } from '../hooks/useKPIConfig';
+
+const KPI_DB_MAP = {
+  'Ocupación': 'ocupacion',
+  'Egresos Mes': 'egresos',
+  'Estancia Promedio': 'estancia',
+  'Rotación Camas': 'rotacion_camas'
+};
 
 const API_BASE = '/api';
 
@@ -85,15 +94,17 @@ function AreaKPICard({ label, value, delta, up, accent }) {
 /* ── Componente principal ────────────────────────────────── */
 export default function DashboardArea() {
   const { user }         = useAuth();
+  const { getKPI }       = useKPIConfig();
   const isRestricted     = user?.role === 'JEFE_AREA' || user?.role === 'USUARIO_OPERATIVO';
   const [area, setArea]  = useState(user?.area || DEFAULT_AREA);
   const [tab,  setTab]   = useState('kpis');
-  const [modal, setModal] = useState(null); // 'incidencia', 'metas'
+
   const [toast, setToast] = useState(null);
   const [dynamicReport, setDynamicReport] = useState(null);
   const [loadingReport, setLoadingReport] = useState(false);
   const [areaData, setAreaData] = useState({ kpis: [] });
   const [pbiModal, setPBIModal] = useState(null);
+  const [showExportApi, setShowExportApi] = useState(false);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -175,8 +186,9 @@ export default function DashboardArea() {
       `}</style>
 
       {pbiModal && (
-        <PBIModal url={pbiModal.url} title={pbiModal.title} onClose={() => setPBIModal(null)} />
+        <PBIModal {...pbiModal} onClose={() => setPBIModal(null)} />
       )}
+      {/* <ExportApiModal isOpen={showExportApi} onClose={() => setShowExportApi(false)} /> */ }
 
       {/* Header Panel */}
       <div style={{ 
@@ -231,15 +243,8 @@ export default function DashboardArea() {
           
           {/* Acciones de Exportación */}
           <div style={{ display:'flex', gap:'0.5rem', marginRight:'0.25rem', paddingRight:'0.875rem', borderRight:'1px solid rgba(255,255,255,0.18)' }}>
-            <ExportButton type="pdf" reportId={area} compact />
-            {dynamicReport && (dynamicReport.ExcelPath || dynamicReport.excelPath) && (
-              <ExportButton 
-                type="excel" 
-                reportId={area} 
-                directUrl={dynamicReport.ExcelPath || dynamicReport.excelPath} 
-                compact 
-              />
-            )}
+            <ExportButton type="pdf" reportId={area} />
+            <ExportButton type="excel" reportId={area} />
           </div>
 
           {/* Selector de Área */}
@@ -293,7 +298,6 @@ export default function DashboardArea() {
       }}>
         {[
           { key:'kpis',     label:'📊 Indicadores'    },
-          { key:'embedded', label:'📈 Tablero BI'     },
         ].map(t => {
           const isActive = tab === t.key;
           return (
@@ -333,168 +337,35 @@ export default function DashboardArea() {
       {tab === 'kpis' && (
         <>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
-            {areaData.kpis.map((kpi, i) => (
-              <EditableKPIWrapper 
-                key={i} 
-                elementoId={`area.${area.toLowerCase()}.${kpi.label.replace(/\s+/g, '_').toLowerCase()}`} 
-                isAdmin={user?.role === 'ADMIN'} 
-                onKPIClick={(url, title) => setPBIModal({ url, title })}
-                accentColor={cfg.color}
-              >
-                <AreaKPICard {...kpi} accent={cfg.color} />
-              </EditableKPIWrapper>
-            ))}
+            {areaData.kpis.map((kpi, i) => {
+              const dbKey = KPI_DB_MAP[kpi.label] || kpi.label.replace(/\s+/g, '_').toLowerCase();
+              const elementId = `area.${area.toLowerCase()}.${dbKey}`;
+              const kpiConfig = getKPI(elementId);
+              const displayName = kpiConfig?.nombre || kpi.label;
+              return (
+                <EditableKPIWrapper 
+                  key={i} 
+                  elementoId={elementId} 
+                  isAdmin={user?.role === 'ADMIN'} 
+                  onKPIClick={(url, title, url2, url3, multiPagina) => setPBIModal({ url, title, url2, url3, multiPagina })}
+                  accentColor={cfg.color}
+                >
+                  <AreaKPICard {...kpi} label={displayName} accent={cfg.color} />
+                </EditableKPIWrapper>
+              );
+            })}
             {areaData.kpis.length === 0 && (
               <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', fontFamily: 'var(--font-body)' }}>Cargando indicadores...</p>
             )}
           </div>
 
-          {/* Acciones rápidas */}
-          {user?.role !== 'USUARIO_OPERATIVO' && (
-            <div style={{
-              background:'#FFFFFF',
-              borderRadius:'16px',
-              padding:'1.25rem 1.5rem',
-              border:'1px solid rgba(0,70,135,0.05)',
-              boxShadow:'var(--shadow-xs)'
-            }}>
-              <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1rem' }}>
-                <div style={{ width:4, height:18, background:cfg.color, borderRadius:2 }}/>
-                <span style={{ fontFamily:"var(--font-display)", fontSize:'0.9rem', fontWeight:700, color: 'var(--text-primary)' }}>Acciones del Área</span>
-              </div>
-              <div style={{ display:'flex', gap:'0.75rem', flexWrap:'wrap' }}>
-                {[
-                  { label: 'Registrar Incidencia', action: () => setModal('incidencia') },
-                  { label: 'Ver Histórico',        action: () => setTab('embedded') },
-                  { label: 'Comparar con Meta',    action: () => setModal('metas') },
-                  { label: 'Solicitar Análisis IA', action: () => window.dispatchEvent(new CustomEvent('toggle-aria')) },
-                ].map(btn => (
-                  <button
-                    key={btn.label}
-                    onClick={btn.action}
-                    className="area-action-btn"
-                    style={{
-                      padding:      '0.55rem 1.1rem',
-                      border:       `1.5px solid ${cfg.color}25`,
-                      borderRadius:  '10px',
-                      background:   `${cfg.color}05`,
-                      color:         cfg.color,
-                      fontFamily:  "var(--font-body)",
-                      fontSize:    '0.8rem',
-                      fontWeight:   600,
-                      cursor:      'pointer',
-                      transition:  'all 200ms ease',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background=`${cfg.color}10`; }}
-                    onMouseLeave={e => { e.currentTarget.style.background=`${cfg.color}05`; }}
-                  >{btn.label}</button>
-                ))}
-              </div>
-            </div>
-          )}
+
         </>
       )}
 
-      {tab === 'embedded' && (
-        loadingReport ? (
-          <div style={{ height:500, display:'flex', alignItems:'center', justifyContent:'center', background:'white', borderRadius:14 }}>
-            <p style={{ color:'var(--text-muted)', fontSize:'0.9rem', fontFamily: 'var(--font-body)' }}>Cargando tablero del área...</p>
-          </div>
-        ) : dynamicReport ? (
-          (() => {
-            const looker = dynamicReport.LookerDashboard || dynamicReport.lookerUrl || dynamicReport.LookerUrl;
-            const pbi    = dynamicReport.PowerBIReportId || dynamicReport.pbiReportId || dynamicReport.reportId;
-            const thumb  = dynamicReport.ThumbnailPath   || dynamicReport.thumbnailPath;
-            const pbix   = dynamicReport.PbixPath        || dynamicReport.pbixPath;
-            const title  = dynamicReport.Titulo          || dynamicReport.name || 'Reporte del Área';
 
-            return (looker || pbi) ? (
-              <EmbeddedBI reportId={looker || pbi} height="calc(100vh - 140px)" />
-            ) : (thumb) ? (
-              <div style={{ 
-                height:600, display:'flex', flexDirection:'column', alignItems:'center', 
-                justifyContent:'center', background:'#f8f9fa', borderRadius:14, 
-                border:'1px solid rgba(0,70,135,0.08)', position:'relative', overflow:'hidden'
-              }}>
-                <img 
-                   src={`/api/files/${thumb}`} 
-                   alt="Previsualización" 
-                   style={{ width:'100%', height:'100%', objectFit:'contain', background:'white' }} 
-                />
-              </div>
-            ) : (pbix) ? (
-               <div style={{ height:400, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'white', borderRadius:14, border:'1px solid rgba(0,70,135,0.08)', boxShadow: 'var(--shadow-xs)' }}>
-                 <div style={{ width:80, height:80, borderRadius:'50%', background:'rgba(0,70,135,0.05)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'2.5rem', marginBottom:'1.5rem' }}>📊</div>
-                 <h3 style={{ fontFamily:"var(--font-display)", fontSize:'1.2rem', color:'var(--color-azul-fuerte)', margin:'0 0 0.5rem', fontWeight: 800 }}>{title}</h3>
-                 <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', textAlign:'center', maxWidth:350, fontFamily: 'var(--font-body)' }}>Reporte de Escritorio listo para descarga.</p>
-               </div>
-            ) : (
-              <EmbeddedBI reportId={dynamicReport.ReporteId || dynamicReport.reportId} height="calc(100vh - 140px)" />
-            )
-          })()
-        ) : (
-          <div style={{ height:500, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'white', borderRadius:14, border:'1px dashed rgba(0,70,135,0.18)' }}>
-            <span style={{ fontSize:'2.25rem', marginBottom:'1rem' }}>📋</span>
-            <p style={{ color:'var(--text-primary)', fontWeight:700, margin:0, fontFamily: 'var(--font-display)', fontSize: '0.95rem' }}>Sin tablero configurado para {AREAS_LABELS[area]}</p>
-            <p style={{ color:'var(--text-muted)', fontSize:'0.82rem', marginTop:'0.35rem', fontFamily: 'var(--font-body)' }}>El administrador debe asignar un reporte al área en Configuración.</p>
-          </div>
-        )
-      )}
 
-      {/* ── Modales de Acción ── */}
-      {modal && (
-        <div style={{
-          position:'fixed', top:0, left:0, right:0, bottom:0,
-          background:'rgba(15, 26, 46, 0.4)', backdropFilter:'var(--glass-blur)',
-          WebkitBackdropFilter: 'var(--glass-blur)',
-          display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000,
-          animation: 'fadeIn 200ms ease'
-        }}>
-          <div style={{
-            background:'#FFFFFF', borderRadius:'18px', width:'90%', maxWidth:450,
-            padding:'1.75rem 1.5rem 1.5rem', boxShadow:'var(--shadow-xl)',
-            position:'relative', animation: 'slideUp 300ms cubic-bezier(0.16, 1, 0.3, 1)'
-          }}>
-            <button onClick={() => setModal(null)} style={{ position:'absolute', top:18, right:18, background:'none', border:'none', fontSize:'1.2rem', cursor:'pointer', color:'var(--text-muted)', display: 'flex', alignItems: 'center' }}>✕</button>
-            
-            {modal === 'incidencia' && (
-              <div>
-                <h3 style={{ fontFamily:"var(--font-display)", fontWeight: 800, margin:'0 0 0.85rem', color:cfg.color, fontSize: '1.25rem' }}>Registrar Incidencia</h3>
-                <p style={{ fontSize:'0.85rem', color:'var(--text-secondary)', marginBottom:'1.25rem', fontFamily: 'var(--font-body)' }}>Complete los detalles del evento en {AREAS_LABELS[area]}.</p>
-                <textarea placeholder="Descripción de la incidencia..." style={{ width:'100%', height:110, borderRadius:10, border:'1.5px solid #E2E8F0', padding:'0.75rem', fontSize:'0.85rem', marginBottom:'1.25rem', fontFamily:'var(--font-body)', outline:'none', resize: 'none' }} />
-                <button 
-                  onClick={() => { setModal(null); showToast('Incidencia registrada correctamente'); }}
-                  style={{ width:'100%', padding:'0.75rem', background:cfg.color, color:'white', border:'none', borderRadius:10, fontWeight:700, fontFamily: 'var(--font-display)', cursor:'pointer', boxShadow: `0 4px 14px ${cfg.color}35` }}
-                >Enviar Reporte</button>
-              </div>
-            )}
 
-            {modal === 'metas' && (
-              <div>
-                <h3 style={{ fontFamily:"var(--font-display)", fontWeight: 800, margin:'0 0 1.25rem', color:cfg.color, fontSize: '1.25rem' }}>Comparativa con Metas</h3>
-                <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
-                  {[
-                    { l:'T. Atención', v:'18min', m:'20min', p:90 },
-                    { l:'Ocupación', v:'93%', m:'85%', p:110, warn:true },
-                    { l:'Altas', v:'41', m:'35', p:117 },
-                  ].map(m => (
-                    <div key={m.l}>
-                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.75rem', fontWeight:700, marginBottom:6, fontFamily: 'var(--font-body)' }}>
-                        <span style={{ color: 'var(--text-primary)' }}>{m.l}</span>
-                        <span style={{ color: m.warn ? 'var(--color-danger)' : 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>{m.v} / {m.m}</span>
-                      </div>
-                      <div style={{ height:7, background:'#F1F5F9', borderRadius:100, overflow:'hidden' }}>
-                        <div style={{ width:`${Math.min(m.p, 100)}%`, height:'100%', background: m.warn ? 'var(--color-danger)' : cfg.color, borderRadius: 100 }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setModal(null)} style={{ width:'100%', marginTop:'1.75rem', padding:'0.65rem', border:`1.5px solid ${cfg.color}40`, color:cfg.color, background:'none', borderRadius:10, fontWeight:700, fontFamily: 'var(--font-display)', fontSize: '0.88rem', cursor:'pointer' }}>Cerrar</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Toast Notification */}
       {toast && (

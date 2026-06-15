@@ -10,7 +10,7 @@
  */
 import { useEffect } from 'react';
 
-export default function PBIModal({ url, title, onClose }) {
+export default function PBIModal({ url, title, multiPagina = false, onClose }) {
   // ESC para cerrar
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -95,8 +95,8 @@ export default function PBIModal({ url, title, onClose }) {
 
         {/* Iframe */}
         <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-          {/* Capa que recorta la barra de PBI (~36px) */}
-          <div style={{ width: '100%', height: 'calc(100% + 36px)', position: 'absolute', top: 0, left: 0 }}>
+          {/* Capa que recorta la barra de PBI (~36px) si no es multipágina */}
+          <div style={{ width: '100%', height: multiPagina ? '100%' : 'calc(100% + 36px)', position: 'absolute', top: 0, left: 0 }}>
             <iframe
               title={title}
               src={url}
@@ -108,6 +108,26 @@ export default function PBIModal({ url, title, onClose }) {
               loading="lazy"
             />
           </div>
+
+          {/* Máscaras de seguridad para ocultar Logo y Compartir de Power BI si es multipágina */}
+          {multiPagina && (
+            <>
+              {/* Esquina Inferior Izquierda (Oculta "Microsoft Power BI") */}
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0,
+                width: '180px', height: '36px',
+                background: '#f3f2f1', zIndex: 10,
+                pointerEvents: 'auto',
+              }} />
+              {/* Esquina Inferior Derecha (Oculta Compartir y Ampliar) */}
+              <div style={{
+                position: 'absolute', bottom: 0, right: 0,
+                width: '120px', height: '36px',
+                background: '#f3f2f1', zIndex: 10,
+                pointerEvents: 'auto',
+              }} />
+            </>
+          )}
         </div>
 
         {/* Footer */}

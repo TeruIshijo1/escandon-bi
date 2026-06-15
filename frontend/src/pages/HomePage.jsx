@@ -11,6 +11,7 @@ import { AREAS_LABELS }        from '../utils/rbac';
 import { API_BASE } from '../api/config';
 import EditableKPIWrapper from '../components/shared/EditableKPIWrapper';
 import PBIModal from '../components/shared/PBIModal';
+import { useKPIConfig } from '../hooks/useKPIConfig';
 
 /* ── Widget de acceso rápido ──────────────────────────────── */
 function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 0 }) {
@@ -129,62 +130,16 @@ function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 
   );
 }
 
-/* ── Stat mini ────────────────────────────────────────────── */
-function StatMini({ label, value, delta, color }) {
-  return (
-    <div style={{
-      background:   '#FFFFFF',
-      borderRadius:  '14px',
-      boxShadow:    'var(--shadow-xs)',
-      border:       '1px solid rgba(0, 70, 135, 0.05)',
-      height: '100%',
-      padding: '1.1rem 1rem',
-      boxSizing: 'border-box',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      minHeight: value == null ? '80px' : 'auto',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        fontFamily: 'var(--font-display)',
-        fontSize:'0.64rem',
-        fontWeight:700,
-        textTransform:'uppercase',
-        letterSpacing:'0.06em',
-        color:'var(--text-muted)',
-        marginBottom: value != null ? '0.35rem' : 0
-      }}>{label}</div>
-      {value != null && (
-        <div style={{
-          fontFamily:"var(--font-mono)",
-          fontSize:'1.6rem',
-          fontWeight:700,
-          color: color || 'var(--text-primary)',
-          lineHeight: 1,
-          letterSpacing: '-0.02em',
-        }}>{value}</div>
-      )}
-      {value != null && delta != null && (
-        <div style={{
-          fontFamily: 'var(--font-body)',
-          fontSize:'0.72rem',
-          color:'var(--text-muted)',
-          marginTop:'0.25rem',
-          fontWeight: 500,
-        }}>{delta}</div>
-      )}
-    </div>
-  );
-}
+
 
 /* ── Componente principal ─────────────────────────────────── */
 export default function HomePage() {
   const { user }       = useAuth();
+  const { getKPI }     = useKPIConfig();
   const navigate        = useNavigate();
   const [hora, setHora] = useState('');
   const [pbiModal, setPBIModal] = useState(null);
+  const handleKPIClick = (url, title, url2, url3, multiPagina) => setPBIModal({ url, title, url2, url3, multiPagina });
 
   useEffect(() => {
     const tick = () => setHora(new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit', second:'2-digit' }));
@@ -204,47 +159,24 @@ export default function HomePage() {
       { icon:'📈', title:'Estadísticas', desc:'Datos demográficos y procesos por servicio', path:'/estadisticas', color:'#0088C9' },
       { icon:'👥', title:'Gestión de Usuarios', desc:'Administrar roles, accesos y permisos del sistema', path:'/admin/usuarios', color:'#00974A' },
       { icon:'🛡️', title:'Log de Auditoría', desc:'Historial completo de acciones del sistema', path:'/admin/auditoria-log', color:'#00974A' },
-      { icon:'📄', title:'Exportar Reportes', desc:'PDF ejecutivo y Excel de datos crudos', path:'/reportes', color:'#F59E0B' },
       { icon:'⚙️', title:'Configuración', desc:'Parámetros del sistema y conexiones BI', path:'/admin/configuracion', color:'#8A97A8' },
     ],
     DIRECTOR: [
       { icon:'📊', title:'Dashboard Directivo', desc:'KPIs globales de eficiencia, eficacia y macropanel financiero', path:'/dashboard/directivo', color:'#004687', badge:'Principal' },
-      { icon:'🎯', title:'Panel de Mando', desc:'Vista ejecutiva con indicadores clave del hospital', path:'/dashboard/mando', color:'#005FA9' },
       { icon:'🔍', title:'Auditoría de Inventarios', desc:'Conciliación de órdenes del almacén y consumos', path:'/auditoria/inventarios', color:'#005FA9' },
       { icon:'🏥', title:'Tablero de Área', desc:'Indicadores clínicos por área hospitalaria', path:'/dashboard/area', color:'#0088C9' },
       { icon:'📈', title:'Estadísticas', desc:'Datos demográficos y procesos por servicio', path:'/estadisticas', color:'#0088C9' },
-      { icon:'📄', title:'Exportar Reportes', desc:'PDF ejecutivo y Excel de datos crudos', path:'/reportes', color:'#00974A' },
     ],
     JEFE_AREA: [
       { icon:'🏥', title:`Tablero — ${AREAS_LABELS[user?.area] || 'Mi Área'}`, desc:'Indicadores operativos de tu área asignada', path:'/dashboard/area', color:'#004687', badge:'Mi Área' },
       { icon:'📈', title:'Estadísticas del Área', desc:'Productividad, estancias y tiempos de respuesta', path:'/estadisticas', color:'#0088C9' },
-      { icon:'📄', title:'Exportar Reportes', desc:'PDF y Excel del área', path:'/reportes', color:'#00974A' },
     ],
     USUARIO_OPERATIVO: [
       { icon:'🏥', title:`Tablero — ${AREAS_LABELS[user?.area] || 'Mi Área'}`, desc:'Visualización de indicadores de tu área', path:'/dashboard/area', color:'#004687', badge:'Mi Área' },
-      { icon:'📄', title:'Descargar Reportes', desc:'Exportar datos de tu área en Excel', path:'/reportes', color:'#00974A' },
     ],
   };
 
-  const [stats, setStats] = useState(null);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const token = sessionStorage.getItem('escandon_token');
-        const res = await fetch(`${API_BASE}/dashboard/directivo`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const json = await res.json();
-        if (json.ok) setStats(json.data);
-      } catch (err) {
-        console.error('[HomePage Stats]', err);
-      }
-    };
-    if (user?.role === 'ADMIN' || user?.role === 'DIRECTOR') {
-      fetchStats();
-    }
-  }, [user]);
 
   const cards  = cardsByRole[user?.role] || [];
   const isAdmin = user?.role === 'ADMIN';
@@ -259,7 +191,7 @@ export default function HomePage() {
       `}</style>
 
       {pbiModal && (
-        <PBIModal url={pbiModal.url} title={pbiModal.title} onClose={() => setPBIModal(null)} />
+        <PBIModal {...pbiModal} onClose={() => setPBIModal(null)} />
       )}
 
       {/* ── Hero / Título con ECG pattern ── */}
@@ -308,59 +240,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── Mini stats para Admin/Director ── */}
-      {(user?.role === 'ADMIN' || user?.role === 'DIRECTOR') && stats && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:'0.875rem', marginBottom:'2rem' }}>
-          <EditableKPIWrapper elementoId="homepage.censo" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#004687" style={{height: '100%'}}>
-            <StatMini 
-              label="Censo Actual" 
-              value={stats.censo?.length > 0 ? stats.censo.reduce((s, a) => s + a.Ocupadas, 0) : null} 
-              delta="pacientes activos" 
-              color="var(--color-azul-fuerte)" 
-            />
-          </EditableKPIWrapper>
-          <EditableKPIWrapper elementoId="homepage.ocupacion" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#0088C9" style={{height: '100%'}}>
-            <StatMini 
-              label="Camas Ocupadas" 
-              value={stats.ocupacion?.PctOcupacion != null ? `${stats.ocupacion.PctOcupacion}%` : null} 
-              delta={stats.ocupacion?.TotalCamas ? `${stats.ocupacion.Ocupadas}/${stats.ocupacion.TotalCamas}` : null} 
-              color="var(--color-azul-claro)" 
-            />
-          </EditableKPIWrapper>
-          <EditableKPIWrapper elementoId="homepage.cirugias" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#005FA9" style={{height: '100%'}}>
-            <StatMini 
-              label="Cirugías Hoy" 
-              value={stats.produccion?.CirugiasHoy || null} 
-              delta={stats.produccion?.CirugiasHoy != null ? `${stats.produccion.Realizadas} realizadas` : null} 
-              color="var(--color-azul-cruz)" 
-            />
-          </EditableKPIWrapper>
-          <EditableKPIWrapper elementoId="homepage.estancia" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#00974A" style={{height: '100%'}}>
-            <StatMini 
-              label="Estancia Prom." 
-              value={stats.eficacia?.EstanciaPromedio != null ? `${stats.eficacia.EstanciaPromedio} d` : null} 
-              delta="promedio mensual" 
-              color="var(--color-verde-e)" 
-            />
-          </EditableKPIWrapper>
-          <EditableKPIWrapper elementoId="homepage.mortalidad" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#00974A" style={{height: '100%'}}>
-            <StatMini 
-              label="Mortalidad" 
-              value={stats.eficacia?.TasaMortalidad != null ? `${stats.eficacia.TasaMortalidad}%` : null} 
-              delta="tasa mensual" 
-              color="var(--color-verde-e)" 
-            />
-          </EditableKPIWrapper>
-          <EditableKPIWrapper elementoId="homepage.egresos" isAdmin={isAdmin} onKPIClick={(url, title) => setPBIModal({url, title})} accentColor="#F59E0B" style={{height: '100%'}}>
-            <StatMini 
-              label="Egresos Mes" 
-              value={stats.eficacia?.TotalEgresos || null} 
-              delta="altas totales" 
-              color="#F59E0B" 
-            />
-          </EditableKPIWrapper>
-        </div>
-      )}
+
 
       {/* ── Accesos rápidos ── */}
       <div style={{ marginBottom:'2rem' }}>

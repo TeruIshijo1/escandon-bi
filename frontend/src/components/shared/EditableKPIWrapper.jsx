@@ -77,7 +77,7 @@ export default function EditableKPIWrapper({
   const handleCardClick = () => {
     if (editing) return;
     if (hasPBI) {
-      onKPIClick?.(kpi.pbiUrl, kpi.nombre);
+      onKPIClick?.(kpi.pbiUrl, kpi.nombre, kpi.pbiUrl2, kpi.pbiUrl3, kpi.multiPagina);
     } else if (!!kpi.pbiUrl && !isAdmin) {
       showToast('🔒 No tienes permiso para ver este reporte');
     }

@@ -156,7 +156,7 @@ export default function LoginPage() {
               position: relative;
               width: 100%;
               padding: 0.8rem;
-              background: linear-gradient(135deg, var(--color-azul-medio) 0%, var(--color-azul-oscuro) 100%);
+              background: linear-gradient(135deg, var(--color-azul-claro) 0%, var(--color-azul-fuerte) 100%);
               border: none;
               border-radius: 12px;
               color: white;
@@ -343,7 +343,7 @@ export default function LoginPage() {
                   Validando accesos…
                 </span>
               ) : (
-                'Iniciar Sesión'
+                'Entrar'
               )}
             </button>
           </form>
