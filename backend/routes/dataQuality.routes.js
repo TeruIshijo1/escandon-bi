@@ -1,5 +1,5 @@
 /**
- * dataQuality.routes.js — Endpoints para Control de Calidad de Datos (Opción 10)
+ * dataQuality.routes.js — Endpoints para Control de Calidad de Datos
  * Hospital Escandón BI Platform
  */
 'use strict';
@@ -10,10 +10,24 @@ const dataQualityService = require('../services/dataQuality.service');
 const { authenticate } = require('../middleware/auth.middleware');
 
 /**
+ * POST /api/data-quality/scan — Escanear base de datos del hospital en vivo
+ */
+router.post('/scan', authenticate, async (req, res) => {
+  try {
+    const result = await dataQualityService.runLiveQualityScan();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/data-quality/stats — Obtener indicador global de salud de datos
  */
-router.get('/stats', authenticate, (req, res) => {
+router.get('/stats', authenticate, async (req, res) => {
   try {
+    // Correr escaneo ligero en vivo
+    await dataQualityService.runLiveQualityScan();
     const stats = dataQualityService.getQualityStats();
     res.json({ success: true, data: stats });
   } catch (err) {

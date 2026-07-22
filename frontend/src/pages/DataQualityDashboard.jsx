@@ -1,5 +1,5 @@
 /**
- * DataQualityDashboard.jsx — Control de Calidad de Datos (Opción 10)
+ * DataQualityDashboard.jsx — Control de Calidad de Datos
  * Hospital Escandón BI Platform
  */
 import React, { useState, useEffect } from 'react';
@@ -14,15 +14,15 @@ export default function DataQualityDashboard() {
   });
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
   const [statusFilter, setStatusFilter] = useState('PENDIENTE');
   const [severityFilter, setSeverityFilter] = useState('');
   const [actionNotes, setActionNotes] = useState('');
-  const [selectedIssueId, setSelectedIssueId] = useState(null);
 
   const fetchStatsAndIssues = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('escandon_token');
       const headers = { Authorization: `Bearer ${token}` };
 
       // Fetch stats
@@ -49,13 +49,33 @@ export default function DataQualityDashboard() {
     }
   };
 
+  const handleScanLiveDB = async () => {
+    setScanning(true);
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('escandon_token');
+      const res = await fetch('/api/data-quality/scan', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`🔍 Escaneo completado. Se detectaron ${data.detectedNewIssues || 0} nuevos hallazgos en la base de datos.`);
+      }
+      fetchStatsAndIssues();
+    } catch (err) {
+      alert('Error de conexión al escanear la base de datos.');
+    } finally {
+      setScanning(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatsAndIssues();
   }, [statusFilter, severityFilter]);
 
   const handleResolveIssue = async (id, status) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('escandon_token');
       const res = await fetch(`/api/data-quality/issues/${id}/resolve`, {
         method: 'POST',
         headers: {
@@ -70,7 +90,6 @@ export default function DataQualityDashboard() {
 
       const data = await res.json();
       if (data.success) {
-        setSelectedIssueId(null);
         setActionNotes('');
         fetchStatsAndIssues();
       } else {
@@ -95,11 +114,13 @@ export default function DataQualityDashboard() {
   const getRuleLabel = (rule) => {
     switch (rule) {
       case 'PRECIO_ZERO':
-        return 'Precio $0 o Negativo';
+        return 'Precio $0.00 o Negativo';
       case 'CARGO_DUPLICADO':
         return 'Posible Cargo Duplicado';
       case 'CANTIDAD_ANOMALA':
-        return 'Cantidad Atípica (>50)';
+        return 'Cantidad Atípica (>10)';
+      case 'DEVOLUCION_PENDIENTE':
+        return 'Devolución Pendiente';
       case 'FECHA_INVALIDA':
         return 'Fecha Futura / Inválida';
       default:
@@ -114,26 +135,46 @@ export default function DataQualityDashboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '1.75rem', color: '#0F172A', fontWeight: '800' }}>
-            🛡️ Motor de Control de Calidad de Datos (Opción 10)
+            🛡️ Motor de Control de Calidad de Datos
           </h1>
           <p style={{ margin: '4px 0 0 0', color: '#64748B', fontSize: '0.95rem' }}>
-            Inspección y filtrado automático de anomalías en cargos e inventarios pre-reportes.
+            Inspección y filtrado automático de anomalías en la base de datos en vivo y reportes.
           </p>
         </div>
-        <button
-          onClick={fetchStatsAndIssues}
-          style={{
-            background: '#004687',
-            color: '#FFFFFF',
-            border: 'none',
-            padding: '10px 18px',
-            borderRadius: '8px',
-            fontWeight: '600',
-            cursor: 'pointer',
-          }}
-        >
-          🔄 Actualizar Estado
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={handleScanLiveDB}
+            disabled={scanning}
+            style={{
+              background: '#00974A',
+              color: '#FFFFFF',
+              border: 'none',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: scanning ? 'wait' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            {scanning ? 'Escaneando...' : '🔍 Escanear Base en Vivo'}
+          </button>
+          <button
+            onClick={fetchStatsAndIssues}
+            style={{
+              background: '#004687',
+              color: '#FFFFFF',
+              border: 'none',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            🔄 Actualizar Estado
+          </button>
+        </div>
       </div>
 
       {/* Tarjetas de Métricas de Salud */}
@@ -218,7 +259,7 @@ export default function DataQualityDashboard() {
                 <th style={{ padding: '12px 16px' }}>Origen</th>
                 <th style={{ padding: '12px 16px' }}>Regla Violada</th>
                 <th style={{ padding: '12px 16px' }}>Severidad</th>
-                <th style={{ padding: '12px 16px' }}>Producto / Expediente</th>
+                <th style={{ padding: '12px 16px' }}>Producto / Paciente</th>
                 <th style={{ padding: '12px 16px' }}>Fecha</th>
                 <th style={{ padding: '12px 16px' }}>Estado</th>
                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Acciones</th>
@@ -229,7 +270,7 @@ export default function DataQualityDashboard() {
                 <tr key={issue.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                   <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>#{issue.id}</td>
                   <td style={{ padding: '12px 16px' }}>
-                    <span style={{ fontSize: '0.8rem', background: '#F1F5F9', padding: '3px 8px', borderRadius: '4px' }}>
+                    <span style={{ fontSize: '0.8rem', background: '#F1F5F9', padding: '3px 8px', borderRadius: '4px', fontWeight: '600' }}>
                       {issue.source}
                     </span>
                   </td>
@@ -238,7 +279,7 @@ export default function DataQualityDashboard() {
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ fontWeight: '600', color: '#0F172A' }}>{issue.description}</div>
                     <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                      Código: {issue.item_code} | Exp: {issue.patient_id || 'N/A'}
+                      Código: {issue.item_code} | Paciente: {issue.patient_id || 'N/A'}
                     </div>
                   </td>
                   <td style={{ padding: '12px 16px', color: '#64748B', fontSize: '0.8rem' }}>
