@@ -1,15 +1,16 @@
 /**
- * AriaCopilotWidget.jsx — Copiloto de Inteligencia Analítica Local MAR-IA
+ * AriaCopilotWidget.jsx — Copiloto de Inteligencia Analítica MAR-IA
  * Hospital Escandón BI Platform
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE } from '../../api/config';
 
 export default function AriaCopilotWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
       sender: 'maria',
-      text: '¡Hola! Soy **MAR-IA**, tu asistente de inteligencia analítica local del Hospital Escandón. 🏥✨\n\n¿En qué te puedo ayudar hoy con los datos en vivo?',
+      text: '¡Hola! Soy **MAR-IA**, tu asistente de inteligencia analítica del Hospital Escandón. 🏥✨\n\n¿En qué te puedo ayudar hoy con los datos en vivo?',
       kpis: null,
       table: null,
       suggestions: [
@@ -35,15 +36,14 @@ export default function AriaCopilotWidget() {
     const q = textToSend || inputQuery;
     if (!q.trim() || loading) return;
 
-    // Agregar mensaje del usuario
     const userMsg = { sender: 'user', text: q };
     setMessages((prev) => [...prev, userMsg]);
     if (!textToSend) setInputQuery('');
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('escandon_token');
-      const res = await fetch('/api/aria/query', {
+      const token = sessionStorage.getItem('escandon_token') || localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/aria/query`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,9 +69,10 @@ export default function AriaCopilotWidget() {
         ]);
       }
     } catch (err) {
+      console.error('[MAR-IA Error]', err);
       setMessages((prev) => [
         ...prev,
-        { sender: 'maria', text: 'Error de conexión con el servicio local de MAR-IA.' },
+        { sender: 'maria', text: 'Error de conexión con el servicio de MAR-IA.' },
       ]);
     } finally {
       setLoading(false);
@@ -154,7 +155,7 @@ export default function AriaCopilotWidget() {
                 <div style={{ fontWeight: '800', fontSize: '1rem', letterSpacing: '0.02em' }}>MAR-IA Copilot</div>
                 <div style={{ fontSize: '0.72rem', color: '#93C5FD', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ background: '#10B981', width: 6, height: 6, borderRadius: '50%' }}></span>
-                  Inteligencia Local • 100% Gratuito
+                  En Línea
                 </div>
               </div>
             </div>

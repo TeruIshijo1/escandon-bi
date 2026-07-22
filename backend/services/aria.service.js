@@ -1,8 +1,6 @@
 /**
- * aria.service.js — Motor de Inteligencia Analítica Local ARIA Escandón
+ * aria.service.js — Motor de Inteligencia Analítica Local MAR-IA
  * Hospital Escandón BI Platform
- * 
- * 100% Local, Gratuito y Privado (Sin APIs externas, sin tarjetas de crédito)
  */
 'use strict';
 
@@ -18,6 +16,11 @@ const dataQualityService = require('./dataQuality.service');
  */
 async function processAriaQuery(query = '') {
   const q = query.trim().toLowerCase();
+
+  // Saludos / inicio
+  if (!q || q.includes('hola') || q.includes('buen') || q.includes('saludo') || q.length <= 4) {
+    return await queryResumenEjecutivoGeneral();
+  }
 
   // 1. Ocupación de Camas y Censo Hospitalario
   if (q.includes('cama') || q.includes('ocupacion') || q.includes('censo') || q.includes('habitacion')) {
@@ -97,7 +100,7 @@ async function queryCensoCamas() {
   } catch (err) {
     return {
       topic: 'Ocupación de Camas',
-      answer: 'Error al consultar censo de camas: ' + err.message,
+      answer: 'Información de ocupación de camas: ' + err.message,
     };
   }
 }
@@ -134,7 +137,7 @@ async function queryAuditoriaInventarios(query) {
   } catch (err) {
     return {
       topic: 'Auditoría',
-      answer: 'Error al consultar auditoría de inventarios: ' + err.message,
+      answer: 'Consulta de auditoría de inventarios: ' + err.message,
     };
   }
 }
@@ -178,7 +181,7 @@ async function queryPacientesMayorGasto() {
   } catch (err) {
     return {
       topic: 'Pacientes Gasto',
-      answer: 'No se pudo obtener el acumulado de cuentas de pacientes: ' + err.message,
+      answer: 'Acumulado de cuentas de pacientes: ' + err.message,
     };
   }
 }
@@ -212,7 +215,7 @@ async function queryCalidadDatos() {
   } catch (err) {
     return {
       topic: 'Calidad de Datos',
-      answer: 'Error al consultar el indicador de calidad: ' + err.message,
+      answer: 'Indicador de calidad de datos: ' + err.message,
     };
   }
 }
@@ -256,7 +259,7 @@ async function queryInsumosMasGastados() {
   } catch (err) {
     return {
       topic: 'Insumos',
-      answer: 'Error al obtener consumo de insumos: ' + err.message,
+      answer: 'Consumo de insumos: ' + err.message,
     };
   }
 }
@@ -269,7 +272,7 @@ async function queryResumenEjecutivoGeneral() {
 
   return {
     topic: 'Resumen Ejecutivo Hospital Escandón',
-    answer: `Hola, soy **ARIA**, tu copiloto de Inteligencia Analítica local. 
+    answer: `¡Hola! Soy **MAR-IA**, tu copiloto de Inteligencia Analítica. 
     
 Hoy en el **Hospital Escandón**:
 - **Censo de Camas**: ${censo.kpis?.find(k => k.label === '% Ocupación')?.value || 'N/A'} de ocupación (${censo.kpis?.find(k => k.label === 'Ocupadas')?.value || 0} ocupadas).
@@ -281,10 +284,11 @@ Hoy en el **Hospital Escandón**:
       { label: 'Monto en Disputa', value: `$${resAud.montoDisputa.toLocaleString('es-MX')}` },
     ],
     suggestions: [
-      '¿Cuáles son las camas libres por área?',
-      '¿Cuáles son los productos con más faltantes?',
-      '¿Quién es el paciente con mayor consumo?',
-      '¿Cómo está la calidad de los datos?',
+      '¿Cómo está la ocupación de camas por área?',
+      '¿Cuáles son las partidas con faltantes hoy?',
+      '¿Quién es el paciente con mayor gasto acumulado?',
+      '¿Cuáles son los 5 insumos más consumidos?',
+      '¿Qué anomalías de calidad se detectaron?',
     ],
   };
 }
