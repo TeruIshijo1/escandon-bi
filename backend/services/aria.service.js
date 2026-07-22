@@ -1,6 +1,8 @@
 /**
  * aria.service.js — Motor de Inteligencia Analítica Local MAR-IA
  * Hospital Escandón BI Platform
+ * 
+ * 100% Local, Gratuito y Privado (Sin APIs externas, sin tarjetas de crédito)
  */
 'use strict';
 
@@ -18,32 +20,37 @@ async function processAriaQuery(query = '') {
   const q = query.trim().toLowerCase();
 
   // Saludos / inicio
-  if (!q || q.includes('hola') || q.includes('buen') || q.includes('saludo') || q.length <= 4) {
+  if (!q || q === 'hola' || q === 'buenos dias' || q === 'buenas tardes' || q.length <= 4) {
     return await queryResumenEjecutivoGeneral();
   }
 
-  // 1. Ocupación de Camas y Censo Hospitalario
-  if (q.includes('cama') || q.includes('ocupacion') || q.includes('censo') || q.includes('habitacion')) {
+  // 1. Médicos que Más Ingresos Aportan / Productividad Médica
+  if (q.includes('medico') || q.includes('médico') || q.includes('doctor') || q.includes('ingreso') || q.includes('aporta') || q.includes('productividad')) {
+    return await queryMedicosMasIngresos();
+  }
+
+  // 2. Ocupación de Camas y Censo Hospitalario
+  if (q.includes('cama') || q.includes('ocupacion') || q.includes('ocupación') || q.includes('censo') || q.includes('habitacion') || q.includes('habitación')) {
     return await queryCensoCamas();
   }
 
-  // 2. Discrepancias, Faltantes e Inventarios vs Cargos
+  // 3. Discrepancias, Faltantes e Inventarios vs Cargos
   if (q.includes('faltante') || q.includes('discrepancia') || q.includes('inventario') || q.includes('diferencia') || q.includes('disputa')) {
     return await queryAuditoriaInventarios(q);
   }
 
-  // 3. Pacientes con Mayor Gasto / Consumo
+  // 4. Pacientes con Mayor Gasto / Consumo
   if (q.includes('paciente') || q.includes('gasto') || q.includes('cuenta') || q.includes('cobro')) {
     return await queryPacientesMayorGasto();
   }
 
-  // 4. Calidad de Datos y Anomalías
-  if (q.includes('calidad') || q.includes('limpieza') || q.includes('anomalia') || q.includes('alerta') || q.includes('error')) {
+  // 5. Calidad de Datos y Anomalías
+  if (q.includes('calidad') || q.includes('limpieza') || q.includes('anomalia') || q.includes('anomalía') || q.includes('alerta') || q.includes('error')) {
     return await queryCalidadDatos();
   }
 
-  // 5. Insumos Más Gastados / Frecuentes
-  if (q.includes('insumo') || q.includes('medicamento') || q.includes('producto') || q.includes('mas gastado') || q.includes('articulo')) {
+  // 6. Insumos Más Gastados / Frecuentes
+  if (q.includes('insumo') || q.includes('medicamento') || q.includes('producto') || q.includes('mas gastado') || q.includes('articulo') || q.includes('artículo')) {
     return await queryInsumosMasGastados();
   }
 
@@ -51,12 +58,55 @@ async function processAriaQuery(query = '') {
   return await queryResumenEjecutivoGeneral();
 }
 
-/* ── 1. Censo de Camas ───────────────────────────────────────── */
+/* ── 1. Médicos por Mayor Aporte de Ingresos ─────────────────── */
+async function queryMedicosMasIngresos() {
+  try {
+    const pool = await getRemoteDb();
+    const res = await pool.request().query(`
+      SELECT TOP 5
+        Medico_Solicitante                                      AS Medico,
+        COUNT(*)                                               AS TotalCargos,
+        SUM(ISNULL(TOTAL_COBRADO, ISNULL(TOTAL_SIN_DESC, 0)))  AS IngresosGenerados
+      FROM UDR_CUENTAS_SERVICIOS
+      WHERE Medico_Solicitante IS NOT NULL AND Medico_Solicitante != ''
+      GROUP BY Medico_Solicitante
+      ORDER BY IngresosGenerados DESC
+    `);
+
+    const rows = res.recordset || [];
+    const topMedico = rows[0] || {};
+    const montoTop = parseFloat(topMedico.IngresosGenerados || 0);
+
+    return {
+      topic: 'Productividad e Ingresos por Médico',
+      answer: `El médico que **más ingresos aporta al Hospital Escandón** es el **Dr. ${topMedico.Medico}** con una facturación acumulada de **$${montoTop.toLocaleString('es-MX')} MXN** generada en ${topMedico.TotalCargos} cargos/atenciones registradas.`,
+      kpis: [
+        { label: 'Médico #1 en Ingresos', value: `Dr. ${topMedico.Medico}` },
+        { label: 'Ingreso Generado', value: `$${montoTop.toLocaleString('es-MX')}`, color: '#16A34A' },
+        { label: 'Total Atenciones', value: topMedico.TotalCargos, color: '#004687' },
+      ],
+      table: {
+        headers: ['Nombre del Médico', 'Total Cargos', 'Ingresos Generados ($)'],
+        rows: rows.map(r => [
+          `Dr. ${r.Medico}`,
+          r.TotalCargos,
+          `$${parseFloat(r.IngresosGenerados || 0).toLocaleString('es-MX')}`,
+        ]),
+      },
+    };
+  } catch (err) {
+    return {
+      topic: 'Productividad Médica',
+      answer: 'Error al obtener los ingresos por médico: ' + err.message,
+    };
+  }
+}
+
+/* ── 2. Censo de Camas ───────────────────────────────────────── */
 async function queryCensoCamas() {
   try {
     const pool = await getRemoteDb();
     
-    // Obtener catálogo de camas reales (sin virtuales)
     const bedsResult = await pool.request().query(`
       SELECT DISTINCT RoomCode, RoomName 
       FROM V_MRPT 
@@ -69,7 +119,6 @@ async function queryCensoCamas() {
     const allRealBeds = bedsResult.recordset || [];
     const totalBeds = allRealBeds.length;
 
-    // Obtener camas ocupadas actualmente (filtrando virtuales)
     const occupiedResult = await pool.request().query(`
       WITH CTE AS (
         SELECT 
@@ -120,7 +169,7 @@ async function queryCensoCamas() {
   }
 }
 
-/* ── 2. Auditoría de Inventarios vs Cargos ───────────────────── */
+/* ── 3. Auditoría de Inventarios vs Cargos ───────────────────── */
 async function queryAuditoriaInventarios(query) {
   try {
     const estado = query.includes('faltante') ? 'FALTANTE' : query.includes('excedente') ? 'EXCEDENTE' : null;
@@ -157,7 +206,7 @@ async function queryAuditoriaInventarios(query) {
   }
 }
 
-/* ── 3. Pacientes con Mayor Gasto Acumulado ──────────────────── */
+/* ── 4. Pacientes con Mayor Gasto Acumulado ──────────────────── */
 async function queryPacientesMayorGasto() {
   try {
     const pool = await getRemoteDb();
@@ -201,7 +250,7 @@ async function queryPacientesMayorGasto() {
   }
 }
 
-/* ── 4. Calidad de Datos y Anomalías ─────────────────────────── */
+/* ── 5. Calidad de Datos y Anomalías ─────────────────────────── */
 async function queryCalidadDatos() {
   try {
     await dataQualityService.runLiveQualityScan();
@@ -235,7 +284,7 @@ async function queryCalidadDatos() {
   }
 }
 
-/* ── 5. Insumos Más Gastados ─────────────────────────────────── */
+/* ── 6. Insumos Más Gastados ─────────────────────────────────── */
 async function queryInsumosMasGastados() {
   try {
     const pool = await getRemoteDb();
@@ -299,11 +348,11 @@ Hoy en el **Hospital Escandón**:
       { label: 'Monto en Disputa', value: `$${resAud.montoDisputa.toLocaleString('es-MX')}` },
     ],
     suggestions: [
-      '¿Cómo está la ocupación de camas por área?',
-      '¿Cuáles son las partidas con faltantes hoy?',
-      '¿Quién es el paciente con mayor gasto acumulado?',
-      '¿Cuáles son los 5 insumos más consumidos?',
-      '¿Qué anomalías de calidad se detectaron?',
+      '👨‍⚕️ ¿Quién es el médico que más ingresos aporta?',
+      '🛏️ ¿Cómo está la ocupación de camas por área?',
+      '🔍 ¿Cuáles son las partidas con faltantes hoy?',
+      '💰 ¿Quién es el paciente con mayor gasto acumulado?',
+      '💊 ¿Cuáles son los 5 insumos más consumidos?',
     ],
   };
 }
