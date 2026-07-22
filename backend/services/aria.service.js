@@ -55,7 +55,22 @@ async function processAriaQuery(query = '') {
 async function queryCensoCamas() {
   try {
     const pool = await getRemoteDb();
-    const res = await pool.request().query(`
+    
+    // Obtener catálogo de camas reales (sin virtuales)
+    const bedsResult = await pool.request().query(`
+      SELECT DISTINCT RoomCode, RoomName 
+      FROM V_MRPT 
+      WHERE RoomName LIKE '%CAMA%' 
+        AND RoomName IS NOT NULL
+        AND RoomName NOT LIKE '%VIRTUAL%' 
+        AND RoomName NOT LIKE '%VIRT%' 
+        AND RoomCode NOT LIKE '%VIRT%'
+    `);
+    const allRealBeds = bedsResult.recordset || [];
+    const totalBeds = allRealBeds.length;
+
+    // Obtener camas ocupadas actualmente (filtrando virtuales)
+    const occupiedResult = await pool.request().query(`
       WITH CTE AS (
         SELECT 
           V.RoomCode AS Cama, 
@@ -70,24 +85,24 @@ async function queryCensoCamas() {
           AND PC.PCType IN ('IP', 'ER')
           AND PC.MedicalDischargeDate IS NULL
           AND V.RoomCode IS NOT NULL
+          AND V.RoomName NOT LIKE '%VIRTUAL%'
+          AND V.RoomName NOT LIKE '%VIRT%'
+          AND V.RoomCode NOT LIKE '%VIRT%'
       )
       SELECT Cama, Area, Paciente, Medico
       FROM CTE WHERE rn = 1
     `);
 
-    const ocupadas = res.recordset || [];
-    
-    const totalBedsRes = await pool.request().query(`SELECT COUNT(*) AS total FROM V_MRPT WHERE RoomName LIKE '%CAMA%' OR RoomCode LIKE '%CAMA%'`);
-    const totalBeds = totalBedsRes.recordset[0]?.total || 30;
+    const ocupadas = occupiedResult.recordset || [];
     const ocupadasCount = ocupadas.length;
     const libresCount = Math.max(0, totalBeds - ocupadasCount);
-    const porcentaje = Math.round((ocupadasCount / totalBeds) * 100);
+    const porcentaje = totalBeds > 0 ? Math.round((ocupadasCount / totalBeds) * 100) : 0;
 
     return {
-      topic: 'Ocupación de Camas',
-      answer: `Actualmente el hospital registra una ocupación hospitalaria del **${porcentaje}%** con **${ocupadasCount} camas ocupadas** y **${libresCount} camas disponibles** de un censo total de ${totalBeds} camas.`,
+      topic: 'Ocupación de Camas Físicas',
+      answer: `Actualmente el hospital cuenta con un censo de **${totalBeds} camas físicas reales** (excluyendo camas virtuales). Se registra una ocupación del **${porcentaje}%** con **${ocupadasCount} camas ocupadas** y **${libresCount} disponibles**.`,
       kpis: [
-        { label: 'Total Camas', value: totalBeds },
+        { label: 'Total Camas Físicas', value: totalBeds },
         { label: 'Ocupadas', value: ocupadasCount, color: '#004687' },
         { label: 'Disponibles', value: libresCount, color: '#16A34A' },
         { label: '% Ocupación', value: `${porcentaje}%`, color: porcentaje > 85 ? '#DC2626' : '#0088C9' },
@@ -100,7 +115,7 @@ async function queryCensoCamas() {
   } catch (err) {
     return {
       topic: 'Ocupación de Camas',
-      answer: 'Información de ocupación de camas: ' + err.message,
+      answer: 'Error al consultar censo de camas: ' + err.message,
     };
   }
 }
@@ -275,11 +290,11 @@ async function queryResumenEjecutivoGeneral() {
     answer: `¡Hola! Soy **MAR-IA**, tu copiloto de Inteligencia Analítica. 
     
 Hoy en el **Hospital Escandón**:
-- **Censo de Camas**: ${censo.kpis?.find(k => k.label === '% Ocupación')?.value || 'N/A'} de ocupación (${censo.kpis?.find(k => k.label === 'Ocupadas')?.value || 0} ocupadas).
+- **Censo de Camas Físicas**: ${censo.kpis?.find(k => k.label === '% Ocupación')?.value || 'N/A'} de ocupación (${censo.kpis?.find(k => k.label === 'Ocupadas')?.value || 0} ocupadas de ${censo.kpis?.find(k => k.label === 'Total Camas Físicas')?.value || 40} reales).
 - **Auditoría de Inventarios**: ${resAud.diferencias} discrepancias pendientes acumulando $${resAud.montoDisputa.toLocaleString('es-MX')} en disputa.
 - **Servicios Conectados**: Base de datos **KH_HE SQL Server en vivo** activa y respondiendo.`,
     kpis: [
-      { label: 'Ocupación Camas', value: censo.kpis?.find(k => k.label === '% Ocupación')?.value || '0%' },
+      { label: 'Ocupación Camas Físicas', value: censo.kpis?.find(k => k.label === '% Ocupación')?.value || '0%' },
       { label: 'Discrepancias Auditadas', value: resAud.diferencias },
       { label: 'Monto en Disputa', value: `$${resAud.montoDisputa.toLocaleString('es-MX')}` },
     ],

@@ -602,16 +602,19 @@ router.get('/censo-camas', authenticate, async (req, res, next) => {
   try {
     const pool = await connectRemoteDB();
 
-    // 1. Obtener listado maestro de camas
+    // 1. Obtener listado maestro de camas reales (excluyendo virtuales)
     const bedsResult = await pool.request().query(`
       SELECT DISTINCT RoomCode, RoomName 
       FROM V_MRPT 
       WHERE RoomName LIKE '%CAMA%' 
         AND RoomName IS NOT NULL
+        AND RoomName NOT LIKE '%VIRTUAL%'
+        AND RoomName NOT LIKE '%VIRT%'
+        AND RoomCode NOT LIKE '%VIRT%'
     `);
     const allBeds = bedsResult.recordset;
 
-    // 2. Obtener camas ocupadas actualmente (última cama asignada)
+    // 2. Obtener camas ocupadas actualmente (última cama asignada sin virtuales)
     const occupiedResult = await pool.request().query(`
       WITH CTE AS (
         SELECT 
@@ -626,6 +629,9 @@ router.get('/censo-camas', authenticate, async (req, res, next) => {
           AND PC.PCType IN ('IP', 'ER')
           AND PC.MedicalDischargeDate IS NULL
           AND V.RoomCode IS NOT NULL
+          AND V.RoomName NOT LIKE '%VIRTUAL%'
+          AND V.RoomName NOT LIKE '%VIRT%'
+          AND V.RoomCode NOT LIKE '%VIRT%'
       )
       SELECT RoomCode, Paciente, Medico
       FROM CTE 
