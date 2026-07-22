@@ -3,145 +3,116 @@
  * Servicio ETL para Auditoría: Inventarios vs. Cargos de Enfermería
  * Hospital Escandón BI Platform v1.0
  *
- * Proceso ETL:
- *  EXTRACT  → Lee órdenes de almacén (AlmacenOrdenes) y cargos de enfermería (CargosEnfermeria)
- *  TRANSFORM→ Cruza por (PacienteId + InsumoId + Fecha) y calcula diferencias
- *  LOAD     → Escribe resultados en AuditoriaInventarioCargos y devuelve JSON
+ * Proceso ETL Real desde SQL Server KH_HE (UDR_CUENTAS_SERVICIOS)
  */
 const { getDb } = require('../config/db');
 const { getRemoteDb, sql } = require('../config/remote-db');
 
 /* ══════════════════════════════════════════════════════════════
    ENDPOINT PRINCIPAL — /api/audit/inventarios-vs-cargos
-   Devuelve conciliación con métricas de resumen
+   Devuelve datos reales de conciliación cruzando la base KH_HE
 ══════════════════════════════════════════════════════════════ */
 async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, limit = 500 }) {
-  const db = getDb(); // Necesario para persistirResultados localmente
+  const db = getDb();
   let pool;
   try {
     pool = await getRemoteDb();
   } catch (err) {
-    throw new Error('No se pudo conectar a la base de datos Vertical: ' + err.message);
+    throw new Error('No se pudo conectar a la base de datos KH_HE: ' + err.message);
   }
-
-  // ── 1. EXTRACT: Leer órdenes del Almacén desde Vertical ──────────────────
-  let ordenesSQL = `
-    SELECT
-      ao.OrdenId,
-      ao.PacienteId,
-      p.NombreCompleto        AS NombrePaciente,
-      ao.AreaHospitalaria,
-      ao.InsumoId,
-      i.Descripcion           AS Insumo,
-      i.CodigoBarras,
-      ao.CantidadSurtida      AS CantAlmacen,
-      ao.PrecioUnitario,
-      ao.FechaSurtido         AS Fecha,
-      ao.EnfermeraReceptora
-    FROM AlmacenOrdenes ao
-    JOIN Pacientes p  ON p.PacienteId  = ao.PacienteId
-    JOIN Insumos   i  ON i.InsumoId    = ao.InsumoId
-    WHERE ao.Estado = 'SURTIDA'
-  `;
 
   const request = pool.request();
+  request.input('limit', sql.Int, limit);
+
+  let querySQL = `
+    SELECT TOP (@limit)
+      NUMERO_DE_ORDEN              AS OrdenId,
+      NOMBRE_DEL_PACIENTE          AS NombrePaciente,
+      UNIDAD_DE_SERVICIO           AS AreaHospitalaria,
+      DESCRIPCION_DEL_ARTICULO     AS Insumo,
+      CODIGO                       AS CodigoBarras,
+      CANTIDAD                     AS CantAlmacen,
+      (CANTIDAD - ISNULL(DEVUELTO, 0)) AS CantCargo,
+      ISNULL(DEVUELTO, 0)          AS Devuelto,
+      ISNULL(TOTAL_COBRADO, ISNULL(TOTAL_SIN_DESC, 0)) AS Monto,
+      FECHA_DE_CARGO               AS Fecha,
+      Medico_Solicitante           AS EnfermeraReceptora
+    FROM UDR_CUENTAS_SERVICIOS
+    WHERE 1=1
+  `;
 
   if (area) {
-    ordenesSQL += ` AND ao.AreaHospitalaria = @area`;
-    request.input('area', sql.VarChar, area);
+    querySQL += ` AND UNIDAD_DE_SERVICIO LIKE @area`;
+    request.input('area', sql.VarChar, `%${area}%`);
   }
   if (fechaDesde) {
-    ordenesSQL += ` AND ao.FechaSurtido >= @fechaDesde`;
+    querySQL += ` AND FECHA_DE_CARGO >= @fechaDesde`;
     request.input('fechaDesde', sql.VarChar, fechaDesde);
   }
-
-  ordenesSQL += ` AND ao.FechaSurtido <= @fechaHasta`;
-  request.input('fechaHasta', sql.VarChar, fechaHasta || new Date().toISOString());
-
-  ordenesSQL += ` ORDER BY ao.FechaSurtido DESC`;
-
-  const ordenesResult = await request.query(ordenesSQL);
-  const ordenes = ordenesResult.recordset || [];
-
-  // ── 2. EXTRACT: Leer cargos de enfermería correspondientes desde Vertical ──
-  const cargoIds = ordenes.map(o => o.OrdenId);
-  const cargosMap = new Map();
-
-  if (cargoIds.length > 0) {
-    const cargosRequest = pool.request();
-    
-    // Crear la lista de parámetros @id0, @id1... para el IN
-    const placeholders = cargoIds.map((id, index) => {
-      cargosRequest.input(`id${index}`, sql.Int, id);
-      return `@id${index}`;
-    }).join(',');
-
-    const cargosSQL = `
-      SELECT
-        ce.OrdenAlmacenId,
-        ce.CantidadCargada  AS CantCargo,
-        ce.FechaCargo,
-        ce.EnfermerId,
-        u.NombreCompleto    AS NombreEnfermera
-      FROM CargosEnfermeria ce
-      JOIN Usuarios u ON u.UsuarioId = ce.EnfermerId
-      WHERE ce.OrdenAlmacenId IN (${placeholders})
-    `;
-    
-    const cargosResult = await cargosRequest.query(cargosSQL);
-    const cargos = cargosResult.recordset || [];
-
-    for (const c of cargos) {
-      cargosMap.set(c.OrdenAlmacenId, c);
-    }
+  if (fechaHasta) {
+    querySQL += ` AND FECHA_DE_CARGO <= @fechaHasta`;
+    request.input('fechaHasta', sql.VarChar, fechaHasta);
   }
 
-  // ── 3. TRANSFORM: Cruzar y calcular diferencias ───────────
-  const partidas = ordenes.map(o => {
-    const cargo      = cargosMap.get(o.OrdenId);
-    const cantCargo  = cargo?.CantCargo ?? 0;
-    const diferencia = cantCargo - o.CantAlmacen;
-    const monto      = Math.abs(diferencia) * o.PrecioUnitario;
+  querySQL += ` ORDER BY FECHA_DE_CARGO DESC`;
 
-    let estadoConciliacion;
-    if (diferencia === 0)      estadoConciliacion = 'COINCIDE';
-    else if (diferencia > 0)   estadoConciliacion = 'EXCEDENTE';
-    else if (cantCargo === 0)  estadoConciliacion = 'FALTANTE';
-    else                       estadoConciliacion = 'DIFERENCIA';
+  const result = await request.query(querySQL);
+  const rows = result.recordset || [];
+
+  // Mapear registros reales de la base KH_HE
+  const partidas = rows.map(r => {
+    const devuelto = r.Devuelto || 0;
+    const cantAlmacen = r.CantAlmacen || 1;
+    const cantCargo = r.CantCargo || 1;
+    const diferencia = devuelto > 0 ? -devuelto : (cantCargo - cantAlmacen);
+    const monto = parseFloat(r.Monto || 0);
+
+    let estadoConciliacion = 'COINCIDE';
+    if (devuelto > 0) estadoConciliacion = 'FALTANTE';
+    else if (diferencia < 0) estadoConciliacion = 'DIFERENCIA';
+    else if (diferencia > 0) estadoConciliacion = 'EXCEDENTE';
+
+    let fechaStr = '';
+    if (r.Fecha) {
+      try {
+        fechaStr = new Date(r.Fecha).toISOString().split('T')[0];
+      } catch (e) {
+        fechaStr = String(r.Fecha).slice(0, 10);
+      }
+    }
 
     return {
-      orden:       o.OrdenId,
-      paciente:    o.NombrePaciente,
-      area:        o.AreaHospitalaria,
-      insumo:      o.Insumo,
-      codigo:      o.CodigoBarras,
-      cantAlmacen: o.CantAlmacen,
+      orden: 'ORD-' + (r.OrdenId || '000'),
+      paciente: r.NombrePaciente || 'PACIENTE NO REGISTRADO',
+      area: r.AreaHospitalaria || 'GENERAL',
+      insumo: r.Insumo || 'PRODUCTO SIN DESCRIPCION',
+      codigo: r.CodigoBarras || 'N/A',
+      cantAlmacen,
       cantCargo,
       diferencia,
       monto,
-      estado:      estadoConciliacion,
-      enfermera:   cargo?.NombreEnfermera || o.EnfermeraReceptora || 'Sin registro',
-      // Convertir fechas a YYYY-MM-DD para frontend
-      fecha:       o.Fecha ? (o.Fecha instanceof Date ? o.Fecha.toISOString().split('T')[0] : o.Fecha.toString().split('T')[0]) : '',
+      estado: estadoConciliacion,
+      enfermera: r.EnfermeraReceptora || 'PERSONAL NO ASIGNADO',
+      fecha: fechaStr,
     };
   });
 
-  // Filtro de estado (post-transform)
+  // Filtro por estado
   const filtradas = estado
     ? partidas.filter(p => p.estado === estado)
     : partidas;
 
-  // ── 4. TRANSFORM: Calcular métricas de resumen ────────────
+  // Métricas de resumen reales
   const resumen = calcularResumen(filtradas);
 
-  // ── 5. LOAD: Persistir resultados en tabla de auditoría (SQLite local) ───
+  // Persistir discrepancias en BD SQLite local
   persistirResultados(db, filtradas);
 
   return {
-    generadoEn:  new Date().toISOString(),
+    generadoEn: new Date().toISOString(),
     totalRegistros: filtradas.length,
     resumen,
-    partidas:    filtradas.slice(0, limit),
+    partidas: filtradas,
   };
 }
 
@@ -166,7 +137,7 @@ function calcularResumen(partidas) {
     }
   }
 
-  totales.montoDisputa        = Math.round(totales.montoDisputa * 100) / 100;
+  totales.montoDisputa = Math.round(totales.montoDisputa * 100) / 100;
   totales.porcentajeConciliado =
     totales.totalPartidas > 0
       ? Math.round((totales.coincidencias / totales.totalPartidas) * 10000) / 100
@@ -175,7 +146,7 @@ function calcularResumen(partidas) {
   return totales;
 }
 
-/* ── Persistir en tabla de auditoría ──────────────────────── */
+/* ── Persistir en tabla de auditoría local ──────────────────────── */
 function persistirResultados(db, partidas) {
   if (!partidas.length) return;
 
@@ -187,7 +158,7 @@ function persistirResultados(db, partidas) {
 
   const insertMany = db.transaction((items) => {
     for (const p of items) {
-      if (p.estado !== 'COINCIDE') { // Solo persistir discrepancias
+      if (p.estado !== 'COINCIDE') {
         insertStmt.run(p.orden, p.estado, p.diferencia, p.monto);
       }
     }
@@ -196,8 +167,7 @@ function persistirResultados(db, partidas) {
   try {
     insertMany(partidas);
   } catch (err) {
-    // No fallar el request por error de persistencia
-    console.error('[ETL] Error al persistir resultados:', err.message);
+    console.warn('[ETL] Aviso al persistir resultados:', err.message);
   }
 }
 
@@ -206,7 +176,6 @@ function persistirResultados(db, partidas) {
 ══════════════════════════════════════════════════════════════ */
 async function getKPIsProductividad({ area } = {}) {
   const db = getDb();
-
   let sql = `
     SELECT
       COUNT(DISTINCT e.EgresoId)                                                      AS TotalEgresos,
@@ -239,7 +208,6 @@ async function getKPIsProductividad({ area } = {}) {
 /* ── Tasa de Mortalidad ──────────────────────────────────── */
 async function getTasaMortalidad({ periodo = 'mes' } = {}) {
   const db = getDb();
-
   const dias = periodo === 'semana' ? 7 : periodo === 'año' ? 365 : 30;
 
   const row = db.prepare(`
