@@ -2,7 +2,7 @@
  * aria.service.js — Motor de Inteligencia Analítica Local MAR-IA
  * Hospital Escandón BI Platform
  * 
- * 100% Local, Gratuito y Privado (Sin APIs externas, sin tarjetas de crédito)
+ * 100% Local, Gratuito y Privado con Búsqueda Dinámica Multitabla en Tiempo Real
  */
 'use strict';
 
@@ -19,43 +19,148 @@ const dataQualityService = require('./dataQuality.service');
 async function processAriaQuery(query = '') {
   const q = query.trim().toLowerCase();
 
-  // Saludos / inicio
-  if (!q || q === 'hola' || q === 'buenos dias' || q === 'buenas tardes' || q.length <= 4) {
+  // 1. Saludos / inicio
+  if (!q || q === 'hola' || q === 'buenos dias' || q === 'buenas tardes' || q.length <= 3) {
     return await queryResumenEjecutivoGeneral();
   }
 
-  // 1. Médicos que Más Ingresos Aportan / Productividad Médica
-  if (q.includes('medico') || q.includes('médico') || q.includes('doctor') || q.includes('ingreso') || q.includes('aporta') || q.includes('productividad')) {
+  // 2. Médicos que Más Ingresos Aportan / Productividad Médica
+  if (q.includes('medico que mas') || q.includes('médico que más') || q.includes('doctor que mas') || q.includes('mas ingresos') || q.includes('más ingresos') || q.includes('productividad')) {
     return await queryMedicosMasIngresos();
   }
 
-  // 2. Ocupación de Camas y Censo Hospitalario
-  if (q.includes('cama') || q.includes('ocupacion') || q.includes('ocupación') || q.includes('censo') || q.includes('habitacion') || q.includes('habitación')) {
+  // 3. Ocupación de Camas y Censo Hospitalario
+  if (q.includes('ocupacion de camas') || q.includes('ocupación de camas') || q.includes('censo') || q.includes('habitaciones libres')) {
     return await queryCensoCamas();
   }
 
-  // 3. Discrepancias, Faltantes e Inventarios vs Cargos
-  if (q.includes('faltante') || q.includes('discrepancia') || q.includes('inventario') || q.includes('diferencia') || q.includes('disputa')) {
+  // 4. Discrepancias, Faltantes e Inventarios vs Cargos
+  if (q.includes('discrepancias') || q.includes('faltantes hoy') || q.includes('auditoria de inventarios')) {
     return await queryAuditoriaInventarios(q);
   }
 
-  // 4. Pacientes con Mayor Gasto / Consumo
-  if (q.includes('paciente') || q.includes('gasto') || q.includes('cuenta') || q.includes('cobro')) {
-    return await queryPacientesMayorGasto();
-  }
-
   // 5. Calidad de Datos y Anomalías
-  if (q.includes('calidad') || q.includes('limpieza') || q.includes('anomalia') || q.includes('anomalía') || q.includes('alerta') || q.includes('error')) {
+  if (q.includes('anomalias de calidad') || q.includes('score de limpieza') || q.includes('alertas de calidad')) {
     return await queryCalidadDatos();
   }
 
   // 6. Insumos Más Gastados / Frecuentes
-  if (q.includes('insumo') || q.includes('medicamento') || q.includes('producto') || q.includes('mas gastado') || q.includes('articulo') || q.includes('artículo')) {
+  if (q.includes('insumos mas consumidos') || q.includes('insumos más consumidos') || q.includes('5 insumos')) {
     return await queryInsumosMasGastados();
   }
 
-  // Fallback inteligente general
-  return await queryResumenEjecutivoGeneral();
+  // 🔍 7. BÚSQUEDA DINÁMICA MULTITABLA EN TIEMPO REAL
+  // Para cualquier otra pregunta abierta (paciente, insumo, médico, área, procedimiento, etc.)
+  return await searchDatabaseDynamically(query);
+}
+
+/* ── 🔍 Búsqueda Dinámica Multitabla en Tiempo Real ───────────── */
+async function searchDatabaseDynamically(userQuery) {
+  try {
+    const pool = await getRemoteDb();
+
+    // Ruido / Palabras de relleno a ignorar
+    const fillerWords = [
+      'busca', 'buscar', 'quien', 'quién', 'como', 'cómo', 'cuanto', 'cuánto', 'donde', 'dónde',
+      'muestrame', 'muéstrame', 'dame', 'sobre', 'para', 'este', 'esta', 'estos', 'estas', 'del',
+      'los', 'las', 'con', 'por', 'que', 'qué', 'una', 'uno', 'unos', 'unas', 'doctor', 'dr', 'dra',
+      'medico', 'médico', 'paciente', 'insumo', 'servicio', 'gastado', 'consumido', 'precio', 'costo',
+      'hospital', 'cuenta', 'registros', 'datos', 'puedes', 'decirme', 'saber', 'ver'
+    ];
+
+    const rawTokens = userQuery
+      .toLowerCase()
+      .replace(/[?¿!¡,.]/g, '')
+      .split(/\s+/);
+
+    const searchTerms = rawTokens.filter(w => w.length >= 3 && !fillerWords.includes(w));
+    const finalTerms = searchTerms.length > 0 ? searchTerms : rawTokens.filter(w => w.length >= 3);
+
+    if (finalTerms.length === 0) {
+      return await queryResumenEjecutivoGeneral();
+    }
+
+    const whereClauses = finalTerms.map((_, idx) => `(
+      NOMBRE_DEL_PACIENTE LIKE @kw${idx} OR
+      DESCRIPCION_DEL_ARTICULO LIKE @kw${idx} OR
+      UNIDAD_DE_SERVICIO LIKE @kw${idx} OR
+      Medico_Solicitante LIKE @kw${idx} OR
+      CODIGO LIKE @kw${idx} OR
+      GRUPO_DE_ARTICULOS LIKE @kw${idx}
+    )`).join(' OR ');
+
+    const request = pool.request();
+    finalTerms.forEach((term, idx) => {
+      request.input(`kw${idx}`, `%${term}%`);
+    });
+
+    const querySQL = `
+      SELECT TOP 25
+        NUMERO_DE_ORDEN          AS OrdenId,
+        NOMBRE_DEL_PACIENTE      AS Paciente,
+        UNIDAD_DE_SERVICIO       AS Area,
+        DESCRIPCION_DEL_ARTICULO AS Insumo,
+        CODIGO                   AS Codigo,
+        CANTIDAD                 AS Cantidad,
+        ISNULL(TOTAL_COBRADO, ISNULL(TOTAL_SIN_DESC, 0)) AS Monto,
+        FECHA_DE_CARGO           AS Fecha,
+        Medico_Solicitante       AS Medico
+      FROM UDR_CUENTAS_SERVICIOS
+      WHERE ${whereClauses}
+      ORDER BY FECHA_DE_CARGO DESC
+    `;
+
+    const res = await request.query(querySQL);
+    const rows = res.recordset || [];
+
+    if (rows.length === 0) {
+      return {
+        topic: `Búsqueda: ${userQuery}`,
+        answer: `No encontré registros en la base de datos en vivo que coincidan con la búsqueda "**${userQuery}**". Prueba buscando por el apellido del paciente, nombre del médico o descripción del servicio.`,
+        suggestions: [
+          '👨‍⚕️ ¿Quién es el médico que más ingresos aporta?',
+          '🛏️ ¿Cómo está la ocupación de camas por área?',
+          '🔍 ¿Cuáles son las partidas con faltantes hoy?',
+        ],
+      };
+    }
+
+    const totalMonto = rows.reduce((acc, r) => acc + parseFloat(r.Monto || 0), 0);
+    const totalCantidad = rows.reduce((acc, r) => acc + parseFloat(r.Cantidad || 0), 0);
+
+    return {
+      topic: `Búsqueda Dinámica: "${finalTerms.join(', ')}"`,
+      answer: `Analicé la base de datos en tiempo real para "**${userQuery}**". Encontré **${rows.length} registros en vivo** acumulando un monto total de **$${totalMonto.toLocaleString('es-MX')} MXN** (${totalCantidad} unidades/atenciones).`,
+      kpis: [
+        { label: 'Registros Encontrados', value: rows.length },
+        { label: 'Monto Total Sumado', value: `$${totalMonto.toLocaleString('es-MX')}`, color: '#16A34A' },
+        { label: 'Unidades/Servicios', value: totalCantidad, color: '#004687' },
+      ],
+      table: {
+        headers: ['Fecha', 'Paciente', 'Área', 'Insumo / Servicio', 'Médico', 'Monto ($)'],
+        rows: rows.slice(0, 7).map(r => {
+          let fechaStr = '';
+          if (r.Fecha) {
+            try { fechaStr = new Date(r.Fecha).toISOString().split('T')[0]; } catch(e) { fechaStr = String(r.Fecha).slice(0,10); }
+          }
+          return [
+            fechaStr,
+            r.Paciente || 'Sin Nombre',
+            r.Area || 'General',
+            r.Insumo || 'Servicio',
+            r.Medico || 'Sin Asignar',
+            `$${parseFloat(r.Monto || 0).toLocaleString('es-MX')}`,
+          ];
+        }),
+      },
+    };
+  } catch (err) {
+    console.error('Error en búsqueda dinámica:', err);
+    return {
+      topic: 'Búsqueda Dinámica',
+      answer: 'No se pudo realizar la búsqueda en tiempo real: ' + err.message,
+    };
+  }
 }
 
 /* ── 1. Médicos por Mayor Aporte de Ingresos ─────────────────── */
