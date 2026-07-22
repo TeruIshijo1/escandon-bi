@@ -43,7 +43,6 @@ export const ROUTE_PERMISSIONS = {
   '/auditoria/inventarios': [ROLES.ADMIN, ROLES.DIRECTOR],
   '/auditoria/cargos':      [ROLES.ADMIN, ROLES.DIRECTOR],
   '/calidad-datos':         [ROLES.ADMIN, ROLES.DIRECTOR],
-  '/interoperabilidad':     [ROLES.ADMIN, ROLES.DIRECTOR],
   '/estadisticas':          [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
   '/admin/usuarios':        [ROLES.ADMIN],
   '/admin/auditoria-log':   [ROLES.ADMIN],
@@ -215,13 +214,6 @@ export function getNavItems(role, area = null) {
       icon:    '🛡️',
       label:   'Control de Calidad de Datos',
       path:    '/calidad-datos',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
-    },
-    {
-      section: 'Auditoría',
-      icon:    '🔌',
-      label:   'Conectores HL7 / FHIR',
-      path:    '/interoperabilidad',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
 

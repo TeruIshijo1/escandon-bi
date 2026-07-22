@@ -117,7 +117,6 @@ app.post('/upload-assets', authenticate, (req, res) => {
 /* ── Rutas ──────────────────────────────────────────────────── */
 const sitiRoutes = require('./routes/siti.routes');
 const dataQualityRoutes = require('./routes/dataQuality.routes');
-const interopRoutes = require('./routes/interoperability.routes');
 
 app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/dashboard',     dashboardRoutes);
@@ -129,7 +128,6 @@ app.use('/api/test',          testRoutes);
 app.use('/api/siti',          sitiRoutes);
 app.use('/api/audit',         auditRoutes);
 app.use('/api/data-quality',  dataQualityRoutes);
-app.use('/api/interop',       interopRoutes);
 app.use('/api/files',         express.static(path.join(__dirname, 'uploads')));
 
 /* ── Manejo de errores global ───────────────────────────────── */
