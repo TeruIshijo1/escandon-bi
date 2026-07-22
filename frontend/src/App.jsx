@@ -38,6 +38,8 @@ const AdminConfiguracion  = lazy(() => import('./pages/AdminConfiguracion'));
 const SinAcceso           = lazy(() => import('./pages/SinAcceso'));
 const DashboardSiti       = lazy(() => import('./components/dashboard/DashboardSiti'));
 const DashboardComparativo= lazy(() => import('./components/dashboard/DashboardComparativo'));
+const DataQualityDashboard= lazy(() => import('./pages/DataQualityDashboard'));
+const InteroperabilidadConfig= lazy(() => import('./pages/InteroperabilidadConfig'));
 
 /* ── Fallback de carga ───────────────────────────────────────── */
 function PageLoader() {
@@ -186,6 +188,22 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
                     <AuditoriaCargos />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="calidad-datos"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
+                    <DataQualityDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="interoperabilidad"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
+                    <InteroperabilidadConfig />
                   </ProtectedRoute>
                 }
               />
