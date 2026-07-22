@@ -54,13 +54,19 @@ export default function ExportButton({
   const [loading, setLoading] = useState(false);
   const cfg = CONFIG[type] || CONFIG.pdf;
 
-  const getToken = () => localStorage.getItem('token') || sessionStorage.getItem('escandon_token') || '';
+  const getToken = () => sessionStorage.getItem('escandon_token') || localStorage.getItem('token') || '';
 
   const buildQueryString = () => {
-    if (!queryParams) return '';
-    const params = new URLSearchParams(
-      Object.fromEntries(Object.entries(queryParams).filter(([, v]) => v !== undefined && v !== null && v !== ''))
-    ).toString();
+    const token = getToken();
+    const cleanParams = queryParams
+      ? Object.fromEntries(Object.entries(queryParams).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+      : {};
+
+    if (token) {
+      cleanParams.token = token;
+    }
+
+    const params = new URLSearchParams(cleanParams).toString();
     return params ? `?${params}` : '';
   };
 
@@ -142,6 +148,11 @@ export default function ExportButton({
       });
 
       if (!res.ok) {
+        if (res.status === 401) {
+          alert('Su sesión ha caducado o el token es inválido. Por favor recargue la página o vuelva a iniciar sesión.');
+          setLoading(false);
+          return;
+        }
         const errText = await res.text();
         throw new Error(errText || 'Error al comunicarse con el servidor de exportación.');
       }

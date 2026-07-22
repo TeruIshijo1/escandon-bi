@@ -38,15 +38,20 @@ const VALID_AREAS = new Set([
 async function authenticate(req, res, next) {
   try {
     const authHeader = req.headers['authorization'];
+    let token = null;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    } else if (req.query && req.query.token) {
+      token = req.query.token;
+    }
+
+    if (!token || token === 'null' || token === 'undefined') {
       return res.status(401).json({
         error: 'Token de autenticación no proporcionado',
         code:  'NO_TOKEN',
       });
     }
-
-    const token = authHeader.slice(7); // quita "Bearer "
 
     // Verificar y decodificar
     const decoded = jwt.verify(token, JWT_SECRET);
