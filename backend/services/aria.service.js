@@ -59,13 +59,14 @@ async function searchDatabaseDynamically(userQuery) {
   try {
     const pool = await getRemoteDb();
 
-    // Ruido / Palabras de relleno a ignorar
+    // Palabras de relleno / ruido a ignorar en la extracción de términos
     const fillerWords = [
       'busca', 'buscar', 'quien', 'quién', 'como', 'cómo', 'cuanto', 'cuánto', 'donde', 'dónde',
       'muestrame', 'muéstrame', 'dame', 'sobre', 'para', 'este', 'esta', 'estos', 'estas', 'del',
       'los', 'las', 'con', 'por', 'que', 'qué', 'una', 'uno', 'unos', 'unas', 'doctor', 'dr', 'dra',
       'medico', 'médico', 'paciente', 'insumo', 'servicio', 'gastado', 'consumido', 'precio', 'costo',
-      'hospital', 'cuenta', 'registros', 'datos', 'puedes', 'decirme', 'saber', 'ver'
+      'hospital', 'cuenta', 'registros', 'datos', 'puedes', 'decirme', 'saber', 'ver',
+      'ultima', 'última', 'ultimo', 'último', 'reciente', 'recientes', 'consulta', 'consultas', 'atencion', 'atención'
     ];
 
     const rawTokens = userQuery
@@ -79,6 +80,13 @@ async function searchDatabaseDynamically(userQuery) {
     if (finalTerms.length === 0) {
       return await queryResumenEjecutivoGeneral();
     }
+
+    // Detectar intención de "Último / Reciente"
+    const isUltimoIntent = userQuery.toLowerCase().includes('ultima') ||
+                          userQuery.toLowerCase().includes('última') ||
+                          userQuery.toLowerCase().includes('ultimo') ||
+                          userQuery.toLowerCase().includes('último') ||
+                          userQuery.toLowerCase().includes('reciente');
 
     const whereClauses = finalTerms.map((_, idx) => `(
       NOMBRE_DEL_PACIENTE LIKE @kw${idx} OR
@@ -125,12 +133,26 @@ async function searchDatabaseDynamically(userQuery) {
       };
     }
 
-    const totalMonto = rows.reduce((acc, r) => acc + parseFloat(r.Monto || 0), 0);
+    const totalMonto = rows.reduce((acc, r) => acc + Math.abs(parseFloat(r.Monto || 0)), 0);
     const totalCantidad = rows.reduce((acc, r) => acc + parseFloat(r.Cantidad || 0), 0);
 
+    let answerText = '';
+    if (isUltimoIntent && rows.length > 0) {
+      const topRow = rows[0];
+      const topMonto = Math.abs(parseFloat(topRow.Monto || 0));
+      let topFecha = '';
+      if (topRow.Fecha) {
+        try { topFecha = new Date(topRow.Fecha).toISOString().split('T')[0]; } catch(e) { topFecha = String(topRow.Fecha).slice(0, 10); }
+      }
+      const medicoName = topRow.Medico ? `el **Dr. ${topRow.Medico}**` : 'el personal de salud';
+      answerText = `La **última atención/consulta** registrada para **"${finalTerms.join(' ')}"** fue el **${topFecha}** por ${medicoName} para el paciente **${topRow.Paciente || 'General'}** en el área **${topRow.Area}** con el servicio **"${topRow.Insumo}"** por un monto de **$${topMonto.toLocaleString('es-MX')} MXN**.`;
+    } else {
+      answerText = `Analicé la base de datos en tiempo real para "**${userQuery}**". Encontré **${rows.length} registros en vivo** acumulando un monto total de **$${totalMonto.toLocaleString('es-MX')} MXN** (${totalCantidad} unidades/atenciones).`;
+    }
+
     return {
-      topic: `Búsqueda Dinámica: "${finalTerms.join(', ')}"`,
-      answer: `Analicé la base de datos en tiempo real para "**${userQuery}**". Encontré **${rows.length} registros en vivo** acumulando un monto total de **$${totalMonto.toLocaleString('es-MX')} MXN** (${totalCantidad} unidades/atenciones).`,
+      topic: `Búsqueda: "${finalTerms.join(', ')}"`,
+      answer: answerText,
       kpis: [
         { label: 'Registros Encontrados', value: rows.length },
         { label: 'Monto Total Sumado', value: `$${totalMonto.toLocaleString('es-MX')}`, color: '#16A34A' },
@@ -143,13 +165,14 @@ async function searchDatabaseDynamically(userQuery) {
           if (r.Fecha) {
             try { fechaStr = new Date(r.Fecha).toISOString().split('T')[0]; } catch(e) { fechaStr = String(r.Fecha).slice(0,10); }
           }
+          const montoAbs = Math.abs(parseFloat(r.Monto || 0));
           return [
             fechaStr,
             r.Paciente || 'Sin Nombre',
             r.Area || 'General',
             r.Insumo || 'Servicio',
             r.Medico || 'Sin Asignar',
-            `$${parseFloat(r.Monto || 0).toLocaleString('es-MX')}`,
+            `$${montoAbs.toLocaleString('es-MX')}`,
           ];
         }),
       },
@@ -180,7 +203,7 @@ async function queryMedicosMasIngresos() {
 
     const rows = res.recordset || [];
     const topMedico = rows[0] || {};
-    const montoTop = parseFloat(topMedico.IngresosGenerados || 0);
+    const montoTop = Math.abs(parseFloat(topMedico.IngresosGenerados || 0));
 
     return {
       topic: 'Productividad e Ingresos por Médico',
@@ -195,7 +218,7 @@ async function queryMedicosMasIngresos() {
         rows: rows.map(r => [
           `Dr. ${r.Medico}`,
           r.TotalCargos,
-          `$${parseFloat(r.IngresosGenerados || 0).toLocaleString('es-MX')}`,
+          `$${Math.abs(parseFloat(r.IngresosGenerados || 0)).toLocaleString('es-MX')}`,
         ]),
       },
     };
@@ -332,9 +355,9 @@ async function queryPacientesMayorGasto() {
 
     return {
       topic: 'Mayores Cuentas de Pacientes',
-      answer: `El paciente con el mayor consumo acumulado en el hospital actualmente es **${topPaciente.Paciente || 'N/A'}** en la unidad **${topPaciente.Area || 'General'}** con un total de **$${parseFloat(topPaciente.MontoTotal || 0).toLocaleString('es-MX')} MXN** distribuidos en ${topPaciente.TotalCargos} cargos registradas.`,
+      answer: `El paciente con el mayor consumo acumulado en el hospital actualmente es **${topPaciente.Paciente || 'N/A'}** en la unidad **${topPaciente.Area || 'General'}** con un total de **$${Math.abs(parseFloat(topPaciente.MontoTotal || 0)).toLocaleString('es-MX')} MXN** distribuidos en ${topPaciente.TotalCargos} cargos registradas.`,
       kpis: [
-        { label: 'Top Consumo Paciente', value: `$${parseFloat(topPaciente.MontoTotal || 0).toLocaleString('es-MX')}` },
+        { label: 'Top Consumo Paciente', value: `$${Math.abs(parseFloat(topPaciente.MontoTotal || 0)).toLocaleString('es-MX')}` },
         { label: 'Cargos Registrados', value: topPaciente.TotalCargos || 0 },
       ],
       table: {
@@ -343,7 +366,7 @@ async function queryPacientesMayorGasto() {
           r.Paciente,
           r.Area,
           r.TotalCargos,
-          `$${parseFloat(r.MontoTotal || 0).toLocaleString('es-MX')}`,
+          `$${Math.abs(parseFloat(r.MontoTotal || 0)).toLocaleString('es-MX')}`,
         ]),
       },
     };
@@ -421,7 +444,7 @@ async function queryInsumosMasGastados() {
           r.Codigo,
           r.Insumo,
           r.CantidadTotal,
-          `$${parseFloat(r.MontoGenerado || 0).toLocaleString('es-MX')}`,
+          `$${Math.abs(parseFloat(r.MontoGenerado || 0)).toLocaleString('es-MX')}`,
         ]),
       },
     };
