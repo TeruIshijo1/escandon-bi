@@ -292,7 +292,7 @@ async function queryResumenEjecutivoGeneral() {
 Hoy en el **Hospital Escandón**:
 - **Censo de Camas Físicas**: ${censo.kpis?.find(k => k.label === '% Ocupación')?.value || 'N/A'} de ocupación (${censo.kpis?.find(k => k.label === 'Ocupadas')?.value || 0} ocupadas de ${censo.kpis?.find(k => k.label === 'Total Camas Físicas')?.value || 40} reales).
 - **Auditoría de Inventarios**: ${resAud.diferencias} discrepancias pendientes acumulando $${resAud.montoDisputa.toLocaleString('es-MX')} en disputa.
-- **Servicios Conectados**: Base de datos **KH_HE SQL Server en vivo** activa y respondiendo.`,
+- **Control de Calidad de Datos**: Monitoreo continuo de anomalías pre-facturación y auditoría automática activa.`,
     kpis: [
       { label: 'Ocupación Camas Físicas', value: censo.kpis?.find(k => k.label === '% Ocupación')?.value || '0%' },
       { label: 'Discrepancias Auditadas', value: resAud.diferencias },
