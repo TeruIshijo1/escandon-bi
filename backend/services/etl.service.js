@@ -59,18 +59,19 @@ async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, li
   const result = await request.query(querySQL);
   const rows = result.recordset || [];
 
-  // Mapear registros reales de la base KH_HE
+  // Mapear registros reales de la base KH_HE con cálculo matemático correcto
   const partidas = rows.map(r => {
-    const devuelto = r.Devuelto || 0;
-    const cantAlmacen = r.CantAlmacen || 1;
-    const cantCargo = r.CantCargo || 1;
-    const diferencia = devuelto > 0 ? -devuelto : (cantCargo - cantAlmacen);
-    const monto = parseFloat(r.Monto || 0);
+    const cantAlmacen = r.CantAlmacen ?? 0;
+    const cantCargo = r.CantCargo ?? 0;
+    const diferencia = cantCargo - cantAlmacen;
+    const monto = Math.abs(parseFloat(r.Monto || 0));
 
     let estadoConciliacion = 'COINCIDE';
-    if (devuelto > 0) estadoConciliacion = 'FALTANTE';
-    else if (diferencia < 0) estadoConciliacion = 'DIFERENCIA';
-    else if (diferencia > 0) estadoConciliacion = 'EXCEDENTE';
+    if (diferencia < 0) {
+      estadoConciliacion = cantCargo === 0 ? 'FALTANTE' : 'DIFERENCIA';
+    } else if (diferencia > 0) {
+      estadoConciliacion = 'EXCEDENTE';
+    }
 
     let fechaStr = '';
     if (r.Fecha) {
@@ -130,10 +131,23 @@ function calcularResumen(partidas) {
 
   for (const p of partidas) {
     switch (p.estado) {
-      case 'COINCIDE':   totales.coincidencias++;                          break;
-      case 'DIFERENCIA': totales.diferencias++;  totales.montoDisputa += p.monto; break;
-      case 'FALTANTE':   totales.faltantes++;    totales.montoDisputa += p.monto; break;
-      case 'EXCEDENTE':  totales.excedentes++;   totales.montoDisputa += p.monto; break;
+      case 'COINCIDE':
+        totales.coincidencias++;
+        break;
+      case 'DIFERENCIA':
+        totales.diferencias++;
+        totales.montoDisputa += p.monto;
+        break;
+      case 'FALTANTE':
+        totales.faltantes++;
+        totales.diferencias++;
+        totales.montoDisputa += p.monto;
+        break;
+      case 'EXCEDENTE':
+        totales.excedentes++;
+        totales.diferencias++;
+        totales.montoDisputa += p.monto;
+        break;
     }
   }
 
