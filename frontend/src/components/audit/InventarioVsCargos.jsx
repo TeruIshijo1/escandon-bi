@@ -30,14 +30,19 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
   const [filters, setFilters] = useState({ area: '', estado: defaultEstado, fechaDesde: '', fechaHasta: '' });
   const [page, setPage] = useState(1);
   const [uploading, setUploading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
   const PER_PAGE = 12;
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(() => {
+      fetchData(true); // silent refresh
+    }, 30000); // Auto-refresh cada 30 segundos
+    return () => clearInterval(interval);
   }, [filters]);
 
-  const fetchData = async () => {
-    setLoad(true);
+  const fetchData = async (isSilent = false) => {
+    if (!isSilent) setLoad(true);
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('escandon_token');
       const params = new URLSearchParams(
@@ -50,7 +55,6 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
       if (json && json.partidas && json.partidas.length > 0) {
         setData(json);
       } else {
-        // Fallback a datos de ejemplo si la respuesta viene vacía
         setData({
           resumen: {
             totalPartidas: SAMPLE_MOCK_ROWS.length,
@@ -61,7 +65,7 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
           partidas: SAMPLE_MOCK_ROWS,
         });
       }
-      setPage(1);
+      setLastUpdate(new Date());
     } catch (err) {
       console.warn('[Auditoría] Usando datos muestrales:', err);
       setData({
@@ -73,6 +77,7 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
         },
         partidas: SAMPLE_MOCK_ROWS,
       });
+      setLastUpdate(new Date());
     } finally {
       setLoad(false);
     }
@@ -128,10 +133,16 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
           <h1 style={{ fontFamily: "var(--font-display)", fontSize: '1.5rem', fontWeight: 800, color: 'white', margin: 0 }}>
             {defaultEstado ? 'Discrepancias en Consumos' : 'Inventarios y Consumos Clínicos'}
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.82rem', marginTop: '0.25rem', margin: '0.25rem 0 0' }}>
-            {defaultEstado 
-              ? 'Revisión y resolución de partidas con diferencias o faltantes'
-              : 'Conciliación de órdenes del Almacén contra consumos clínicos en la cuenta del paciente'}
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.82rem', marginTop: '0.25rem', margin: '0.25rem 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>{defaultEstado ? 'Revisión y resolución de partidas con diferencias o faltantes' : 'Conciliación de órdenes del Almacén contra consumos clínicos en la cuenta del paciente'}</span>
+            <span style={{ color: '#4ADE80', fontWeight: 700, background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
+              ● Auto-refresh 30s
+            </span>
+            {lastUpdate && (
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>
+                · Actualizado: {lastUpdate.toLocaleTimeString('es-MX')}
+              </span>
+            )}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
