@@ -7,8 +7,9 @@
  *  3. Bloqueo de Teclas de Inspección (F12, Ctrl+Shift+I/J, Ctrl+U)
  *  4. UI Premium y Limpia
  */
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE } from '../../api/config';
+import PremiumLoader from '../shared/PremiumLoader';
 
 export default function EmbeddedBI({ reportId, height = 480, filters = {}, multiPagina = false }) {
   const containerRef = useRef(null);
@@ -226,19 +227,7 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
         
         {state === 'loading' && (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:'1.25rem' }}>
-            <div className="security-loader" />
-            <style>{`
-              .security-loader {
-                width: 48px; height: 48px; border: 3px solid rgba(0,70,135,0.05);
-                border-top: 3px solid #004687; border-radius: 50%;
-                animation: spin 1s cubic-bezier(0.76, 0, 0.24, 1) infinite;
-              }
-              @keyframes spin { to { transform: rotate(360deg); } }
-            `}</style>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ color:'#0D1B2A', fontSize:'0.9rem', fontWeight:600, marginBottom: '0.25rem' }}>Verificando Seguridad</p>
-              <p style={{ color:'#8A97A8', fontSize:'0.75rem' }}>Cargando tablero protegido para Hospital Escandón...</p>
-            </div>
+            <PremiumLoader text="Cargando tablero protegido para Hospital Escandón..." />
           </div>
         )}
 

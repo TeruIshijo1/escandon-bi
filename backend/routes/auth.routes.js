@@ -40,8 +40,8 @@ router.post('/login', async (req, res, next) => {
     `).get(username.trim().toLowerCase());
 
     if (!user) {
-      // Respuesta genérica para evitar enumeración de usuarios
-      return res.status(401).json({ message: 'Credenciales incorrectas' });
+      // Mensaje específico solicitado por el cliente
+      return res.status(401).json({ message: 'el usuario no existe, si hay un error comunicarse al departamento de TI' });
     }
 
     const passwordOk = await bcrypt.compare(password, user.PasswordHash);

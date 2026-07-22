@@ -85,6 +85,33 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
     }
   };
 
+  const handleExportExcel = async (e) => {
+    e.stopPropagation();
+    try {
+      showToast('⏳ Generando Excel...');
+      const token = sessionStorage.getItem('escandon_token');
+      const res = await fetch(`/api/export/json-to-excel/kpi/${elementoId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(()=>({}));
+        throw new Error(data.error || 'Error al exportar');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Exportacion_${kpi.nombre || elementoId}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast('✅ Excel descargado');
+    } catch (err) {
+      showToast(`❌ ${err.message}`);
+    }
+  };
+
   return (
     <>
       {/* ── Tarjeta principal ── */}
@@ -190,20 +217,24 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
           </div>
         )}
 
-        {/* Indicador PBI (solo si tiene URL) */}
-        {!!kpi.pbiUrl && (
-          <div style={{
-            marginTop: '0.5rem',
-            fontFamily: 'var(--font-body)',
-            fontSize: '0.62rem', fontWeight: 700,
-            color: hasPBI ? accentColor : 'var(--text-muted)',
-            display: 'flex', alignItems: 'center', gap: '0.3rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.03em'
-          }}>
-            <span>{hasPBI ? '📊' : '🔒'}</span> {hasPBI ? 'Ver reporte →' : 'Sin acceso'}
-          </div>
-        )}
+        {/* Indicadores en la parte inferior */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+          
+          {/* Indicador PBI (solo si tiene URL) */}
+          {!!kpi.pbiUrl ? (
+            <div style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: '0.62rem', fontWeight: 700,
+              color: hasPBI ? accentColor : 'var(--text-muted)',
+              display: 'flex', alignItems: 'center', gap: '0.3rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.03em'
+            }}>
+              <span>{hasPBI ? '📊' : '🔒'}</span> {hasPBI ? 'Ver reporte →' : 'Sin acceso'}
+            </div>
+          ) : <div/>}
+
+        </div>
       </div>
 
       {/* ── Modal de edición inline ── */}

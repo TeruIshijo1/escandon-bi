@@ -1,0 +1,187 @@
+-- =====================================================================
+-- PROYECTO: MATRIZ DE CONTROL DE CALIDAD HOSPITALARIA
+-- ENTREGABLE: CÓDIGO DAX PARA TABLA DE CALENDARIO Y MEDIDAS DE CONTROL
+-- =====================================================================
+
+/*
+=======================================================================
+PARTE 1: TABLA CALENDARIO (DimCalendario)
+Instrucciones:
+1. En Power BI Desktop, ve a la pestaña "Modelado" (Modeling) o "Inicio" (Home).
+2. Haz clic en "Nueva tabla" (New Table).
+3. Pega el siguiente código DAX y presiona Enter.
+=======================================================================
+*/
+
+DimCalendario = 
+ADDCOLUMNS (
+    -- Genera un rango de fechas que cubre el período relevante del dashboard
+    CALENDAR (
+        DATE ( 2025, 1, 1 ), 
+        DATE ( 2027, 12, 31 )
+    ),
+    "Año", YEAR ( [Date] ),
+    "MesNro", MONTH ( [Date] ),
+    -- Nombre del mes completo (ej. enero, febrero...)
+    "MesNombre", FORMAT ( [Date], "MMMM", "es-ES" ),
+    -- Nombre del mes con la primera letra en mayúscula
+    "MesCorto", UPPER ( LEFT ( FORMAT ( [Date], "MMM", "es-ES" ), 1 ) ) & RIGHT ( FORMAT ( [Date], "MMM", "es-ES" ), LEN ( FORMAT ( [Date], "MMM", "es-ES" ) ) - 1 ),
+    -- Formato estándar de visualización mensual para directivos (ej. Enero 2026)
+    "MesAño", UPPER ( LEFT ( FORMAT ( [Date], "MMMM yyyy", "es-ES" ), 1 ) ) & RIGHT ( FORMAT ( [Date], "MMMM yyyy", "es-ES" ), LEN ( FORMAT ( [Date], "MMMM yyyy", "es-ES" ) ) - 1 ),
+    -- Código numérico para ordenar cronológicamente la columna MesAño (ej. 202601)
+    "AnioMesSort", YEAR ( [Date] ) * 100 + MONTH ( [Date] )
+)
+
+
+/*
+=======================================================================
+INSTRUCCIÓN IMPORTANTE DE ORDENAMIENTO (SORT BY COLUMN):
+Una vez creada la tabla:
+1. Ve a la vista de "Datos" o "Tabla" en Power BI.
+2. Selecciona la columna 'MesAño' de DimCalendario.
+3. En la barra de herramientas "Herramientas de columnas" (Column Tools), busca "Ordenar por columna" (Sort by column).
+4. Selecciona la columna 'AnioMesSort'.
+Esto evitará que los meses se ordenen alfabéticamente (Abril, Agosto, Diciembre...) en tus segmentadores y gráficos.
+=======================================================================
+*/
+
+
+/*
+=======================================================================
+PARTE 2: MEDIDAS DAX DE ALERTA Y GOBERNANZA (TABLA DE MEDIDAS O KPI)
+Instrucciones:
+1. Para cada bloque, haz clic derecho sobre la tabla UDR_BI_INDICADORES_OPERATIVOS o tu tabla de medidas y selecciona "Nueva medida" (New Measure).
+2. Pega el código de la medida correspondiente.
+=======================================================================
+*/
+
+-- ---------------------------------------------------------------------
+-- 2.1. Métricas de Alerta Operativa (Numéricas para lógica condicional)
+-- Retornan 1 si "No Cumple" y 0 en otros casos.
+-- ---------------------------------------------------------------------
+
+Alerta_Triaje = 
+IF (
+    SELECTEDVALUE ( UDR_BI_INDICADORES_OPERATIVOS[EstadoTriaje] ) = "No Cumple",
+    1,
+    0
+)
+
+Alerta_Laboratorio = 
+IF (
+    SELECTEDVALUE ( UDR_BI_INDICADORES_OPERATIVOS[EstadoLaboratorio] ) = "No Cumple",
+    1,
+    0
+)
+
+Alerta_Imagenologia = 
+IF (
+    SELECTEDVALUE ( UDR_BI_INDICADORES_OPERATIVOS[EstadoImagenologia] ) = "No Cumple",
+    1,
+    0
+)
+
+Alerta_Egreso = 
+IF (
+    SELECTEDVALUE ( UDR_BI_INDICADORES_OPERATIVOS[EstadoEgreso] ) = "No Cumple",
+    1,
+    0
+)
+
+
+-- ---------------------------------------------------------------------
+-- 2.2. Porcentaje de Outliers (Métricas de Auditoría e Integridad)
+-- Miden el porcentaje de registros que excedieron los límites operativos
+-- (ej. > 4h en triaje, > 12h en laboratorios/imágenes).
+-- ---------------------------------------------------------------------
+
+%_Outliers_Lab = 
+DIVIDE (
+    SUM ( UDR_BI_INDICADORES_OPERATIVOS[LaboratorioOutliers] ),
+    SUM ( UDR_BI_INDICADORES_OPERATIVOS[LaboratorioRegistros] ) + SUM ( UDR_BI_INDICADORES_OPERATIVOS[LaboratorioOutliers] ),
+    0
+)
+
+%_Outliers_Triaje = 
+DIVIDE (
+    SUM ( UDR_BI_INDICADORES_OPERATIVOS[TriajeOutliers] ),
+    SUM ( UDR_BI_INDICADORES_OPERATIVOS[TriajeRegistros] ) + SUM ( UDR_BI_INDICADORES_OPERATIVOS[TriajeOutliers] ),
+    0
+)
+
+%_Outliers_Imagen = 
+DIVIDE (
+    SUM ( UDR_BI_INDICADORES_OPERATIVOS[ImagenologiaOutliers] ),
+    SUM ( UDR_BI_INDICADORES_OPERATIVOS[ImagenologiaRegistros] ) + SUM ( UDR_BI_INDICADORES_OPERATIVOS[ImagenologiaOutliers] ),
+    0
+)
+
+
+-- ---------------------------------------------------------------------
+-- 2.3. Formato Condicional Dinámico (Códigos de Color Hexadecimal)
+-- Retornan el código Hex de color directamente basados en el estado del mes.
+-- Cumple = Verde Pastel (#D4EDDA)
+-- No Cumple = Rojo Pastel (#F8D7DA)
+-- Sin Datos = Gris Neutro (#E6E6E6)
+-- ---------------------------------------------------------------------
+
+Color_Estado_Triaje = 
+SWITCH (
+    SELECTEDVALUE ( UDR_BI_INDICADORES_OPERATIVOS[EstadoTriaje] ),
+    "Cumple", "#D4EDDA",      -- Verde suave
+    "No Cumple", "#F8D7DA",   -- Rojo suave
+    "Sin datos", "#E6E6E6",   -- Gris neutro
+    "#FFFFFF"                 -- Blanco por defecto si no aplica
+)
+
+Color_Estado_Lab = 
+SWITCH (
+    SELECTEDVALUE ( UDR_BI_INDICADORES_OPERATIVOS[EstadoLaboratorio] ),
+    "Cumple", "#D4EDDA",      -- Verde suave
+    "No Cumple", "#F8D7DA",   -- Rojo suave
+    "Sin datos", "#E6E6E6",   -- Gris neutro
+    "#FFFFFF"                 -- Blanco por defecto
+)
+
+Color_Estado_Imagen = 
+SWITCH (
+    SELECTEDVALUE ( UDR_BI_INDICADORES_OPERATIVOS[EstadoImagenologia] ),
+    "Cumple", "#D4EDDA",      -- Verde suave
+    "No Cumple", "#F8D7DA",   -- Rojo suave
+    "Sin datos", "#E6E6E6",   -- Gris neutro
+    "#FFFFFF"                 -- Blanco por defecto
+)
+
+Color_Estado_Egreso = 
+SWITCH (
+    SELECTEDVALUE ( UDR_BI_INDICADORES_OPERATIVOS[EstadoEgreso] ),
+    "Cumple", "#D4EDDA",      -- Verde suave
+    "No Cumple", "#F8D7DA",   -- Rojo suave
+    "Sin datos", "#E6E6E6",   -- Gris neutro
+    "#FFFFFF"                 -- Blanco por defecto
+)
+
+
+/*
+=======================================================================
+PASO A PASO PARA CONFIGURAR EL FORMATO CONDICIONAL EN LA MATRIZ:
+1. Agrega una visual de "Matriz" (Matrix) a tu lienzo de la Pestaña 1.
+2. Configura los campos:
+   - Filas (Rows): DimCalendario[Año] y DimCalendario[MesAño] (en jerarquía).
+   - Columnas (Columns): Vacío.
+   - Valores (Values): TriajeMin, LaboratorioMin, ImagenologiaMin y EgresoHoras.
+3. Ve al panel de "Formato" (Format Visual) de la matriz.
+4. Expande la sección "Elementos de celda" (Cell elements).
+5. En el menú desplegable "Aplicar configuración a", selecciona "TriajeMin".
+6. Activa la opción "Color de fondo" (Background color).
+7. En la ventana emergente:
+   - Estilo de formato (Format style): Elige "Valor de campo" (Field value).
+   - ¿En qué campo debemos basar esto?: Busca y selecciona la medida [Color_Estado_Triaje].
+8. Repite los pasos 5 a 7 para los demás indicadores, asociando a cada uno su respectiva medida de color:
+   - Para "LaboratorioMin" usa [Color_Estado_Lab].
+   - Para "ImagenologiaMin" usa [Color_Estado_Imagen].
+   - Para "EgresoHoras" usa [Color_Estado_Egreso].
+9. ¡Listo! La matriz ahora se pintará dinámicamente con los tonos pastel adecuados y
+   mostrará las celdas sin datos en gris neutro sin emitir alertas erróneas.
+=======================================================================
+*/

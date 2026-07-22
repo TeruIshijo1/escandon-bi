@@ -9,8 +9,9 @@
  *   onClose {fn}     — Cerrar el modal
  */
 import { useEffect } from 'react';
+import ExportButton from './ExportButton';
 
-export default function PBIModal({ url, title, multiPagina = false, onClose }) {
+export default function PBIModal({ url, title, multiPagina = false, reportId, hasJson = false, onClose }) {
   // ESC para cerrar
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -22,6 +23,7 @@ export default function PBIModal({ url, title, multiPagina = false, onClose }) {
 
   return (
     <div
+      id="pbi-modal-wrapper"
       onClick={onClose}
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -39,9 +41,65 @@ export default function PBIModal({ url, title, multiPagina = false, onClose }) {
           from { opacity: 0; transform: scale(0.96) translateY(12px); }
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
+
+        @media print {
+          @page {
+            size: landscape;
+            margin: 10mm;
+          }
+
+          /* Ocultar el fondo oscurecido */
+          #pbi-modal-wrapper {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100vh !important;
+            background: white !important;
+            backdrop-filter: none !important;
+            display: block !important;
+            padding: 0 !important;
+            z-index: 9999 !important;
+          }
+
+          /* Ajustar el panel principal al tamaño de la página */
+          #pbi-modal-panel {
+            width: 100% !important;
+            height: 100vh !important;
+            max-width: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            border: 8px solid #004687 !important; /* Marco azul institucional */
+            display: flex !important;
+            flex-direction: column !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+          }
+
+          /* Ocultar el header oscuro interactivo y el footer */
+          #pbi-modal-header, #pbi-modal-footer {
+            display: none !important;
+          }
+
+          /* Mostrar el header exclusivo para impresión */
+          #pbi-print-header {
+            display: flex !important;
+          }
+
+          /* El iframe toma todo el espacio restante automáticamente */
+          #pbi-iframe-container {
+            flex: 1 !important;
+            width: 100% !important;
+            height: 100% !important;
+            position: relative !important;
+            background: white !important;
+          }
+        }
       `}</style>
 
       <div
+        id="pbi-modal-panel"
         onClick={e => e.stopPropagation()}
         style={{
           width: '95vw', maxWidth: 1100,
@@ -55,7 +113,7 @@ export default function PBIModal({ url, title, multiPagina = false, onClose }) {
         }}
       >
         {/* Header */}
-        <div style={{
+        <div id="pbi-modal-header" style={{
           background: 'linear-gradient(90deg, #004687, #0088C9)',
           padding: '0.9rem 1.5rem',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -77,24 +135,57 @@ export default function PBIModal({ url, title, multiPagina = false, onClose }) {
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            title="Cerrar (Esc)"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              border: '1px solid rgba(255,255,255,0.25)',
-              borderRadius: 8, color: 'white',
-              width: 36, height: 36, fontSize: '1rem',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'background 150ms',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >✕</button>
+          
+          {/* RIGHT SIDE: Acciones y Cerrar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            {reportId && (
+              <div style={{ display: 'flex', gap: '0.5rem', borderRight: '1px solid rgba(255,255,255,0.2)', paddingRight: '0.8rem' }}>
+                <ExportButton type="pdf" reportId={reportId} compact={true} />
+                {hasJson && <ExportButton type="excel" reportId={reportId} compact={true} />}
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              title="Cerrar (Esc)"
+              style={{
+                background: 'rgba(255,255,255,0.15)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: 8, color: 'white',
+                width: 36, height: 36, fontSize: '1rem',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 150ms',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            >✕</button>
+          </div>
+        </div>
+
+        {/* Print Only Header */}
+        <div id="pbi-print-header" style={{
+          display: 'none',
+          padding: '1.5rem',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '2px solid #004687',
+          background: 'white',
+          flexShrink: 0
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <img src="/logo-escandon.png" alt="Hospital Escandón" style={{ height: '50px', objectFit: 'contain' }} />
+            <div>
+              <h2 style={{ margin: 0, color: '#004687', fontSize: '1.2rem', fontFamily: 'var(--font-display)' }}>Hospital Escandón</h2>
+              <p style={{ margin: 0, color: '#4A5568', fontSize: '0.8rem' }}>Reporte de Inteligencia de Negocios</p>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <h3 style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>{title}</h3>
+            <p style={{ margin: 0, color: '#8A97A8', fontSize: '0.75rem' }}>{new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          </div>
         </div>
 
         {/* Iframe */}
-        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <div id="pbi-iframe-container" style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
           {/* Capa que recorta la barra de PBI (~36px) si no es multipágina */}
           <div style={{ width: '100%', height: multiPagina ? '100%' : 'calc(100% + 36px)', position: 'absolute', top: 0, left: 0 }}>
             <iframe
@@ -131,7 +222,7 @@ export default function PBIModal({ url, title, multiPagina = false, onClose }) {
         </div>
 
         {/* Footer */}
-        <div style={{
+        <div id="pbi-modal-footer" style={{
           padding: '0.45rem 1.5rem',
           background: '#F8FAFC',
           borderTop: '1px solid #E2E8F0',

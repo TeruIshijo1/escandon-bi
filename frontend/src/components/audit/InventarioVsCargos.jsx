@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from 'react';
 import ExportButton from '../shared/ExportButton';
+import PremiumLoader from '../shared/PremiumLoader';
 
 import { API_BASE } from '../../api/config';
 
@@ -163,11 +164,9 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
       {/* Tabla */}
       <div style={{ background:'white', borderRadius:14, border:'1px solid rgba(0,70,135,0.07)', boxShadow:'0 2px 8px rgba(0,70,135,0.05)', overflow:'hidden' }}>
         {loading ? (
-          <div style={{ padding:'3rem', textAlign:'center', color:'#8A97A8' }}>
-            <div style={{ width:36, height:36, border:'3px solid rgba(0,70,135,0.1)', borderTop:'3px solid #004687', borderRadius:'50%', animation:'spin 0.9s linear infinite', margin:'0 auto 1rem' }} />
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            Cargando datos de auditoría…
-          </div>
+          <div style={{ background:'white', borderRadius:12, padding:'3rem', textAlign:'center' }}>
+          <PremiumLoader text="Cargando datos de auditoría…" />
+        </div>
         ) : (
           <div style={{ overflowX:'auto' }}>
             <table className="audit-table">

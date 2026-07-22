@@ -23,7 +23,10 @@ const exportRoutes           = require('./routes/export.routes');
 const aiRoutes               = require('./routes/ai.routes');
 const biRoutes               = require('./routes/bi.routes');
 const adminRoutes            = require('./routes/admin.routes');
+const testRoutes             = require('./routes/test.routes');
+const auditRoutes            = require('./routes/audit.routes');
 const { auditMiddleware }    = require('./middleware/audit.middleware');
+const { connectRemoteDB }    = require('./config/remote-db');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -112,12 +115,17 @@ app.post('/upload-assets', authenticate, (req, res) => {
 });
 
 /* ── Rutas ──────────────────────────────────────────────────── */
+const sitiRoutes = require('./routes/siti.routes');
+
 app.use('/api/auth',       authLimiter, authRoutes);
 app.use('/api/dashboard',  dashboardRoutes);
 app.use('/api/export',     exportRoutes);
 app.use('/api/ai',         aiRoutes);
 app.use('/api/bi',         biRoutes);
 app.use('/api/admin',      adminRoutes);
+app.use('/api/test',       testRoutes);
+app.use('/api/siti',       sitiRoutes);
+app.use('/api/audit',      auditRoutes);
 app.use('/api/files',      express.static(path.join(__dirname, 'uploads')));
 
 /* ── Manejo de errores global ───────────────────────────────── */
@@ -165,6 +173,9 @@ app.get('/health', (req, res) => {
   try {
     connectDB();
     dbStatus = 'ok';
+    
+    // Inicializar conexión a SQL Server Remoto
+    connectRemoteDB().catch(e => console.warn('⚠️ SQL Server Remoto no inicializado al arranque.'));
   } catch (err) {
     dbStatus = 'sin_conexion';
     console.warn('\n⚠️   SQLite no disponible:', err.message);

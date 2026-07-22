@@ -10,11 +10,45 @@
 const express  = require('express');
 const router   = express.Router();
 const bcrypt   = require('bcryptjs');
+const multer   = require('multer');
+const path     = require('path');
+const fs       = require('fs');
 const { getDb } = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 
+// Configuración de multer para JSON
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '..', 'uploads', 'json');
+    if (!fs.existsSync(uploadDir)){
+        fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage: storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max
+
 /* ── Todas las rutas requieren ADMIN ──────────────────────── */
 router.use(authenticate, authorize(['ADMIN']));
+
+/**
+ * POST /api/admin/upload-json
+ * Sube un archivo JSON para la configuración de BI/KPI y devuelve la ruta
+ */
+router.post('/upload-json', upload.single('jsonFile'), (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+    // Guardar ruta relativa al backend
+    const filePath = `/uploads/json/${req.file.filename}`;
+    res.json({ ok: true, filePath });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * GET /api/admin/usuarios
@@ -282,12 +316,14 @@ router.get('/roles', (req, res, next) => {
 
 /**
  * GET /api/admin/audit-logs
- * Retorna los últimos 1000 logs de auditoría del sistema
+ * Retorna logs de auditoría, filtrados por fecha
  */
 router.get('/audit-logs', (req, res, next) => {
   try {
     const db = getDb();
-    const logs = db.prepare(`
+    const { start, end } = req.query;
+
+    let query = `
       SELECT
         LogId      AS id,
         Username   AS usuario,
@@ -299,11 +335,84 @@ router.get('/audit-logs', (req, res, next) => {
         IP         AS ip,
         FechaHora  AS fecha
       FROM AuditLog
-      ORDER BY FechaHora DESC
-      LIMIT 1000
-    `).all();
+    `;
+    const params = [];
+
+    if (start && end) {
+      query += ` WHERE date(FechaHora) BETWEEN ? AND ? `;
+      params.push(start, end);
+    } else if (start) {
+      query += ` WHERE date(FechaHora) >= ? `;
+      params.push(start);
+    } else if (end) {
+      query += ` WHERE date(FechaHora) <= ? `;
+      params.push(end);
+    }
+
+    query += ` ORDER BY FechaHora DESC LIMIT 100000`;
+
+    const logs = db.prepare(query).all(...params);
 
     res.json({ ok: true, data: logs });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/admin/audit-logs/excel
+ * Exporta el log de auditoría completo a formato Excel
+ */
+router.get('/audit-logs/excel', async (req, res, next) => {
+  try {
+    const db = require('../config/db').getDb();
+    const ExcelJS = require('exceljs');
+    const { start, end } = req.query;
+
+    let query = `
+      SELECT
+        LogId, Username, Rol, Metodo, Ruta, EstadoHTTP, DuracionMs, IP, FechaHora
+      FROM AuditLog
+    `;
+    const params = [];
+
+    if (start && end) {
+      query += ` WHERE date(FechaHora) BETWEEN ? AND ? `;
+      params.push(start, end);
+    } else if (start) {
+      query += ` WHERE date(FechaHora) >= ? `;
+      params.push(start);
+    } else if (end) {
+      query += ` WHERE date(FechaHora) <= ? `;
+      params.push(end);
+    }
+
+    query += ` ORDER BY FechaHora DESC LIMIT 100000`;
+
+    const logs = db.prepare(query).all(...params);
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Log Auditoria');
+
+    sheet.columns = [
+      { header: 'ID', key: 'LogId', width: 10 },
+      { header: 'FECHA/HORA', key: 'FechaHora', width: 22 },
+      { header: 'USUARIO', key: 'Username', width: 15 },
+      { header: 'ROL', key: 'Rol', width: 15 },
+      { header: 'METODO', key: 'Metodo', width: 10 },
+      { header: 'RUTA', key: 'Ruta', width: 40 },
+      { header: 'STATUS', key: 'EstadoHTTP', width: 10 },
+      { header: 'DURACIÓN (ms)', key: 'DuracionMs', width: 15 },
+      { header: 'IP', key: 'IP', width: 15 }
+    ];
+
+    sheet.addRows(logs);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=LogAuditoria.xlsx');
+
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (err) {
     next(err);
   }
@@ -316,7 +425,7 @@ router.get('/audit-logs', (req, res, next) => {
 router.get('/config-bi', (req, res, next) => {
   try {
     const db = getDb();
-    const config = db.prepare('SELECT ConfigId AS id, ReporteId AS reportId, Titulo AS name, PowerBIWorkspace AS workspaceId, PowerBIReportId AS pbiReportId, LookerDashboard AS lookerUrl, LookerDashboard2 AS lookerUrl2, LookerDashboard3 AS lookerUrl3, PbixPath AS pbixPath, ExcelPath AS excelPath, ThumbnailPath AS thumbnailPath, RolesPermitidos AS roles, AreaRequerida AS area, MultiPagina AS multiPagina, Activo AS active FROM ConfiguracionBI').all();
+    const config = db.prepare('SELECT ConfigId AS id, ReporteId AS reportId, Titulo AS name, PowerBIWorkspace AS workspaceId, PowerBIReportId AS pbiReportId, LookerDashboard AS lookerUrl, LookerDashboard2 AS lookerUrl2, LookerDashboard3 AS lookerUrl3, PbixPath AS pbixPath, ExcelPath AS excelPath, ThumbnailPath AS thumbnailPath, RolesPermitidos AS roles, AreaRequerida AS area, MultiPagina AS multiPagina, Activo AS active, JsonApiUrl AS jsonApiUrl, JsonFilePath AS jsonFilePath FROM ConfiguracionBI').all();
     
     // Parsear roles JSON
     const data = config.map(c => ({
@@ -336,13 +445,13 @@ router.get('/config-bi', (req, res, next) => {
  */
 router.post('/config-bi', (req, res, next) => {
   try {
-    const { reportId, name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, roles, area, multiPagina } = req.body;
+    const { reportId, name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, roles, area, multiPagina, jsonApiUrl, jsonFilePath } = req.body;
     const db = getDb();
 
     db.prepare(`
-      INSERT INTO ConfiguracionBI (ReporteId, Titulo, PowerBIWorkspace, PowerBIReportId, LookerDashboard, LookerDashboard2, LookerDashboard3, PbixPath, ExcelPath, ThumbnailPath, RolesPermitidos, AreaRequerida, MultiPagina)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(reportId, name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, JSON.stringify(roles || []), area, multiPagina ? 1 : 0);
+      INSERT INTO ConfiguracionBI (ReporteId, Titulo, PowerBIWorkspace, PowerBIReportId, LookerDashboard, LookerDashboard2, LookerDashboard3, PbixPath, ExcelPath, ThumbnailPath, RolesPermitidos, AreaRequerida, MultiPagina, JsonApiUrl, JsonFilePath)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(reportId, name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, JSON.stringify(roles || []), area, multiPagina ? 1 : 0, jsonApiUrl || null, jsonFilePath || null);
 
     res.status(201).json({ ok: true, message: 'Configuración creada' });
   } catch (err) {
@@ -356,14 +465,14 @@ router.post('/config-bi', (req, res, next) => {
  */
 router.put('/config-bi/:id', (req, res, next) => {
   try {
-    const { name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, roles, area, multiPagina, active } = req.body;
+    const { name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, roles, area, multiPagina, active, jsonApiUrl, jsonFilePath } = req.body;
     const db = getDb();
 
     db.prepare(`
       UPDATE ConfiguracionBI
-      SET Titulo = ?, PowerBIWorkspace = ?, PowerBIReportId = ?, LookerDashboard = ?, LookerDashboard2 = ?, LookerDashboard3 = ?, PbixPath = ?, ExcelPath = ?, ThumbnailPath = ?, RolesPermitidos = ?, AreaRequerida = ?, MultiPagina = ?, Activo = ?
+      SET Titulo = ?, PowerBIWorkspace = ?, PowerBIReportId = ?, LookerDashboard = ?, LookerDashboard2 = ?, LookerDashboard3 = ?, PbixPath = ?, ExcelPath = ?, ThumbnailPath = ?, RolesPermitidos = ?, AreaRequerida = ?, MultiPagina = ?, Activo = ?, JsonApiUrl = ?, JsonFilePath = ?
       WHERE ConfigId = ?
-    `).run(name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, JSON.stringify(roles || []), area, multiPagina ? 1 : 0, active ? 1 : 0, req.params.id);
+    `).run(name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, JSON.stringify(roles || []), area, multiPagina ? 1 : 0, active ? 1 : 0, jsonApiUrl || null, jsonFilePath || null, req.params.id);
 
     res.json({ ok: true, message: 'Configuración actualizada' });
   } catch (err) {
@@ -479,7 +588,7 @@ router.get('/kpi-config', (req, res, next) => {
     const db   = getDb();
     const kpis = db.prepare(`
       SELECT KPIId AS id, ElementoId, Seccion,
-             NombreDefault, NombreCustom, Icono, PBIUrl, PBIUrl2, PBIUrl3, MultiPagina, Activo
+             NombreDefault, NombreCustom, Icono, PBIUrl, PBIUrl2, PBIUrl3, MultiPagina, Activo, JsonApiUrl, JsonFilePath
       FROM KPIConfig
       ORDER BY Seccion, KPIId
     `).all();
@@ -494,7 +603,7 @@ router.get('/kpi-config', (req, res, next) => {
  */
 router.put('/kpi-config/:elementoId', (req, res, next) => {
   try {
-    const { nombreCustom, icono, pbiUrl, pbiUrl2, pbiUrl3, multiPagina } = req.body;
+    const { nombreCustom, icono, pbiUrl, pbiUrl2, pbiUrl3, multiPagina, jsonApiUrl, jsonFilePath } = req.body;
     const db = getDb();
 
     const kpi = db.prepare('SELECT KPIId FROM KPIConfig WHERE ElementoId = ?').get(req.params.elementoId);
@@ -509,6 +618,8 @@ router.put('/kpi-config/:elementoId', (req, res, next) => {
     if (pbiUrl2      !== undefined) { updates.push('PBIUrl2 = ?');       params.push(pbiUrl2 || null); }
     if (pbiUrl3      !== undefined) { updates.push('PBIUrl3 = ?');       params.push(pbiUrl3 || null); }
     if (multiPagina   !== undefined) { updates.push('MultiPagina = ?');   params.push(multiPagina ? 1 : 0); }
+    if (jsonApiUrl    !== undefined) { updates.push('JsonApiUrl = ?');    params.push(jsonApiUrl || null); }
+    if (jsonFilePath  !== undefined) { updates.push('JsonFilePath = ?');  params.push(jsonFilePath || null); }
 
     if (updates.length === 0) return res.status(400).json({ error: 'Sin campos que actualizar' });
 

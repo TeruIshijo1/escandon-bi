@@ -10,6 +10,9 @@ import ExportButton    from '../components/shared/ExportButton';
 import EditableKPIWrapper from '../components/shared/EditableKPIWrapper';
 import PBIModal        from '../components/shared/PBIModal';
 import ExportApiModal  from '../components/shared/ExportApiModal';
+import PremiumLoader   from '../components/shared/PremiumLoader';
+import DashboardUrgenciasNativo from '../components/dashboard/DashboardUrgenciasNativo';
+import DashboardQuirofanoNativo from '../components/dashboard/DashboardQuirofanoNativo';
 import { AREAS, AREAS_LABELS, can } from '../utils/rbac';
 import { useKPIConfig } from '../hooks/useKPIConfig';
 
@@ -98,6 +101,7 @@ export default function DashboardArea() {
   const isRestricted     = user?.role === 'JEFE_AREA' || user?.role === 'USUARIO_OPERATIVO';
   const [area, setArea]  = useState(user?.area || DEFAULT_AREA);
   const [tab,  setTab]   = useState('kpis');
+  const [urgenciasSearch, setUrgenciasSearch] = useState('');
 
   const [toast, setToast] = useState(null);
   const [dynamicReport, setDynamicReport] = useState(null);
@@ -119,20 +123,55 @@ export default function DashboardArea() {
   const fetchAreaData = async () => {
     try {
       const token = sessionStorage.getItem('escandon_token');
-      const res = await fetch(`/api/dashboard/area/${area}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      if (json.ok) {
-        const { camas, egresos } = json.data;
-        setAreaData({
-          kpis: [
-            { label: 'Ocupación',         value: camas?.PctOcupacion != null ? `${camas.PctOcupacion}%` : null,  delta: camas?.TotalCamas ? `${camas.Ocupadas}/${camas.TotalCamas} camas` : null, up: null },
-            { label: 'Egresos Mes',       value: egresos?.EgresosMes || null,       delta: 'altas registradas', up: null },
-            { label: 'Estancia Promedio', value: egresos?.EstanciaPromedio != null ? `${egresos.EstanciaPromedio} d` : null, delta: 'días por paciente', up: null },
-            { label: 'Rotación Camas',    value: egresos?.RotacionCamas || null,    delta: 'pacientes/cama', up: null },
-          ]
+      
+      if (area === AREAS.URGENCIAS) {
+        // Para Urgencias usamos el endpoint nativo especializado
+        const res = await fetch('/api/dashboard/urgencias-nativo', {
+          headers: { Authorization: `Bearer ${token}` }
         });
+        const json = await res.json();
+        if (json.ok) {
+          const kpis = json.data.kpis;
+          setAreaData({
+            kpis: [
+              { label: 'Atenciones Médicas', value: kpis.atenciones, delta: 'pacientes mes', up: null },
+              { label: 'Egresos Mes', value: kpis.egresos, delta: 'altas registradas', up: null },
+              { label: 'Estancia Promedio', value: `${kpis.estanciaHoras} hrs`, delta: 'tiempo por paciente', up: null },
+              { label: 'Rotación Camas', value: kpis.rotacion, delta: 'pacientes por día', up: null },
+            ],
+            rawUrgenciasData: json.data // Guardamos la data completa para pasarla al DashboardUrgenciasNativo
+          });
+        }
+      } else if (area === AREAS.QUIROFANO) {
+        // Endpoint nativo para Quirófanos
+        const res = await fetch('/api/dashboard/quirofano-nativo', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.ok) {
+          setAreaData({
+            kpis: [], // No renderizamos las tarjetas estandar, usaremos custom cards en el nativo
+            rawQuirofanoData: json.data
+          });
+        }
+      } else {
+        // Flujo normal para otras áreas
+        const res = await fetch(`/api/dashboard/area/${area}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (json.ok) {
+          const { camas, egresos } = json.data;
+          setAreaData({
+            kpis: [
+              { label: 'Ocupación',         value: camas?.PctOcupacion != null ? `${camas.PctOcupacion}%` : null,  delta: camas?.TotalCamas ? `${camas.Ocupadas}/${camas.TotalCamas} camas` : null, up: null },
+              { label: 'Egresos Mes',       value: egresos?.EgresosMes || null,       delta: 'altas registradas', up: null },
+              { label: 'Estancia Promedio', value: egresos?.EstanciaPromedio != null ? `${egresos.EstanciaPromedio} d` : null, delta: 'días por paciente', up: null },
+              { label: 'Rotación Camas',    value: egresos?.RotacionCamas || null,    delta: 'pacientes/cama', up: null },
+            ],
+            rawUrgenciasData: null
+          });
+        }
       }
     } catch (err) {
       console.error('[DashboardArea]', err);
@@ -170,7 +209,7 @@ export default function DashboardArea() {
   const cfg = AREA_CONFIG[area] || AREA_CONFIG[DEFAULT_AREA];
 
   return (
-    <div style={{ maxWidth:1200, margin:'0 auto' }}>
+    <div id="dashboard-container" style={{ maxWidth:1200, margin:'0 auto' }}>
       <style>{`
         .area-kpi-card:hover {
           transform: translateY(-2px);
@@ -244,7 +283,18 @@ export default function DashboardArea() {
           {/* Acciones de Exportación */}
           <div style={{ display:'flex', gap:'0.5rem', marginRight:'0.25rem', paddingRight:'0.875rem', borderRight:'1px solid rgba(255,255,255,0.18)' }}>
             <ExportButton type="pdf" reportId={area} />
-            <ExportButton type="excel" reportId={area} />
+            {area === AREAS.URGENCIAS && (
+              <ExportButton 
+                type="excel" 
+                directUrl={`/dashboard/export-excel?dashboard=urgencias&search=${encodeURIComponent(urgenciasSearch)}`} 
+              />
+            )}
+            {area === AREAS.QUIROFANO && (
+              <ExportButton 
+                type="excel" 
+                directUrl={`/dashboard/export-excel?dashboard=quirofano`} 
+              />
+            )}
           </div>
 
           {/* Selector de Área */}
@@ -336,30 +386,93 @@ export default function DashboardArea() {
       {/* KPIs Grid */}
       {tab === 'kpis' && (
         <>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
-            {areaData.kpis.map((kpi, i) => {
-              const dbKey = KPI_DB_MAP[kpi.label] || kpi.label.replace(/\s+/g, '_').toLowerCase();
-              const elementId = `area.${area.toLowerCase()}.${dbKey}`;
-              const kpiConfig = getKPI(elementId);
-              const displayName = kpiConfig?.nombre || kpi.label;
-              return (
-                <EditableKPIWrapper 
-                  key={i} 
-                  elementoId={elementId} 
-                  isAdmin={user?.role === 'ADMIN'} 
-                  onKPIClick={(url, title, url2, url3, multiPagina) => setPBIModal({ url, title, url2, url3, multiPagina })}
-                  accentColor={cfg.color}
-                >
-                  <AreaKPICard {...kpi} label={displayName} accent={cfg.color} />
-                </EditableKPIWrapper>
-              );
-            })}
-            {areaData.kpis.length === 0 && (
-              <p style={{ color:'var(--text-muted)', fontSize:'0.85rem', fontFamily: 'var(--font-body)' }}>Cargando indicadores...</p>
-            )}
-          </div>
+          {area !== AREAS.QUIROFANO && (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
+              {areaData.kpis.map((kpi, i) => {
+                const dbKey = KPI_DB_MAP[kpi.label] || kpi.label.replace(/\s+/g, '_').toLowerCase();
+                const elementId = `area.${area.toLowerCase()}.${dbKey}`;
+                const kpiConfig = getKPI(elementId);
+                const displayName = kpiConfig?.nombre || kpi.label;
+                return (
+                  <EditableKPIWrapper 
+                    key={i} 
+                    elementoId={elementId} 
+                    isAdmin={user?.role === 'ADMIN'} 
+                    onKPIClick={(url, title, url2, url3, multiPagina, hasJson) => setPBIModal({ url, title, url2, url3, multiPagina, reportId: elementId, hasJson })}
+                    accentColor={cfg.color}
+                  >
+                    <AreaKPICard {...kpi} label={displayName} accent={cfg.color} />
+                  </EditableKPIWrapper>
+                );
+              })}
+              
+              {/* KPIs ADICIONALES ASIGNADOS AL USUARIO (solo para no admins) */}
+              {user?.role !== 'ADMIN' && user?.role !== 'DIRECTOR' && user?.permisos?.map((permId, i) => {
+                // No duplicar los KPIs que ya se muestran en el área actual
+                if (permId.startsWith(`area.${area.toLowerCase()}`)) return null;
+                
+                const kpiConfig = getKPI(permId);
+                if (!kpiConfig) return null;
+                
+                return (
+                  <EditableKPIWrapper 
+                    key={`custom-${i}`} 
+                    elementoId={permId} 
+                    isAdmin={false} 
+                    onKPIClick={(url, title, url2, url3, multiPagina, hasJson) => setPBIModal({ url, title, url2, url3, multiPagina, reportId: permId, hasJson })}
+                    accentColor="#8b5cf6"
+                  >
+                    <div style={{ 
+                      background: 'linear-gradient(135deg, white, #f3e8ff)', 
+                      borderRadius: 12, padding: '1.25rem', 
+                      boxShadow: '0 4px 6px rgba(139, 92, 246, 0.1)',
+                      border: '1px solid rgba(139, 92, 246, 0.2)',
+                      display: 'flex', flexDirection: 'column', gap: '0.5rem',
+                      height: '100%'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#8b5cf6', fontSize: '1.2rem' }}>
+                        <span>{kpiConfig.icono || '📊'}</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Reporte Asignado</span>
+                      </div>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1e293b' }}>
+                        {kpiConfig.nombre || kpiConfig.titulo || 'Reporte Personalizado'}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 'auto' }}>
+                        Haz clic para ver el reporte interactivo
+                      </div>
+                    </div>
+                  </EditableKPIWrapper>
+                );
+              })}
 
+              {areaData.kpis.length === 0 && (!user?.permisos || user.permisos.length === 0) && (
+                <div style={{ background:'white', borderRadius:12, padding:'3rem', textAlign:'center', border:'1px solid var(--border-color)', boxShadow:'var(--shadow-sm)' }}>
+              <PremiumLoader text="Cargando indicadores..." style={{ padding: '1rem' }} />
+            </div>
+              )}
+            </div>
+          )}
 
+          {/* Renderizado Condicional del Dashboard Inferior */}
+          {area === AREAS.URGENCIAS ? (
+            <DashboardUrgenciasNativo 
+              data={areaData.rawUrgenciasData} 
+              searchFilter={urgenciasSearch}
+              setSearchFilter={setUrgenciasSearch}
+            />
+          ) : area === AREAS.QUIROFANO ? (
+            <DashboardQuirofanoNativo 
+              data={areaData.rawQuirofanoData} 
+            />
+          ) : (
+            <div style={{ marginTop: '2rem' }}>
+              <EmbeddedBI
+                report={dynamicReport}
+                loading={loadingReport}
+                onExportApi={() => setShowExportApi(true)}
+              />
+            </div>
+          )}
         </>
       )}
 

@@ -1,0 +1,193 @@
+CREATE OR ALTER VIEW dbo.UDR_BI_INDICADORES_OPERATIVOS
+AS
+/*
+    =====================================================================
+    Vista de indicadores operativos mensuales
+    Propósito: Calcular KPIs de triaje, laboratorio, imagenología, egreso,
+               ocupación de camas, quirófanos activos, y volúmenes de atención.
+    Notas:
+        - Triaje: se excluyen esperas > 240 minutos (4h) para evitar outliers
+          por registros sin cerrar. Se cuenta cuántos outliers se excluyen.
+        - Laboratorio e Imagenología: se excluyen duraciones > 720 minutos (12h).
+        - Egreso: se calcula en horas decimales (minutos/60.0) para precisión.
+        - CamasOcupadas: son camas distintas utilizadas al menos una vez en el mes.
+        - Los estados de cumplimiento muestran 'Sin datos' cuando no hay registros
+          válidos para el indicador en ese mes.
+    =====================================================================
+*/
+
+WITH
+-- 1. Camas utilizadas (hospitalización)
+CamasOcupadas AS (
+    SELECT
+        YEAR(PCFR.EntryDate) AS Anio,
+        MONTH(PCFR.EntryDate) AS Mes,
+        COUNT(DISTINCT PCFR.FRCode) AS CamasUtilizadas
+    FROM dbo.PCFR
+    INNER JOIN dbo.FR ON PCFR.FRCode = FR.FRCode
+    WHERE FR.FRType = 'IP'
+    GROUP BY YEAR(PCFR.EntryDate), MONTH(PCFR.EntryDate)
+),
+
+-- 2. Quirófanos activos (Excluyendo salas de recuperación)
+QuirofanosActivos AS (
+    SELECT
+        YEAR(PCFR.EntryDate) AS Anio,
+        MONTH(PCFR.EntryDate) AS Mes,
+        COUNT(DISTINCT PCFR.FRCode) AS QuirofanosActivos
+    FROM dbo.PCFR
+    INNER JOIN dbo.FR ON PCFR.FRCode = FR.FRCode
+    WHERE FR.FRType = 'OR'   -- Asumimos que 'OR' es el código de quirófano
+      AND FR.FRCode NOT LIKE '%RECU%' -- Excluye salas de recuperación para contar solo quirófanos reales
+    GROUP BY YEAR(PCFR.EntryDate), MONTH(PCFR.EntryDate)
+),
+
+-- 3. Volumen de pacientes por área (PCs creados)
+PacientesPorArea AS (
+    SELECT
+        YEAR([Date]) AS Anio,
+        MONTH([Date]) AS Mes,
+        SUM(CASE WHEN PCType = 'ER' THEN 1 ELSE 0 END) AS Urgencias,
+        SUM(CASE WHEN PCType = 'IP' THEN 1 ELSE 0 END) AS Hospitalizacion
+    FROM dbo.PC
+    GROUP BY YEAR([Date]), MONTH([Date])
+),
+
+-- 4. Triaje: promedio de minutos en espera (filtro 0-240 min) + outliers
+TriajeAtencion AS (
+    SELECT
+        YEAR([Date]) AS Anio,
+        MONTH([Date]) AS Mes,
+        AVG(CASE WHEN DATEDIFF(MINUTE, [Date], EntryDate) BETWEEN 0 AND 240
+                 THEN DATEDIFF(MINUTE, [Date], EntryDate)
+            END) AS TriajeMin,
+        COUNT(CASE WHEN DATEDIFF(MINUTE, [Date], EntryDate) > 240 THEN 1 END) AS TriajeOutliers,
+        COUNT(CASE WHEN DATEDIFF(MINUTE, [Date], EntryDate) BETWEEN 0 AND 240 THEN 1 END) AS TriajeRegistrosValidos
+    FROM dbo.PC
+    WHERE PCType = 'ER'
+      AND EntryDate IS NOT NULL
+      AND EntryDate > [Date]
+    GROUP BY YEAR([Date]), MONTH([Date])
+),
+
+-- 5. Laboratorio: tiempo de respuesta en minutos (filtro 0-720 min)
+Laboratorio AS (
+    SELECT
+        YEAR(CreatedOn) AS Anio,
+        MONTH(CreatedOn) AS Mes,
+        AVG(CASE WHEN DATEDIFF(MINUTE, CreatedOn, ModifiedOn) BETWEEN 0 AND 720
+                 THEN DATEDIFF(MINUTE, CreatedOn, ModifiedOn)
+            END) AS LaboratorioMin,
+        COUNT(CASE WHEN DATEDIFF(MINUTE, CreatedOn, ModifiedOn) > 720 THEN 1 END) AS LaboratorioOutliers,
+        COUNT(CASE WHEN DATEDIFF(MINUTE, CreatedOn, ModifiedOn) BETWEEN 0 AND 720 THEN 1 END) AS LaboratorioRegistrosValidos
+    FROM dbo.PCPR
+    WHERE SUCode = 'ACL'
+      AND ModifiedOn IS NOT NULL
+      AND ModifiedOn > CreatedOn
+    GROUP BY YEAR(CreatedOn), MONTH(CreatedOn)
+),
+
+-- 6. Imagenología: tiempo de respuesta en minutos (filtro 0-720 min)
+Imagenologia AS (
+    SELECT
+        YEAR(CreatedOn) AS Anio,
+        MONTH(CreatedOn) AS Mes,
+        AVG(CASE WHEN DATEDIFF(MINUTE, CreatedOn, ModifiedOn) BETWEEN 0 AND 720
+                 THEN DATEDIFF(MINUTE, CreatedOn, ModifiedOn)
+            END) AS ImagenologiaMin,
+        COUNT(CASE WHEN DATEDIFF(MINUTE, CreatedOn, ModifiedOn) > 720 THEN 1 END) AS ImagenologiaOutliers,
+        COUNT(CASE WHEN DATEDIFF(MINUTE, CreatedOn, ModifiedOn) BETWEEN 0 AND 720 THEN 1 END) AS ImagenologiaRegistrosValidos
+    FROM dbo.PCPR
+    WHERE SUCode = 'IMG'
+      AND ModifiedOn IS NOT NULL
+      AND ModifiedOn > CreatedOn
+    GROUP BY YEAR(CreatedOn), MONTH(CreatedOn)
+),
+
+-- 7. Egreso programado: horas entre alta médica y cierre (decimal)
+EgresoProgramado AS (
+    SELECT
+        YEAR(MedicalDischargeDate) AS Anio,
+        MONTH(MedicalDischargeDate) AS Mes,
+        AVG(DATEDIFF(MINUTE, MedicalDischargeDate, ClosedOn) / 60.0) AS EgresoHoras,
+        COUNT(*) AS EgresoRegistros
+    FROM dbo.PC
+    WHERE MedicalDischargeDate IS NOT NULL
+      AND ClosedOn IS NOT NULL
+      AND ClosedOn > MedicalDischargeDate
+    GROUP BY YEAR(MedicalDischargeDate), MONTH(MedicalDischargeDate)
+)
+
+-- 8. Salida final: todos los meses provenientes de PacientesPorArea (tabla base)
+SELECT
+    P.Anio,
+    P.Mes,
+    DATEFROMPARTS(P.Anio, P.Mes, 1) AS FechaPeriodo,
+
+    -- Indicadores numéricos (con 0 si no hay datos)
+    ISNULL(C.CamasUtilizadas, 0) AS CamasOcupadas,
+    ISNULL(Q.QuirofanosActivos, 0) AS QuirofanosActivos,
+    P.Urgencias,
+    P.Hospitalizacion,
+
+    ISNULL(T.TriajeMin, 0) AS TriajeMin,
+    20 AS TriajeMeta,
+    ISNULL(T.TriajeOutliers, 0) AS TriajeOutliers,
+    ISNULL(T.TriajeRegistrosValidos, 0) AS TriajeRegistros,
+
+    ISNULL(L.LaboratorioMin, 0) AS LaboratorioMin,
+    60 AS LaboratorioMeta,
+    ISNULL(L.LaboratorioOutliers, 0) AS LaboratorioOutliers,
+    ISNULL(L.LaboratorioRegistrosValidos, 0) AS LaboratorioRegistros,
+
+    ISNULL(I.ImagenologiaMin, 0) AS ImagenologiaMin,
+    60 AS ImagenologiaMeta,
+    ISNULL(I.ImagenologiaOutliers, 0) AS ImagenologiaOutliers,
+    ISNULL(I.ImagenologiaRegistrosValidos, 0) AS ImagenologiaRegistros,
+
+    ISNULL(E.EgresoHoras, 0) AS EgresoHoras,
+    4 AS EgresoMeta,
+    ISNULL(E.EgresoRegistros, 0) AS EgresoRegistros,
+
+    -- Estados de cumplimiento (con 'Sin datos' cuando no hay registros válidos)
+    CASE
+        WHEN T.TriajeRegistrosValidos IS NULL THEN 'Sin datos'
+        WHEN T.TriajeMin <= 20 THEN 'Cumple'
+        ELSE 'No Cumple'
+    END AS EstadoTriaje,
+
+    CASE
+        WHEN L.LaboratorioRegistrosValidos IS NULL THEN 'Sin datos'
+        WHEN L.LaboratorioMin <= 60 THEN 'Cumple'
+        ELSE 'No Cumple'
+    END AS EstadoLaboratorio,
+
+    CASE
+        WHEN I.ImagenologiaRegistrosValidos IS NULL THEN 'Sin datos'
+        WHEN I.ImagenologiaMin <= 60 THEN 'Cumple'
+        ELSE 'No Cumple'
+    END AS EstadoImagenologia,
+
+    CASE
+        WHEN E.EgresoRegistros IS NULL THEN 'Sin datos'
+        WHEN E.EgresoHoras <= 4 THEN 'Cumple'
+        ELSE 'No Cumple'
+    END AS EstadoEgreso
+
+FROM PacientesPorArea P
+LEFT JOIN CamasOcupadas C ON P.Anio = C.Anio AND P.Mes = C.Mes
+LEFT JOIN QuirofanosActivos Q ON P.Anio = Q.Anio AND P.Mes = Q.Mes
+LEFT JOIN TriajeAtencion T ON P.Anio = T.Anio AND P.Mes = T.Mes
+LEFT JOIN Laboratorio L ON P.Anio = L.Anio AND P.Mes = L.Mes
+LEFT JOIN Imagenologia I ON P.Anio = I.Anio AND P.Mes = I.Mes
+LEFT JOIN EgresoProgramado E ON P.Anio = E.Anio AND P.Mes = E.Mes;
+GO
+
+-- =====================================================================
+-- Índices recomendados para optimizar el rendimiento de la vista
+-- =====================================================================
+-- CREATE INDEX IX_PC_Date_Type ON dbo.PC([Date], PCType) INCLUDE (EntryDate, MedicalDischargeDate, ClosedOn);
+-- CREATE INDEX IX_PCFR_EntryDate ON dbo.PCFR(EntryDate, FRCode);
+-- CREATE INDEX IX_FR_Code_Type ON dbo.FR(FRCode, FRType);
+-- CREATE INDEX IX_PCPR_SUCode_Created ON dbo.PCPR(SUCode, CreatedOn) INCLUDE (ModifiedOn);
+-- CREATE INDEX IX_PCPR_SUCode_Modified ON dbo.PCPR(SUCode, ModifiedOn) INCLUDE (CreatedOn); -- Alternativo para búsquedas

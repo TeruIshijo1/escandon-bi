@@ -36,7 +36,10 @@ export const AREAS = {
 export const ROUTE_PERMISSIONS = {
   '/':                      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
   '/dashboard/directivo':   [ROLES.ADMIN, ROLES.DIRECTOR],
+  '/dashboard/ocupacion':   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
   '/dashboard/area':        [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
+  '/siti/dashboard':        [ROLES.ADMIN, ROLES.DIRECTOR],
+  '/siti/comparativo':      [ROLES.ADMIN, ROLES.DIRECTOR],
   '/auditoria/inventarios': [ROLES.ADMIN, ROLES.DIRECTOR],
   '/auditoria/cargos':      [ROLES.ADMIN, ROLES.DIRECTOR],
   '/estadisticas':          [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
@@ -160,6 +163,13 @@ export function getNavItems(role, area = null) {
       path:    '/dashboard/directivo',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
+    {
+      section: 'Dirección',
+      icon:    '🛏️',
+      label:   'Ocupación de camas',
+      path:    '/dashboard/ocupacion',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
+    },
     // Área
     {
       section: 'Mi Área',
@@ -174,6 +184,21 @@ export function getNavItems(role, area = null) {
       label:   'Estadísticas',
       path:    '/estadisticas',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
+    },
+    // Legado SITI
+    {
+      section: 'Históricos SITI',
+      icon:    '⏳',
+      label:   'Dashboard SITI',
+      path:    '/siti/dashboard',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
+    },
+    {
+      section: 'Históricos SITI',
+      icon:    '⚖️',
+      label:   'Comparativo vs Vertical',
+      path:    '/siti/comparativo',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
     // Auditoría
     {

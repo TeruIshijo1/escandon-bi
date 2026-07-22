@@ -11,6 +11,11 @@
  */
 import { useState, useEffect } from 'react';
 import EmbeddedBI    from './EmbeddedBI';
+import PremiumLoader from '../shared/PremiumLoader';
+import DashboardFinancieroNativo from './DashboardFinancieroNativo';
+import DashboardEficienciaNativo from './DashboardEficienciaNativo';
+import DashboardEficaciaNativo from './DashboardEficaciaNativo';
+import DashboardNuevoMapa from './DashboardNuevoMapa';
 import ExportButton  from '../shared/ExportButton';
 import ExportApiModal from '../shared/ExportApiModal';
 import { useAuth }   from '../../context/AuthContext';
@@ -49,6 +54,7 @@ export default function DashboardDirectivo() {
   const [activeTab, setTab]  = useState('eficiencia');
   const [data, setData]      = useState({ censo: [] });
   const [showExportApi, setShowExportApi] = useState(false);
+  const [configList, setConfigList] = useState([]);
 
   useEffect(() => {
     const now = new Date();
@@ -71,6 +77,16 @@ export default function DashboardDirectivo() {
           censo: censo
         });
       }
+
+      // Fetch configurations to know if current tab has JSON
+      const resCfg = await fetch(`${API_BASE}/admin/config/reports`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const jsonCfg = await resCfg.json();
+      if (jsonCfg.ok) {
+        setConfigList(jsonCfg.data);
+      }
+
     } catch (err) {
       console.error('[DashboardDirectivo]', err);
     } finally {
@@ -80,10 +96,8 @@ export default function DashboardDirectivo() {
 
   if (loading) {
     return (
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'50vh', flexDirection:'column', gap:'1rem' }}>
-        <div style={{ width:44, height:44, border:'4px solid rgba(0,70,135,0.1)', borderTop:'4px solid #004687', borderRadius:'50%', animation:'spin 0.9s linear infinite' }} />
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <span style={{ color:'#8A97A8', fontSize:'0.85rem' }}>Cargando indicadores…</span>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+        <PremiumLoader text="Cargando indicadores…" />
       </div>
     );
   }
@@ -157,8 +171,28 @@ export default function DashboardDirectivo() {
 
           {/* Botones de exportación */}
           <div style={{ display:'flex', gap:'0.5rem', alignItems:'flex-start', flexShrink:0 }}>
-            <ExportButton type="pdf"   reportId="directivo" />
-            <ExportButton type="excel" reportId="directivo" />
+            <button
+              onClick={() => document.getElementById('export-pdf-btn')?.click()}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.6rem 1.1rem',
+                background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.22)',
+                borderRadius: 10, color: '#FFFFFF', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer'
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              Exportar PDF
+            </button>
+            <button
+              onClick={() => document.getElementById('export-excel-btn')?.click()}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.6rem 1.1rem',
+                background: '#00974A', border: '1.5px solid rgba(0,151,74,0.5)',
+                borderRadius: 10, color: '#FFFFFF', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer'
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+              Exportar Excel
+            </button>
           </div>
         </div>
       </div>
@@ -175,6 +209,7 @@ export default function DashboardDirectivo() {
           { key:'eficiencia', label:'⚙️  Eficiencia Operativa' },
           { key:'eficacia',   label:'🎯  Eficacia Clínica' },
           { key:'financiero', label:'💼  Macropanel Financiero' },
+          { key:'demografia', label:'🗺️  Demografía Geográfica' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -208,33 +243,44 @@ export default function DashboardDirectivo() {
       {activeTab === 'eficiencia' && (
         <div>
           <SectionHeader
-            title="Tablero de Eficiencia Operativa"
-            subtitle="Acceso seguro a analítica avanzada de ocupación, tiempos y recursos"
+            title="Tablero de Eficiencia Operativa (Nativo Directo a SQL)"
+            subtitle="Acceso ultra-rápido a métricas operativas desde UDR_BI_INDICADORES_OPERATIVOS"
             accent="#0088C9"
           />
-          <EmbeddedBI reportId="directivo-eficiencia" height="calc(100vh - 140px)" />
+          <DashboardEficienciaNativo />
         </div>
       )}
 
       {activeTab === 'eficacia' && (
         <div>
           <SectionHeader
-            title="Tablero de Eficacia Clínica"
-            subtitle="Acceso seguro a analítica avanzada de eficacia y calidad médica"
+            title="Tablero de Eficacia Clínica (Nativo Directo a SQL)"
+            subtitle="Acceso ultra-rápido a productividad de médicos y consultas"
             accent="#00974A"
           />
-          <EmbeddedBI reportId="directivo-eficacia" height="calc(100vh - 140px)" />
+          <DashboardEficaciaNativo />
         </div>
       )}
 
       {activeTab === 'financiero' && (
         <div>
           <SectionHeader
-            title="Macropanel Financiero"
-            subtitle="Acceso seguro a analítica financiera y presupuestos"
+            title="Macropanel Financiero (Nativo Directo a SQL)"
+            subtitle="Datos en tiempo real sin Power BI. Interactivo, seguro y nativo."
             accent="#005FA9"
           />
-          <EmbeddedBI reportId="directivo-financiero" height="calc(100vh - 140px)" />
+          <DashboardFinancieroNativo />
+        </div>
+      )}
+
+      {activeTab === 'demografia' && (
+        <div>
+          <SectionHeader
+            title="Dashboard Demográfico Geográfico"
+            subtitle="Distribución espacial de pacientes por estado y municipio"
+            accent="#F59E0B"
+          />
+          <DashboardNuevoMapa />
         </div>
       )}
     </div>

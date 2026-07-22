@@ -337,38 +337,107 @@ async function generateAnswer({ question, data, intent, userRole, userName, syst
   return callLLM(messages);
 }
 
-/* ── Cliente OpenAI / Azure OpenAI ──────────────────────── */
+/* ── Cliente OpenAI / Azure OpenAI (MODO DEMO) ──────────────────────── */
+/* ── Cliente OpenAI / Azure OpenAI (MODO DEMO) ──────────────────────── */
 async function callLLM(messages, options = {}) {
-  if (!LLM_API_KEY || LLM_API_KEY.startsWith('sk-...')) {
-    throw new Error('LLM API error: No se ha configurado la API Key de Gemini/DeepSeek/OpenAI en el servidor.');
+  // MODO DEMO: No consumir tokens reales y devolver respuestas simuladas pero REALES usando los datos extraídos.
+  
+  const isClassification = messages[0]?.content?.includes("Clasifica la pregunta");
+  
+  if (isClassification) {
+    const q = (messages[1]?.content || '').toLowerCase();
+    if (q.includes('hola') || q.includes('buenos dias') || q.includes('qué tal')) return 'saludo';
+    if (q.includes('ocupación') || q.includes('cama') || q.includes('ocupacion')) return 'ocupacion_camas';
+    if (q.includes('paciente') || q.includes('censo')) return 'censo_pacientes';
+    if (q.includes('cirug')) return 'cirugias_dia';
+    if (q.includes('mortalidad')) return 'tasa_mortalidad';
+    if (q.includes('rotacion') || q.includes('estancia')) return 'rotacion_area';
+    if (q.includes('readmision')) return 'readmision';
+    if (q.includes('auditoria') || q.includes('inventario')) return 'auditoria';
+    if (q.includes('financiero') || q.includes('factura') || q.includes('dinero')) return 'financiero';
+    if (q.includes('plataforma') || q.includes('como') || q.includes('dónde')) return 'plataforma';
+    return 'general';
   }
 
-  const endpoint = LLM_BASE.endsWith('/chat/completions') ? LLM_BASE : `${LLM_BASE}/chat/completions`;
-
-  const response = await fetch(endpoint, {
-    method:  'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${LLM_API_KEY}`,
-      ...(process.env.AZURE_OPENAI_ENDPOINT && !process.env.DEEPSEEK_API_KEY
-        ? { 'api-key': LLM_API_KEY }
-        : {}),
-    },
-    body: JSON.stringify({
-      model:       LLM_MODEL,
-      messages,
-      max_tokens:  options.max_tokens  || 800,
-      temperature: options.temperature ?? 0.3,
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`LLM API error: ${response.status} — ${err}`);
+  // Generación de respuesta
+  const userMsg = messages.find(m => m.role === 'user');
+  let qText = '';
+  if (userMsg && typeof userMsg.content === 'string') {
+    qText = userMsg.content.toLowerCase();
+  } else if (userMsg && Array.isArray(userMsg.content)) {
+    qText = userMsg.content.find(c => c.type === 'text')?.text?.toLowerCase() || '';
   }
 
-  const json = await response.json();
-  return json.choices?.[0]?.message?.content?.trim() || 'Disculpa, no pude generar una respuesta. ¿Podrías reformular tu pregunta?';
+  // Extraer la intención real enviada por el prompt
+  const intentMatch = qText.match(/intención detectada:\s*([a-z_]+)/);
+  const detectedIntent = intentMatch ? intentMatch[1] : 'general';
+
+  // Extraer los datos JSON de la base de datos inyectados en el prompt
+  let dbData = [];
+  const jsonMatch = qText.match(/```json\n([\s\S]*?)\n```/);
+  if (jsonMatch) {
+     try {
+       dbData = JSON.parse(jsonMatch[1]);
+     } catch (e) {
+       console.error("Error parseando JSON en DEMO:", e);
+     }
+  }
+
+  let response = "🤖 **[MODO DEMO ACTIVADO]**\n\n";
+
+  if (detectedIntent === 'saludo') {
+      response += "¡Hola! 👋 Soy Mar-IA, tu asistente de inteligencia analítica del Hospital Escandón. ¿En qué te puedo ayudar hoy? (Ej. Puedes preguntarme por la ocupación de camas o censo de pacientes).";
+  } else if (detectedIntent === 'plataforma') {
+      response += "Para usar la plataforma, puedes navegar por el menú lateral izquierdo. Allí encontrarás los Dashboards directivos, información por áreas, reportes de auditoría y configuración general.";
+  } else if (Array.isArray(dbData) && dbData.length > 0 && !dbData[0]._rbac_denied) {
+      // Generar una tabla o lista real basada en los datos extraídos
+      response += "Aquí tienes la información solicitada basada en los datos actuales del hospital:\n\n";
+      
+      if (detectedIntent === 'ocupacion_camas') {
+          dbData.forEach(row => {
+              response += `- **${row.Area}**: Ocupación al **${row.PorcentajeOcupacion}%** (${row.CamasOcupadas} de ${row.TotalCamas} camas ocupadas).\n`;
+          });
+      } else if (detectedIntent === 'censo_pacientes') {
+          dbData.forEach(row => {
+              response += `- **${row.Area}**: **${row.Pacientes}** pacientes ingresados.\n`;
+          });
+      } else if (detectedIntent === 'cirugias_dia') {
+          dbData.forEach(row => {
+              response += `- **${row.Area}**: **${row.TotalCirugias}** cirugías totales (Completadas: ${row.Completadas}, Urgencias: ${row.Urgencias}, Canceladas: ${row.Canceladas}).\n`;
+          });
+      } else if (detectedIntent === 'tasa_mortalidad') {
+          dbData.forEach(row => {
+              response += `- **${row.Area}**: Tasa de mortalidad del **${row.TasaMortalidadPorcentaje}%** (${row.Defunciones} defunciones de ${row.TotalEgresos} egresos).\n`;
+          });
+      } else if (detectedIntent === 'rotacion_area') {
+          dbData.forEach(row => {
+              response += `- **${row.Area}**: Hubo **${row.Egresos}** egresos con una estancia promedio de **${Math.round(row.EstanciaPromedioDias || 0)} días**. La rotación de camas fue de **${row.RotacionCamas}**.\n`;
+          });
+      } else if (detectedIntent === 'readmision') {
+          dbData.forEach(row => {
+              response += `- Tasa de readmisión global a 30 días: **${row.TasaReadmision}%** (${row.ReadmisionesCount} readmisiones de ${row.TotalEgresados} egresos totales).\n`;
+          });
+      } else {
+          // Fallback genérico sin JSON crudo
+          response += "Resumen de datos encontrados:\n";
+          dbData.forEach((row) => {
+              response += "- ";
+              Object.entries(row).forEach(([k, v]) => {
+                  if (k !== '_rbac_denied') {
+                      response += `**${k}**: ${v} | `;
+                  }
+              });
+              response += "\n";
+          });
+      }
+      response += "\n*Nota: Esta respuesta fue construida automáticamente a partir de los datos en vivo del sistema.*";
+  } else if (Array.isArray(dbData) && dbData.length > 0 && dbData[0]._rbac_denied) {
+      response += "🔒 Lo siento, no tienes los permisos suficientes para consultar esta información con tu rol actual.";
+  } else {
+      response += "No he encontrado datos específicos para responder a tu consulta en este momento, o tu perfil no tiene información asignada a esta métrica. ¿Puedo ayudarte con alguna otra consulta operativa?";
+  }
+
+  return response;
 }
 
 

@@ -17,20 +17,9 @@ echo  Frontend:   http://localhost:5173
 if defined LOCAL_IP echo  Red Local:  http://%LOCAL_IP%:5173
 echo.
 
-:: Iniciar Backend
-start "HE-BI Backend" cmd /k "cd /d "%~dp0backend" && node server.js"
-
-:: Esperar al backend
-ping 127.0.0.1 -n 4 > nul
-
-:: Iniciar Frontend con acceso por IP
-start "HE-BI Frontend" cmd /k "cd /d "%~dp0frontend" && npx vite --host"
-
-:: Esperar un par de segundos para asegurar que Vite arranque
-ping 127.0.0.1 -n 3 > nul
-
-:: Iniciar Ngrok (Túnel Público)
-start "HE-BI Ngrok" cmd /k "ngrok http 5173 --host-header=localhost"
-
-echo  Servidores y Tunel iniciados.
+:: Instalar y arrancar todo en la misma ventana con concurrently
+echo  Iniciando servicios...
+echo  (Presiona Ctrl+C en esta ventana para detener todos los servicios)
 echo.
+
+npx concurrently -n "BACKEND,FRONTEND,NGROK" -c "bgBlue.bold,bgGreen.bold,bgMagenta.bold" "cd backend && node server.js" "cd frontend && npx vite --host" "ngrok http 5173 --host-header=localhost --log=stdout"

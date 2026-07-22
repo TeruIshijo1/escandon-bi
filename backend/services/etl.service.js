@@ -8,18 +8,23 @@
  *  TRANSFORM→ Cruza por (PacienteId + InsumoId + Fecha) y calcula diferencias
  *  LOAD     → Escribe resultados en AuditoriaInventarioCargos y devuelve JSON
  */
-'use strict';
-
 const { getDb } = require('../config/db');
+const { getRemoteDb, sql } = require('../config/remote-db');
 
 /* ══════════════════════════════════════════════════════════════
    ENDPOINT PRINCIPAL — /api/audit/inventarios-vs-cargos
    Devuelve conciliación con métricas de resumen
 ══════════════════════════════════════════════════════════════ */
 async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, limit = 500 }) {
-  const db = getDb();
+  const db = getDb(); // Necesario para persistirResultados localmente
+  let pool;
+  try {
+    pool = await getRemoteDb();
+  } catch (err) {
+    throw new Error('No se pudo conectar a la base de datos Vertical: ' + err.message);
+  }
 
-  // ── 1. EXTRACT: Leer órdenes del Almacén ──────────────────
+  // ── 1. EXTRACT: Leer órdenes del Almacén desde Vertical ──────────────────
   let ordenesSQL = `
     SELECT
       ao.OrdenId,
@@ -39,31 +44,39 @@ async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, li
     WHERE ao.Estado = 'SURTIDA'
   `;
 
-  const params = [];
+  const request = pool.request();
 
   if (area) {
-    ordenesSQL += ` AND ao.AreaHospitalaria = ?`;
-    params.push(area);
+    ordenesSQL += ` AND ao.AreaHospitalaria = @area`;
+    request.input('area', sql.VarChar, area);
   }
   if (fechaDesde) {
-    ordenesSQL += ` AND ao.FechaSurtido >= ?`;
-    params.push(fechaDesde);
+    ordenesSQL += ` AND ao.FechaSurtido >= @fechaDesde`;
+    request.input('fechaDesde', sql.VarChar, fechaDesde);
   }
 
-  ordenesSQL += ` AND ao.FechaSurtido <= ?`;
-  params.push(fechaHasta || new Date().toISOString());
+  ordenesSQL += ` AND ao.FechaSurtido <= @fechaHasta`;
+  request.input('fechaHasta', sql.VarChar, fechaHasta || new Date().toISOString());
 
   ordenesSQL += ` ORDER BY ao.FechaSurtido DESC`;
 
-  const ordenes = db.prepare(ordenesSQL).all(...params);
+  const ordenesResult = await request.query(ordenesSQL);
+  const ordenes = ordenesResult.recordset || [];
 
-  // ── 2. EXTRACT: Leer cargos de enfermería correspondientes ──
+  // ── 2. EXTRACT: Leer cargos de enfermería correspondientes desde Vertical ──
   const cargoIds = ordenes.map(o => o.OrdenId);
-
   const cargosMap = new Map();
+
   if (cargoIds.length > 0) {
-    const placeholders = cargoIds.map(() => '?').join(',');
-    const cargos = db.prepare(`
+    const cargosRequest = pool.request();
+    
+    // Crear la lista de parámetros @id0, @id1... para el IN
+    const placeholders = cargoIds.map((id, index) => {
+      cargosRequest.input(`id${index}`, sql.Int, id);
+      return `@id${index}`;
+    }).join(',');
+
+    const cargosSQL = `
       SELECT
         ce.OrdenAlmacenId,
         ce.CantidadCargada  AS CantCargo,
@@ -73,7 +86,10 @@ async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, li
       FROM CargosEnfermeria ce
       JOIN Usuarios u ON u.UsuarioId = ce.EnfermerId
       WHERE ce.OrdenAlmacenId IN (${placeholders})
-    `).all(...cargoIds);
+    `;
+    
+    const cargosResult = await cargosRequest.query(cargosSQL);
+    const cargos = cargosResult.recordset || [];
 
     for (const c of cargos) {
       cargosMap.set(c.OrdenAlmacenId, c);
@@ -105,7 +121,8 @@ async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, li
       monto,
       estado:      estadoConciliacion,
       enfermera:   cargo?.NombreEnfermera || o.EnfermeraReceptora || 'Sin registro',
-      fecha:       o.Fecha ? o.Fecha.split('T')[0] : '',
+      // Convertir fechas a YYYY-MM-DD para frontend
+      fecha:       o.Fecha ? (o.Fecha instanceof Date ? o.Fecha.toISOString().split('T')[0] : o.Fecha.toString().split('T')[0]) : '',
     };
   });
 
@@ -117,8 +134,7 @@ async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, li
   // ── 4. TRANSFORM: Calcular métricas de resumen ────────────
   const resumen = calcularResumen(filtradas);
 
-  // ── 5. LOAD: Persistir resultados en tabla de auditoría ───
-  //    (En producción se haría como job programado, no en cada request)
+  // ── 5. LOAD: Persistir resultados en tabla de auditoría (SQLite local) ───
   persistirResultados(db, filtradas);
 
   return {

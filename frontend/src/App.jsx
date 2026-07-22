@@ -21,11 +21,13 @@ import ProtectedRoute      from './components/layout/ProtectedRoute';
 import AppShell            from './components/layout/AppShell';
 import { ROLES }           from './utils/rbac';
 import './styles/globals.css';
+import PremiumLoader       from './components/shared/PremiumLoader';
 
 /* ── Carga diferida de páginas (code splitting) ──────────────── */
 const LoginPage           = lazy(() => import('./pages/LoginPage'));
 const HomePage            = lazy(() => import('./pages/HomePage'));
 const DashboardDirectivo  = lazy(() => import('./components/dashboard/DashboardDirectivo'));
+const OcupacionCamas      = lazy(() => import('./pages/OcupacionCamas'));
 const DashboardArea       = lazy(() => import('./pages/DashboardArea'));
 const AuditoriaInventarios = lazy(() => import('./components/audit/InventarioVsCargos'));
 const AuditoriaCargos     = lazy(() => import('./pages/AuditoriaCargos'));
@@ -34,29 +36,15 @@ const AdminUsuarios       = lazy(() => import('./pages/AdminUsuarios'));
 const AdminAuditoriaLog   = lazy(() => import('./pages/AdminAuditoriaLog'));
 const AdminConfiguracion  = lazy(() => import('./pages/AdminConfiguracion'));
 const SinAcceso           = lazy(() => import('./pages/SinAcceso'));
+const DashboardSiti       = lazy(() => import('./components/dashboard/DashboardSiti'));
+const DashboardComparativo= lazy(() => import('./components/dashboard/DashboardComparativo'));
 
 /* ── Fallback de carga ───────────────────────────────────────── */
 function PageLoader() {
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '60vh',
-      flexDirection: 'column',
-      gap: '1rem',
-    }}>
-      <div style={{
-        width: 48,
-        height: 48,
-        border: '4px solid rgba(0,70,135,0.1)',
-        borderTop: '4px solid #004687',
-        borderRadius: '50%',
-        animation: 'spin 0.9s linear infinite',
-      }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <span style={{ color: '#8A97A8', fontSize: '0.85rem' }}>Cargando módulo…</span>
-    </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
+        <PremiumLoader text="Cargando módulo…" />
+      </div>
   );
 }
 
@@ -138,16 +126,41 @@ export default function App() {
               {/* Home / Resumen */}
               <Route index element={<HomePage />} />
 
-              {/* Dashboard Directivo — ADMIN + DIRECTOR */}
-              <Route
-                path="dashboard/directivo"
+              {/* DIRECCIÓN */}
+              <Route 
+                path="dashboard/directivo" 
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
                     <DashboardDirectivo />
                   </ProtectedRoute>
-                }
+                } 
+              />
+              <Route 
+                path="dashboard/ocupacion" 
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA]}>
+                    <OcupacionCamas />
+                  </ProtectedRoute>
+                } 
               />
 
+              {/* HISTÓRICOS SITI */}
+              <Route 
+                path="siti/dashboard" 
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
+                    <DashboardSiti />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="siti/comparativo" 
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
+                    <DashboardComparativo />
+                  </ProtectedRoute>
+                } 
+              />
 
               {/* Dashboard por Área — Todos (filtrado por área del usuario) */}
               <Route

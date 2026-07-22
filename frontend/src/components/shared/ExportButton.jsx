@@ -6,6 +6,9 @@
 import { useState } from 'react';
 import { API_BASE } from '../../api/config';
 
+import { toPng } from 'html-to-image';
+import { jsPDF } from 'jspdf';
+
 const CONFIG = {
   pdf: {
     label:   'Exportar PDF',
@@ -39,37 +42,122 @@ const CONFIG = {
   },
 };
 
-export default function ExportButton({ type = 'pdf', reportId, directUrl = null, compact = false, onClickOverride }) {
+export default function ExportButton({ id, type = 'pdf', reportId, directUrl = null, compact = false, onClickOverride, targetId = 'dashboard-container' }) {
   const [loading, setLoading] = useState(false);
   const cfg = CONFIG[type] || CONFIG.pdf;
 
   const handleExport = async () => {
+    if (loading) return;
+
     if (onClickOverride) {
       onClickOverride();
       return;
     }
 
-    if (loading) return;
-
     if (type === 'pdf') {
-      window.print();
+      const element = document.getElementById(targetId);
+      if (!element) {
+        alert('No se encontró el contenido del dashboard para exportar.');
+        return;
+      }
+      setLoading(true);
+      try {
+        // Scroll al inicio para capturar todo
+        const originalScroll = window.scrollY;
+        window.scrollTo(0, 0);
+        await new Promise(r => setTimeout(r, 400));
+
+        // Temporalmente ocultar la tabla (ocupa mucha altura y se excluye del PDF)
+        const tablesToHide = element.querySelectorAll('[data-html2canvas-ignore="true"]');
+        tablesToHide.forEach(el => el.style.setProperty('display', 'none', 'important'));
+
+        // Temporalmente quitar maxWidth para que el contenido llene el ancho
+        const origMaxWidth = element.style.maxWidth;
+        const origMargin = element.style.margin;
+        element.style.maxWidth = 'none';
+        element.style.margin = '0';
+
+        await new Promise(r => setTimeout(r, 100)); // Dejar que el DOM recalcule
+
+        // Usar html-to-image (soporta SVG nativamente)
+        const dataUrl = await toPng(element, {
+          quality: 1,
+          pixelRatio: 2,
+          cacheBust: true
+        });
+
+        // Restaurar estilos originales
+        element.style.maxWidth = origMaxWidth || '';
+        element.style.margin = origMargin || '';
+        tablesToHide.forEach(el => el.style.removeProperty('display'));
+
+        window.scrollTo(0, originalScroll);
+
+        // Generar PDF A4 landscape
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pdfW = pdf.internal.pageSize.getWidth();
+        const pdfH = pdf.internal.pageSize.getHeight();
+
+        // Header institucional
+        pdf.setFillColor(0, 70, 135);
+        pdf.rect(0, 0, pdfW, 16, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Hospital Escandón', 6, 11);
+        pdf.setFontSize(9);
+        pdf.text('Reporte de BI - ' + new Date().toLocaleDateString('es-MX'), pdfW - 6, 11, { align: 'right' });
+
+        // Imagen del dashboard - llenar todo el ancho disponible
+        const imgProps = pdf.getImageProperties(dataUrl);
+        const m = 3;
+        const fW = pdfW - m * 2; // Ancho completo
+        const fH = (imgProps.height * fW) / imgProps.width; // Alto proporcional
+        pdf.addImage(dataUrl, 'PNG', m, 17, fW, fH);
+
+        pdf.save(`Dashboard_${Date.now()}.pdf`);
+      } catch (error) {
+        alert('Error al generar PDF: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
     if (type === 'excel' && directUrl) {
       const a = document.createElement('a');
-      a.href = directUrl.startsWith('http') ? directUrl : `/api/files/${directUrl}`;
-      a.download = directUrl.split('/').pop() || 'reporte.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const token = sessionStorage.getItem('escandon_token');
+      // For standard browser download with token we would need to fetch and blob, but for now we'll do fetch + blob for directUrl as well to pass auth
+      setLoading(true);
+      try {
+        const urlToFetch = directUrl.startsWith('http') ? directUrl : `${API_BASE}${directUrl.startsWith('/') ? directUrl : '/' + directUrl}`;
+        const res = await fetch(urlToFetch, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Error al exportar');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        a.href = url;
+        a.download = `Exportacion_${new Date().getTime()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(err);
+        alert('Hubo un error al generar el Excel.');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
     setLoading(true);
     try {
       const token = sessionStorage.getItem('escandon_token');
-      const res   = await fetch(`${API_BASE}/export/${cfg.endpoint}/${reportId}`, {
+      // If we don't have directUrl but we are standard excel fallback:
+      const endpointPath = reportId ? `${cfg.endpoint}/${reportId}` : cfg.endpoint;
+      const res = await fetch(`${API_BASE}/export/${endpointPath}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -94,6 +182,7 @@ export default function ExportButton({ type = 'pdf', reportId, directUrl = null,
 
   return (
     <button
+      id={id}
       onClick={handleExport}
       disabled={loading}
       style={{

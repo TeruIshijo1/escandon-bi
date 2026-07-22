@@ -1,0 +1,2882 @@
+[
+  {
+    "PRNum": "52",
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "8",
+    "IngresosTotales": "32579.66"
+  },
+  {
+    "PRNum": "52",
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "36",
+    "IngresosTotales": "191482.07"
+  },
+  {
+    "PRNum": "52",
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "27",
+    "IngresosTotales": "202293.72"
+  },
+  {
+    "PRNum": "52",
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "30",
+    "IngresosTotales": "293404.76"
+  },
+  {
+    "PRNum": "52",
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "44",
+    "IngresosTotales": "673838.53"
+  },
+  {
+    "PRNum": "52",
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "33",
+    "IngresosTotales": "580498.70"
+  },
+  {
+    "PRNum": "45",
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "18230.54"
+  },
+  {
+    "PRNum": "45",
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "3",
+    "IngresosTotales": "471564.29"
+  },
+  {
+    "PRNum": "45",
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "4",
+    "IngresosTotales": "1900139.66"
+  },
+  {
+    "PRNum": "45",
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "2",
+    "IngresosTotales": "185063.28"
+  },
+  {
+    "PRNum": "45",
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "3",
+    "IngresosTotales": "623190.84"
+  },
+  {
+    "PRNum": "71",
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "6",
+    "IngresosTotales": "418299.64"
+  },
+  {
+    "PRNum": "71",
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "376817.44"
+  },
+  {
+    "PRNum": "71",
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "2",
+    "IngresosTotales": "140200.82"
+  },
+  {
+    "PRNum": "71",
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "4",
+    "IngresosTotales": "251105.74"
+  },
+  {
+    "PRNum": "71",
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "3",
+    "IngresosTotales": "335881.48"
+  },
+  {
+    "PRNum": "71",
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "5",
+    "IngresosTotales": "200953.58"
+  },
+  {
+    "PRNum": "122",
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "84",
+    "IngresosTotales": "180051.38"
+  },
+  {
+    "PRNum": "122",
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "101",
+    "IngresosTotales": "208266.21"
+  },
+  {
+    "PRNum": "122",
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "99",
+    "IngresosTotales": "201618.45"
+  },
+  {
+    "PRNum": "122",
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "130",
+    "IngresosTotales": "305307.96"
+  },
+  {
+    "PRNum": "122",
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "49",
+    "IngresosTotales": "75813.51"
+  },
+  {
+    "PRNum": "122",
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "26",
+    "IngresosTotales": "32297.69"
+  },
+  {
+    "PRNum": "147",
+    "Medico": "ANASTASIA ZAITSEV ZAITSEVA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "45551.28"
+  },
+  {
+    "PRNum": "147",
+    "Medico": "ANASTASIA ZAITSEV ZAITSEVA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "36520.30"
+  },
+  {
+    "PRNum": "147",
+    "Medico": "ANASTASIA ZAITSEV ZAITSEVA",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "2",
+    "IngresosTotales": "44262.25"
+  },
+  {
+    "PRNum": "147",
+    "Medico": "ANASTASIA ZAITSEV ZAITSEVA",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "23853.68"
+  },
+  {
+    "PRNum": "70",
+    "Medico": "ANDREA ARANXA ICAZBALCETA ARGAEZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "28801.59"
+  },
+  {
+    "PRNum": "70",
+    "Medico": "ANDREA ARANXA ICAZBALCETA ARGAEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "2",
+    "IngresosTotales": "54332.53"
+  },
+  {
+    "PRNum": "70",
+    "Medico": "ANDREA ARANXA ICAZBALCETA ARGAEZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "631.00"
+  },
+  {
+    "PRNum": "70",
+    "Medico": "ANDREA ARANXA ICAZBALCETA ARGAEZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "3",
+    "IngresosTotales": "96133.29"
+  },
+  {
+    "PRNum": "70",
+    "Medico": "ANDREA ARANXA ICAZBALCETA ARGAEZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "3",
+    "IngresosTotales": "52031.47"
+  },
+  {
+    "PRNum": "67",
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "21346.04"
+  },
+  {
+    "PRNum": "67",
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "9",
+    "IngresosTotales": "223944.65"
+  },
+  {
+    "PRNum": "67",
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "6",
+    "IngresosTotales": "60437.16"
+  },
+  {
+    "PRNum": "67",
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "4",
+    "IngresosTotales": "50300.24"
+  },
+  {
+    "PRNum": "67",
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "3",
+    "IngresosTotales": "43021.98"
+  },
+  {
+    "PRNum": "67",
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "2",
+    "IngresosTotales": "48483.38"
+  },
+  {
+    "PRNum": "203",
+    "Medico": "ANNA MARIA LECONA IBARRA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "7",
+    "IngresosTotales": "26794.52"
+  },
+  {
+    "PRNum": "203",
+    "Medico": "ANNA MARIA LECONA IBARRA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "11",
+    "IngresosTotales": "65041.17"
+  },
+  {
+    "PRNum": "203",
+    "Medico": "ANNA MARIA LECONA IBARRA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "4",
+    "IngresosTotales": "25868.01"
+  },
+  {
+    "PRNum": "46",
+    "Medico": "ANTONIO FERNANDEZ MACIAS VALADEZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "3",
+    "IngresosTotales": "310647.31"
+  },
+  {
+    "PRNum": "46",
+    "Medico": "ANTONIO FERNANDEZ MACIAS VALADEZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "4",
+    "IngresosTotales": "693247.09"
+  },
+  {
+    "PRNum": "46",
+    "Medico": "ANTONIO FERNANDEZ MACIAS VALADEZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "429154.81"
+  },
+  {
+    "PRNum": "220",
+    "Medico": "ARREDONDO VAZQUEZ GABRIELA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "21671.43"
+  },
+  {
+    "PRNum": "69",
+    "Medico": "ARTURO ABRAHAM HOLLING MARTÍNEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "2",
+    "IngresosTotales": "81473.73"
+  },
+  {
+    "PRNum": "69",
+    "Medico": "ARTURO ABRAHAM HOLLING MARTÍNEZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "33904.44"
+  },
+  {
+    "PRNum": "61",
+    "Medico": "BRENDA GOVEA MENDOZA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "1385.00"
+  },
+  {
+    "PRNum": "153",
+    "Medico": "CARLOS ADRIAN TORREJON HERNANDEZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "48788.35"
+  },
+  {
+    "PRNum": "153",
+    "Medico": "CARLOS ADRIAN TORREJON HERNANDEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "197716.19"
+  },
+  {
+    "PRNum": "153",
+    "Medico": "CARLOS ADRIAN TORREJON HERNANDEZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "11275.00"
+  },
+  {
+    "PRNum": "153",
+    "Medico": "CARLOS ADRIAN TORREJON HERNANDEZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "3",
+    "IngresosTotales": "214083.02"
+  },
+  {
+    "PRNum": "59",
+    "Medico": "CARLOS FERNANDO GOMEZ CUEVAS",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "39038.37"
+  },
+  {
+    "PRNum": "12",
+    "Medico": "CINDY JACQUELINE BACA CARDOSO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "40992.31"
+  },
+  {
+    "PRNum": "12",
+    "Medico": "CINDY JACQUELINE BACA CARDOSO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "54781.46"
+  },
+  {
+    "PRNum": "12",
+    "Medico": "CINDY JACQUELINE BACA CARDOSO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "3",
+    "IngresosTotales": "177836.60"
+  },
+  {
+    "PRNum": "33",
+    "Medico": "DIANA CHAVEZ   GARRIDO",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "15992.28"
+  },
+  {
+    "PRNum": "33",
+    "Medico": "DIANA CHAVEZ   GARRIDO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "2",
+    "IngresosTotales": "34379.84"
+  },
+  {
+    "PRNum": "115",
+    "Medico": "DORI DAISY RIVERA OLIVA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "47219.39"
+  },
+  {
+    "PRNum": "115",
+    "Medico": "DORI DAISY RIVERA OLIVA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "3",
+    "IngresosTotales": "124642.13"
+  },
+  {
+    "PRNum": "115",
+    "Medico": "DORI DAISY RIVERA OLIVA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "18790.52"
+  },
+  {
+    "PRNum": "115",
+    "Medico": "DORI DAISY RIVERA OLIVA",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "2",
+    "IngresosTotales": "49423.66"
+  },
+  {
+    "PRNum": "115",
+    "Medico": "DORI DAISY RIVERA OLIVA",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "650.00"
+  },
+  {
+    "PRNum": "40",
+    "Medico": "EDWIN JAVIER CRESPO MARTINEZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "1878.60"
+  },
+  {
+    "PRNum": "62",
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "10",
+    "IngresosTotales": "13851.00"
+  },
+  {
+    "PRNum": "62",
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "16",
+    "IngresosTotales": "22899.80"
+  },
+  {
+    "PRNum": "62",
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "21",
+    "IngresosTotales": "114970.91"
+  },
+  {
+    "PRNum": "62",
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "15",
+    "IngresosTotales": "35479.03"
+  },
+  {
+    "PRNum": "62",
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "6",
+    "IngresosTotales": "8006.80"
+  },
+  {
+    "PRNum": "62",
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "20",
+    "IngresosTotales": "92305.96"
+  },
+  {
+    "PRNum": "134",
+    "Medico": "EMANUEL  TINTORI TINTORI",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "3",
+    "IngresosTotales": "4740.07"
+  },
+  {
+    "PRNum": "4",
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "3",
+    "IngresosTotales": "59333.62"
+  },
+  {
+    "PRNum": "4",
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "3",
+    "IngresosTotales": "31584.77"
+  },
+  {
+    "PRNum": "4",
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "13",
+    "IngresosTotales": "259649.59"
+  },
+  {
+    "PRNum": "4",
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "12",
+    "IngresosTotales": "299624.23"
+  },
+  {
+    "PRNum": "4",
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "9",
+    "IngresosTotales": "159267.52"
+  },
+  {
+    "PRNum": "4",
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "7",
+    "IngresosTotales": "96701.36"
+  },
+  {
+    "PRNum": "51",
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "35654.67"
+  },
+  {
+    "PRNum": "51",
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "9",
+    "IngresosTotales": "352584.07"
+  },
+  {
+    "PRNum": "51",
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "4",
+    "IngresosTotales": "241404.49"
+  },
+  {
+    "PRNum": "51",
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "15486.65"
+  },
+  {
+    "PRNum": "51",
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "2",
+    "IngresosTotales": "94531.26"
+  },
+  {
+    "PRNum": "51",
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "4",
+    "IngresosTotales": "59295.38"
+  },
+  {
+    "PRNum": "90",
+    "Medico": "FERNANDO MONTEMAYOR RUIZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "118179.30"
+  },
+  {
+    "PRNum": "90",
+    "Medico": "FERNANDO MONTEMAYOR RUIZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "2",
+    "IngresosTotales": "1280655.77"
+  },
+  {
+    "PRNum": "90",
+    "Medico": "FERNANDO MONTEMAYOR RUIZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "74775.20"
+  },
+  {
+    "PRNum": "90",
+    "Medico": "FERNANDO MONTEMAYOR RUIZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "115808.76"
+  },
+  {
+    "PRNum": "90",
+    "Medico": "FERNANDO MONTEMAYOR RUIZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "390465.53"
+  },
+  {
+    "PRNum": "126",
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "62",
+    "IngresosTotales": "253116.51"
+  },
+  {
+    "PRNum": "126",
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "55",
+    "IngresosTotales": "295673.98"
+  },
+  {
+    "PRNum": "126",
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "39",
+    "IngresosTotales": "345175.64"
+  },
+  {
+    "PRNum": "126",
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "94",
+    "IngresosTotales": "1202630.59"
+  },
+  {
+    "PRNum": "126",
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "92",
+    "IngresosTotales": "2184129.95"
+  },
+  {
+    "PRNum": "126",
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "72",
+    "IngresosTotales": "1216883.63"
+  },
+  {
+    "PRNum": "149",
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "3",
+    "IngresosTotales": "203412.19"
+  },
+  {
+    "PRNum": "149",
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "2",
+    "IngresosTotales": "102706.75"
+  },
+  {
+    "PRNum": "149",
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "21194.54"
+  },
+  {
+    "PRNum": "149",
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "70638.98"
+  },
+  {
+    "PRNum": "149",
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "6",
+    "IngresosTotales": "145659.10"
+  },
+  {
+    "PRNum": "149",
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "10",
+    "IngresosTotales": "219521.29"
+  },
+  {
+    "PRNum": "218",
+    "Medico": "GARCIA HERNANDEZ ISAAC BENJAMIN",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "3945.00"
+  },
+  {
+    "PRNum": "26",
+    "Medico": "GAVIN AMERICO CARRION   CRESPO",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "16164.04"
+  },
+  {
+    "PRNum": "44",
+    "Medico": "GEORGE BENJAMIN EDGAR SANCHEZ DE LA BARQUERA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "26327.21"
+  },
+  {
+    "PRNum": "44",
+    "Medico": "GEORGE BENJAMIN EDGAR SANCHEZ DE LA BARQUERA",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "2",
+    "IngresosTotales": "72598.28"
+  },
+  {
+    "PRNum": "44",
+    "Medico": "GEORGE BENJAMIN EDGAR SANCHEZ DE LA BARQUERA",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "2",
+    "IngresosTotales": "99816.54"
+  },
+  {
+    "PRNum": "104",
+    "Medico": "GUILLERMO CESAR PÉREZ PELÁEZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "4",
+    "IngresosTotales": "3281.55"
+  },
+  {
+    "PRNum": "178",
+    "Medico": "HECTOR ABAD RIVERA MARTINEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "36657.38"
+  },
+  {
+    "PRNum": "68",
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "37922.36"
+  },
+  {
+    "PRNum": "68",
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "2",
+    "IngresosTotales": "76562.90"
+  },
+  {
+    "PRNum": "68",
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "5",
+    "IngresosTotales": "205229.18"
+  },
+  {
+    "PRNum": "68",
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "32132.73"
+  },
+  {
+    "PRNum": "68",
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "41737.07"
+  },
+  {
+    "PRNum": "211",
+    "Medico": "HIRAM JOSE SERRANO ORTIZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "557442.82"
+  },
+  {
+    "PRNum": "211",
+    "Medico": "HIRAM JOSE SERRANO ORTIZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "34086.16"
+  },
+  {
+    "PRNum": "27",
+    "Medico": "HORACIO ALFONSO CASTILLA  SERRANO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "4",
+    "IngresosTotales": "112458.45"
+  },
+  {
+    "PRNum": "27",
+    "Medico": "HORACIO ALFONSO CASTILLA  SERRANO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "3",
+    "IngresosTotales": "84904.34"
+  },
+  {
+    "PRNum": "27",
+    "Medico": "HORACIO ALFONSO CASTILLA  SERRANO",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "4",
+    "IngresosTotales": "98116.48"
+  },
+  {
+    "PRNum": "103",
+    "Medico": "IGNACIO PALAFOX CARRAL",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "6",
+    "IngresosTotales": "734558.50"
+  },
+  {
+    "PRNum": "103",
+    "Medico": "IGNACIO PALAFOX CARRAL",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "4",
+    "IngresosTotales": "198597.18"
+  },
+  {
+    "PRNum": "103",
+    "Medico": "IGNACIO PALAFOX CARRAL",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "30113.96"
+  },
+  {
+    "PRNum": "103",
+    "Medico": "IGNACIO PALAFOX CARRAL",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "4",
+    "IngresosTotales": "157706.14"
+  },
+  {
+    "PRNum": "209",
+    "Medico": "JAVIER LOPEZ GOMEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "48933.44"
+  },
+  {
+    "PRNum": "209",
+    "Medico": "JAVIER LOPEZ GOMEZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "108802.46"
+  },
+  {
+    "PRNum": "17",
+    "Medico": "JESUS BARRAGAN  MAYA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "1500.00"
+  },
+  {
+    "PRNum": "15",
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "76497.21"
+  },
+  {
+    "PRNum": "15",
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "3",
+    "IngresosTotales": "186426.21"
+  },
+  {
+    "PRNum": "15",
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "44342.60"
+  },
+  {
+    "PRNum": "15",
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "4",
+    "IngresosTotales": "339050.02"
+  },
+  {
+    "PRNum": "15",
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "70422.13"
+  },
+  {
+    "PRNum": "15",
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "2",
+    "IngresosTotales": "13360.42"
+  },
+  {
+    "PRNum": "6",
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "4",
+    "IngresosTotales": "111924.33"
+  },
+  {
+    "PRNum": "6",
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "4",
+    "IngresosTotales": "106365.79"
+  },
+  {
+    "PRNum": "6",
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "134400.79"
+  },
+  {
+    "PRNum": "6",
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "6",
+    "IngresosTotales": "333309.42"
+  },
+  {
+    "PRNum": "6",
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "21796.53"
+  },
+  {
+    "PRNum": "6",
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "18755.46"
+  },
+  {
+    "PRNum": "188",
+    "Medico": "JOSE ADOLFO FLORES SOLORIO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "9",
+    "IngresosTotales": "82003.01"
+  },
+  {
+    "PRNum": "188",
+    "Medico": "JOSE ADOLFO FLORES SOLORIO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "36",
+    "IngresosTotales": "167149.84"
+  },
+  {
+    "PRNum": "188",
+    "Medico": "JOSE ADOLFO FLORES SOLORIO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "34",
+    "IngresosTotales": "476367.39"
+  },
+  {
+    "PRNum": "188",
+    "Medico": "JOSE ADOLFO FLORES SOLORIO",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "17",
+    "IngresosTotales": "110458.44"
+  },
+  {
+    "PRNum": "14",
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "236851.69"
+  },
+  {
+    "PRNum": "14",
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "94848.06"
+  },
+  {
+    "PRNum": "14",
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "2",
+    "IngresosTotales": "1187400.61"
+  },
+  {
+    "PRNum": "14",
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "32373.62"
+  },
+  {
+    "PRNum": "14",
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "3321.65"
+  },
+  {
+    "PRNum": "11",
+    "Medico": "JUAN ANTONIO AYALA HIDALGO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "15911.92"
+  },
+  {
+    "PRNum": "11",
+    "Medico": "JUAN ANTONIO AYALA HIDALGO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "19107.00"
+  },
+  {
+    "PRNum": "86",
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "81",
+    "IngresosTotales": "171513.25"
+  },
+  {
+    "PRNum": "86",
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "143",
+    "IngresosTotales": "301993.84"
+  },
+  {
+    "PRNum": "86",
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "107",
+    "IngresosTotales": "206052.99"
+  },
+  {
+    "PRNum": "86",
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "109",
+    "IngresosTotales": "244026.23"
+  },
+  {
+    "PRNum": "86",
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "72",
+    "IngresosTotales": "243544.77"
+  },
+  {
+    "PRNum": "86",
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "23",
+    "IngresosTotales": "58003.23"
+  },
+  {
+    "PRNum": "85",
+    "Medico": "JUAN CARLOS MELGAREJO LÓPEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "104666.31"
+  },
+  {
+    "PRNum": "85",
+    "Medico": "JUAN CARLOS MELGAREJO LÓPEZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "51028.20"
+  },
+  {
+    "PRNum": "85",
+    "Medico": "JUAN CARLOS MELGAREJO LÓPEZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "87955.98"
+  },
+  {
+    "PRNum": "101",
+    "Medico": "JUAN EDUARDO ORTIZ  RAMIREZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "40979.85"
+  },
+  {
+    "PRNum": "101",
+    "Medico": "JUAN EDUARDO ORTIZ  RAMIREZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "4",
+    "IngresosTotales": "157230.58"
+  },
+  {
+    "PRNum": "101",
+    "Medico": "JUAN EDUARDO ORTIZ  RAMIREZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "4",
+    "IngresosTotales": "143030.62"
+  },
+  {
+    "PRNum": "101",
+    "Medico": "JUAN EDUARDO ORTIZ  RAMIREZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "72808.09"
+  },
+  {
+    "PRNum": "172",
+    "Medico": "JUAN EMILIANO MARQUEZ RAMIREZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "43035.09"
+  },
+  {
+    "PRNum": "83",
+    "Medico": "JUAN JOSE MEDINA   PEREZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "115465.29"
+  },
+  {
+    "PRNum": "83",
+    "Medico": "JUAN JOSE MEDINA   PEREZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "27880.60"
+  },
+  {
+    "PRNum": "94",
+    "Medico": "JUAN MANUEL MORALES   SANCHEZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "51368.56"
+  },
+  {
+    "PRNum": "94",
+    "Medico": "JUAN MANUEL MORALES   SANCHEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "60214.08"
+  },
+  {
+    "PRNum": "94",
+    "Medico": "JUAN MANUEL MORALES   SANCHEZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "63344.14"
+  },
+  {
+    "PRNum": "94",
+    "Medico": "JUAN MANUEL MORALES   SANCHEZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "75320.59"
+  },
+  {
+    "PRNum": "137",
+    "Medico": "JULIAN TOTO MORALES",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "27289.02"
+  },
+  {
+    "PRNum": "137",
+    "Medico": "JULIAN TOTO MORALES",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "87694.34"
+  },
+  {
+    "PRNum": "195",
+    "Medico": "JULIO CESAR ALVARADO AVILA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "9",
+    "IngresosTotales": "23254.66"
+  },
+  {
+    "PRNum": "195",
+    "Medico": "JULIO CESAR ALVARADO AVILA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "7",
+    "IngresosTotales": "216133.72"
+  },
+  {
+    "PRNum": "195",
+    "Medico": "JULIO CESAR ALVARADO AVILA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "10",
+    "IngresosTotales": "36844.00"
+  },
+  {
+    "PRNum": "194",
+    "Medico": "JULIO CESAR GARDUÑO SANCHEZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "14301.13"
+  },
+  {
+    "PRNum": "66",
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "21",
+    "IngresosTotales": "90110.08"
+  },
+  {
+    "PRNum": "66",
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "37",
+    "IngresosTotales": "127775.23"
+  },
+  {
+    "PRNum": "66",
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "29",
+    "IngresosTotales": "89292.41"
+  },
+  {
+    "PRNum": "66",
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "38",
+    "IngresosTotales": "233532.74"
+  },
+  {
+    "PRNum": "66",
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "38",
+    "IngresosTotales": "376652.82"
+  },
+  {
+    "PRNum": "66",
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "30",
+    "IngresosTotales": "542745.67"
+  },
+  {
+    "PRNum": "73",
+    "Medico": "KARLA ELENA JUAREZ ECHEVERRIA",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "2972.89"
+  },
+  {
+    "PRNum": "73",
+    "Medico": "KARLA ELENA JUAREZ ECHEVERRIA",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "7",
+    "IngresosTotales": "59290.35"
+  },
+  {
+    "PRNum": "73",
+    "Medico": "KARLA ELENA JUAREZ ECHEVERRIA",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "7",
+    "IngresosTotales": "39897.95"
+  },
+  {
+    "PRNum": "39",
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "4",
+    "IngresosTotales": "15285.81"
+  },
+  {
+    "PRNum": "39",
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "17",
+    "IngresosTotales": "166895.43"
+  },
+  {
+    "PRNum": "39",
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "13",
+    "IngresosTotales": "187749.12"
+  },
+  {
+    "PRNum": "39",
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "19",
+    "IngresosTotales": "516248.50"
+  },
+  {
+    "PRNum": "39",
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "68",
+    "IngresosTotales": "909493.36"
+  },
+  {
+    "PRNum": "42",
+    "Medico": "LINDA GUIENIZA DIAZ GALLARDO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "2",
+    "IngresosTotales": "2370.00"
+  },
+  {
+    "PRNum": "64",
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "7",
+    "IngresosTotales": "12365.00"
+  },
+  {
+    "PRNum": "64",
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "19",
+    "IngresosTotales": "123892.74"
+  },
+  {
+    "PRNum": "64",
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "22",
+    "IngresosTotales": "122142.03"
+  },
+  {
+    "PRNum": "64",
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "22",
+    "IngresosTotales": "201800.97"
+  },
+  {
+    "PRNum": "64",
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "16",
+    "IngresosTotales": "213107.35"
+  },
+  {
+    "PRNum": "64",
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "4",
+    "IngresosTotales": "3335.00"
+  },
+  {
+    "PRNum": "206",
+    "Medico": "LUIS ARMANDO MARTINEZ GARCIA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "4",
+    "IngresosTotales": "5593.00"
+  },
+  {
+    "PRNum": "54",
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "6",
+    "IngresosTotales": "229538.82"
+  },
+  {
+    "PRNum": "54",
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "83617.32"
+  },
+  {
+    "PRNum": "54",
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "4",
+    "IngresosTotales": "219723.01"
+  },
+  {
+    "PRNum": "54",
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "133736.14"
+  },
+  {
+    "PRNum": "54",
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "5",
+    "IngresosTotales": "394868.74"
+  },
+  {
+    "PRNum": "102",
+    "Medico": "LUIS MANUEL PADILLA MARTÍNEZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "2",
+    "IngresosTotales": "5120.00"
+  },
+  {
+    "PRNum": "102",
+    "Medico": "LUIS MANUEL PADILLA MARTÍNEZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "568.00"
+  },
+  {
+    "PRNum": "102",
+    "Medico": "LUIS MANUEL PADILLA MARTÍNEZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "1204.00"
+  },
+  {
+    "PRNum": "102",
+    "Medico": "LUIS MANUEL PADILLA MARTÍNEZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "180525.28"
+  },
+  {
+    "PRNum": "176",
+    "Medico": "LUIS TRUJILLO ORTIZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "40154.83"
+  },
+  {
+    "PRNum": "107",
+    "Medico": "MARCO PEREZ   BELTRÁN",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "2",
+    "IngresosTotales": "176267.03"
+  },
+  {
+    "PRNum": "107",
+    "Medico": "MARCO PEREZ   BELTRÁN",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "10",
+    "IngresosTotales": "100606.39"
+  },
+  {
+    "PRNum": "107",
+    "Medico": "MARCO PEREZ   BELTRÁN",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "11",
+    "IngresosTotales": "90298.96"
+  },
+  {
+    "PRNum": "125",
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "15",
+    "IngresosTotales": "85036.62"
+  },
+  {
+    "PRNum": "125",
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "26",
+    "IngresosTotales": "175155.21"
+  },
+  {
+    "PRNum": "125",
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "22",
+    "IngresosTotales": "128680.22"
+  },
+  {
+    "PRNum": "125",
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "24",
+    "IngresosTotales": "142998.80"
+  },
+  {
+    "PRNum": "125",
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "34",
+    "IngresosTotales": "479815.28"
+  },
+  {
+    "PRNum": "125",
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "25",
+    "IngresosTotales": "346741.73"
+  },
+  {
+    "PRNum": "34",
+    "Medico": "MARTHA CONDE GUTIERREZ ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "2",
+    "IngresosTotales": "2068.00"
+  },
+  {
+    "PRNum": "34",
+    "Medico": "MARTHA CONDE GUTIERREZ ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "2",
+    "IngresosTotales": "87346.18"
+  },
+  {
+    "PRNum": "196",
+    "Medico": "MARTHA ESTHER OLIVO SANCHEZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "5",
+    "IngresosTotales": "15516.49"
+  },
+  {
+    "PRNum": "196",
+    "Medico": "MARTHA ESTHER OLIVO SANCHEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "2",
+    "IngresosTotales": "12326.06"
+  },
+  {
+    "PRNum": "196",
+    "Medico": "MARTHA ESTHER OLIVO SANCHEZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "4",
+    "IngresosTotales": "23391.29"
+  },
+  {
+    "PRNum": "196",
+    "Medico": "MARTHA ESTHER OLIVO SANCHEZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "2",
+    "IngresosTotales": "6674.83"
+  },
+  {
+    "PRNum": "146",
+    "Medico": "MARTHA TERESA VIDAL   IXTA",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "1262.00"
+  },
+  {
+    "PRNum": "133",
+    "Medico": "MAYRA PAULINA TEJEDA BLANCO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "2",
+    "IngresosTotales": "4281.24"
+  },
+  {
+    "PRNum": "199",
+    "Medico": "MIGUEL ANGEL GARCIA GUERRERO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "421271.13"
+  },
+  {
+    "PRNum": "199",
+    "Medico": "MIGUEL ANGEL GARCIA GUERRERO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "130883.08"
+  },
+  {
+    "PRNum": "199",
+    "Medico": "MIGUEL ANGEL GARCIA GUERRERO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "133690.94"
+  },
+  {
+    "PRNum": "79",
+    "Medico": "MIGUEL ANGEL MARQUEZ   UGALDE",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "221924.13"
+  },
+  {
+    "PRNum": "79",
+    "Medico": "MIGUEL ANGEL MARQUEZ   UGALDE",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "4",
+    "IngresosTotales": "507188.86"
+  },
+  {
+    "PRNum": "79",
+    "Medico": "MIGUEL ANGEL MARQUEZ   UGALDE",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "101687.82"
+  },
+  {
+    "PRNum": "79",
+    "Medico": "MIGUEL ANGEL MARQUEZ   UGALDE",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "5",
+    "IngresosTotales": "743086.14"
+  },
+  {
+    "PRNum": "49",
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "32888.63"
+  },
+  {
+    "PRNum": "49",
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "1500.00"
+  },
+  {
+    "PRNum": "49",
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "635.00"
+  },
+  {
+    "PRNum": "49",
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "2",
+    "IngresosTotales": "15511.53"
+  },
+  {
+    "PRNum": "49",
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "7182.50"
+  },
+  {
+    "PRNum": "124",
+    "Medico": "NADIA ELIZABETH SAAVEDRA   FUENTES",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "2",
+    "IngresosTotales": "1616.58"
+  },
+  {
+    "PRNum": "124",
+    "Medico": "NADIA ELIZABETH SAAVEDRA   FUENTES",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "4",
+    "IngresosTotales": "10233.53"
+  },
+  {
+    "PRNum": "3",
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "3",
+    "IngresosTotales": "100858.71"
+  },
+  {
+    "PRNum": "3",
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "3",
+    "IngresosTotales": "56645.97"
+  },
+  {
+    "PRNum": "3",
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "7",
+    "IngresosTotales": "248734.74"
+  },
+  {
+    "PRNum": "3",
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "136503.35"
+  },
+  {
+    "PRNum": "3",
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "30737.01"
+  },
+  {
+    "PRNum": "131",
+    "Medico": "NORMA DANIELA SILVA   CURIEL",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "5600.00"
+  },
+  {
+    "PRNum": "30",
+    "Medico": "OMAR FRANCISCO CATANA GALLEGOS",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "4",
+    "IngresosTotales": "544421.06"
+  },
+  {
+    "PRNum": "21",
+    "Medico": "OMAR GABRIEL BURGOS   SANTOS",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "13658.95"
+  },
+  {
+    "PRNum": "21",
+    "Medico": "OMAR GABRIEL BURGOS   SANTOS",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "2",
+    "IngresosTotales": "73343.52"
+  },
+  {
+    "PRNum": "24",
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "68220.41"
+  },
+  {
+    "PRNum": "24",
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "5",
+    "IngresosTotales": "636090.69"
+  },
+  {
+    "PRNum": "24",
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "6",
+    "IngresosTotales": "54225.67"
+  },
+  {
+    "PRNum": "24",
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "4",
+    "IngresosTotales": "99555.05"
+  },
+  {
+    "PRNum": "24",
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "2",
+    "IngresosTotales": "90901.43"
+  },
+  {
+    "PRNum": "24",
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "4",
+    "IngresosTotales": "136090.12"
+  },
+  {
+    "PRNum": "16",
+    "Medico": "PAOLA GABRIELA BALLESTEROS PENEDO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "5114.50"
+  },
+  {
+    "PRNum": "16",
+    "Medico": "PAOLA GABRIELA BALLESTEROS PENEDO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "65.00"
+  },
+  {
+    "PRNum": "202",
+    "Medico": "PAOLA ISABEL OTERO SANCHEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "38654.10"
+  },
+  {
+    "PRNum": "8",
+    "Medico": "PATRICIA ELIZABETH ARGUELLES  LOPEZ ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "3",
+    "IngresosTotales": "71873.75"
+  },
+  {
+    "PRNum": "8",
+    "Medico": "PATRICIA ELIZABETH ARGUELLES  LOPEZ ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "405.00"
+  },
+  {
+    "PRNum": "8",
+    "Medico": "PATRICIA ELIZABETH ARGUELLES  LOPEZ ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "38.00"
+  },
+  {
+    "PRNum": "8",
+    "Medico": "PATRICIA ELIZABETH ARGUELLES  LOPEZ ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "55481.67"
+  },
+  {
+    "PRNum": "119",
+    "Medico": "PAULO ROBERTO ROJAS   MACUIL",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "12160.14"
+  },
+  {
+    "PRNum": "119",
+    "Medico": "PAULO ROBERTO ROJAS   MACUIL",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "3",
+    "IngresosTotales": "38454.55"
+  },
+  {
+    "PRNum": "119",
+    "Medico": "PAULO ROBERTO ROJAS   MACUIL",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "10736.47"
+  },
+  {
+    "PRNum": "119",
+    "Medico": "PAULO ROBERTO ROJAS   MACUIL",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "6",
+    "IngresosTotales": "59553.53"
+  },
+  {
+    "PRNum": "119",
+    "Medico": "PAULO ROBERTO ROJAS   MACUIL",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "2",
+    "IngresosTotales": "24405.35"
+  },
+  {
+    "PRNum": "216",
+    "Medico": "PEREZ CASTAÑON RUBEN BERNABE",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "12778.37"
+  },
+  {
+    "PRNum": "216",
+    "Medico": "PEREZ CASTAÑON RUBEN BERNABE",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "5",
+    "IngresosTotales": "114776.34"
+  },
+  {
+    "PRNum": "121",
+    "Medico": "PRISCILA ROMAN PROA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "32904.39"
+  },
+  {
+    "PRNum": "121",
+    "Medico": "PRISCILA ROMAN PROA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "3",
+    "IngresosTotales": "56681.07"
+  },
+  {
+    "PRNum": "19",
+    "Medico": "RAFAEL BARRON RAMIREZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "4",
+    "IngresosTotales": "6224.53"
+  },
+  {
+    "PRNum": "5",
+    "Medico": "RAQUEL ALONSO GARCIA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "55472.64"
+  },
+  {
+    "PRNum": "197",
+    "Medico": "RAUL RICAÑO ROCHA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "26616.95"
+  },
+  {
+    "PRNum": "197",
+    "Medico": "RAUL RICAÑO ROCHA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "2",
+    "IngresosTotales": "122134.97"
+  },
+  {
+    "PRNum": "197",
+    "Medico": "RAUL RICAÑO ROCHA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "85316.97"
+  },
+  {
+    "PRNum": "142",
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "8",
+    "IngresosTotales": "1211554.55"
+  },
+  {
+    "PRNum": "142",
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "6",
+    "IngresosTotales": "734750.44"
+  },
+  {
+    "PRNum": "142",
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "2",
+    "IngresosTotales": "129745.24"
+  },
+  {
+    "PRNum": "142",
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "33485.22"
+  },
+  {
+    "PRNum": "142",
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "5",
+    "IngresosTotales": "4025239.84"
+  },
+  {
+    "PRNum": "127",
+    "Medico": "RICARDO YOZAFAT SANCHEZ ARCEGA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "141943.11"
+  },
+  {
+    "PRNum": "127",
+    "Medico": "RICARDO YOZAFAT SANCHEZ ARCEGA",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "23041.08"
+  },
+  {
+    "PRNum": "100",
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "2",
+    "IngresosTotales": "40450.95"
+  },
+  {
+    "PRNum": "100",
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "5",
+    "IngresosTotales": "213175.16"
+  },
+  {
+    "PRNum": "100",
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "4",
+    "IngresosTotales": "70477.22"
+  },
+  {
+    "PRNum": "100",
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "1",
+    "IngresosTotales": "1453.00"
+  },
+  {
+    "PRNum": "100",
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "8",
+    "IngresosTotales": "307306.05"
+  },
+  {
+    "PRNum": "100",
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "4",
+    "IngresosTotales": "176430.25"
+  },
+  {
+    "PRNum": "95",
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "7",
+    "IngresosTotales": "29725.51"
+  },
+  {
+    "PRNum": "95",
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "10",
+    "IngresosTotales": "28650.12"
+  },
+  {
+    "PRNum": "95",
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "14",
+    "IngresosTotales": "41085.78"
+  },
+  {
+    "PRNum": "95",
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "11",
+    "IngresosTotales": "32901.74"
+  },
+  {
+    "PRNum": "95",
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "13",
+    "IngresosTotales": "65426.54"
+  },
+  {
+    "PRNum": "95",
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "9",
+    "IngresosTotales": "236660.78"
+  },
+  {
+    "PRNum": "116",
+    "Medico": "SHARLA EDDA RIVERA BAENA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "1",
+    "IngresosTotales": "64124.76"
+  },
+  {
+    "PRNum": "116",
+    "Medico": "SHARLA EDDA RIVERA BAENA",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "1",
+    "IngresosTotales": "45800.28"
+  },
+  {
+    "PRNum": "143",
+    "Medico": "SONIA PATRICIA VELASCO   GUERRERO",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "1",
+    "IngresosTotales": "822.00"
+  },
+  {
+    "PRNum": "143",
+    "Medico": "SONIA PATRICIA VELASCO   GUERRERO",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "1500.00"
+  },
+  {
+    "PRNum": "205",
+    "Medico": "VENECIA ROMERO FLORES",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "1",
+    "IngresosTotales": "1500.00"
+  },
+  {
+    "PRNum": "82",
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "4",
+    "IngresosTotales": "3910.88"
+  },
+  {
+    "PRNum": "82",
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "8",
+    "IngresosTotales": "19704.97"
+  },
+  {
+    "PRNum": "82",
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "4",
+    "IngresosTotales": "3417.00"
+  },
+  {
+    "PRNum": "82",
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "7",
+    "IngresosTotales": "10532.73"
+  },
+  {
+    "PRNum": "82",
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "1",
+    "IngresosTotales": "568.00"
+  },
+  {
+    "PRNum": "82",
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "3",
+    "IngresosTotales": "2500.00"
+  },
+  {
+    "PRNum": "139",
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "3",
+    "IngresosTotales": "4574.53"
+  },
+  {
+    "PRNum": "139",
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "14",
+    "IngresosTotales": "233771.76"
+  },
+  {
+    "PRNum": "139",
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "12",
+    "IngresosTotales": "134529.69"
+  },
+  {
+    "PRNum": "139",
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "14",
+    "IngresosTotales": "181402.13"
+  },
+  {
+    "PRNum": "139",
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "10",
+    "IngresosTotales": "100896.73"
+  },
+  {
+    "PRNum": "139",
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "9",
+    "IngresosTotales": "40306.03"
+  },
+  {
+    "PRNum": "9",
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "9",
+    "IngresosTotales": "81653.03"
+  },
+  {
+    "PRNum": "9",
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "16",
+    "IngresosTotales": "69840.49"
+  },
+  {
+    "PRNum": "9",
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "22",
+    "IngresosTotales": "70474.52"
+  },
+  {
+    "PRNum": "9",
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "19",
+    "IngresosTotales": "91525.56"
+  },
+  {
+    "PRNum": "9",
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "17",
+    "IngresosTotales": "217324.37"
+  },
+  {
+    "PRNum": "9",
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "12",
+    "IngresosTotales": "104405.37"
+  },
+  {
+    "PRNum": "112",
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Anio": "2026",
+    "Mes": "6",
+    "MesNombre": "June",
+    "TotalConsultas": "9",
+    "IngresosTotales": "14241.80"
+  },
+  {
+    "PRNum": "112",
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Anio": "2026",
+    "Mes": "5",
+    "MesNombre": "May",
+    "TotalConsultas": "19",
+    "IngresosTotales": "36149.00"
+  },
+  {
+    "PRNum": "112",
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Anio": "2026",
+    "Mes": "4",
+    "MesNombre": "April",
+    "TotalConsultas": "19",
+    "IngresosTotales": "28941.87"
+  },
+  {
+    "PRNum": "112",
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Anio": "2026",
+    "Mes": "3",
+    "MesNombre": "March",
+    "TotalConsultas": "16",
+    "IngresosTotales": "22056.64"
+  },
+  {
+    "PRNum": "112",
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Anio": "2026",
+    "Mes": "2",
+    "MesNombre": "February",
+    "TotalConsultas": "24",
+    "IngresosTotales": "73479.02"
+  },
+  {
+    "PRNum": "112",
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Anio": "2026",
+    "Mes": "1",
+    "MesNombre": "January",
+    "TotalConsultas": "15",
+    "IngresosTotales": "23081.52"
+  }
+]

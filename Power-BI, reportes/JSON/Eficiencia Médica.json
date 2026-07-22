@@ -1,0 +1,2418 @@
+[
+  {
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-01-01",
+    "Primeras": "32",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "34"
+  },
+  {
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "43",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "44"
+  },
+  {
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "28",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "30"
+  },
+  {
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-04-01",
+    "Primeras": "28",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "28"
+  },
+  {
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-05-01",
+    "Primeras": "35",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "37"
+  },
+  {
+    "Medico": "ABIRÁN GARCÍA FLORES",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-06-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Especialidad": "NEUMOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Especialidad": "NEUMOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Especialidad": "NEUMOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Especialidad": "NEUMOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "ALAN ESPINDOLA   CRUZ",
+    "Especialidad": "NEUMOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-01-01",
+    "Primeras": "4",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "5"
+  },
+  {
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-02-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-03-01",
+    "Primeras": "2",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-04-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "ALEJANDRO JIMENEZ CANET  ATILANO ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "25",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "27"
+  },
+  {
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "49",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "49"
+  },
+  {
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "131",
+    "Subsecuentes": "3",
+    "TotalAtenciones": "134"
+  },
+  {
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "98",
+    "Subsecuentes": "3",
+    "TotalAtenciones": "101"
+  },
+  {
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "96",
+    "Subsecuentes": "6",
+    "TotalAtenciones": "102"
+  },
+  {
+    "Medico": "ANA LAURA RUANO CASTILLEJOS",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-06-01",
+    "Primeras": "37",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "37"
+  },
+  {
+    "Medico": "ANASTASIA ZAITSEV ZAITSEVA",
+    "Especialidad": "OTORRINOLARINGOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "ANASTASIA ZAITSEV ZAITSEVA",
+    "Especialidad": "OTORRINOLARINGOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "ANASTASIA ZAITSEV ZAITSEVA",
+    "Especialidad": "OTORRINOLARINGOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ANASTASIA ZAITSEV ZAITSEVA",
+    "Especialidad": "OTORRINOLARINGOLOGÍA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ANDREA ARANXA ICAZBALCETA ARGAEZ",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-01-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "ANDREA ARANXA ICAZBALCETA ARGAEZ",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "ANDREA ARANXA ICAZBALCETA ARGAEZ",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ANDREA ARANXA ICAZBALCETA ARGAEZ",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-01-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-02-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-03-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-04-01",
+    "Primeras": "5",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-05-01",
+    "Primeras": "9",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "9"
+  },
+  {
+    "Medico": "ANDRES HERNANDEZ  TREJO",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ANNA MARIA LECONA IBARRA",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-04-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "ANNA MARIA LECONA IBARRA",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-05-01",
+    "Primeras": "11",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "11"
+  },
+  {
+    "Medico": "ANNA MARIA LECONA IBARRA",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-06-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "ANTONIO FERNANDEZ MACIAS VALADEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ANTONIO FERNANDEZ MACIAS VALADEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-04-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "ANTONIO FERNANDEZ MACIAS VALADEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ARREDONDO VAZQUEZ GABRIELA",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ARTURO ABRAHAM HOLLING MARTÍNEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ARTURO ABRAHAM HOLLING MARTÍNEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "BRENDA GOVEA MENDOZA",
+    "Especialidad": "GASTROENTEROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "CARLOS ADRIAN TORREJON HERNANDEZ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-03-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "CARLOS ADRIAN TORREJON HERNANDEZ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "CARLOS ADRIAN TORREJON HERNANDEZ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "CARLOS ADRIAN TORREJON HERNANDEZ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "CARLOS FERNANDO GOMEZ CUEVAS",
+    "Especialidad": "ONCOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "CINDY JACQUELINE BACA CARDOSO",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-01-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "CINDY JACQUELINE BACA CARDOSO",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "CINDY JACQUELINE BACA CARDOSO",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "DAVID VAZQUEZ   ARROYO",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "DIANA CHAVEZ   GARRIDO",
+    "Especialidad": "ANGIOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "DIANA CHAVEZ   GARRIDO",
+    "Especialidad": "ANGIOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "DORI DAISY RIVERA OLIVA",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "DORI DAISY RIVERA OLIVA",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "DORI DAISY RIVERA OLIVA",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "DORI DAISY RIVERA OLIVA",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "DORIS MICHELLE PALACIOS RIVERA",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "EDWIN JAVIER CRESPO MARTINEZ",
+    "Especialidad": "CARDIOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "19",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "20"
+  },
+  {
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "7",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "7"
+  },
+  {
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "14",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "15"
+  },
+  {
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "20",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "21"
+  },
+  {
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "17",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "17"
+  },
+  {
+    "Medico": "ELSA MARIA GRANADOS  GALVAN",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-06-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "EMANUEL  TINTORI TINTORI",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-01-01",
+    "Primeras": "7",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "7"
+  },
+  {
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "8",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "10"
+  },
+  {
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-03-01",
+    "Primeras": "12",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "12"
+  },
+  {
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "12",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "14"
+  },
+  {
+    "Medico": "FELIPE ALFAN   GUZMAN",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Especialidad": "ANGIOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Especialidad": "ANGIOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Especialidad": "ANGIOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Especialidad": "ANGIOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "FERNANDO GAMBOA RAMIREZ",
+    "Especialidad": "ANGIOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "9",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "9"
+  },
+  {
+    "Medico": "FERNANDO LOZANO BONILLA",
+    "Especialidad": "PROCTOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "FERNANDO MONTEMAYOR RUIZ",
+    "Especialidad": "CARDIOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "FERNANDO MONTEMAYOR RUIZ",
+    "Especialidad": "CARDIOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "FERNANDO MONTEMAYOR RUIZ",
+    "Especialidad": "CARDIOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "FERNANDO MONTEMAYOR RUIZ",
+    "Especialidad": "CARDIOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-01-01",
+    "Primeras": "74",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "74"
+  },
+  {
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-02-01",
+    "Primeras": "92",
+    "Subsecuentes": "3",
+    "TotalAtenciones": "95"
+  },
+  {
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-03-01",
+    "Primeras": "87",
+    "Subsecuentes": "8",
+    "TotalAtenciones": "95"
+  },
+  {
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-04-01",
+    "Primeras": "38",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "40"
+  },
+  {
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-05-01",
+    "Primeras": "52",
+    "Subsecuentes": "9",
+    "TotalAtenciones": "61"
+  },
+  {
+    "Medico": "FERNANDO SAMPERIO PÉREZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-06-01",
+    "Primeras": "7",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "9"
+  },
+  {
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-01-01",
+    "Primeras": "10",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "11"
+  },
+  {
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "4",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "FRANCISCO ZEA   PRADO",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-06-01",
+    "Primeras": "0",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "GARCIA HERNANDEZ ISAAC BENJAMIN",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "GAVIN AMERICO CARRION   CRESPO",
+    "Especialidad": "PROCTOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "GEORGE BENJAMIN EDGAR SANCHEZ DE LA BARQUERA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "GEORGE BENJAMIN EDGAR SANCHEZ DE LA BARQUERA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-03-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "GEORGE BENJAMIN EDGAR SANCHEZ DE LA BARQUERA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "GUILLERMO CESAR PÉREZ PELÁEZ",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "HECTOR ABAD RIVERA MARTINEZ",
+    "Especialidad": "NEUMOLOGIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-02-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-03-01",
+    "Primeras": "5",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "5"
+  },
+  {
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-05-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "HECTOR HERRERA   MEILLON",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "HORACIO ALFONSO CASTILLA  SERRANO",
+    "Especialidad": "OTORRINOLARINGOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "7",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "7"
+  },
+  {
+    "Medico": "HORACIO ALFONSO CASTILLA  SERRANO",
+    "Especialidad": "OTORRINOLARINGOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "3",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "HORACIO ALFONSO CASTILLA  SERRANO",
+    "Especialidad": "OTORRINOLARINGOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "2",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "HORACIO ALFONSO CASTILLA  SERRANO",
+    "Especialidad": "OTORRINOLARINGOLOGÍA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "IGNACIO PALAFOX CARRAL",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-01-01",
+    "Primeras": "3",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "IGNACIO PALAFOX CARRAL",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "IGNACIO PALAFOX CARRAL",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-03-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "IGNACIO PALAFOX CARRAL",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "2",
+    "Subsecuentes": "4",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "ITZEL MORENO REYES",
+    "Especialidad": "OFTALMOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "JAVIER LOPEZ GOMEZ",
+    "Especialidad": "CIRUGIA ONCOLÓGICA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JAVIER LOPEZ GOMEZ",
+    "Especialidad": "CIRUGIA ONCOLÓGICA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Especialidad": "NEFROLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Especialidad": "NEFROLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Especialidad": "NEFROLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Especialidad": "NEFROLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JOANA BALDERAS   JUAREZ",
+    "Especialidad": "NEFROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "2",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-03-01",
+    "Primeras": "6",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "3",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "JORGE YAIR ALVAREZ  OJEDA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-06-01",
+    "Primeras": "0",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JOSE ADOLFO FLORES SOLORIO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-03-01",
+    "Primeras": "16",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "17"
+  },
+  {
+    "Medico": "JOSE ADOLFO FLORES SOLORIO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-04-01",
+    "Primeras": "34",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "34"
+  },
+  {
+    "Medico": "JOSE ADOLFO FLORES SOLORIO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-05-01",
+    "Primeras": "37",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "37"
+  },
+  {
+    "Medico": "JOSE ADOLFO FLORES SOLORIO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-06-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Especialidad": "NEUROLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Especialidad": "NEUROLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "0",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Especialidad": "NEUROLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Especialidad": "NEUROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JOSE ANGEL BALDERAS   JUAREZ",
+    "Especialidad": "NEUROLOGÍA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN ANTONIO AYALA HIDALGO",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "22",
+    "Subsecuentes": "3",
+    "TotalAtenciones": "25"
+  },
+  {
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "70",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "72"
+  },
+  {
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "109",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "109"
+  },
+  {
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "103",
+    "Subsecuentes": "5",
+    "TotalAtenciones": "108"
+  },
+  {
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "137",
+    "Subsecuentes": "9",
+    "TotalAtenciones": "146"
+  },
+  {
+    "Medico": "JUAN CAMERINO MENDOZA SOTO",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-06-01",
+    "Primeras": "32",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "34"
+  },
+  {
+    "Medico": "JUAN CARLOS MELGAREJO LÓPEZ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN CARLOS MELGAREJO LÓPEZ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN CARLOS MELGAREJO LÓPEZ",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN EDUARDO ORTIZ  RAMIREZ",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN EDUARDO ORTIZ  RAMIREZ",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-04-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "JUAN EDUARDO ORTIZ  RAMIREZ",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-05-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "JUAN EDUARDO ORTIZ  RAMIREZ",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN EMILIANO MARQUEZ RAMIREZ",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN JOSE MEDINA   PEREZ",
+    "Especialidad": "ANESTESIOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN JOSE MEDINA   PEREZ",
+    "Especialidad": "ANESTESIOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN MANUEL MORALES   SANCHEZ",
+    "Especialidad": "NEUROLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN MANUEL MORALES   SANCHEZ",
+    "Especialidad": "NEUROLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JUAN MANUEL MORALES   SANCHEZ",
+    "Especialidad": "NEUROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JULIAN TOTO MORALES",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JULIAN TOTO MORALES",
+    "Especialidad": "CIRUGÍA GENERAL",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "JULIO CESAR ALVARADO AVILA",
+    "Especialidad": "MEDICINA GENERAL",
+    "Fecha": "2026-04-01",
+    "Primeras": "10",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "10"
+  },
+  {
+    "Medico": "JULIO CESAR ALVARADO AVILA",
+    "Especialidad": "MEDICINA GENERAL",
+    "Fecha": "2026-05-01",
+    "Primeras": "7",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "7"
+  },
+  {
+    "Medico": "JULIO CESAR GARDUÑO SANCHEZ",
+    "Especialidad": "HOMEOPATÍA Y MEDICINA DE TERAPIA COMPLEMENTARIA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-01-01",
+    "Primeras": "29",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "30"
+  },
+  {
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "38",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "38"
+  },
+  {
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "38",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "39"
+  },
+  {
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-04-01",
+    "Primeras": "29",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "30"
+  },
+  {
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-05-01",
+    "Primeras": "36",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "37"
+  },
+  {
+    "Medico": "KARLA ANGÉLICA HERNÁNDEZ RIOS",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-06-01",
+    "Primeras": "12",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "12"
+  },
+  {
+    "Medico": "KARLA ELENA JUAREZ ECHEVERRIA",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-01-01",
+    "Primeras": "7",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "7"
+  },
+  {
+    "Medico": "KARLA ELENA JUAREZ ECHEVERRIA",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "7",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "7"
+  },
+  {
+    "Medico": "KARLA ELENA JUAREZ ECHEVERRIA",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-01-01",
+    "Primeras": "66",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "68"
+  },
+  {
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "19",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "19"
+  },
+  {
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "13",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "13"
+  },
+  {
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-04-01",
+    "Primeras": "17",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "17"
+  },
+  {
+    "Medico": "LAURA PATRICIA CORTEZ GARDUÑO",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-05-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "LINDA GUIENIZA DIAZ GALLARDO",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-01-01",
+    "Primeras": "5",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "5"
+  },
+  {
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "18",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "18"
+  },
+  {
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-03-01",
+    "Primeras": "13",
+    "Subsecuentes": "9",
+    "TotalAtenciones": "22"
+  },
+  {
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "15",
+    "Subsecuentes": "9",
+    "TotalAtenciones": "24"
+  },
+  {
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "7",
+    "Subsecuentes": "13",
+    "TotalAtenciones": "20"
+  },
+  {
+    "Medico": "LUIS ANTONIO GUZMAN AMOROSO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "LUIS ARMANDO MARTINEZ GARCIA",
+    "Especialidad": "PEDIATRÍA",
+    "Fecha": "2026-06-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "LUIS IGNACIO CALDERON   CASTILLO",
+    "Especialidad": "ALERGOLOGÍA  E INMUNOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-01-01",
+    "Primeras": "5",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-03-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "LUIS JERONIMO GARCIA TORRES",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-05-01",
+    "Primeras": "6",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "LUIS MANUEL PADILLA MARTÍNEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "LUIS MANUEL PADILLA MARTÍNEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "LUIS MANUEL PADILLA MARTÍNEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "LUIS MANUEL PADILLA MARTÍNEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-04-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "LUIS RAMIRO GARCIA   LOPEZ",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "LUIS TRUJILLO ORTIZ",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MALYNAHI LIBERTAD TAPIA   JUAREZ",
+    "Especialidad": "DERMATOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MARCO PEREZ   BELTRÁN",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-01-01",
+    "Primeras": "11",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "11"
+  },
+  {
+    "Medico": "MARCO PEREZ   BELTRÁN",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "10",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "10"
+  },
+  {
+    "Medico": "MARCO PEREZ   BELTRÁN",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-01-01",
+    "Primeras": "24",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "25"
+  },
+  {
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "32",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "34"
+  },
+  {
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "24",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "25"
+  },
+  {
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-04-01",
+    "Primeras": "23",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "23"
+  },
+  {
+    "Medico": "MARIANA SAAVEDRA   GASPAR",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-05-01",
+    "Primeras": "26",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "27"
+  },
+  {
+    "Medico": "MARTHA CONDE GUTIERREZ ",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "MARTHA CONDE GUTIERREZ ",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "0",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "MARTHA TERESA VIDAL   IXTA",
+    "Especialidad": "AUDIOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MAYRA PAULINA TEJEDA BLANCO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-01-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "MELVI IRENE CASTRO   CRUZ",
+    "Especialidad": "PROGRAMAS MULTIDISCIPLINARIOS O GENERALES EN SALUD",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MIGUEL ANGEL GARCIA GUERRERO",
+    "Especialidad": "NEUROCIRUGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MIGUEL ANGEL GARCIA GUERRERO",
+    "Especialidad": "NEUROCIRUGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MIGUEL ANGEL GARCIA GUERRERO",
+    "Especialidad": "NEUROCIRUGÍA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MIGUEL ANGEL MARQUEZ   UGALDE",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "3",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "5"
+  },
+  {
+    "Medico": "MIGUEL ANGEL MARQUEZ   UGALDE",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MIGUEL ANGEL MARQUEZ   UGALDE",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-04-01",
+    "Primeras": "3",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "MIGUEL ANGEL MARQUEZ   UGALDE",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MIRIAM MEJIA  PAZ ",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-01-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-03-01",
+    "Primeras": "0",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "MONICA BEATRIZ FLORIAN MORENO",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "NADIA ELIZABETH SAAVEDRA   FUENTES",
+    "Especialidad": "NEFROLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "NADIA ELIZABETH SAAVEDRA   FUENTES",
+    "Especialidad": "NEFROLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "5",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "7"
+  },
+  {
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "NALLELY PERLA SUSANA ALCANTARA MENA",
+    "Especialidad": "UROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "NORMA DANIELA SILVA   CURIEL",
+    "Especialidad": "TERAPIA Y REHABILITACIÓN",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "OMAR FRANCISCO CATANA GALLEGOS",
+    "Especialidad": "NEUROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "OMAR GABRIEL BURGOS   SANTOS",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-02-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "OMAR GABRIEL BURGOS   SANTOS",
+    "Especialidad": "CIRUGÍA DE ESPECIALIDAD",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-01-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-03-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "4",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "OSCAR ALEJANDRO CANALES ZAMORA",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "2",
+    "Subsecuentes": "3",
+    "TotalAtenciones": "5"
+  },
+  {
+    "Medico": "PAOLA GABRIELA BALLESTEROS PENEDO",
+    "Especialidad": "NEUMOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "PAOLA ISABEL OTERO SANCHEZ",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "PATRICIA ELIZABETH ARGUELLES  LOPEZ ",
+    "Especialidad": "CIRUGÍA PLÁSTICA Y RECONSTRUCTIVA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "PATRICIA ELIZABETH ARGUELLES  LOPEZ ",
+    "Especialidad": "CIRUGÍA PLÁSTICA Y RECONSTRUCTIVA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "PATRICIA ELIZABETH ARGUELLES  LOPEZ ",
+    "Especialidad": "CIRUGÍA PLÁSTICA Y RECONSTRUCTIVA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "PATRICIA ELIZABETH ARGUELLES  LOPEZ ",
+    "Especialidad": "CIRUGÍA PLÁSTICA Y RECONSTRUCTIVA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "PAULO ROBERTO ROJAS   MACUIL",
+    "Especialidad": "GASTROENTEROLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "3",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "PAULO ROBERTO ROJAS   MACUIL",
+    "Especialidad": "GASTROENTEROLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "6",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "PAULO ROBERTO ROJAS   MACUIL",
+    "Especialidad": "GASTROENTEROLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "PAULO ROBERTO ROJAS   MACUIL",
+    "Especialidad": "GASTROENTEROLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "PEREZ CASTAÑON RUBEN BERNABE",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-05-01",
+    "Primeras": "5",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "5"
+  },
+  {
+    "Medico": "PRISCILA ROMAN PROA",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "2",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "PRISCILA ROMAN PROA",
+    "Especialidad": "GINECOLOGÍA Y OBSTETRICIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "RAFAEL BARRON RAMIREZ",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "RAQUEL ALONSO GARCIA",
+    "Especialidad": "ONCOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-01-01",
+    "Primeras": "4",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "5"
+  },
+  {
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-03-01",
+    "Primeras": "2",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "2"
+  },
+  {
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-04-01",
+    "Primeras": "6",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "RICARDO VAZQUEZ   RODRIGUEZ",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-05-01",
+    "Primeras": "8",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "8"
+  },
+  {
+    "Medico": "RICARDO YOZAFAT SANCHEZ ARCEGA",
+    "Especialidad": "NEUROCIRUGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "RICARDO YOZAFAT SANCHEZ ARCEGA",
+    "Especialidad": "NEUROCIRUGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "ROSA ELENA PEREZ   JIMENEZ",
+    "Especialidad": "PSICOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-01-01",
+    "Primeras": "5",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "5"
+  },
+  {
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-02-01",
+    "Primeras": "8",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "8"
+  },
+  {
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-03-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-04-01",
+    "Primeras": "4",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "4"
+  },
+  {
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-05-01",
+    "Primeras": "6",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "6"
+  },
+  {
+    "Medico": "RUBEN DARIO ORRICO   GALVEZ",
+    "Especialidad": "TRAUMATOLOGÍA Y ORTOPEDIA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-01-01",
+    "Primeras": "9",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "9"
+  },
+  {
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-02-01",
+    "Primeras": "13",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "13"
+  },
+  {
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-03-01",
+    "Primeras": "12",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "12"
+  },
+  {
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-04-01",
+    "Primeras": "14",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "14"
+  },
+  {
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-05-01",
+    "Primeras": "10",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "10"
+  },
+  {
+    "Medico": "SERGIO ALBERTO MORENO VELASCO",
+    "Especialidad": "MEDICINA INTERNA Y MEDICINA DE URGENCIAS",
+    "Fecha": "2026-06-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "SONIA PATRICIA VELASCO   GUERRERO",
+    "Especialidad": "ESTOMATOLOGÍA Y ODONTOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "SONIA PATRICIA VELASCO   GUERRERO",
+    "Especialidad": "ESTOMATOLOGÍA Y ODONTOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "0",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "VENECIA ROMERO FLORES",
+    "Especialidad": "CIRUGÍA PLÁSTICA Y RECONSTRUCTIVA",
+    "Fecha": "2026-04-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-01-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  },
+  {
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "7",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "7"
+  },
+  {
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-04-01",
+    "Primeras": "4",
+    "Subsecuentes": "1",
+    "TotalAtenciones": "5"
+  },
+  {
+    "Medico": "VIRIDIANA MAYEN BERNAL",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-05-01",
+    "Primeras": "10",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "10"
+  },
+  {
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-01-01",
+    "Primeras": "10",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "10"
+  },
+  {
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "10",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "10"
+  },
+  {
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "14",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "14"
+  },
+  {
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-04-01",
+    "Primeras": "12",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "12"
+  },
+  {
+    "Medico": "WENDELL OMAR VALLADARES PEREZ",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-05-01",
+    "Primeras": "15",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "15"
+  },
+  {
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-01-01",
+    "Primeras": "15",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "15"
+  },
+  {
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-02-01",
+    "Primeras": "17",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "17"
+  },
+  {
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-03-01",
+    "Primeras": "19",
+    "Subsecuentes": "2",
+    "TotalAtenciones": "21"
+  },
+  {
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-04-01",
+    "Primeras": "23",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "23"
+  },
+  {
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-05-01",
+    "Primeras": "16",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "16"
+  },
+  {
+    "Medico": "XAVIERA ARREGUÍN GARCÍA",
+    "Especialidad": "MEDICINA",
+    "Fecha": "2026-06-01",
+    "Primeras": "1",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "1"
+  },
+  {
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-01-01",
+    "Primeras": "17",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "17"
+  },
+  {
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-02-01",
+    "Primeras": "26",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "26"
+  },
+  {
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-03-01",
+    "Primeras": "18",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "18"
+  },
+  {
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-04-01",
+    "Primeras": "20",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "20"
+  },
+  {
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-05-01",
+    "Primeras": "19",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "19"
+  },
+  {
+    "Medico": "YALINA  REYES ZUÑIGA",
+    "Especialidad": "NEONATOLOGÍA",
+    "Fecha": "2026-06-01",
+    "Primeras": "3",
+    "Subsecuentes": "0",
+    "TotalAtenciones": "3"
+  }
+]

@@ -2,12 +2,16 @@
  * main.jsx — Punto de entrada de la aplicación React
  * Hospital Escandón BI Platform v3.5
  */
-import { StrictMode } from 'react';
-import { createRoot }  from 'react-dom/client';
-import App             from './App.jsx';
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+import './styles/globals.css'
+import { ErrorBoundary } from './components/shared/ErrorBoundary.jsx'
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </React.StrictMode>,
 );

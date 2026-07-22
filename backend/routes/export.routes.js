@@ -8,8 +8,123 @@ const express = require('express');
 const router  = express.Router();
 const PDFDocument = require('pdfkit');
 const ExcelJS     = require('exceljs');
+const fs          = require('fs');
+const path        = require('path');
+const { getDb }   = require('../config/db');
 const { authenticate, authorize, authorizeCapability } = require('../middleware/auth.middleware');
 const { getInventariosVsCargos } = require('../services/etl.service');
+
+async function exportJsonToExcel(res, type, id) {
+  try {
+    const db = getDb();
+    let config = null;
+
+    if (type === 'kpi') {
+      config = db.prepare('SELECT COALESCE(NombreCustom, NombreDefault) AS nombre, JsonApiUrl, JsonFilePath FROM KPIConfig WHERE ElementoId = ? OR KPIId = ?').get(id, id);
+    } else if (type === 'bi') {
+      config = db.prepare('SELECT Titulo AS nombre, JsonApiUrl, JsonFilePath FROM ConfiguracionBI WHERE ReporteId = ? OR ConfigId = ?').get(id, id);
+    }
+
+    if (!config || (!config.JsonApiUrl && !config.JsonFilePath)) {
+      return res.status(404).json({ error: 'Configuración JSON no encontrada para este elemento.' });
+    }
+
+    let jsonData = null;
+
+    // 1. Obtener los datos JSON
+    if (config.JsonFilePath) {
+      const fullPath = path.join(__dirname, '..', config.JsonFilePath);
+      if (fs.existsSync(fullPath)) {
+        const raw = fs.readFileSync(fullPath, 'utf8');
+        jsonData = JSON.parse(raw);
+      } else {
+        return res.status(404).json({ error: 'El archivo JSON configurado ya no existe.' });
+      }
+    } else if (config.JsonApiUrl) {
+      const response = await fetch(config.JsonApiUrl);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      jsonData = await response.json();
+    }
+
+    let rows = [];
+    if (Array.isArray(jsonData)) {
+      rows = jsonData;
+    } else if (typeof jsonData === 'object' && jsonData !== null) {
+      const key = Object.keys(jsonData).find(k => Array.isArray(jsonData[k]));
+      if (key) rows = jsonData[key];
+      else rows = [jsonData]; // Fallback to single row
+    }
+
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'El JSON no es un array válido o está vacío.' });
+    }
+
+    // 2. Generar Excel
+    const workbook  = new ExcelJS.Workbook();
+    workbook.creator = 'Hospital Escandón — Plataforma BI';
+    workbook.created = new Date();
+
+    // Limitar nombre de hoja a 31 caracteres
+    let sheetName = (config.nombre || 'Exportación').substring(0, 31).replace(/[/\\?*\[\]]/g, '');
+    const sheet = workbook.addWorksheet(sheetName, {
+      pageSetup: { paperSize: 9, orientation: 'landscape' },
+    });
+
+    // Obtener columnas dinámicamente del primer objeto
+    const keys = Object.keys(rows[0] || {});
+    sheet.columns = keys.map(key => ({
+      header: key.toUpperCase(),
+      key: key,
+      width: Math.max(15, key.length + 5)
+    }));
+
+    // Estilo de encabezado institucional
+    sheet.getRow(1).eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF004687' } }; // Azul Fuerte
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 11, name: 'Calibri' };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+    sheet.getRow(1).height = 25;
+
+    // Insertar datos
+    rows.forEach((row, index) => {
+      const excelRow = sheet.addRow(row);
+      // Filas alternadas
+      if (index % 2 === 0) {
+        excelRow.eachCell(cell => {
+          cell.fill = { type:'pattern', pattern:'solid', fgColor: { argb: 'FFF4F6F9' } };
+        });
+      }
+    });
+
+    // Filtros automáticos
+    sheet.autoFilter = { from: 'A1', to: { row: 1, column: keys.length } };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="Exportacion_${sheetName}.xlsx"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('[Export JSON error]', err);
+    res.status(500).json({ error: 'Error al exportar JSON a Excel.' });
+  }
+}
+
+/**
+ * GET /api/export/json-to-excel/:type/:id
+ * Exporta un JSON (de API o archivo local) a Excel
+ * :type puede ser 'kpi' o 'bi'
+ */
+router.get(
+  '/json-to-excel/:type/:id',
+  authenticate,
+  authorizeCapability('exportarExcel'),
+  async (req, res, next) => {
+    const { type, id } = req.params;
+    await exportJsonToExcel(res, type, id);
+  }
+);
 
 
 /**
@@ -24,6 +139,19 @@ router.get(
     try {
       const { reportId } = req.params;
       const { area, estado, fechaDesde, fechaHasta } = req.query;
+
+      // Verificar si el reporte tiene un JSON asignado (override)
+      const db = require('../config/db').getDb();
+      const configJson = db.prepare('SELECT JsonApiUrl, JsonFilePath FROM ConfiguracionBI WHERE ReporteId = ? OR ConfigId = ?').get(reportId, reportId);
+      if (configJson && (configJson.JsonApiUrl || configJson.JsonFilePath)) {
+        return await exportJsonToExcel(res, 'bi', reportId);
+      }
+
+      // Verificar si el reporte corresponde a un KPI que tiene JSON asignado
+      const kpiJson = db.prepare('SELECT JsonApiUrl, JsonFilePath FROM KPIConfig WHERE ElementoId = ? OR KPIId = ?').get(reportId, reportId);
+      if (kpiJson && (kpiJson.JsonApiUrl || kpiJson.JsonFilePath)) {
+        return await exportJsonToExcel(res, 'kpi', reportId);
+      }
 
       // Obtener datos (fuente dinámica según reportId)
       const reporte = await resolveReportData(reportId, { area, estado, fechaDesde, fechaHasta, userRole: req.user.role, userArea: req.user.area });

@@ -154,21 +154,28 @@ export default function HomePage() {
   const cardsByRole = {
     ADMIN: [
       { icon:'📊', title:'Dashboard Directivo', desc:'KPIs globales de eficiencia, eficacia y macropanel financiero', path:'/dashboard/directivo', color:'#004687' },
+      { icon:'🛏️', title:'Ocupación de Camas', desc:'Censo de pacientes y camas en tiempo real', path:'/dashboard/ocupacion', color:'#005FA9' },
       { icon:'🔍', title:'Auditoría de Inventarios', desc:'Conciliación de órdenes del almacén y consumos clínicos', path:'/auditoria/inventarios', color:'#005FA9' },
       { icon:'🏥', title:'Tablero de Área', desc:'Indicadores clínicos por área hospitalaria', path:'/dashboard/area', color:'#0088C9' },
       { icon:'📈', title:'Estadísticas', desc:'Datos demográficos y procesos por servicio', path:'/estadisticas', color:'#0088C9' },
+      { icon:'⏳', title:'Dashboard SITI', desc:'Históricos financieros y operativos del sistema legado', path:'/siti/dashboard', color:'#6B7280' },
+      { icon:'⚖️', title:'Comparativo vs Vertical', desc:'Transición de ingresos entre sistemas', path:'/siti/comparativo', color:'#6B7280' },
       { icon:'👥', title:'Gestión de Usuarios', desc:'Administrar roles, accesos y permisos del sistema', path:'/admin/usuarios', color:'#00974A' },
       { icon:'🛡️', title:'Log de Auditoría', desc:'Historial completo de acciones del sistema', path:'/admin/auditoria-log', color:'#00974A' },
       { icon:'⚙️', title:'Configuración', desc:'Parámetros del sistema y conexiones BI', path:'/admin/configuracion', color:'#8A97A8' },
     ],
     DIRECTOR: [
       { icon:'📊', title:'Dashboard Directivo', desc:'KPIs globales de eficiencia, eficacia y macropanel financiero', path:'/dashboard/directivo', color:'#004687', badge:'Principal' },
+      { icon:'🛏️', title:'Ocupación de Camas', desc:'Censo de pacientes y camas en tiempo real', path:'/dashboard/ocupacion', color:'#005FA9' },
       { icon:'🔍', title:'Auditoría de Inventarios', desc:'Conciliación de órdenes del almacén y consumos', path:'/auditoria/inventarios', color:'#005FA9' },
       { icon:'🏥', title:'Tablero de Área', desc:'Indicadores clínicos por área hospitalaria', path:'/dashboard/area', color:'#0088C9' },
       { icon:'📈', title:'Estadísticas', desc:'Datos demográficos y procesos por servicio', path:'/estadisticas', color:'#0088C9' },
+      { icon:'⏳', title:'Dashboard SITI', desc:'Históricos financieros y operativos del sistema legado', path:'/siti/dashboard', color:'#6B7280' },
+      { icon:'⚖️', title:'Comparativo vs Vertical', desc:'Transición de ingresos entre sistemas', path:'/siti/comparativo', color:'#6B7280' },
     ],
     JEFE_AREA: [
       { icon:'🏥', title:`Tablero — ${AREAS_LABELS[user?.area] || 'Mi Área'}`, desc:'Indicadores operativos de tu área asignada', path:'/dashboard/area', color:'#004687', badge:'Mi Área' },
+      { icon:'🛏️', title:'Ocupación de Camas', desc:'Censo de pacientes y camas en tiempo real', path:'/dashboard/ocupacion', color:'#005FA9' },
       { icon:'📈', title:'Estadísticas del Área', desc:'Productividad, estancias y tiempos de respuesta', path:'/estadisticas', color:'#0088C9' },
     ],
     USUARIO_OPERATIVO: [
