@@ -263,7 +263,8 @@ router.get(
   async (req, res, next) => {
     try {
       const { reportId } = req.params;
-      const reporte = await resolveReportData(reportId, { userRole: req.user.role, userArea: req.user.area });
+      const { area, estado, fechaDesde, fechaHasta } = req.query;
+      const reporte = await resolveReportData(reportId, { area, estado, fechaDesde, fechaHasta, userRole: req.user.role, userArea: req.user.area });
 
       const doc      = new PDFDocument({ size: 'LETTER', margin: 50 });
       const filename = `escandon_ejecutivo_${reportId}_${Date.now()}.pdf`;

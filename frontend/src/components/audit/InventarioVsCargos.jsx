@@ -146,8 +146,8 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <ExportButton type="excel" reportId="auditoria-inventarios" />
-          <ExportButton type="pdf" reportId="auditoria-inventarios" />
+          <ExportButton type="excel" reportId="auditoria-inventarios" queryParams={filters} />
+          <ExportButton type="pdf" reportId="auditoria-inventarios" queryParams={filters} useServerPdf={true} />
         </div>
       </div>
 

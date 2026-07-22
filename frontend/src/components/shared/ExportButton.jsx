@@ -1,11 +1,9 @@
 /**
  * ExportButton.jsx — Botones de exportación PDF y Excel
  * Hospital Escandón BI Platform v4.0
- * Rediseño premium
  */
 import { useState } from 'react';
 import { API_BASE } from '../../api/config';
-
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
@@ -42,9 +40,29 @@ const CONFIG = {
   },
 };
 
-export default function ExportButton({ id, type = 'pdf', reportId, directUrl = null, compact = false, onClickOverride, targetId = 'dashboard-container' }) {
+export default function ExportButton({
+  id,
+  type = 'pdf',
+  reportId,
+  queryParams = null,
+  directUrl = null,
+  compact = false,
+  onClickOverride,
+  targetId = 'dashboard-container',
+  useServerPdf = false,
+}) {
   const [loading, setLoading] = useState(false);
   const cfg = CONFIG[type] || CONFIG.pdf;
+
+  const getToken = () => localStorage.getItem('token') || sessionStorage.getItem('escandon_token') || '';
+
+  const buildQueryString = () => {
+    if (!queryParams) return '';
+    const params = new URLSearchParams(
+      Object.fromEntries(Object.entries(queryParams).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+    ).toString();
+    return params ? `?${params}` : '';
+  };
 
   const handleExport = async () => {
     if (loading) return;
@@ -54,127 +72,92 @@ export default function ExportButton({ id, type = 'pdf', reportId, directUrl = n
       return;
     }
 
-    if (type === 'pdf') {
+    const token = getToken();
+    const qStr = buildQueryString();
+
+    // 1. Exportación PDF vía captura DOM (si existe el elemento y no se exige PDF del servidor)
+    if (type === 'pdf' && !useServerPdf) {
       const element = document.getElementById(targetId);
-      if (!element) {
-        alert('No se encontró el contenido del dashboard para exportar.');
-        return;
+      if (element) {
+        setLoading(true);
+        try {
+          const originalScroll = window.scrollY;
+          window.scrollTo(0, 0);
+          await new Promise(r => setTimeout(r, 300));
+
+          const origMaxWidth = element.style.maxWidth;
+          const origMargin = element.style.margin;
+          element.style.maxWidth = 'none';
+          element.style.margin = '0';
+
+          await new Promise(r => setTimeout(r, 100));
+
+          const dataUrl = await toPng(element, { quality: 1, pixelRatio: 2, cacheBust: true });
+
+          element.style.maxWidth = origMaxWidth || '';
+          element.style.margin = origMargin || '';
+          window.scrollTo(0, originalScroll);
+
+          const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+          const pdfW = pdf.internal.pageSize.getWidth();
+
+          pdf.setFillColor(0, 70, 135);
+          pdf.rect(0, 0, pdfW, 16, 'F');
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('Hospital Escandón', 6, 11);
+          pdf.setFontSize(9);
+          pdf.text('Reporte de BI - ' + new Date().toLocaleDateString('es-MX'), pdfW - 6, 11, { align: 'right' });
+
+          const imgProps = pdf.getImageProperties(dataUrl);
+          const m = 3;
+          const fW = pdfW - m * 2;
+          const fH = (imgProps.height * fW) / imgProps.width;
+          pdf.addImage(dataUrl, 'PNG', m, 17, fW, fH);
+
+          pdf.save(`Reporte_${reportId || 'Escandon'}_${Date.now()}.pdf`);
+          setLoading(false);
+          return;
+        } catch (err) {
+          console.warn('Captura DOM PDF falló, usando PDF del servidor...', err);
+        }
       }
-      setLoading(true);
-      try {
-        // Scroll al inicio para capturar todo
-        const originalScroll = window.scrollY;
-        window.scrollTo(0, 0);
-        await new Promise(r => setTimeout(r, 400));
-
-        // Temporalmente ocultar la tabla (ocupa mucha altura y se excluye del PDF)
-        const tablesToHide = element.querySelectorAll('[data-html2canvas-ignore="true"]');
-        tablesToHide.forEach(el => el.style.setProperty('display', 'none', 'important'));
-
-        // Temporalmente quitar maxWidth para que el contenido llene el ancho
-        const origMaxWidth = element.style.maxWidth;
-        const origMargin = element.style.margin;
-        element.style.maxWidth = 'none';
-        element.style.margin = '0';
-
-        await new Promise(r => setTimeout(r, 100)); // Dejar que el DOM recalcule
-
-        // Usar html-to-image (soporta SVG nativamente)
-        const dataUrl = await toPng(element, {
-          quality: 1,
-          pixelRatio: 2,
-          cacheBust: true
-        });
-
-        // Restaurar estilos originales
-        element.style.maxWidth = origMaxWidth || '';
-        element.style.margin = origMargin || '';
-        tablesToHide.forEach(el => el.style.removeProperty('display'));
-
-        window.scrollTo(0, originalScroll);
-
-        // Generar PDF A4 landscape
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const pdfW = pdf.internal.pageSize.getWidth();
-        const pdfH = pdf.internal.pageSize.getHeight();
-
-        // Header institucional
-        pdf.setFillColor(0, 70, 135);
-        pdf.rect(0, 0, pdfW, 16, 'F');
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFontSize(11);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Hospital Escandón', 6, 11);
-        pdf.setFontSize(9);
-        pdf.text('Reporte de BI - ' + new Date().toLocaleDateString('es-MX'), pdfW - 6, 11, { align: 'right' });
-
-        // Imagen del dashboard - llenar todo el ancho disponible
-        const imgProps = pdf.getImageProperties(dataUrl);
-        const m = 3;
-        const fW = pdfW - m * 2; // Ancho completo
-        const fH = (imgProps.height * fW) / imgProps.width; // Alto proporcional
-        pdf.addImage(dataUrl, 'PNG', m, 17, fW, fH);
-
-        pdf.save(`Dashboard_${Date.now()}.pdf`);
-      } catch (error) {
-        alert('Error al generar PDF: ' + error.message);
-      } finally {
-        setLoading(false);
-      }
-      return;
     }
 
-    if (type === 'excel' && directUrl) {
-      const a = document.createElement('a');
-      const token = sessionStorage.getItem('escandon_token');
-      // For standard browser download with token we would need to fetch and blob, but for now we'll do fetch + blob for directUrl as well to pass auth
-      setLoading(true);
-      try {
-        const urlToFetch = directUrl.startsWith('http') ? directUrl : `${API_BASE}${directUrl.startsWith('/') ? directUrl : '/' + directUrl}`;
-        const res = await fetch(urlToFetch, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error('Error al exportar');
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        a.href = url;
-        a.download = `Exportacion_${new Date().getTime()}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } catch (err) {
-        console.error(err);
-        alert('Hubo un error al generar el Excel.');
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
+    // 2. Exportación Directa por URL o Servidor Backend (Excel o PDF Servidor)
     setLoading(true);
     try {
-      const token = sessionStorage.getItem('escandon_token');
-      // If we don't have directUrl but we are standard excel fallback:
-      const endpointPath = reportId ? `${cfg.endpoint}/${reportId}` : cfg.endpoint;
-      const res = await fetch(`${API_BASE}/export/${endpointPath}`, {
+      let endpointUrl = directUrl;
+      if (!endpointUrl) {
+        const endpointPath = reportId ? `${cfg.endpoint}/${reportId}` : cfg.endpoint;
+        endpointUrl = `${API_BASE}/export/${endpointPath}${qStr}`;
+      } else {
+        endpointUrl = endpointUrl.startsWith('http') ? endpointUrl : `${API_BASE}${endpointUrl.startsWith('/') ? endpointUrl : '/' + endpointUrl}`;
+        if (qStr) endpointUrl += (endpointUrl.includes('?') ? '&' : '?') + qStr.slice(1);
+      }
+
+      const res = await fetch(endpointUrl, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error('Error al exportar');
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || 'Error al comunicarse con el servidor de exportación.');
+      }
 
-      const blob     = await res.blob();
-      const url      = URL.createObjectURL(blob);
-      const a        = document.createElement('a');
-      a.href         = url;
-      a.download     = `reporte_${reportId}_${Date.now()}.${type === 'pdf' ? 'pdf' : 'xlsx'}`;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reporte_${reportId || 'escandon'}_${Date.now()}.${type === 'pdf' ? 'pdf' : 'xlsx'}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('[ExportButton]', err);
-      alert('No se pudo generar el reporte. Intente nuevamente.');
+      alert('Error al generar la descarga: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -186,25 +169,25 @@ export default function ExportButton({ id, type = 'pdf', reportId, directUrl = n
       onClick={handleExport}
       disabled={loading}
       style={{
-        display:       'inline-flex',
-        alignItems:    'center',
+        display: 'inline-flex',
+        alignItems: 'center',
         justifyContent: 'center',
-        gap:           '0.45rem',
-        padding:       compact ? '0.45rem 0.85rem' : '0.6rem 1.1rem',
-        background:    loading ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.15)',
-        border:        '1.5px solid rgba(255,255,255,0.22)',
-        borderRadius:   10,
-        color:          '#FFFFFF',
-        fontFamily:    "var(--font-display)",
-        fontSize:      compact ? '0.74rem' : '0.82rem',
-        fontWeight:     700,
-        cursor:         loading ? 'not-allowed' : 'pointer',
-        backdropFilter:'var(--glass-blur)',
+        gap: '0.45rem',
+        padding: compact ? '0.45rem 0.85rem' : '0.6rem 1.1rem',
+        background: loading ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.15)',
+        border: '1.5px solid rgba(255,255,255,0.22)',
+        borderRadius: 10,
+        color: '#FFFFFF',
+        fontFamily: 'var(--font-display)',
+        fontSize: compact ? '0.74rem' : '0.82rem',
+        fontWeight: 700,
+        cursor: loading ? 'not-allowed' : 'pointer',
+        backdropFilter: 'var(--glass-blur)',
         WebkitBackdropFilter: 'var(--glass-blur)',
-        transition:    'all var(--transition-fast)',
-        opacity:        loading ? 0.7 : 1,
-        whiteSpace:    'nowrap',
-        boxShadow:     'var(--shadow-xs)'
+        transition: 'all var(--transition-fast)',
+        opacity: loading ? 0.7 : 1,
+        whiteSpace: 'nowrap',
+        boxShadow: 'var(--shadow-xs)',
       }}
       onMouseEnter={e => !loading && (e.currentTarget.style.background = 'rgba(255,255,255,0.28)')}
       onMouseLeave={e => !loading && (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
