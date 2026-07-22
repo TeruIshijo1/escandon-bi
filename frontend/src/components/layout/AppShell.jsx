@@ -1,12 +1,12 @@
 /**
- * AppShell.jsx — Layout principal con Sidebar + Navbar + Outlet
+ * AppShell.jsx — Layout principal con Sidebar + Navbar + Outlet + Copiloto MAR-IA
  */
 import { Outlet } from 'react-router-dom';
 import Sidebar    from './Sidebar';
 import Navbar     from './Navbar';
-import AIAssistant from '../ai/AIAssistant';
+import AriaCopilotWidget from '../aria/AriaCopilotWidget';
 import { useAuth } from '../../context/AuthContext';
-import { can, ROLES } from '../../utils/rbac';
+import { can } from '../../utils/rbac';
 
 export default function AppShell() {
   const { user } = useAuth();
@@ -19,7 +19,7 @@ export default function AppShell() {
       <main className="main-content">
         <Outlet />
       </main>
-      {showAI && <AIAssistant />}
+      {showAI && <AriaCopilotWidget />}
     </div>
   );
 }

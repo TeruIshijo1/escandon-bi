@@ -118,10 +118,13 @@ app.post('/upload-assets', authenticate, (req, res) => {
 const sitiRoutes = require('./routes/siti.routes');
 const dataQualityRoutes = require('./routes/dataQuality.routes');
 
+const ariaRoutes = require('./routes/aria.routes');
+
 app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/dashboard',     dashboardRoutes);
 app.use('/api/export',        exportRoutes);
 app.use('/api/ai',            aiRoutes);
+app.use('/api/aria',          ariaRoutes);
 app.use('/api/bi',            biRoutes);
 app.use('/api/admin',         adminRoutes);
 app.use('/api/test',          testRoutes);
