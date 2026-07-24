@@ -10,6 +10,7 @@ const { getDb } = require('../config/db');
 const { authenticate, authorize, authorizeArea } = require('../middleware/auth.middleware');
 const dataHubService = require('../services/datahub.service');
 const { querySiti } = require('../config/siti-api');
+const { connectRemoteDB } = require('../config/remote-db');
 
 /**
  * GET /api/dashboard/directivo
@@ -200,58 +201,117 @@ router.get(
       if (periodo === 'trimestre') dateFilter = "-3 months";
       if (periodo === 'año')       dateFilter = "-1 year";
 
-      // 1. KPIs Generales
-      const general = db.prepare(`
-        SELECT 
-          COUNT(*) AS TotalEgresos,
-          ROUND(AVG(CAST(strftime('%Y', 'now') - strftime('%Y', p.FechaNacimiento) AS REAL)), 1) AS PromedioEdad,
-          SUM(CASE WHEN e.TipoEgreso = 'DEFUNCION' THEN 1 ELSE 0 END) AS Defunciones,
-          ROUND(AVG(CAST(julianday(e.FechaEgreso) - julianday(a.FechaIngreso) AS REAL)), 1) AS EstanciaPromedio,
-          (SELECT COUNT(*) FROM Egresos WHERE AreaEgreso = 'CUNEROS' AND FechaEgreso >= datetime('now', ?)) AS Nacimientos
-        FROM Egresos e
-        JOIN Admisiones a ON a.AdmisionId = e.AdmisionId
-        JOIN Pacientes p ON a.PacienteId = p.PacienteId
-        WHERE e.FechaEgreso >= datetime('now', ?)
-      `).get(dateFilter, dateFilter);
+      let general = { TotalEgresos: 0, PromedioEdad: 0, Defunciones: 0, EstanciaPromedio: 0, Nacimientos: 0 };
+      let pctFemenino = 0;
+      let facturacionArea = [];
+      let topMedicos = [];
+      
+      try {
+        const pool = await connectRemoteDB();
+        
+        let dateFilterSQL = "DATEADD(month, -1, GETDATE())";
+        if (periodo === 'semana') dateFilterSQL = "DATEADD(day, -7, GETDATE())";
+        if (periodo === 'trimestre') dateFilterSQL = "DATEADD(month, -3, GETDATE())";
+        if (periodo === 'año') dateFilterSQL = "DATEADD(year, -1, GETDATE())";
 
-      // 2. Género
-      const generos = db.prepare(`
-        SELECT p.Genero, COUNT(*) as Cantidad
-        FROM Egresos e
-        JOIN Admisiones a ON a.AdmisionId = e.AdmisionId
-        JOIN Pacientes p ON a.PacienteId = p.PacienteId
-        WHERE e.FechaEgreso >= datetime('now', ?)
-        GROUP BY p.Genero
-      `).all(dateFilter);
+        // 1. KPIs Generales desde SQL Server
+        const generalRes = await pool.request().query(`
+          SELECT 
+            COUNT(*) AS TotalEgresos,
+            ROUND(AVG(CAST(DATEDIFF(year, BirthDate, GETDATE()) AS FLOAT)), 1) AS PromedioEdad,
+            SUM(CASE WHEN MedicalDischarge IN ('DEF', 'DEFUNCION') OR DateOfDeath IS NOT NULL THEN 1 ELSE 0 END) AS Defunciones,
+            ROUND(AVG(CAST(DATEDIFF(day, Date, MedicalDischargeDate) AS FLOAT)), 1) AS EstanciaPromedio,
+            (
+               SELECT COUNT(*) 
+               FROM PC p2 
+               JOIN V_MRPT v ON p2.PTNum = v.PTNum 
+               WHERE p2.MedicalDischargeDate >= ${dateFilterSQL} 
+                 AND p2.PC_ST = 'CL' 
+                 AND (v.RoomName LIKE '%CUNERO%' OR v.RoomCode LIKE '%CUN%')
+            ) AS Nacimientos
+          FROM PC
+          WHERE MedicalDischargeDate >= ${dateFilterSQL}
+            AND PC_ST = 'CL'
+        `);
+        
+        if (generalRes.recordset && generalRes.recordset.length > 0) {
+          general = {
+            TotalEgresos: generalRes.recordset[0].TotalEgresos || 0,
+            PromedioEdad: generalRes.recordset[0].PromedioEdad || 0,
+            Defunciones: generalRes.recordset[0].Defunciones || 0,
+            EstanciaPromedio: generalRes.recordset[0].EstanciaPromedio || 0,
+            Nacimientos: generalRes.recordset[0].Nacimientos || 0
+          };
+        }
 
-      const totalGen = generos.reduce((s, g) => s + g.Cantidad, 0);
-      const pctFemenino = totalGen > 0 
-        ? ((generos.find(g => g.Genero === 'F' || g.Genero === 'FEMENINO')?.Cantidad || 0) * 100 / totalGen).toFixed(1)
-        : 0;
+        // 2. Géneros desde SQL Server
+        const generosRes = await pool.request().query(`
+          SELECT Gender as Genero, COUNT(*) as Cantidad
+          FROM PC
+          WHERE MedicalDischargeDate >= ${dateFilterSQL}
+            AND PC_ST = 'CL'
+          GROUP BY Gender
+        `);
+        const generos = generosRes.recordset || [];
+        const totalGen = generos.reduce((s, g) => s + g.Cantidad, 0);
+        pctFemenino = totalGen > 0 
+          ? ((generos.find(g => g.Genero === 'F' || g.Genero === 'FEMENINO')?.Cantidad || 0) * 100 / totalGen).toFixed(1)
+          : 0;
 
-      // 3. Top Diagnósticos
-      const diagnosticos = db.prepare(`
-        SELECT 
-          DiagnosticoEgreso as dx, 
-          COUNT(*) as n,
-          ROUND(CAST(COUNT(*) AS REAL) * 100.0 / (SELECT COUNT(*) FROM Egresos WHERE FechaEgreso >= datetime('now', ?)), 1) as pct
-        FROM Egresos
-        WHERE FechaEgreso >= datetime('now', ?)
-        GROUP BY DiagnosticoEgreso
-        ORDER BY n DESC
-        LIMIT 8
-      `).all(dateFilter, dateFilter);
+        // Query 1: Facturación por área
+        const factRes = await pool.request().query(`
+          SELECT 
+            UNIDAD_DE_SERVICIO as area, 
+            SUM(TOTAL_COBRADO) as n
+          FROM UDR_CUENTAS_SERVICIOS
+          WHERE FECHA_DE_CARGO >= ${dateFilterSQL}
+          GROUP BY UNIDAD_DE_SERVICIO
+          ORDER BY n DESC
+        `);
+        
+        const areaLabels = {
+          'URG': 'URGENCIAS',
+          'QUI': 'QUIROFANO',
+          'LAB': 'LABORATORIO',
+          'IMA': 'IMAGENOLOGIA',
+          'FAR': 'FARMACIA',
+          'HOS': 'HOSPITALIZACION',
+          'CUN': 'CUNEROS',
+          'CE':  'CONSULTA EXTERNA'
+        };
+        
+        facturacionArea = (factRes.recordset || []).map(r => ({
+          dx: areaLabels[r.area] || r.area || 'OTRO',
+          n: r.n,
+          pct: 0 // calculate later
+        }));
+        
+        const totalFact = facturacionArea.reduce((sum, item) => sum + item.n, 0);
+        facturacionArea.forEach(item => {
+          item.pct = totalFact > 0 ? (item.n * 100 / totalFact).toFixed(1) : 0;
+        });
 
-      // 4. Egresos por Servicio
-      const servicios = db.prepare(`
-        SELECT 
-          AreaEgreso as area, 
-          COUNT(*) as n
-        FROM Egresos
-        WHERE FechaEgreso >= datetime('now', ?)
-        GROUP BY AreaEgreso
-        ORDER BY n DESC
-      `).all(dateFilter);
+        // Query 2: Top Médicos
+        const medRes = await pool.request().query(`
+          SELECT TOP 10
+            Medico as area,
+            SUM(IngresosTotales) as n,
+            'SIN ESPECIALIDAD' as Especialidad
+          FROM UDR_BI_INGRESOS_MEDICOS
+          WHERE DATEFROMPARTS(Anio, Mes, 1) >= ${dateFilterSQL}
+          GROUP BY Medico
+          ORDER BY n DESC
+        `);
+
+        topMedicos = (medRes.recordset || []).map(r => ({
+          area: r.area,
+          n: r.n,
+          especialidad: r.Especialidad
+        }));
+
+      } catch (err) {
+        console.error("Error fetching stats from KH_HE:", err);
+      }
 
       res.json({
         ok: true,
@@ -260,8 +320,8 @@ router.get(
             ...general,
             pctFemenino
           },
-          diagnosticos,
-          servicios
+          diagnosticos: facturacionArea,
+          servicios: topMedicos
         }
       });
     } catch (err) {
@@ -311,9 +371,8 @@ router.get('/kpi-config', authenticate, (req, res, next) => {
  * GET /api/dashboard/financiero-nativo
  * Pipeline de Calidad de Datos, Detección de Anomalías y Predicciones.
  */
-const { connectRemoteDB } = require('../config/remote-db');
 
-router.get('/financiero-nativo', authenticate, async (req, res, next) => {
+router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']), async (req, res, next) => {
   try {
     const { startDate, endDate, search } = req.query;
     const pool = await connectRemoteDB();
@@ -528,7 +587,7 @@ router.get('/financiero-nativo', authenticate, async (req, res, next) => {
  * GET /api/dashboard/eficiencia-nativo
  * Consulta la vista UDR_BI_INDICADORES_OPERATIVOS creada por el usuario
  */
-router.get('/eficiencia-nativo', authenticate, async (req, res, next) => {
+router.get('/eficiencia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']), async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
     const pool = await connectRemoteDB();
@@ -598,7 +657,7 @@ router.get('/eficiencia-nativo', authenticate, async (req, res, next) => {
  * GET /api/dashboard/censo-camas
  * Retorna el censo de camas en tiempo real cruzando V_MRPT y PC
  */
-router.get('/censo-camas', authenticate, async (req, res, next) => {
+router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     const pool = await connectRemoteDB();
 
@@ -606,7 +665,7 @@ router.get('/censo-camas', authenticate, async (req, res, next) => {
     const bedsResult = await pool.request().query(`
       SELECT DISTINCT RoomCode, RoomName 
       FROM V_MRPT 
-      WHERE RoomName LIKE '%CAMA%' 
+      WHERE (RoomName LIKE '%CAMA%' OR RoomCode LIKE 'CUBUTI%') 
         AND RoomName IS NOT NULL
         AND RoomName NOT LIKE '%VIRTUAL%'
         AND RoomName NOT LIKE '%VIRT%'
@@ -623,7 +682,7 @@ router.get('/censo-camas', authenticate, async (req, res, next) => {
           PR.FullName AS Medico,
           ROW_NUMBER() OVER(PARTITION BY V.RoomCode ORDER BY PC.Date DESC) as rn
         FROM PC
-        JOIN V_MRPT V ON PC.PTNum = V.PTNum AND V.RoomName LIKE '%CAMA%'
+        JOIN V_MRPT V ON PC.PTNum = V.PTNum AND (V.RoomName LIKE '%CAMA%' OR V.RoomCode LIKE 'CUBUTI%')
         LEFT JOIN PR ON PC.PRNum = PR.PRNum
         WHERE PC.PC_ST = 'OP' 
           AND PC.PCType IN ('IP', 'ER')
@@ -687,7 +746,7 @@ router.get('/censo-camas', authenticate, async (req, res, next) => {
  * GET /api/dashboard/urgencias-nativo
  * Dashboard nativo para Urgencias basado en tabla PC (PCType = 'ER')
  */
-router.get('/urgencias-nativo', authenticate, async (req, res, next) => {
+router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     let { startDate, endDate, search } = req.query;
     
@@ -799,7 +858,7 @@ router.get('/urgencias-nativo', authenticate, async (req, res, next) => {
  * GET /api/dashboard/eficacia-nativo
  * Retorna datos de UDR_BI_PRODUCTIVIDAD_MEDICOS y V_UDR_CONSULTA_DIA
  */
-router.get('/eficacia-nativo', authenticate, async (req, res, next) => {
+router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     const { startDate, endDate, search, especialidad } = req.query;
     const pool = await connectRemoteDB();
@@ -967,7 +1026,7 @@ router.get('/filtros-eficacia', authenticate, async (req, res, next) => {
  * GET /api/dashboard/quirofano-nativo
  * Dashboard nativo para Quirófanos basado en la vista UDR_USOQX
  */
-router.get('/quirofano-nativo', authenticate, async (req, res, next) => {
+router.get('/quirofano-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     let { startDate, endDate, search } = req.query;
 
@@ -1025,7 +1084,7 @@ const path = require('path');
  * GET /api/dashboard/export-excel
  * Exporta la tabla de datos cruda del dashboard a Excel con el logo y formato institucional
  */
-router.get('/export-excel', authenticate, async (req, res, next) => {
+router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR']), async (req, res, next) => {
   try {
     let { dashboard, startDate, endDate, search, especialidad } = req.query;
     
@@ -1253,6 +1312,151 @@ router.get('/export-excel', authenticate, async (req, res, next) => {
   }
 });
 
+/**
+ * GET /api/dashboard/auxiliares-nativo/:tipo
+ * Extrae volumen e ingresos para IMAGENOLOGIA, LABORATORIO, FARMACIA
+ * desde KH_HE (SQL Server)
+ */
+router.get('/auxiliares-nativo/:tipo', authenticate, async (req, res, next) => {
+  try {
+    const { tipo } = req.params;
+    let areaNombre = 'IMAGENOLOGIA';
+    if (tipo === 'laboratorio') areaNombre = 'LABORATORIO';
+    if (tipo === 'farmacia') areaNombre = 'FARMACIA';
+
+    const { connectRemoteDB } = require('../config/remote-db');
+    const pool = await connectRemoteDB();
+    
+    // Tendencia Anual
+    const tendenciaQuery = await pool.request()
+      .input('areaNombre', areaNombre)
+      .query(`
+        SELECT 
+          YEAR(s.Fecha) as Yr,
+          MONTH(s.Fecha) as Mes,
+          SUM(s.Cantidad) as volumen,
+          SUM(CAST(ISNULL(p.LineTotal, 0) AS FLOAT)) as ingresos
+        FROM UDR_BI_SOLICITUDES_ESTUDIOS s
+        LEFT JOIN UDR_PAY_IMA p ON s.PCPRITNum = p.PCITNum
+        WHERE s.AreaNombre = @areaNombre
+          AND s.Fecha IS NOT NULL
+        GROUP BY YEAR(s.Fecha), MONTH(s.Fecha)
+        ORDER BY Yr ASC, Mes ASC
+      `);
+
+    // Top Estudios
+    const topQuery = await pool.request()
+      .input('areaNombre', areaNombre)
+      .query(`
+        SELECT TOP 10
+          s.Estudio as procedimiento,
+          SUM(s.Cantidad) as cantidad
+        FROM UDR_BI_SOLICITUDES_ESTUDIOS s
+        WHERE s.AreaNombre = @areaNombre
+        GROUP BY s.Estudio
+        ORDER BY cantidad DESC
+      `);
+
+    res.json({
+      success: true,
+      tendenciaAnual: tendenciaQuery.recordset,
+      topEstudios: topQuery.recordset
+    });
+  } catch (error) {
+    console.error('Error en auxiliares-nativo:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/dashboard/cuneros-nativo
+ * Extrae datos de Neonatos (Cuneros) desde KH_HE
+ */
+router.get('/cuneros-nativo', authenticate, async (req, res, next) => {
+  try {
+    const { connectRemoteDB } = require('../config/remote-db');
+    const pool = await connectRemoteDB();
+
+    // 1. Total de Recién Nacidos
+    const rnQuery = await pool.request().query(`
+      SELECT COUNT(DISTINCT FullName) as total_rn 
+      FROM UDR_PAY_IMA 
+      WHERE FullName LIKE 'RN %'
+    `);
+    const totalRN = rnQuery.recordset[0].total_rn || 0;
+
+    // 2. Ingresos Totales de RNs
+    const ingresosQuery = await pool.request().query(`
+      SELECT SUM(CAST(ISNULL(LineTotal, 0) AS FLOAT)) as total_ingresos 
+      FROM UDR_PAY_IMA 
+      WHERE FullName LIKE 'RN %'
+    `);
+    const totalIngresos = ingresosQuery.recordset[0].total_ingresos || 0;
+
+    // 3. Fórmulas entregadas (Biberones)
+    const formulasQuery = await pool.request().query(`
+      SELECT SUM(Quantity) as total_formulas 
+      FROM UDR_PAY_IMA 
+      WHERE FullName LIKE 'RN %' AND ItemDescription LIKE '%FORMULA%'
+    `);
+    const totalFormulas = formulasQuery.recordset[0].total_formulas || 0;
+
+    // 4. Top Insumos y Medicamentos
+    const insumosQuery = await pool.request().query(`
+      SELECT TOP 10 
+        ItemDescription as item, 
+        SUM(Quantity) as cantidad,
+        SUM(CAST(ISNULL(LineTotal, 0) AS FLOAT)) as ingresos
+      FROM UDR_PAY_IMA 
+      WHERE FullName LIKE 'RN %'
+        AND ItemDescription NOT LIKE '%FORMULA%'
+        AND ItemDescription NOT LIKE '%USO DE OXIGENO%'
+        AND ItemDescription NOT LIKE '%USO PUNTAS PARA OXIGENO%'
+        AND ItemDescription NOT LIKE '%ESTANCIA%'
+        AND ItemDescription NOT LIKE '%GRUPO SANGUINEO%'
+        AND ItemDescription NOT LIKE '%TOMA DE GLUCOSA%'
+        AND ItemDescription NOT LIKE '%Anticipo%'
+        AND ItemDescription NOT LIKE '%CONSULTA%'
+      GROUP BY ItemDescription
+      ORDER BY cantidad DESC
+    `);
+    const topInsumos = insumosQuery.recordset;
+
+    // 5. Distribución de Servicios
+    const serviciosQuery = await pool.request().query(`
+      SELECT 
+        ItemDescription as servicio, 
+        SUM(Quantity) as cantidad
+      FROM UDR_PAY_IMA 
+      WHERE FullName LIKE 'RN %'
+        AND (
+          ItemDescription LIKE '%USO DE OXIGENO%' OR 
+          ItemDescription LIKE '%USO PUNTAS PARA OXIGENO%' OR
+          ItemDescription LIKE '%ESTANCIA DE CUNERO%' OR
+          ItemDescription LIKE '%TOMA DE GLUCOSA%' OR
+          ItemDescription LIKE '%GRUPO SANGUINEO%' OR
+          ItemDescription LIKE '%TAMIZ%'
+        )
+      GROUP BY ItemDescription
+      ORDER BY cantidad DESC
+    `);
+    const topServicios = serviciosQuery.recordset;
+
+    res.json({
+      success: true,
+      data: {
+        totalRN,
+        totalIngresos,
+        totalFormulas,
+        topInsumos,
+        topServicios
+      }
+    });
+  } catch (error) {
+    console.error('Error en cuneros-nativo:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 /**
  * GET /api/dashboard/geografia
  * Datos geográficos para el dashboard demográfico

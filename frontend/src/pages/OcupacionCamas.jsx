@@ -45,6 +45,7 @@ export default function OcupacionCamas() {
       'PPB (Planta Baja)': [],
       'Urgencias 1': [],
       'Urgencias 2': [],
+      'Terapia Intensiva': [],
       'Otras Áreas': [],
       'Camas Virtuales': []
     };
@@ -63,6 +64,8 @@ export default function OcupacionCamas() {
         category = 'Urgencias 1';
       } else if (name.includes('URGENCIAS 2')) {
         category = 'Urgencias 2';
+      } else if (cama.RoomCode.includes('CUBUTI') || name.includes('TERAPIA INTENSIVA')) {
+        category = 'Terapia Intensiva';
       }
 
       groups[category].push(cama);
@@ -92,6 +95,7 @@ export default function OcupacionCamas() {
     'PPA (Planta Alta)', 
     'Urgencias 1', 
     'Urgencias 2', 
+    'Terapia Intensiva',
     'Otras Áreas', 
     'Camas Virtuales'
   ];
