@@ -682,7 +682,7 @@ router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
           PR.FullName AS Medico,
           ROW_NUMBER() OVER(PARTITION BY V.RoomCode ORDER BY PC.Date DESC) as rn
         FROM PC
-        JOIN V_MRPT V ON PC.PTNum = V.PTNum AND (V.RoomName LIKE '%CAMA%' OR V.RoomCode LIKE 'CUBUTI%')
+        JOIN V_MRPT V ON PC.PCNum = V.ControllerKey AND V.ControllerName = 'PC' AND (V.RoomName LIKE '%CAMA%' OR V.RoomCode LIKE 'CUBUTI%')
         LEFT JOIN PR ON PC.PRNum = PR.PRNum
         WHERE PC.PC_ST = 'OP' 
           AND PC.PCType IN ('IP', 'ER')
