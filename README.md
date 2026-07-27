@@ -154,6 +154,14 @@ Para colaborar con el proyecto sigue estos pasos:
 - [Estructura Completa](ESTRUCTURA.md) - Arquitectura y diseño del código.
 
 ---
+
+## 👨‍💻 Acerca del Autor
+
+**Ing. Alberto García Mendoza**  
+Arquitecto de Soluciones y Desarrollador Principal  
+GitHub: [@TeruIshijo1](https://github.com/TeruIshijo1)
+
+---
 <p align="center">
   ⚕️ <b>Hospital Escandón</b> · Uso interno y confidencial
 </p>
