@@ -16,6 +16,23 @@
 
 La **Plataforma BI Hospital Escandón** es una solución integral orientada a la toma de decisiones clínicas, operativas y directivas. Combina cuadros de mando avanzados incrustados mediante **PowerBI Embedded**, control de acceso basado en roles (**RBAC**), y un innovador **Asistente de IA** (ARIA) integrado con RAG, capaz de generar consultas a las bases de datos internas respondiendo en lenguaje natural.
 
+## 🏗️ Arquitectura de Datos (Data Sources)
+
+La plataforma unifica información proveniente de **3 ecosistemas distintos** dentro del hospital. Es crucial entender qué rol juega cada uno para construir consultas y reportes correctos:
+
+1. **Sistema SITI (Legacy):**
+   - **Motor:** PostgreSQL
+   - **Rol:** Contiene datos históricos e información operativa del sistema anterior. Se consulta vía API legada o conexión directa.
+2. **Sistema VERTICAL (Nuevo Sistema):**
+   - **Motor:** SQL Server
+   - **Rol:** Sistema actual de operaciones, expedientes y transacciones diarias en piso. 
+3. **SAP Business One (ERP):**
+   - **Motor:** SAP Service Layer (API OData / HANA)
+   - **Rol:** **La Verdad Absoluta**. Todo lo relacionado con finanzas, inventarios valorizados, contabilidad y facturación se extrae de aquí. Es la fuente más confiable porque toda la información que contiene ya está auditada y "subida".
+
+> [!WARNING]
+> Nunca cruzar consultas SQL directamente entre las bases de datos. Cada ecosistema debe consultarse por su canal designado (Ej. SAP *solo* vía Service Layer, nunca directo por SQL Server).
+
 ## ✨ Características Principales
 
 - 🔐 **Control de Acceso (RBAC):** Sistema robusto con Autenticación JWT y roles personalizables (Superadmin, Directivo, Auditor, Médico Jefe).

@@ -15,6 +15,7 @@ const morgan        = require('morgan');
 const path          = require('path');
 const fs            = require('fs');
 const multer        = require('multer');
+const xss           = require('xss-clean');
 
 const { connectDB }         = require('./config/db');
 const authRoutes             = require('./routes/auth.routes');
@@ -58,18 +59,19 @@ const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
   max:      300,
   standardHeaders: true,
-  message: { error: 'Demasiadas solicitudes. Intente en 15 minutos.' },
+  message: { message: 'Demasiadas solicitudes. Intente en 15 minutos.', error: 'Demasiadas solicitudes. Intente en 15 minutos.' },
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max:      10,
-  message: { error: 'Demasiados intentos de autenticación. Intente más tarde.' },
+  max:      20,
+  message: { message: 'Demasiados intentos de autenticación. Intente más tarde.', error: 'Demasiados intentos de autenticación. Intente más tarde.' },
 });
 
 app.use(globalLimiter);
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(xss()); // Sanitiza body, query y params contra inyecciones XSS
 
 /* ── Logging ────────────────────────────────────────────────── */
 if (process.env.NODE_ENV !== 'test') {
@@ -101,8 +103,8 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
 
 // Endpoint de subida directo (FUERA de /api para evitar middleware de auditoría y bloqueos)
-const { authenticate } = require('./middleware/auth.middleware');
-app.post('/upload-assets', authenticate, (req, res) => {
+const { authenticate, authorize } = require('./middleware/auth.middleware');
+app.post('/upload-assets', authenticate, authorize(['ADMIN']), (req, res) => {
   upload.single('file')(req, res, (err) => {
     if (err) {
       console.error('[UPLOAD ERROR]', err.message);
@@ -119,6 +121,8 @@ const sitiRoutes = require('./routes/siti.routes');
 const dataQualityRoutes = require('./routes/dataQuality.routes');
 
 const ariaRoutes = require('./routes/aria.routes');
+const pharmacyRoutes = require('./routes/pharmacy.routes');
+const sapRoutes = require('./routes/sap.routes');
 
 app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/dashboard',     dashboardRoutes);
@@ -131,7 +135,9 @@ app.use('/api/test',          testRoutes);
 app.use('/api/siti',          sitiRoutes);
 app.use('/api/audit',         auditRoutes);
 app.use('/api/data-quality',  dataQualityRoutes);
-app.use('/api/files',         express.static(path.join(__dirname, 'uploads')));
+app.use('/api/pharmacy',      pharmacyRoutes);
+app.use('/api/sap',           sapRoutes);
+app.use('/api/files', authenticate, express.static(path.join(__dirname, 'uploads')));
 
 /* ── Manejo de errores global ───────────────────────────────── */
 app.use((err, req, res, next) => {
@@ -148,6 +154,7 @@ app.use((err, req, res, next) => {
   }
 
   res.status(err.status || 500).json({
+    message: err.message || 'Error interno del servidor',
     error:   err.message || 'Error interno del servidor',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
