@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth }                  from '../../context/AuthContext';
-import { getNavItems, AREAS_LABELS } from '../../utils/rbac';
+import { getNavItems, AREAS_LABELS, hasPermission } from '../../utils/rbac';
 
 export default function Sidebar() {
   const { user, logout }    = useAuth();
@@ -16,7 +16,8 @@ export default function Sidebar() {
 
   if (!user) return null;
 
-  const navItems = getNavItems(user.role, user.area);
+  const navItems = getNavItems(user.role, user.area, user.username)
+    .filter(item => hasPermission(user, item.path));
 
   // Agrupar por sección
   const sections = navItems.reduce((acc, item) => {
@@ -128,6 +129,16 @@ export default function Sidebar() {
           </svg>
           Cerrar sesión
         </button>
+        <div style={{ 
+          marginTop: '1.2rem', 
+          textAlign: 'center', 
+          fontSize: '0.6rem', 
+          fontFamily: 'var(--font-mono)', 
+          color: 'rgba(255,255,255,0.3)',
+          letterSpacing: '0.05em'
+        }}>
+          Autor: <a href="https://github.com/TeruIshijo1" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'rgba(255,255,255,0.8)'} onMouseLeave={e => e.target.style.color = 'rgba(255,255,255,0.3)'}>Ing. Alberto García M.</a>
+        </div>
       </div>
     </aside>
   );
