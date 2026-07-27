@@ -1,6 +1,6 @@
 <div align="center">
   <h1>🏥 Hospital Escandón — Plataforma BI</h1>
-  <p><strong>Plataforma de Estadísticos e Indicadores con BI Embedded, RBAC y Asistente de IA (RAG)</strong></p>
+  <p><strong>Plataforma de Estadísticos e Indicadores con BI Embedded y Control de Accesos (RBAC)</strong></p>
   <p>
     <img src="https://img.shields.io/badge/React-18-blue.svg" alt="React" />
     <img src="https://img.shields.io/badge/Node.js-20-green.svg" alt="Node.js" />
@@ -14,144 +14,59 @@
 
 ## 📖 Descripción del Proyecto
 
-La **Plataforma BI Hospital Escandón** es una solución integral orientada a la toma de decisiones clínicas, operativas y directivas. Combina cuadros de mando avanzados incrustados mediante **PowerBI Embedded**, control de acceso basado en roles (**RBAC**), y un innovador **Asistente de IA** (ARIA) integrado con RAG, capaz de generar consultas a las bases de datos internas respondiendo en lenguaje natural.
+La **Plataforma BI Hospital Escandón** es una solución web integral orientada a facilitar la toma de decisiones directivas, operativas y clínicas. La herramienta concentra, procesa y visualiza la información proveniente de los diversos ecosistemas de datos del hospital a través de tableros incrustados (Power BI Embedded), control de acceso por roles (RBAC) y la generación de métricas clave en tiempo real.
 
-## 🏗️ Arquitectura de Datos (Data Sources)
+## 🏗️ Arquitectura y Fuentes de Datos
 
-La plataforma unifica información proveniente de **3 ecosistemas distintos** dentro del hospital. Es crucial entender qué rol juega cada uno para construir consultas y reportes correctos:
-
-1. **Sistema SITI (Legacy):**
-   - **Motor:** PostgreSQL
-   - **Rol:** Contiene datos históricos e información operativa del sistema anterior. Se consulta vía API legada o conexión directa.
-2. **Sistema VERTICAL (Nuevo Sistema):**
-   - **Motor:** SQL Server
-   - **Rol:** Sistema actual de operaciones, expedientes y transacciones diarias en piso. 
-3. **SAP Business One (ERP):**
-   - **Motor:** SAP Service Layer (API OData / HANA)
-   - **Rol:** **La Verdad Absoluta**. Todo lo relacionado con finanzas, inventarios valorizados, contabilidad y facturación se extrae de aquí. Es la fuente más confiable porque toda la información que contiene ya está auditada y "subida".
-
-> [!WARNING]
-> Nunca cruzar consultas SQL directamente entre las bases de datos. Cada ecosistema debe consultarse por su canal designado (Ej. SAP *solo* vía Service Layer, nunca directo por SQL Server).
+La plataforma unifica la información de 3 sistemas clave dentro de la institución:
+1. **Sistema Histórico (Legacy):** Datos operativos históricos y registros anteriores (PostgreSQL).
+2. **Sistema Operativo Actual (SIT):** Operaciones diarias, gestión de camas, expedientes clínicos y control de urgencias (SQL Server).
+3. **ERP Institucional (SAP Business One):** Información financiera, contabilidad, inventarios y facturación.
 
 ## ✨ Características Principales
 
-- 🔐 **Control de Acceso (RBAC):** Sistema robusto con Autenticación JWT y roles personalizables (Superadmin, Directivo, Auditor, Médico Jefe).
-- 📊 **PowerBI Embedded:** Dashboards interactivos incrustados sin necesidad de salir de la aplicación.
-- 🤖 **Asistente ARIA (IA - RAG):** Asistente virtual impulsado por OpenAI (GPT-4o) para consultas analíticas instantáneas vía chat.
-- 🏥 **Módulos Clínicos y Operativos:** Monitorización del Quirófano, UCI, Consulta Externa e Inventarios.
-- 📄 **Exportación Dinámica:** Generación de reportes en formatos PDF interactivo y hojas de cálculo (Excel).
+- 🔐 **Control de Acceso (RBAC):** Sistema robusto con Autenticación JWT y roles personalizables (Directivo, Administrador, Jefes de Área y Perfil Operativo).
+- 📊 **Power BI Embedded:** Paneles interactivos totalmente incrustados dentro de la plataforma sin requerir licenciamiento individual por usuario para su visualización básica.
+- 🏥 **Módulos Especializados:** Paneles dedicados para monitorear Quirófano, UCI, Consulta Externa y Farmacia.
+- 📄 **Auditoría e Inventarios:** Módulos de conciliación automática que comparan inventarios con cargos en la cuenta del paciente.
+- 📈 **Exportación de Datos:** Generación automatizada de reportes en PDF interactivo y formato Excel avanzado.
 
 ## 🛠️ Stack Tecnológico
 
-| Capa        | Tecnología                        | Versión   |
-|-------------|-----------------------------------|-----------|
-| **Frontend**| React + Vite + React Router DOM   | 18 / 5 / 6|
-| **Estilos** | CSS Vanilla (Variables, Módulos)  | —         |
-| **Backend** | Node.js + Express                 | 20 / 4    |
-| **Base Datos**| SQLite 3 (better-sqlite3)       | 3         |
-| **Auth**    | JWT (jsonwebtoken) + bcryptjs     | 9         |
-| **BI Embed**| PowerBI REST API                  | v1.0      |
-| **IA/RAG**  | OpenAI API / Azure OpenAI (GPT-4o)| —         |
-| **Reportes**| pdfkit + exceljs                  | —         |
+- **Frontend:** React.js, Vite, React Router, y CSS nativo modularizado.
+- **Backend:** Node.js, Express.
+- **Base de Datos:** SQLite (motor local, con integraciones remotas a SQL Server y HANA).
+- **Autenticación:** JSON Web Tokens (JWT) y cifrado con bcrypt.
+- **Reportes:** pdfkit y exceljs.
 
-## 🚀 Inicio Rápido (Instalación Local)
+## 🚀 Instalación y Despliegue Local
 
 ### Prerrequisitos
-- [Node.js](https://nodejs.org/es/) (v20 o superior recomendado)
-- [Git](https://git-scm.com/)
+- Node.js (v20 o superior recomendado)
+- Git
 
-### 1. Clonar el Repositorio
-
+### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/TU_USUARIO/escandon-bi.git
+git clone https://github.com/TeruIshijo1/escandon-bi.git
 cd escandon-bi
 ```
 
-### 2. Configuración del Backend
-
+### 2. Levantar el Backend
 ```bash
 cd backend
-# Copia y configura las variables de entorno
 cp .env.example .env
-
-# Instala las dependencias
 npm install
-```
-
-> [!IMPORTANT]
-> **Configuración Inicial:**
-> Antes de inicializar la base de datos, asegúrate de configurar la variable `SEED_ADMIN_PASSWORD` en el archivo `backend/.env`. Esto establecerá la contraseña de la primera cuenta administradora (`admin`).
-
-```bash
-# Inicializa la base de datos SQLite y pobla roles
 npm run db:init
-
-# Inicia el servidor de desarrollo
 npm run dev
 ```
-El backend estará disponible en `http://localhost:4000`
 
-### 3. Configuración del Frontend
-
-Abre una nueva terminal en el directorio raíz del proyecto:
-
+### 3. Levantar el Frontend
+En otra terminal desde la raíz del proyecto:
 ```bash
 cd frontend
-# Instala las dependencias
 npm install
-
-# Inicia el entorno de Vite
 npm run dev
 ```
-El frontend estará disponible en `http://localhost:5173`
-
----
-
-## ⚙️ Variables de Entorno
-
-El sistema usa variables de entorno para proteger secretos. En la carpeta `backend`, consulta `.env.example`. Las más críticas a rellenar:
-
-- `DB_PATH`: Ruta al archivo de SQLite (por defecto: `../database/escandon_bi.db`)
-- `JWT_SECRET`: Llave criptográfica (mínimo 64 caracteres)
-- `SEED_ADMIN_PASSWORD`: Contraseña para crear el Admin en `npm run db:init`
-- `OPENAI_API_KEY`: API Key para activar el Asistente ARIA
-- `PBI_*`: Credenciales para Azure Active Directory y PowerBI Workspace.
-
----
-
-## 📂 Estructura del Proyecto
-
-El repositorio sigue un patrón cliente-servidor claro:
-
-```text
-escandon-bi/
-├── backend/            # API REST (Express), Auth, Logs y AI Services
-├── frontend/           # SPA (React + Vite), UI Glassmorphism
-├── database/           # Scripts DDL, Migraciones, Seeders SQL
-└── docs/               # Documentación de Endpoints, Prompts de IA, etc.
-```
-
-*Para un desglose detallado de las carpetas, revisa `ESTRUCTURA.md`.*
-
----
-
-## 🤝 Flujo de Contribución (GitHub)
-
-Para colaborar con el proyecto sigue estos pasos:
-
-1. Realiza un **Fork** del repositorio.
-2. Crea una rama para tu feature o bugfix (`git checkout -b feature/nueva-funcionalidad`).
-3. Realiza el commit de tus cambios (`git commit -m "feat: añade nuevo panel de radiología"`).
-4. Sube los cambios a tu rama (`git push origin feature/nueva-funcionalidad`).
-5. Abre un **Pull Request** detallando el alcance de tu contribución.
-
----
-
-## 📚 Documentación Adicional
-
-- [Especificaciones del API](docs/api_spec.md) - Detalle de los endpoints.
-- [Prompt del Asistente IA](docs/ai_system_prompt.md) - Directrices y contexto de GPT-4o.
-- [Estructura Completa](ESTRUCTURA.md) - Arquitectura y diseño del código.
 
 ---
 
@@ -160,8 +75,3 @@ Para colaborar con el proyecto sigue estos pasos:
 **Ing. Alberto García Mendoza**  
 Arquitecto de Soluciones y Desarrollador Principal  
 GitHub: [@TeruIshijo1](https://github.com/TeruIshijo1)
-
----
-<p align="center">
-  ⚕️ <b>Hospital Escandón</b> · Uso interno y confidencial
-</p>
