@@ -11,7 +11,7 @@
 import { useEffect } from 'react';
 import ExportButton from './ExportButton';
 
-export default function PBIModal({ url, title, multiPagina = false, reportId, hasJson = false, onClose }) {
+export default function PBIModal({ url, title, multiPagina = false, reportId, hasJson = false, onClose, isApiModal = false }) {
   // ESC para cerrar
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -20,6 +20,10 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
   }, [onClose]);
 
   if (!url) return null;
+
+  // Append token for API routes since iframes don't send Authorization headers
+  const token = sessionStorage.getItem('escandon_token');
+  const finalUrl = isApiModal && token ? `${url}?token=${token}` : url;
 
   return (
     <div
@@ -190,7 +194,7 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
           <div style={{ width: '100%', height: multiPagina ? '100%' : 'calc(100% + 36px)', position: 'absolute', top: 0, left: 0 }}>
             <iframe
               title={title}
-              src={url}
+              src={finalUrl}
               width="100%"
               height="100%"
               frameBorder="0"

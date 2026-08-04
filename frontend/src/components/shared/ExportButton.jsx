@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import { API_BASE } from '../../api/config';
+import { authHeaders, getAuthToken } from '../../api/auth';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
@@ -47,17 +48,23 @@ export default function ExportButton({
   queryParams = null,
   directUrl = null,
   compact = false,
+  variant = 'glass', // 'glass' | 'solid'
   onClickOverride,
   targetId = 'dashboard-container',
   useServerPdf = false,
 }) {
   const [loading, setLoading] = useState(false);
   const cfg = CONFIG[type] || CONFIG.pdf;
-
-  const getToken = () => sessionStorage.getItem('escandon_token') || localStorage.getItem('token') || '';
+  
+  // Define styles based on variant
+  const bgIdle = variant === 'solid' ? cfg.bg : 'rgba(255,255,255,0.15)';
+  const bgHover = variant === 'solid' ? cfg.bg : 'rgba(255,255,255,0.28)';
+  const borderStyle = variant === 'solid' ? 'none' : '1.5px solid rgba(255,255,255,0.22)';
+  const shadowStyle = variant === 'solid' ? `0 4px 12px ${cfg.shadow}` : 'var(--shadow-xs)';
 
   const buildQueryString = () => {
-    const token = getToken();
+    // ... [existing logic inside buildQueryString] ...
+    const token = getAuthToken();
     const cleanParams = queryParams
       ? Object.fromEntries(Object.entries(queryParams).filter(([, v]) => v !== undefined && v !== null && v !== ''))
       : {};
@@ -72,16 +79,15 @@ export default function ExportButton({
 
   const handleExport = async () => {
     if (loading) return;
-
+    // ... [existing handleExport logic] ...
     if (onClickOverride) {
       onClickOverride();
       return;
     }
 
-    const token = getToken();
+    const token = getAuthToken();
     const qStr = buildQueryString();
 
-    // 1. Exportación PDF vía captura DOM (si existe el elemento y no se exige PDF del servidor)
     if (type === 'pdf' && !useServerPdf) {
       const element = document.getElementById(targetId);
       if (element) {
@@ -131,7 +137,6 @@ export default function ExportButton({
       }
     }
 
-    // 2. Exportación Directa por URL o Servidor Backend (Excel o PDF Servidor)
     setLoading(true);
     try {
       let endpointUrl = directUrl;
@@ -144,7 +149,7 @@ export default function ExportButton({
       }
 
       const res = await fetch(endpointUrl, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(),
       });
 
       if (!res.ok) {
@@ -161,7 +166,15 @@ export default function ExportButton({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `reporte_${reportId || 'escandon'}_${Date.now()}.${type === 'pdf' ? 'pdf' : 'xlsx'}`;
+
+      const disposition = res.headers.get('Content-Disposition');
+      let filename = `reporte_${reportId || 'escandon'}_${Date.now()}.${type === 'pdf' ? 'pdf' : 'xlsx'}`;
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -185,23 +198,23 @@ export default function ExportButton({
         justifyContent: 'center',
         gap: '0.45rem',
         padding: compact ? '0.45rem 0.85rem' : '0.6rem 1.1rem',
-        background: loading ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.15)',
-        border: '1.5px solid rgba(255,255,255,0.22)',
+        background: bgIdle,
+        border: borderStyle,
         borderRadius: 10,
         color: '#FFFFFF',
         fontFamily: 'var(--font-display)',
         fontSize: compact ? '0.74rem' : '0.82rem',
         fontWeight: 700,
         cursor: loading ? 'not-allowed' : 'pointer',
-        backdropFilter: 'var(--glass-blur)',
-        WebkitBackdropFilter: 'var(--glass-blur)',
+        backdropFilter: variant === 'glass' ? 'var(--glass-blur)' : 'none',
+        WebkitBackdropFilter: variant === 'glass' ? 'var(--glass-blur)' : 'none',
         transition: 'all var(--transition-fast)',
         opacity: loading ? 0.7 : 1,
         whiteSpace: 'nowrap',
-        boxShadow: 'var(--shadow-xs)',
+        boxShadow: shadowStyle,
       }}
-      onMouseEnter={e => !loading && (e.currentTarget.style.background = 'rgba(255,255,255,0.28)')}
-      onMouseLeave={e => !loading && (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+      onMouseEnter={e => !loading && (e.currentTarget.style.background = bgHover)}
+      onMouseLeave={e => !loading && (e.currentTarget.style.background = bgIdle)}
       title={`${cfg.label} del reporte ${reportId}`}
     >
       {loading ? (

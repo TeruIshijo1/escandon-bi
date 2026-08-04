@@ -10,12 +10,8 @@ import PremiumLoader from '../components/shared/PremiumLoader';
 const API_BASE = '/api';
 
 const SECCION_LABELS = {
-  directivo: '📊 Dashboard Directivo',
-  mando:     '🎯 Panel de Mando',
   area:      '🏥 Tablero de Área',
-  stats:     '📈 Estadísticas',
-  audit:     '🔍 Auditoría',
-  home:      '🏠 Inicio',
+  stats:     '📈 Estadísticas'
 };
 
 const ICONOS_RAPIDOS = ['📊','🏥','❤️','🔪','📅','🚪','📦','💼','⚙️','🎯','⭐','📋','👤','♀️','📉','👶','✅','⚠️','💰','🛏️','🔄'];
@@ -504,94 +500,6 @@ export default function AdminConfiguracion() {
           </div>
         </div>
 
-        {/* Configuración Azure / Power BI */}
-        <div className="config-card">
-          <div className="config-watermark">📊</div>
-          <h2 style={{ fontFamily:"var(--font-display)", fontSize:'1.05rem', fontWeight:800, color:'var(--color-azul-fuerte)', marginBottom:'1.25rem', paddingBottom:'0.65rem', borderBottom:'1px solid rgba(0,70,135,0.06)', display:'flex', alignItems:'center', gap:'0.6rem', letterSpacing: '-0.01em' }}>
-            Servicios en la Nube (Azure / Power BI)
-          </h2>
-          <div style={{ display:'flex', flexDirection:'column', gap:'0.875rem' }}>
-            <div>
-              <label style={{ display:'block', fontSize:'0.65rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.35rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>TENANT ID</label>
-              <input value={pbiConfig.tenantId} onChange={e => setPbiConfig({...pbiConfig, tenantId:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:8, padding:'0.55rem', fontSize:'0.82rem', fontFamily: 'var(--font-mono)', background: '#F8FAFC', outline: 'none', transition: 'all var(--transition-fast)' }} />
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:'0.65rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.35rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>CLIENT ID (APP ID)</label>
-              <input value={pbiConfig.clientId} onChange={e => setPbiConfig({...pbiConfig, clientId:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:8, padding:'0.55rem', fontSize:'0.82rem', fontFamily: 'var(--font-mono)', background: '#F8FAFC', outline: 'none', transition: 'all var(--transition-fast)' }} />
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:'0.65rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.35rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>CLIENT SECRET</label>
-              <input type="password" value={pbiConfig.clientSecret} onChange={e => setPbiConfig({...pbiConfig, clientSecret:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:8, padding:'0.55rem', fontSize:'0.82rem', background: '#F8FAFC', outline: 'none', transition: 'all var(--transition-fast)' }} />
-            </div>
-            <div style={{ marginTop:'0.25rem', fontSize:'0.72rem', color:'var(--text-muted)', fontStyle:'italic', fontFamily: 'var(--font-body)' }}>
-              ℹ️ Requerido para integraciones mediante Token de Servicio Embebido (App Owns Data).
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ background:'#FFFFFF', borderRadius:16, padding:'1.75rem 1.5rem', marginBottom:'2rem', border:'1px solid rgba(0,70,135,0.05)', boxShadow:'var(--shadow-xs)' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem', paddingBottom:'0.65rem', borderBottom:'1px solid rgba(0,70,135,0.06)' }}>
-          <h2 style={{ fontFamily:"var(--font-display)", fontSize:'1.05rem', fontWeight:800, color:'var(--color-azul-fuerte)', margin:0, letterSpacing: '-0.01em' }}>Catálogo de Tableros y Reportes</h2>
-          <button 
-            onClick={handleOpenAdd} 
-            style={{ 
-              padding:'0.55rem 1.1rem', 
-              background:'linear-gradient(135deg, var(--color-azul-claro), var(--color-azul-cruz))', 
-              color:'white', 
-              border:'none', 
-              borderRadius:10, 
-              fontSize:'0.76rem', 
-              fontWeight:700, 
-              fontFamily: 'var(--font-display)',
-              cursor:'pointer',
-              boxShadow: '0 4px 12px rgba(0, 136, 201, 0.2)'
-            }}
-          >+ Añadir Reporte</button>
-        </div>
-        
-        <div style={{ overflowX: 'auto' }}>
-          <table className="config-table" style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.82rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid rgba(0,70,135,0.06)' }}>
-                {['Nombre del Tablero', 'ID Interno', 'Estado', 'Acciones'].map(h => (
-                  <th key={h} style={{ 
-                    textAlign: h === 'Acciones' ? 'right' : 'left', 
-                    padding:'0.85rem 0.75rem', 
-                    color:'var(--text-primary)', 
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 800,
-                    fontSize: '0.7rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    borderBottom:'1px solid rgba(0,70,135,0.06)' 
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan="4" style={{ padding:'2rem', textAlign:'center', color:'var(--text-muted)' }}>
-                  <PremiumLoader text="Cargando catálogo central..." />
-                </td></tr>
-              ) : reports.length === 0 ? (
-                <tr><td colSpan="4" style={{ padding:'2rem', textAlign:'center', color:'var(--text-muted)', fontFamily: 'var(--font-body)' }}>No hay reportes de Power BI o Looker configurados en la plataforma.</td></tr>
-              ) : reports.map(r => (
-                <tr key={r.id} style={{ borderBottom: '1px solid rgba(0,70,135,0.04)', transition: 'background-color 150ms' }}>
-                  <td style={{ padding:'0.75rem 0.5rem', fontWeight:600, color:'var(--text-primary)', fontFamily: 'var(--font-body)', fontSize: '0.82rem' }}>{r.name}</td>
-                  <td style={{ padding:'0.75rem 0.5rem', fontFamily:'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>{r.reportId}</td>
-                  <td style={{ padding:'0.75rem 0.5rem' }}>
-                    {r.active ? <span style={{ color:'var(--color-verde-e)', fontWeight:700, fontFamily: 'var(--font-mono)', fontSize: '0.74rem' }}>● Activo</span> : <span style={{ color:'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.74rem' }}>○ Inactivo</span>}
-                  </td>
-                  <td style={{ padding:'0.75rem 0.5rem', textAlign:'right' }}>
-                    <button onClick={() => handleOpenConfig(r)} style={{ background:'none', border:'none', color:'var(--color-azul-fuerte)', cursor:'pointer', fontSize:'0.75rem', fontWeight:700, fontFamily: 'var(--font-display)', marginRight:'0.75rem' }}>Configurar</button>
-                    <button onClick={() => handleDeleteReport(r.id)} style={{ background:'none', border:'none', color:'var(--color-danger)', cursor:'pointer', fontSize:'0.75rem', fontWeight:700, fontFamily: 'var(--font-display)' }}>Eliminar</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       {/* ── SECCIÓN DATA HUB ── */}
@@ -688,7 +596,7 @@ export default function AdminConfiguracion() {
           <table className="config-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid rgba(0,70,135,0.06)' }}>
-                {['Sección', 'Ícono', 'Nombre Original', 'Nombre Custom', 'Power BI Direct Link', 'Acciones'].map(h => (
+                {['Sección', 'Ícono', 'Nombre Original', 'Nombre Custom', 'Fuente de Datos', 'Acciones'].map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '0.85rem 0.75rem', color: 'var(--text-primary)', fontWeight: 800, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid rgba(0,70,135,0.06)', whiteSpace: 'nowrap', fontFamily: 'var(--font-display)' }}>{h}</th>
                 ))}
               </tr>
@@ -752,14 +660,6 @@ export default function AdminConfiguracion() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                           <input
                             type="url"
-                            value={kpiEditForm.pbiUrl}
-                            onChange={e => setKPIEditForm(f => ({ ...f, pbiUrl: e.target.value }))}
-                            placeholder="PowerBI URL: https://app.powerbi.com/..."
-                            className="config-input-field"
-                            style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: 8, padding: '0.45rem 0.75rem', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', outline: 'none', background: '#F8FAFC' }}
-                          />
-                          <input
-                            type="url"
                             value={kpiEditForm.jsonApiUrl}
                             onChange={e => setKPIEditForm(f => ({ ...f, jsonApiUrl: e.target.value }))}
                             placeholder="JSON API URL: https://..."
@@ -785,13 +685,8 @@ export default function AdminConfiguracion() {
                           </label>
                         </div>
                       ) : (
-                        kpi.PBIUrl || kpi.JsonApiUrl || kpi.JsonFilePath ? (
+                        kpi.JsonApiUrl || kpi.JsonFilePath ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                            {kpi.PBIUrl && (
-                              <span style={{ color: 'var(--color-verde-e)', fontSize: '0.74rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'var(--font-body)' }}>
-                                <span style={{ fontSize: '0.8rem' }}>✓</span> PBI Asignado
-                              </span>
-                            )}
                             {kpi.JsonApiUrl && (
                               <span style={{ color: 'var(--color-azul-fuerte)', fontSize: '0.74rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'var(--font-body)' }}>
                                 <span style={{ fontSize: '0.8rem' }}>✓</span> API JSON
@@ -856,138 +751,6 @@ export default function AdminConfiguracion() {
           💾 Guardar Todo
         </button>
       </div>
-
-      {/* Modal Añadir/Configurar Reporte */}
-      {modalReportOpen && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(15, 26, 46, 0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:999, backdropFilter:'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
-          <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-          <div style={{ background:'white', borderRadius:20, width:'95%', maxWidth:520, padding:'2.25rem 2rem 2rem', boxShadow:'var(--shadow-xl)', animation:'fadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)', maxHeight:'90vh', overflowY:'auto', boxSizing: 'border-box' }}>
-            <h2 style={{ fontFamily:"var(--font-display)", fontWeight: 800, margin:'0 0 0.4rem', fontSize:'1.35rem', color:'var(--color-azul-fuerte)', letterSpacing: '-0.01em' }}>{currentReport.id ? 'Modificar Reporte' : 'Registrar Nuevo Reporte'}</h2>
-            <p style={{ fontFamily: 'var(--font-body)', fontSize:'0.82rem', color:'var(--text-muted)', marginBottom:'1.5rem', fontWeight: 500 }}>Configura las fuentes de visualización e iframe del reporte seleccionado.</p>
-            
-            <div style={{ display:'flex', flexDirection:'column', gap:'1.15rem' }}>
-              <div>
-                <label style={{ display:'block', fontSize:'0.75rem', fontWeight:700, color:'var(--color-azul-fuerte)', marginBottom:'0.45rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ID Interno (Unico)</label>
-                <input value={currentReport.reportId} onChange={e => setCurrentReport({...currentReport, reportId:e.target.value})} placeholder="Ej. quirofano-main" className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:10, padding:'0.6rem 0.85rem', fontSize:'0.85rem', fontFamily:"var(--font-mono)", outline:'none', boxSizing:'border-box', background: '#F8FAFC', transition: 'all var(--transition-fast)' }} />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:'0.75rem', fontWeight:700, color:'var(--color-azul-fuerte)', marginBottom:'0.45rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Nombre Visible del Reporte</label>
-                <input value={currentReport.name} onChange={e => setCurrentReport({...currentReport, name:e.target.value})} placeholder="Ej. Reporte General de Quirófano" className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:10, padding:'0.6rem 0.85rem', fontSize:'0.85rem', fontFamily:"var(--font-body)", outline:'none', boxSizing:'border-box', background: '#F8FAFC', transition: 'all var(--transition-fast)' }} />
-              </div>
-              
-              <div style={{ border:'1.5px solid rgba(0,70,135,0.06)', borderRadius:12, padding:'1.1rem', background: '#FAFBFD' }}>
-                <span style={{ display:'block', fontSize:'0.7rem', fontWeight:800, color:'var(--color-azul-fuerte)', marginBottom:'0.75rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>INTEGRACIÓN POWER BI / LOOKER STUDIO</span>
-                <div style={{ display:'flex', gap:'0.875rem', marginBottom:'0.85rem' }}>
-                  <div style={{ flex:1 }}>
-                    <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: '0.25rem' }}>Workspace ID</label>
-                    <input value={currentReport.workspaceId || ''} onChange={e => setCurrentReport({...currentReport, workspaceId:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #CBD5E0', borderRadius:8, padding:'0.45rem', fontSize:'0.78rem', fontFamily: 'var(--font-mono)', outline: 'none', background: '#FFFFFF' }} />
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: '0.25rem' }}>Report ID</label>
-                    <input value={currentReport.pbiReportId || ''} onChange={e => setCurrentReport({...currentReport, pbiReportId:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #CBD5E0', borderRadius:8, padding:'0.45rem', fontSize:'0.78rem', fontFamily: 'var(--font-mono)', outline: 'none', background: '#FFFFFF' }} />
-                  </div>
-                </div>
-                <div>
-                  <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: '0.25rem' }}>Looker Studio / Public IFrame URL</label>
-                  <input value={currentReport.lookerUrl || ''} onChange={e => setCurrentReport({...currentReport, lookerUrl:e.target.value})} placeholder="https://lookerstudio.google.com/embed/..." className="config-input-field" style={{ width:'100%', border:'1px solid #CBD5E0', borderRadius:8, padding:'0.45rem', fontSize:'0.78rem', fontFamily: 'var(--font-body)', outline: 'none', background: '#FFFFFF' }} />
-                </div>
-                <div style={{ marginTop: '0.65rem' }}>
-                  <label style={{ display:'block', fontSize:'0.65rem', color:'var(--text-muted)', fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: '0.25rem' }}>API JSON URL</label>
-                  <input value={currentReport.jsonApiUrl || ''} onChange={e => setCurrentReport({...currentReport, jsonApiUrl:e.target.value})} placeholder="https://api..." className="config-input-field" style={{ width:'100%', border:'1px solid #CBD5E0', borderRadius:8, padding:'0.45rem', fontSize:'0.78rem', fontFamily: 'var(--font-body)', outline: 'none', background: '#FFFFFF' }} />
-                </div>
-                <div style={{ marginTop: '0.65rem' }}>
-                  <JsonUploader 
-                    label="O subir Archivo JSON (Data estática):" 
-                    onUpload={(path) => setCurrentReport({...currentReport, jsonFilePath: path})} 
-                  />
-                  {currentReport.jsonFilePath && (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--color-verde-e)', fontWeight: 700 }}>
-                      ✓ Archivo cargado: {currentReport.jsonFilePath.split('/').pop()}
-                    </span>
-                  )}
-                </div>
-                <div style={{ marginTop: '0.65rem' }}>
-                  <label style={{ display:'flex', alignItems:'center', gap:'0.5rem', fontSize:'0.78rem', cursor:'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, color: 'var(--color-azul-fuerte)' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={currentReport.multiPagina || false} 
-                      onChange={e => setCurrentReport({...currentReport, multiPagina: e.target.checked})} 
-                    />
-                    Habilitar navegación nativa (Tiene Múltiples Páginas)
-                  </label>
-                </div>
-              </div>
-              
-              <div style={{ display:'flex', gap:'1rem' }}>
-                <div style={{ flex:1 }}>
-                  <label style={{ display:'block', fontSize:'0.75rem', fontWeight:700, color:'var(--color-azul-fuerte)', marginBottom:'0.45rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Tablero de Área / Filtro</label>
-                  <select value={currentReport.area || ''} onChange={e => setCurrentReport({...currentReport, area:e.target.value})} className="config-select-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:10, padding:'0.6rem 0.85rem', fontSize:'0.85rem', fontFamily: 'var(--font-body)', fontWeight: 600, color: 'var(--text-secondary)', outline:'none', boxSizing:'border-box', background: 'white', transition: 'all var(--transition-fast)' }}>
-                    <option value="">Global / Todos</option>
-                    {AREAS_LIST.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ border:'1.5px solid rgba(0,70,135,0.06)', borderRadius:12, padding:'1.1rem', background: '#FAFBFD' }}>
-                <span style={{ display:'block', fontSize:'0.7rem', fontWeight:800, color:'var(--color-azul-fuerte)', marginBottom:'0.75rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>🔐 ROLES AUTORIZADOS</span>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.65rem' }}>
-                  {Object.entries(ROL_DISPLAY).map(([key, label]) => (
-                    <label key={key} style={{ display:'flex', alignItems:'center', gap:'0.5rem', fontSize:'0.78rem', color:'var(--text-primary)', cursor:'pointer', fontFamily: 'var(--font-body)', fontWeight: 500 }}>
-                      <input 
-                        type="checkbox" 
-                        checked={currentReport.roles?.includes(key)} 
-                        onChange={e => {
-                          const newRoles = e.target.checked 
-                            ? [...(currentReport.roles || []), key]
-                            : (currentReport.roles || []).filter(r => r !== key);
-                          setCurrentReport({...currentReport, roles: newRoles});
-                        }} 
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ border:'1.5px solid rgba(0,70,135,0.06)', borderRadius:12, padding:'1.1rem', background:'rgba(0,70,135,0.02)' }}>
-                <span style={{ display:'block', fontSize:'0.7rem', fontWeight:800, color:'var(--color-azul-fuerte)', marginBottom:'0.85rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>📂 ACTIVOS LOCALES (DESARROLLO)</span>
-                <div style={{ display:'flex', flexDirection:'column' }}>
-                  <FileUploader 
-                    label="ARCHIVO DE POWER BI (.PBIX)" 
-                    value={currentReport.pbixPath} 
-                    onUpload={fn => setCurrentReport({...currentReport, pbixPath:fn})}
-                    accept=".pbix"
-                  />
-                  <FileUploader 
-                    label="ARCHIVO EXCEL (ORIGEN CRUDO)" 
-                    value={currentReport.excelPath} 
-                    onUpload={fn => setCurrentReport({...currentReport, excelPath:fn})}
-                    accept=".xlsx,.xls,.csv"
-                  />
-                  <FileUploader 
-                    label="MINIATURA / CAPTURA PREVIA" 
-                    value={currentReport.thumbnailPath} 
-                    onUpload={fn => setCurrentReport({...currentReport, thumbnailPath:fn})}
-                    accept="image/*"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display:'flex', alignItems:'center', gap:'0.5rem', fontSize:'0.85rem', cursor:'pointer', fontFamily: 'var(--font-body)', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  <input type="checkbox" checked={currentReport.active} onChange={e => setCurrentReport({...currentReport, active:e.target.checked})} />
-                  Habilitar Visualización en Plataforma
-                </label>
-              </div>
-            </div>
-
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:'0.75rem', marginTop:'2.25rem', paddingTop:'1.25rem', borderTop:'1px solid rgba(0,70,135,0.06)' }}>
-              <button onClick={() => setModalReportOpen(false)} style={{ padding:'0.6rem 1.25rem', border:'1px solid #E2E8F0', borderRadius:10, background:'transparent', color:'var(--text-secondary)', fontSize:'0.85rem', fontWeight:700, cursor:'pointer', fontFamily:"var(--font-display)" }}>Cancelar</button>
-              <button onClick={handleSaveReport} style={{ padding:'0.6rem 1.25rem', border:'none', borderRadius:10, background:'linear-gradient(135deg, var(--color-azul-claro), var(--color-azul-cruz))', color:'white', fontSize:'0.85rem', fontWeight:700, cursor:'pointer', fontFamily:"var(--font-display)", boxShadow:'0 4px 12px rgba(0,136,201,0.2)' }}>Guardar Cambios</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Toast Notification */}
       {toast && (

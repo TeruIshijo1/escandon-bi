@@ -16,6 +16,38 @@ const SUGGESTED_QUESTIONS = [
   'Resumen de cirugías de la semana',
 ];
 
+function formatMarkdown(text) {
+  if (!text) return '';
+  let formatted = String(text);
+
+  formatted = formatted
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Headers
+  formatted = formatted.replace(/^### (.*$)/gim, '<div style="font-weight:700; font-size:0.88rem; color:#004687; margin:0.3rem 0 0.15rem;">$1</div>');
+  formatted = formatted.replace(/^## (.*$)/gim, '<div style="font-weight:800; font-size:0.92rem; color:#004687; margin:0.4rem 0 0.2rem;">$1</div>');
+
+  // Bold (**text** or __text__)
+  formatted = formatted.replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="font-weight:700; color:#004687;">$1</strong>');
+  formatted = formatted.replace(/__([\s\S]+?)__/g, '<strong style="font-weight:700; color:#004687;">$1</strong>');
+
+  // Italics (*text*)
+  formatted = formatted.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+
+  // Inline Code / Highlights (`text`)
+  formatted = formatted.replace(/`([^`]+)`/g, '<code style="background:rgba(0,70,135,0.08); color:#005FA9; padding:2px 5px; border-radius:4px; font-family:var(--font-mono); font-size:0.78rem; font-weight:600;">$1</code>');
+
+  // Bullet Lists
+  formatted = formatted.replace(/^\s*[-*]\s+(.*$)/gim, '<div style="display:flex; gap:6px; margin:2px 0 2px 6px;"><span style="color:#0088C9; font-weight:bold;">•</span><span>$1</span></div>');
+
+  // Line breaks
+  formatted = formatted.replace(/\n/g, '<br/>');
+
+  return formatted;
+}
+
 export default function AIAssistant() {
   const { user }     = useAuth();
   const [open, setOpen] = useState(false);
@@ -127,10 +159,27 @@ export default function AIAssistant() {
         .ai-fab:focus {
           outline: none;
         }
-        .ai-message.assistant strong,
+        .ai-message.assistant strong {
+          font-weight: 700;
+          color: #004687;
+        }
         .ai-message.user strong {
           font-weight: 700;
-          color: inherit;
+          color: #FFFFFF;
+        }
+        .ai-message code {
+          font-family: var(--font-mono);
+          font-size: 0.78rem;
+          padding: 2px 5px;
+          border-radius: 4px;
+        }
+        .ai-message.assistant code {
+          background: rgba(0, 70, 135, 0.08);
+          color: #005FA9;
+        }
+        .ai-message.user code {
+          background: rgba(255, 255, 255, 0.2);
+          color: #FFFFFF;
         }
         .ai-chat-input-focus:focus {
           border-color: var(--color-verde-e) !important;
@@ -164,11 +213,7 @@ export default function AIAssistant() {
           <div className="ai-messages" style={{ background: '#FAFBFD' }}>
             {messages.map((msg, i) => (
               <div key={i} className={`ai-message ${msg.role}`} style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', padding: '0.75rem 0.9rem', borderRadius: '12px' }}>
-                <span dangerouslySetInnerHTML={{
-                  __html: msg.content
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\n/g, '<br/>'),
-                }} />
+                <span dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} />
                 {msg.sources && (
                   <div style={{ marginTop:'0.4rem', fontSize:'0.66rem', opacity:0.7, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                     📊 Fuente: {msg.sources.join(', ')}

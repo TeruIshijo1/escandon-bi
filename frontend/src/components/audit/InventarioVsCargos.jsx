@@ -1,28 +1,127 @@
 /**
  * InventarioVsCargos.jsx — Módulo de Auditoría Prioridad 1
  * Compara Órdenes surtidas por Almacén y Consumos en Cuenta del Paciente
- * Hospital Escandón BI Platform v3.5
+ * Hospital Escandón BI Platform v4.0
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ExportButton from '../shared/ExportButton';
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
 
 const ESTADO_CONFIG = {
-  COINCIDE:    { label:'Coincide',     class:'badge-ok'      },
-  DIFERENCIA:  { label:'Diferencia',   class:'badge-warning' },
-  FALTANTE:    { label:'Faltante',     class:'badge-danger'  },
-  EXCEDENTE:   { label:'Excedente',    class:'badge-warning' },
+  'CONSUMO TOTAL':           { label:'Consumo Total',     class:'badge-ok'      },
+  'DEVUELTO PARCIAL':        { label:'Dev. Parcial',      class:'badge-warning' },
+  'DEVUELTO TOTAL':          { label:'Dev. Total',        class:'badge-warning' },
+  'FALTANTE / NO COBRADO':   { label:'Faltante (Fuga)',   class:'badge-danger'  },
+  'SOBRECARGO / NO SURTIDO': { label:'Sobrecargo',        class:'badge-warning' },
 };
 
-const SAMPLE_MOCK_ROWS = [
-  { orden: 'ORD-10492', paciente: 'García Mendoza, Juan', area: 'Quirófano', insumo: 'Kit de Anestesia General BD', cantAlmacen: 1, cantCargo: 1, diferencia: 0, monto: 1450.00, estado: 'COINCIDE', enfermera: 'L.E. María Elena Cruz', fecha: '2026-07-22' },
-  { orden: 'ORD-10493', paciente: 'Hernández López, Sofía', area: 'UCI', insumo: 'Fentanilo 0.5mg Inyectable', cantAlmacen: 3, cantCargo: 2, diferencia: -1, monto: 380.00, estado: 'FALTANTE', enfermera: 'L.E. Carlos Ramírez', fecha: '2026-07-22' },
-  { orden: 'ORD-10494', paciente: 'Martínez Soria, Roberto', area: 'Urgencias', insumo: 'Jeringa 5ml Nipro c/Aguja', cantAlmacen: 5, cantCargo: 5, diferencia: 0, monto: 75.00, estado: 'COINCIDE', enfermera: 'L.E. Ana Patricia Silva', fecha: '2026-07-21' },
-  { orden: 'ORD-10495', paciente: 'Ramírez Torres, Carmen', area: 'Quirófano', insumo: 'Sutura Catgut Cromo 2-0', cantAlmacen: 2, cantCargo: 4, diferencia: 2, monto: 420.00, estado: 'EXCEDENTE', enfermera: 'L.E. María Elena Cruz', fecha: '2026-07-21' },
-  { orden: 'ORD-10496', paciente: 'Vázquez Gómez, Alejandro', area: 'Hospitalización', insumo: 'Solución Salina 0.9% 1000ml', cantAlmacen: 4, cantCargo: 3, diferencia: -1, monto: 120.00, estado: 'DIFERENCIA', enfermera: 'L.E. Jorge Luis Benítez', fecha: '2026-07-20' },
-  { orden: 'ORD-10497', paciente: 'Álvarez Ruiz, Lucía', area: 'Cuneros', insumo: 'Catéter Periférico 24G', cantAlmacen: 2, cantCargo: 2, diferencia: 0, monto: 210.00, estado: 'COINCIDE', enfermera: 'L.E. Beatriz Morales', fecha: '2026-07-20' },
-];
+const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align = 'left' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const uniqueOptions = Array.from(new Set(data.map(r => r[columnKey]))).filter(val => val !== null && val !== undefined).sort();
+  const filteredOptions = uniqueOptions.filter(opt => 
+    String(opt).toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const selectedValues = colFilters[columnKey]; // undefined means all selected
+  const isAllSelected = !selectedValues || selectedValues.length === uniqueOptions.length;
+
+  const toggleSelection = (val) => {
+    setColFilters(prev => {
+      let current = prev[columnKey];
+      if (!current) {
+        current = uniqueOptions.filter(o => o !== val);
+      } else {
+        if (current.includes(val)) current = current.filter(o => o !== val);
+        else current = [...current, val];
+      }
+      
+      if (current.length === uniqueOptions.length || current.length === 0) {
+        const { [columnKey]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [columnKey]: current };
+    });
+  };
+
+  const selectAll = () => {
+    setColFilters(prev => {
+      if (isAllSelected) {
+        return { ...prev, [columnKey]: [] };
+      } else {
+        const { [columnKey]: _, ...rest } = prev;
+        return rest;
+      }
+    });
+  };
+
+  return (
+    <th style={{ position: 'relative', textAlign: align }}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)} 
+        style={{ display: 'flex', alignItems: 'center', justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start', gap: '6px', cursor: 'pointer', padding: '4px' }}
+      >
+        <span>{label}</span>
+        <span style={{ fontSize: '0.6rem', color: selectedValues ? '#004687' : '#94A3B8' }}>▼</span>
+      </div>
+      
+      {isOpen && (
+        <div ref={dropdownRef} style={{
+          position: 'absolute', top: '100%', left: align === 'right' ? 'auto' : 0, right: align === 'right' ? 0 : 'auto', marginTop: '4px',
+          background: 'white', border: '1px solid #E2E8F0', borderRadius: '8px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.15)', padding: '10px',
+          zIndex: 50, minWidth: '220px', fontWeight: 'normal', color: '#0F172A', textAlign: 'left', textTransform: 'none'
+        }}>
+          <input 
+            type="text" 
+            placeholder="Buscar..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginBottom: '8px', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '4px 0', borderBottom: '1px solid #E2E8F0', marginBottom: '4px' }}>
+              <input 
+                type="checkbox" 
+                checked={isAllSelected} 
+                onChange={selectAll}
+              />
+              <span style={{ fontWeight: 600 }}>(Seleccionar todo)</span>
+            </label>
+            {filteredOptions.map(opt => (
+              <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '2px 0' }}>
+                <input 
+                  type="checkbox" 
+                  checked={isAllSelected || selectedValues.includes(opt)}
+                  onChange={() => toggleSelection(opt)}
+                />
+                <span>{opt}</span>
+              </label>
+            ))}
+            {filteredOptions.length === 0 && (
+              <div style={{ color: '#94A3B8', fontStyle: 'italic', padding: '4px 0' }}>No hay resultados</div>
+            )}
+          </div>
+        </div>
+      )}
+    </th>
+  );
+};
+
 
 export default function InventarioVsCargos({ defaultEstado = '' }) {
   const [data, setData] = useState(null);
@@ -31,9 +130,11 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
   const [page, setPage] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [colFilters, setColFilters] = useState({});
   const PER_PAGE = 12;
 
   useEffect(() => {
+    setPage(1);
     fetchData();
     const interval = setInterval(() => {
       fetchData(true); // silent refresh
@@ -44,7 +145,8 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
   const fetchData = async (isSilent = false) => {
     if (!isSilent) setLoad(true);
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('escandon_token');
+      const rawToken = sessionStorage.getItem('escandon_token') || localStorage.getItem('token');
+      const token = (rawToken && rawToken !== 'null' && rawToken !== 'undefined') ? rawToken : '';
       const params = new URLSearchParams(
         Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
       );
@@ -52,30 +154,20 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
-      if (json && json.partidas && json.partidas.length > 0) {
+      if (json && json.partidas) {
         setData(json);
       } else {
         setData({
-          resumen: {
-            totalPartidas: SAMPLE_MOCK_ROWS.length,
-            coincidencias: SAMPLE_MOCK_ROWS.filter(r => r.estado === 'COINCIDE').length,
-            diferencias: SAMPLE_MOCK_ROWS.filter(r => r.estado !== 'COINCIDE').length,
-            montoDisputa: SAMPLE_MOCK_ROWS.reduce((acc, r) => acc + (r.estado !== 'COINCIDE' ? r.monto : 0), 0),
-          },
-          partidas: SAMPLE_MOCK_ROWS,
+          resumen: { totalPartidas: 0, coincidencias: 0, diferencias: 0, montoDisputa: 0 },
+          partidas: [],
         });
       }
       setLastUpdate(new Date());
     } catch (err) {
-      console.warn('[Auditoría] Usando datos muestrales:', err);
+      console.error('[Auditoría Error]:', err);
       setData({
-        resumen: {
-          totalPartidas: SAMPLE_MOCK_ROWS.length,
-          coincidencias: SAMPLE_MOCK_ROWS.filter(r => r.estado === 'COINCIDE').length,
-          diferencias: SAMPLE_MOCK_ROWS.filter(r => r.estado !== 'COINCIDE').length,
-          montoDisputa: SAMPLE_MOCK_ROWS.reduce((acc, r) => acc + (r.estado !== 'COINCIDE' ? r.monto : 0), 0),
-        },
-        partidas: SAMPLE_MOCK_ROWS,
+        resumen: { totalPartidas: 0, coincidencias: 0, diferencias: 0, montoDisputa: 0 },
+        partidas: [],
       });
       setLastUpdate(new Date());
     } finally {
@@ -93,57 +185,66 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
     }, 1200);
   };
 
-  const rows = data?.partidas ?? SAMPLE_MOCK_ROWS;
+  const rows = data?.partidas ?? [];
   const filtered = rows.filter(r => {
-    if (filters.area && r.area !== filters.area) return false;
-    if (filters.estado && r.estado !== filters.estado) return false;
-    if (filters.fechaDesde && r.fecha < filters.fechaDesde) return false;
-    if (filters.fechaHasta && r.fecha > filters.fechaHasta) return false;
+    for (const key of Object.keys(colFilters)) {
+      if (colFilters[key] && !colFilters[key].includes(r[key])) {
+        return false;
+      }
+    }
     return true;
   });
 
-  const summaryStats = data?.resumen || {
+  const summaryStats = {
     totalPartidas: filtered.length,
-    coincidencias: filtered.filter(r => r.estado === 'COINCIDE').length,
-    diferencias: filtered.filter(r => r.estado !== 'COINCIDE').length,
-    montoDisputa: filtered.reduce((acc, r) => acc + (r.estado !== 'COINCIDE' ? r.monto : 0), 0),
+    articulosSolicitados: filtered.reduce((acc, curr) => acc + (curr.salidaFisica || 0), 0),
+    articulosDevueltos: filtered.reduce((acc, curr) => acc + (curr.devolucionFisica || 0), 0),
+    montoCobrado: filtered.reduce((acc, curr) => acc + (curr.monto || 0), 0),
+    montoFuga: filtered.reduce((acc, curr) => {
+       if (curr.estado === 'FALTANTE / NO COBRADO') {
+           let diff = (curr.fisicoNeto || 0) - (curr.cantCargo || 0);
+           return acc + ((curr.precioUnitario > 0 ? curr.precioUnitario * diff : 0));
+       }
+       return acc;
+    }, 0)
   };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ width: '100%', height: 'calc(100vh - 110px)', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif' }}>
 
-      {/* Encabezado */}
+      {/* Encabezado Compacto */}
       <div style={{
         background: 'linear-gradient(135deg, #004687 0%, #005FA9 100%)',
-        borderRadius: 16,
-        padding: '1.5rem 1.75rem',
-        marginBottom: '1.25rem',
+        borderRadius: 12,
+        padding: '0.75rem 1.25rem',
+        marginBottom: '0.5rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        boxShadow: '0 4px 12px rgba(0,70,135,0.15)',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+        boxShadow: '0 2px 8px rgba(0,70,135,0.15)',
       }}>
         <div>
-          <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', marginBottom: '0.25rem' }}>
-            Auditoría — Prioridad 1
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: '1.2rem', fontWeight: 800, color: 'white', margin: 0, lineHeight: 1.1 }}>
+              {defaultEstado ? 'Discrepancias en Consumos' : 'Inventarios y Consumos Clínicos'}
+            </h1>
+            <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.8)', background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: '4px' }}>
+              Auditoría P1
+            </span>
           </div>
-          <h1 style={{ fontFamily: "var(--font-display)", fontSize: '1.5rem', fontWeight: 800, color: 'white', margin: 0 }}>
-            {defaultEstado ? 'Discrepancias en Consumos' : 'Inventarios y Consumos Clínicos'}
-          </h1>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.82rem', marginTop: '0.25rem', margin: '0.25rem 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>{defaultEstado ? 'Revisión y resolución de partidas con diferencias o faltantes' : 'Conciliación de órdenes del Almacén contra consumos clínicos en la cuenta del paciente'}</span>
-            <span style={{ color: '#4ADE80', fontWeight: 700, background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem' }}>
-              ● Auto-refresh 30s
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#4ADE80', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '10px' }}>●</span> Auto-refresh 30s
             </span>
             {lastUpdate && (
-              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>
-                · Actualizado: {lastUpdate.toLocaleTimeString('es-MX')}
-              </span>
+              <span>· Act: {lastUpdate.toLocaleTimeString('es-MX')}</span>
             )}
-          </p>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <ExportButton type="excel" reportId="auditoria-inventarios" queryParams={filters} />
@@ -151,56 +252,56 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
         </div>
       </div>
 
-      {/* Tarjetas de Resumen KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.875rem', marginBottom: '1.25rem' }}>
-        <div style={{ background: 'white', borderRadius: 12, padding: '1rem', border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 2px 6px rgba(0,70,135,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8A97A8' }}>Total Partidas</span>
-            <span style={{ fontSize: '1.1rem' }}>📋</span>
+      {/* Tarjetas de Resumen KPI Compactas */}
+      <div style={{ flexShrink: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div style={{ background: 'white', borderRadius: 8, padding: '0.6rem 0.8rem', border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', color: '#8A97A8', marginBottom: '0.1rem' }}>Total Partidas</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: '1.15rem', fontWeight: 700, color: '#004687' }}>{summaryStats.totalPartidas}</div>
           </div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: '1.4rem', fontWeight: 700, color: '#004687' }}>
-            {summaryStats.totalPartidas}
-          </div>
+          <span style={{ fontSize: '1.2rem', opacity: 0.8 }}>📋</span>
         </div>
 
-        <div style={{ background: 'white', borderRadius: 12, padding: '1rem', border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 2px 6px rgba(0,70,135,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8A97A8' }}>Coincidencias</span>
-            <span style={{ fontSize: '1.1rem' }}>✅</span>
+        <div style={{ background: 'white', borderRadius: 8, padding: '0.6rem 0.8rem', border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', color: '#8A97A8', marginBottom: '0.1rem' }}>Arts. Solicitados</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: '1.15rem', fontWeight: 700, color: '#004687' }}>{summaryStats.articulosSolicitados || 0}</div>
           </div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: '1.4rem', fontWeight: 700, color: '#00974A' }}>
-            {summaryStats.coincidencias}
-          </div>
+          <span style={{ fontSize: '1.2rem', opacity: 0.8 }}>📦</span>
         </div>
 
-        <div style={{ background: 'white', borderRadius: 12, padding: '1rem', border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 2px 6px rgba(0,70,135,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8A97A8' }}>Con Discrepancia</span>
-            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+        <div style={{ background: 'white', borderRadius: 8, padding: '0.6rem 0.8rem', border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', color: '#8A97A8', marginBottom: '0.1rem' }}>Arts. Devueltos</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: '1.15rem', fontWeight: 700, color: '#F59E0B' }}>{summaryStats.articulosDevueltos || 0}</div>
           </div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: '1.4rem', fontWeight: 700, color: '#F59E0B' }}>
-            {summaryStats.diferencias}
-          </div>
+          <span style={{ fontSize: '1.2rem', opacity: 0.8 }}>🔄</span>
         </div>
 
-        <div style={{ background: 'white', borderRadius: 12, padding: '1rem', border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 2px 6px rgba(0,70,135,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#8A97A8' }}>Monto en Disputa</span>
-            <span style={{ fontSize: '1.1rem' }}>💰</span>
+        <div style={{ background: 'white', borderRadius: 8, padding: '0.6rem 0.8rem', border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', color: '#8A97A8', marginBottom: '0.1rem' }}>Monto Cobrado</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: '1.15rem', fontWeight: 700, color: '#00974A' }}>${(summaryStats.montoCobrado || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: '1.4rem', fontWeight: 700, color: '#EF4444' }}>
-            ${summaryStats.montoDisputa?.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+          <span style={{ fontSize: '1.2rem', opacity: 0.8 }}>💰</span>
+        </div>
+
+        <div style={{ background: '#FEF2F2', borderRadius: 8, padding: '0.6rem 0.8rem', border: '1px solid #FECACA', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', color: '#EF4444', marginBottom: '0.1rem' }}>Monto Fuga</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: '1.15rem', fontWeight: 700, color: '#DC2626' }}>${(summaryStats.montoFuga || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
+          <span style={{ fontSize: '1.2rem', opacity: 0.8 }}>🚨</span>
         </div>
       </div>
 
-      {/* Bar de Filtros y Carga Excel */}
-      <div style={{ background: 'white', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: '1rem', border: '1px solid rgba(0,70,135,0.07)', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4A5568', marginRight: '0.25rem' }}>🔍 Filtros:</span>
+      {/* Bar de Filtros Globales Compacta */}
+      <div style={{ flexShrink: 0, background: 'white', borderRadius: 8, padding: '0.5rem 0.75rem', marginBottom: '0.5rem', border: '1px solid rgba(0,70,135,0.07)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4A5568', marginRight: '0.25rem' }}>🔍 Server Filtros:</span>
 
         {[
-          { key: 'area', placeholder: 'Área…', options: ['', 'Quirófano', 'UCI', 'Urgencias', 'Cuneros', 'Hospitalización'] },
-          { key: 'estado', placeholder: 'Estado…', options: ['', 'COINCIDE', 'DIFERENCIA', 'FALTANTE', 'EXCEDENTE'] },
+          { key: 'area', placeholder: 'Todas las Áreas', options: ['', 'Quirófano', 'UCI', 'Urgencias', 'Cuneros', 'Hospitalización'] },
+          { key: 'estado', placeholder: 'Cualquier Estado', options: ['', 'CONSUMO TOTAL', 'DEVUELTO PARCIAL', 'DEVUELTO TOTAL', 'FALTANTE / NO COBRADO', 'SOBRECARGO / NO SURTIDO'] },
         ].map(f => (
           <select
             key={f.key}
@@ -208,103 +309,106 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
             onChange={e => setFilters(prev => ({ ...prev, [f.key]: e.target.value }))}
             style={{
               border: '1px solid rgba(0,70,135,0.15)',
-              borderRadius: 8,
-              padding: '0.4rem 0.625rem',
-              fontSize: '0.83rem',
+              borderRadius: 6,
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.75rem',
               color: '#4A5568',
               outline: 'none',
               background: 'white',
               cursor: 'pointer',
+              minWidth: '130px',
             }}
           >
-            {f.options.map(o => <option key={o} value={o}>{o || f.placeholder}</option>)}
+            {f.options.map((o, idx) => <option key={idx} value={o}>{o || f.placeholder}</option>)}
           </select>
         ))}
+
+        <div style={{ width: '1px', height: '20px', background: '#E2E8F0', margin: '0 0.25rem' }}></div>
 
         {[
           { key: 'fechaDesde', type: 'date', label: 'Desde' },
           { key: 'fechaHasta', type: 'date', label: 'Hasta' },
         ].map(f => (
-          <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <span style={{ fontSize: '0.75rem', color: '#8A97A8' }}>{f.label}</span>
+          <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            <span style={{ fontSize: '0.7rem', color: '#8A97A8' }}>{f.label}</span>
             <input
               type={f.type}
               value={filters[f.key]}
               onChange={e => setFilters(prev => ({ ...prev, [f.key]: e.target.value }))}
-              style={{ border: '1px solid rgba(0,70,135,0.15)', borderRadius: 8, padding: '0.4rem 0.625rem', fontSize: '0.83rem', outline: 'none' }}
+              style={{ border: '1px solid rgba(0,70,135,0.15)', borderRadius: 6, padding: '0.25rem 0.5rem', fontSize: '0.75rem', outline: 'none' }}
             />
           </div>
         ))}
 
         <button
           onClick={() => setFilters({ area: '', estado: '', fechaDesde: '', fechaHasta: '' })}
-          style={{ fontSize: '0.78rem', color: '#8A97A8', background: 'none', border: '1px solid rgba(0,70,135,0.1)', borderRadius: 8, padding: '0.4rem 0.75rem', cursor: 'pointer' }}
+          style={{ fontSize: '0.75rem', color: '#8A97A8', background: 'none', border: '1px solid rgba(0,70,135,0.1)', borderRadius: 6, padding: '0.25rem 0.6rem', cursor: 'pointer', marginLeft: 'auto' }}
         >
           Limpiar
         </button>
 
-        {/* Botón de Carga de Reporte */}
-        <label style={{
-          marginLeft: 'auto',
-          background: '#00974A',
-          color: 'white',
-          padding: '0.45rem 0.9rem',
-          borderRadius: 8,
-          fontSize: '0.8rem',
-          fontWeight: 700,
-          cursor: uploading ? 'wait' : 'pointer',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.4rem',
-        }}>
-          📥 {uploading ? 'Cargando...' : 'Cargar Reporte Excel'}
-          <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} style={{ display: 'none' }} disabled={uploading} />
-        </label>
+
       </div>
 
       {/* Tabla de Conciliación */}
-      <div style={{ background: 'white', borderRadius: 14, border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 2px 8px rgba(0,70,135,0.05)', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'white', borderRadius: 14, border: '1px solid rgba(0,70,135,0.12)', boxShadow: '0 4px 14px rgba(0,70,135,0.08)', overflow: 'hidden' }}>
         {loading ? (
           <div style={{ background: 'white', borderRadius: 12, padding: '3rem', textAlign: 'center' }}>
             <PremiumLoader text="Cargando datos de auditoría…" />
           </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#64748B' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📑</div>
-            <div style={{ fontWeight: 700, fontSize: '1rem', color: '#0F172A' }}>No se encontraron registros de conciliación</div>
-            <div style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>Ajusta los filtros o carga un archivo Excel con el botón verde arriba.</div>
-          </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="custom-table-scroll" style={{ flex: 1, minHeight: 0 }}>
             <table className="audit-table">
-              <thead>
-                <tr>
-                  {['# Orden', 'Paciente', 'Área', 'Insumo / Medicamento', 'Cant. Almacén', 'Cant. Consumo', 'Diferencia', 'Monto ($)', 'Estado', 'Responsable', 'Fecha'].map(h => (
-                    <th key={h}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map((row, i) => {
-                  const est = ESTADO_CONFIG[row.estado] || ESTADO_CONFIG.COINCIDE;
-                  return (
-                    <tr key={i}>
-                      <td><code style={{ fontSize: '0.75rem', color: '#005FA9' }}>{row.orden}</code></td>
-                      <td style={{ fontWeight: 500 }}>{row.paciente}</td>
-                      <td>{row.area}</td>
-                      <td>{row.insumo}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.cantAlmacen}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.cantCargo}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 700, color: row.diferencia !== 0 ? '#EF4444' : '#00974A' }}>
-                        {row.diferencia > 0 ? `+${row.diferencia}` : row.diferencia}
+                <thead>
+                  <tr>
+                    <ColumnFilter columnKey="orden" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="# ORDEN" />
+                    <ColumnFilter columnKey="folio" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="FOLIO" />
+                    <ColumnFilter columnKey="paciente" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="PACIENTE" />
+                    <ColumnFilter columnKey="area" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="ÁREA" />
+                    <ColumnFilter columnKey="categoria" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="CATEGORÍA" />
+                    <ColumnFilter columnKey="codigo" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="CÓDIGO / SKU" />
+                    <ColumnFilter columnKey="insumo" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="INSUMO / MEDICAMENTO" />
+                    <th style={{ textAlign: 'right' }}>P. UNITARIO ($)</th>
+                    <th style={{ textAlign: 'center' }}>SALIDA FÍSICA</th>
+                    <th style={{ textAlign: 'center' }}>DEV. FÍSICA</th>
+                    <th style={{ textAlign: 'center', color: '#004687' }}>NETO FÍSICO</th>
+                    <th style={{ textAlign: 'center' }}>CANT. COBRADA</th>
+                    <th style={{ textAlign: 'right' }}>MONTO COBRADO ($)</th>
+                    <ColumnFilter columnKey="estado" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="ESTADO" align="center" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan="13" style={{ padding: '3rem', textAlign: 'center', color: '#64748B' }}>
+                        <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📑</div>
+                        <div style={{ fontWeight: 700, fontSize: '1rem', color: '#0F172A' }}>No se encontraron registros</div>
+                        <div style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>Ajusta los filtros de las columnas o recarga la información.</div>
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>${row.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
-                      <td><span className={`badge ${est.class}`}>{est.label}</span></td>
-                      <td style={{ fontSize: '0.8rem', color: '#4A5568' }}>{row.enfermera}</td>
-                      <td style={{ fontSize: '0.78rem', color: '#8A97A8', whiteSpace: 'nowrap' }}>{row.fecha}</td>
                     </tr>
-                  );
-                })}
+                  ) : (
+                    paginated.map((p, i) => {
+                      const est = ESTADO_CONFIG[p.estado] || ESTADO_CONFIG['CONSUMO TOTAL'];
+                      return (
+                        <tr key={i}>
+                          <td className="sticky-col-1"><code style={{ fontSize: '0.75rem', color: '#005FA9', fontWeight: 700 }}>{p.orden}</code></td>
+                          <td style={{ fontSize: '0.78rem', color: '#64748B' }}>{p.folio}</td>
+                          <td className="sticky-col-3" style={{ fontWeight: 600, minWidth: 180 }}>{p.paciente}</td>
+                          <td><span style={{ background: '#F1F5F9', padding: '2px 6px', borderRadius: 4, fontSize: '0.78rem', fontWeight: 600 }}>{p.area}</span></td>
+                          <td style={{ fontSize: '0.78rem', color: '#475569' }}>{p.categoria}</td>
+                          <td><code style={{ fontSize: '0.75rem', color: '#475569' }}>{p.codigo}</code></td>
+                          <td style={{ minWidth: 200 }}>{p.insumo}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 600 }}>${p.precioUnitario?.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 700, color: '#1E293B' }}>{p.salidaFisica || 0}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 700, color: p.devolucionFisica > 0 ? '#F59E0B' : '#4A5568' }}>{p.devolucionFisica || 0}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 800, color: '#004687', background: '#F1F5F9' }}>{p.fisicoNeto || 0}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 700, color: p.cantCargo < p.fisicoNeto ? '#EF4444' : '#004687' }}>{p.cantCargo}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#00974A' }}>${p.monto?.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+                          <td style={{ textAlign: 'center' }}><span className={`badge ${est.class}`}>{est.label}</span></td>
+                        </tr>
+                      );
+                    })
+                  )}
               </tbody>
             </table>
           </div>
@@ -312,27 +416,74 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
 
         {/* Paginación */}
         {!loading && totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1.25rem', borderTop: '1px solid rgba(0,70,135,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 12rem 0.75rem 1.25rem', borderTop: '1px solid rgba(0,70,135,0.06)' }}>
             <span style={{ fontSize: '0.78rem', color: '#8A97A8' }}>
               {filtered.length} registros · página {page} de {totalPages}
             </span>
-            <div style={{ display: 'flex', gap: '0.35rem' }}>
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  style={{
-                    width: 36, height: 32,
-                    borderRadius: 8,
-                    border: p === page ? 'none' : '1px solid rgba(0,70,135,0.12)',
-                    background: p === page ? '#004687' : 'white',
-                    color: p === page ? 'white' : '#4A5568',
-                    cursor: 'pointer',
-                    fontSize: '0.82rem',
-                    fontWeight: p === page ? 700 : 400,
-                  }}
-                >{p}</button>
-              ))}
+            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                style={{
+                  padding: '0 10px', height: 32, borderRadius: 8,
+                  border: '1px solid rgba(0,70,135,0.12)', background: 'white',
+                  color: page === 1 ? '#CBD5E1' : '#4A5568', cursor: page === 1 ? 'not-allowed' : 'pointer',
+                  fontSize: '0.8rem', fontWeight: 600
+                }}
+              >
+                ‹ Anterior
+              </button>
+
+              {(() => {
+                const pages = [];
+                let start = Math.max(1, page - 2);
+                let end = Math.min(totalPages, page + 2);
+
+                if (start > 1) {
+                  pages.push(1);
+                  if (start > 2) pages.push('...');
+                }
+                for (let i = start; i <= end; i++) {
+                  pages.push(i);
+                }
+                if (end < totalPages) {
+                  if (end < totalPages - 1) pages.push('...');
+                  pages.push(totalPages);
+                }
+
+                return pages.map((p, idx) => (
+                  typeof p === 'number' ? (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      style={{
+                        width: 36, height: 32, borderRadius: 8,
+                        border: p === page ? 'none' : '1px solid rgba(0,70,135,0.12)',
+                        background: p === page ? '#004687' : 'white',
+                        color: p === page ? 'white' : '#4A5568',
+                        cursor: 'pointer', fontSize: '0.82rem', fontWeight: p === page ? 700 : 400
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ) : (
+                    <span key={`dots-${idx}`} style={{ padding: '0 4px', color: '#94A3B8', fontSize: '0.82rem' }}>...</span>
+                  )
+                ));
+              })()}
+
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                style={{
+                  padding: '0 10px', height: 32, borderRadius: 8,
+                  border: '1px solid rgba(0,70,135,0.12)', background: 'white',
+                  color: page === totalPages ? '#CBD5E1' : '#4A5568', cursor: page === totalPages ? 'not-allowed' : 'pointer',
+                  fontSize: '0.8rem', fontWeight: 600
+                }}
+              >
+                Siguiente ›
+              </button>
             </div>
           </div>
         )}

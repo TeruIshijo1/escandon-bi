@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ExportApiModal({ isOpen, onClose }) {
-  const { token } = useAuth();
+  const { user } = useAuth();
+  const token = user?.token || sessionStorage.getItem('escandon_token');
   const [apiUrl, setApiUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

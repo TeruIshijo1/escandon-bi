@@ -20,6 +20,18 @@ function connectDB() {
     db.pragma('foreign_keys = ON');
     db.pragma('busy_timeout = 5000');
 
+    // Inicializar tablas críticas de los módulos
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS hidden_prescriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        docEntry INTEGER NOT NULL,
+        lineNum INTEGER NOT NULL,
+        itemCode TEXT NOT NULL,
+        hiddenAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(docEntry, lineNum, itemCode)
+      );
+    `);
+
     console.log('✅  Conectado a SQLite —', DB_PATH);
     return db;
   } catch (err) {

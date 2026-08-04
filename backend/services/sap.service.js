@@ -135,10 +135,11 @@ class SapService {
    * Petición GET genérica a SAP
    * Ej: await sapService.get('/Orders?$top=5')
    */
-  async get(endpoint) {
+  async get(endpoint, additionalHeaders = {}) {
     await this._ensureSession();
     return this._request(endpoint, 'GET', null, {
-      'Cookie': this.sessionCookie
+      'Cookie': this.sessionCookie,
+      ...additionalHeaders
     });
   }
 
@@ -146,11 +147,79 @@ class SapService {
    * Petición POST genérica a SAP
    * Ej: await sapService.post('/Orders', { ... })
    */
-  async post(endpoint, payload) {
+  async post(endpoint, payload, additionalHeaders = {}) {
     await this._ensureSession();
     return this._request(endpoint, 'POST', payload, {
-      'Cookie': this.sessionCookie
+      'Cookie': this.sessionCookie,
+      ...additionalHeaders
     });
+  }
+
+  /**
+   * Petición PATCH genérica a SAP
+   */
+  async patch(endpoint, payload, additionalHeaders = {}) {
+    await this._ensureSession();
+    return this._request(endpoint, 'PATCH', payload, {
+      'Cookie': this.sessionCookie,
+      ...additionalHeaders
+    });
+  }
+
+  /**
+   * Fetch a SAP Service Layer endpoint handling pagination automatically (odata.nextLink)
+   * Returns an array of all values. Caches results for 5 minutes by endpoint key.
+   */
+  async fetchAllPages(endpoint, additionalHeaders = {}) {
+    if (!this.cache) this.cache = new Map();
+    
+    const cacheKey = endpoint;
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
+      return cached.data;
+    }
+
+    let allValues = [];
+    // Ensure $top=1000 is present if not already specified to fetch larger chunks per request
+    let currentEndpoint = endpoint;
+    if (!currentEndpoint.includes('$top=')) {
+      const sep = currentEndpoint.includes('?') ? '&' : '?';
+      currentEndpoint += `${sep}$top=1000`;
+    }
+    
+    let pageCount = 0;
+    const maxPages = 10; // Cap at 10 pages max (up to 10,000 records) to prevent hanging
+    
+    const headers = { 'Prefer': 'odata.maxpagesize=1000', ...additionalHeaders };
+    
+    while (currentEndpoint && pageCount < maxPages) {
+      pageCount++;
+      try {
+        if (!currentEndpoint.includes('$top=')) {
+          const sep = currentEndpoint.includes('?') ? '&' : '?';
+          currentEndpoint += `${sep}$top=1000`;
+        }
+        const response = await this.get(currentEndpoint, headers);
+        const data = response.data;
+        
+        if (data && data.value && Array.isArray(data.value)) {
+          allValues = allValues.concat(data.value);
+        }
+        
+        if (data && data['odata.nextLink']) {
+          currentEndpoint = data['odata.nextLink'].startsWith('/') ? data['odata.nextLink'] : `/${data['odata.nextLink']}`;
+        } else {
+          currentEndpoint = null;
+        }
+      } catch (err) {
+        console.error(`[SAP] Error fetching page ${pageCount} for ${currentEndpoint}:`, err.message || err);
+        break;
+      }
+    }
+    
+    // Save to cache
+    this.cache.set(cacheKey, { timestamp: Date.now(), data: allValues });
+    return allValues;
   }
 }
 

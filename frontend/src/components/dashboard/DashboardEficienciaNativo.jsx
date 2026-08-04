@@ -7,29 +7,24 @@ import { API_BASE } from '../../api/config';
 import PremiumLoader from '../shared/PremiumLoader';
 import ExportButton from '../shared/ExportButton';
 
-export default function DashboardEficienciaNativo() {
+export default function DashboardEficienciaNativo({ globalFilters, globalTrigger }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const [filters, setFilters] = useState({
-    startDate: '',
-    endDate: ''
-  });
 
   const [applyTrigger, setApplyTrigger] = useState(0);
 
   useEffect(() => {
     fetchData();
-  }, [applyTrigger]);
+  }, [applyTrigger, globalTrigger]);
 
   const fetchData = async () => {
     try {
       const token = sessionStorage.getItem('escandon_token');
       
       let url = `${API_BASE}/dashboard/eficiencia-nativo?`;
-      if (filters.startDate) url += `startDate=${filters.startDate}&`;
-      if (filters.endDate) url += `endDate=${filters.endDate}&`;
+      if (globalFilters?.startDate) url += `startDate=${globalFilters.startDate}&`;
+      if (globalFilters?.endDate) url += `endDate=${globalFilters.endDate}&`;
 
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const jsonEfi = await res.json();
@@ -58,33 +53,14 @@ export default function DashboardEficienciaNativo() {
   
   const handleApply = () => setApplyTrigger(prev => prev + 1);
   const handleClear = () => {
-    setFilters({ startDate: '', endDate: '' });
     setTimeout(() => setApplyTrigger(prev => prev + 1), 50);
   };
 
   return (
     <div id="dashboard-eficiencia" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
 
-      {/* 🧠 Barra Inteligente Eficiencia */}
-      <div style={{
-        background: 'white', borderRadius: 12, padding: '1rem 1.5rem', marginBottom: '1.5rem',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.03)', border: '1px solid rgba(0,136,201,0.2)',
-        display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap'
-      }}>
-        <div style={{ flex: '1 1 150px' }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem' }}>
-            DESDE (PERIODO)
-          </label>
-          <input type="date" value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 6, border: '1px solid #CBD5E1', outline: 'none' }} />
-        </div>
-        
-        <div style={{ flex: '1 1 150px' }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem' }}>
-            HASTA (PERIODO)
-          </label>
-          <input type="date" value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 6, border: '1px solid #CBD5E1', outline: 'none' }} />
-        </div>
-
+      {/* 🧠 Barra Inteligente Eficiencia (Removed as we use GlobalFilterBar) */}
+      <div style={{ display: 'none' }}>
         <button onClick={handleApply} style={{ background: '#0088C9', color: 'white', border: 'none', padding: '0.65rem 1.5rem', borderRadius: 6, fontWeight: 600, cursor: 'pointer', height: 42 }}>Aplicar</button>
         <button onClick={handleClear} style={{ background: 'transparent', color: '#64748B', border: '1px solid #CBD5E1', padding: '0.65rem 1rem', borderRadius: 6, fontWeight: 600, cursor: 'pointer', height: 42 }}>Limpiar</button>
         
@@ -93,24 +69,13 @@ export default function DashboardEficienciaNativo() {
           <ExportButton 
             id="export-excel-btn"
             type="excel" 
-            directUrl={`/dashboard/export-excel?dashboard=eficiencia&startDate=${filters.startDate}&endDate=${filters.endDate}`} 
+            directUrl={`/dashboard/export-excel?dashboard=eficiencia&startDate=${globalFilters?.startDate || ''}&endDate=${globalFilters?.endDate || ''}`} 
             compact={true} 
           />
         </div>
       </div>
 
-      {/* Banner Superior */}
-      <div style={{ background: '#0D1B2A', color: 'white', padding: '1.25rem', borderRadius: 12, marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
-        <div>
-          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8A97A8' }}>Fuente de Datos</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '0.2rem' }}>
-            <span style={{ color: '#0088C9' }}>⚡ UDR_BI_INDICADORES_OPERATIVOS & PC (Tiempo Real)</span>
-          </div>
-          <div style={{ fontSize: '0.85rem', color: '#CBD5E1', marginTop: '0.3rem' }}>
-            Este panel combina el histórico con el censo en vivo para máxima precisión.
-          </div>
-        </div>
-      </div>
+
 
       {/* KPIs Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>

@@ -24,12 +24,15 @@ const VALID_ROLES = new Set([
   'DIRECTOR',
   'JEFE_AREA',
   'USUARIO_OPERATIVO',
+  'ALMACEN_GENERAL',
 ]);
 
 /* ── Áreas válidas del hospital ────────────────────────────── */
 const VALID_AREAS = new Set([
   'QUIROFANO', 'IMAGENOLOGIA', 'URGENCIAS', 'CUNEROS',
   'UCI', 'CONSULTA_EXTERNA', 'CARDIOLOGIA', 'LABORATORIO',
+  'HOSPITALIZACION', 'FARMACIA', 'FINANZAS', 'ASEGURADORAS',
+  'ALMACEN_GENERAL',
 ]);
 
 /* ══════════════════════════════════════════════════════════════
@@ -180,7 +183,8 @@ function authorizeCapability(capability) {
     ADMIN:            ['exportarPDF','exportarExcel','gestionarUsuarios','verAuditoria','verLogAuditoria','verMacropanelFinanciero','usarAsistenteIA'],
     DIRECTOR:         ['exportarPDF','exportarExcel','verAuditoria','verMacropanelFinanciero','usarAsistenteIA'],
     JEFE_AREA:        ['exportarPDF','exportarExcel','usarAsistenteIA'],
-    USUARIO_OPERATIVO:['exportarExcel','usarAsistenteIA'],
+    USUARIO_OPERATIVO:['exportarExcel'],
+    ALMACEN_GENERAL:  ['exportarExcel'],
   };
 
   return (req, res, next) => {
@@ -211,6 +215,7 @@ function generateTokens(user) {
     nombre:   user.nombre,
     role:     user.role,
     area:     user.area || null,
+    permisos: user.permisos || [],
   };
 
   const accessToken = jwt.sign(payload, JWT_SECRET, {

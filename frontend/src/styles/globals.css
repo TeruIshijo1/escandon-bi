@@ -146,6 +146,7 @@ code, pre, .mono {
   flex: 1;
   padding: 1.75rem 2.5%;
   min-height: calc(100vh - var(--navbar-height));
+  min-width: 0;
   background: var(--color-bg-base);
   transition: margin-left var(--transition-base), padding var(--transition-base);
   animation: fadeIn 0.4s var(--ease-out-expo);
@@ -645,8 +646,9 @@ code, pre, .mono {
   position: fixed;
   bottom: 5rem;
   right: 1.5rem;
-  width: 390px;
-  max-height: 540px;
+  width: calc(100vw - 2rem);
+  max-width: 390px;
+  max-height: calc(100vh - 6rem);
   background: var(--surface-raised);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(0, 46, 87, 0.08);
@@ -656,6 +658,17 @@ code, pre, .mono {
   z-index: 200;
   overflow: hidden;
   animation: panelSlideUp var(--transition-base) var(--ease-out-expo);
+}
+
+@media (max-width: 640px) {
+  .ai-panel {
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+    max-width: none;
+    bottom: 4.5rem;
+    max-height: 80vh;
+  }
 }
 
 @keyframes panelSlideUp {
@@ -816,6 +829,7 @@ code, pre, .mono {
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .badge-ok {
@@ -962,3 +976,158 @@ code, pre, .mono {
     break-inside: avoid;
   }
 }
+
+/* ── Custom Table Horizontal Scrollbar & Table Styling (Excel Style) ── */
+.custom-table-scroll {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  width: 100%;
+  border-top: 1px solid #D1D5DB;
+  border-bottom: 1px solid #D1D5DB;
+  background: #FFFFFF;
+  scrollbar-color: #C1C9D2 #F3F4F6;
+  scrollbar-width: thin;
+}
+
+.custom-table-scroll::-webkit-scrollbar {
+  height: 17px !important;
+  width: 12px !important;
+  background-color: #F3F4F6 !important;
+}
+
+.custom-table-scroll::-webkit-scrollbar-track {
+  background: #F3F4F6 !important;
+  border-top: 1px solid #D1D5DB;
+  box-shadow: inset 0 1px 0 #FFFFFF;
+}
+
+.custom-table-scroll::-webkit-scrollbar-thumb {
+  background: #C1C9D2 !important;
+  border-radius: 2px;
+  border: 2px solid #F3F4F6 !important;
+  box-shadow: inset 0 0 1px rgba(0,0,0,0.1);
+}
+
+.custom-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8 !important;
+}
+
+.custom-table-scroll::-webkit-scrollbar-thumb:active {
+  background: #64748B !important;
+}
+
+.custom-table-scroll::-webkit-scrollbar-button {
+  display: block !important;
+  height: 17px !important;
+  width: 17px !important;
+  background-color: #E5E7EB !important;
+  border: 1px solid #D1D5DB !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  cursor: pointer !important;
+}
+
+.custom-table-scroll::-webkit-scrollbar-button:hover {
+  background-color: #D1D5DB !important;
+}
+
+.custom-table-scroll::-webkit-scrollbar-button:horizontal:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='%23374151'%3E%3Cpolygon points='15,4 7,12 15,20'/%3E%3C/svg%3E") !important;
+}
+
+.custom-table-scroll::-webkit-scrollbar-button:horizontal:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='%23374151'%3E%3Cpolygon points='9,4 17,12 9,20'/%3E%3C/svg%3E") !important;
+}
+
+/* Tabla de Auditoría */
+.audit-table {
+  width: 100%;
+  min-width: 1750px !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  font-size: 0.84rem;
+  background: #FFFFFF;
+}
+
+.audit-table thead {
+  background: #004687 !important;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.audit-table th {
+  background: #004687 !important;
+  color: #FFFFFF !important;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 2px solid #002E57;
+}
+
+.audit-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #E2E8F0;
+  color: var(--text-primary);
+  white-space: normal;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.audit-table tr:nth-child(even) td {
+  background: #F8FAFC;
+}
+
+.audit-table tr:hover td {
+  background: rgba(0, 136, 201, 0.06) !important;
+}
+
+/* Columnas fijas / Sticky columns */
+.sticky-col-1 {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 4 !important;
+  background: #FFFFFF !important;
+  box-shadow: 2px 0 4px rgba(0, 70, 135, 0.08);
+}
+
+.audit-table tr:nth-child(even) td.sticky-col-1 {
+  background: #F8FAFC !important;
+}
+
+.audit-table tr:hover td.sticky-col-1 {
+  background: #EFF6FF !important;
+}
+
+.audit-table th.sticky-col-1 {
+  background: #004687 !important;
+  z-index: 12 !important;
+}
+
+.sticky-col-3 {
+  position: sticky !important;
+  left: 100px !important;
+  z-index: 4 !important;
+  background: #FFFFFF !important;
+  box-shadow: 4px 0 8px -2px rgba(0, 0, 0, 0.12);
+}
+
+.audit-table tr:nth-child(even) td.sticky-col-3 {
+  background: #F8FAFC !important;
+}
+
+.audit-table tr:hover td.sticky-col-3 {
+  background: #EFF6FF !important;
+}
+
+.audit-table th.sticky-col-3 {
+  background: #004687 !important;
+  z-index: 12 !important;
+}
+
+

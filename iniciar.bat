@@ -22,4 +22,4 @@ echo  Iniciando servicios...
 echo  (Presiona Ctrl+C en esta ventana para detener todos los servicios)
 echo.
 
-npx concurrently -n "BACKEND,FRONTEND,NGROK" -c "bgBlue.bold,bgGreen.bold,bgMagenta.bold" "cd backend && node server.js" "cd frontend && npx vite --host" "ngrok http 5173 --host-header=localhost --log=stdout"
+npx concurrently -n "BACKEND,FRONTEND,NGROK" -c "bgBlue.bold,bgGreen.bold,bgMagenta.bold" "cd backend && node server.js" "cd frontend && npx vite --host" "ngrok http 5173 --host-header=localhost --log=stdout --authtoken 3H6A6J7ZzbGOQQIt865EStbmcYj_5T1WE7kvnxNnz74dPgSBg"

@@ -1,12 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const { querySiti } = require('../config/siti-api');
+const { authenticate, authorize } = require('../middleware/auth.middleware');
 
 // Middleware simple de logger
 router.use((req, res, next) => {
   console.log(`[SITI Route] ${req.method} ${req.url}`);
   next();
 });
+
+/* ── Todas las rutas SITI requieren ADMIN o DIRECTOR ──────── */
+router.use(authenticate, authorize(['ADMIN', 'DIRECTOR']));
 
 /**
  * GET /api/siti/financiero
@@ -24,7 +28,7 @@ router.get('/financiero', async (req, res) => {
       FROM "CtaH" H
       JOIN "CtaHLn" L ON H."NoAno" = L."NoAno" AND H."NoCtaH" = L."NoCtaH"
       WHERE H."FechaIng" != '' AND H."FechaIng" IS NOT NULL
-        AND EXTRACT(YEAR FROM TO_DATE(H."FechaIng", 'DD/MM/YYYY')) <= 2025
+        AND EXTRACT(YEAR FROM TO_DATE(H."FechaIng", 'DD/MM/YYYY')) <= 2026
       GROUP BY 1, 2
       ORDER BY 1, 2
     `);
@@ -106,7 +110,7 @@ router.get('/pacientes', async (req, res) => {
 
 /**
  * GET /api/siti/cirugias
- * Obtiene estadísticas de cirugías del historial SITI (2010 - 2025)
+ * Obtiene estadísticas de cirugías del historial SITI (2010 - 2026)
  */
 router.get('/cirugias', async (req, res) => {
   try {
@@ -170,7 +174,7 @@ router.get('/cirugias', async (req, res) => {
 
 /**
  * GET /api/siti/auxiliares/:tipo
- * Obtiene estadísticas de auxiliares de diagnóstico del historial SITI (2010 - 2025)
+ * Obtiene estadísticas de auxiliares de diagnóstico del historial SITI (2010 - 2026)
  * :tipo puede ser 'laboratorio' o 'imagenologia'
  */
 router.get('/auxiliares/:tipo', async (req, res) => {

@@ -31,6 +31,12 @@ const OcupacionCamas      = lazy(() => import('./pages/OcupacionCamas'));
 const DashboardArea       = lazy(() => import('./pages/DashboardArea'));
 const AuditoriaInventarios = lazy(() => import('./components/audit/InventarioVsCargos'));
 const AuditoriaCargos     = lazy(() => import('./pages/AuditoriaCargos'));
+const DevolucionesFarmacia = lazy(() => import('./components/pharmacy/DevolucionesFarmacia'));
+const InventarioFarmacia   = lazy(() => import('./components/pharmacy/InventarioFarmacia'));
+const CargosSAP            = lazy(() => import('./components/pharmacy/CargosSAP'));
+const ResumenMaestro       = lazy(() => import('./components/pharmacy/ResumenMaestro'));
+const InventarioAlmacen    = lazy(() => import('./components/almacen/InventarioAlmacen'));
+const TrasladosAlmacen    = lazy(() => import('./components/almacen/TrasladosAlmacen'));
 const Estadisticas        = lazy(() => import('./pages/Estadisticas'));
 const AdminUsuarios       = lazy(() => import('./pages/AdminUsuarios'));
 const AdminAuditoriaLog   = lazy(() => import('./pages/AdminAuditoriaLog'));
@@ -191,6 +197,54 @@ export default function App() {
                 }
               />
               <Route
+                path="farmacia/devoluciones"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA]}>
+                    <DevolucionesFarmacia />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="farmacia/cargos-sap"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO]}>
+                    <CargosSAP />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="farmacia/resumen-maestro"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO]}>
+                    <ResumenMaestro />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="farmacia/inventario"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA]}>
+                    <InventarioFarmacia />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="almacen/inventario"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL]}>
+                    <InventarioAlmacen />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="almacen/traslados"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL]}>
+                    <TrasladosAlmacen />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="calidad-datos"
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
@@ -235,6 +289,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+
 
               {/* Ruta no encontrada dentro del shell */}
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -35,10 +35,11 @@ export default function LoginPage() {
       return;
     }
     setSubmitting(true);
-    const ok = await login(form.username.trim().toLowerCase(), form.password);
+    setLocalError('');
+    const result = await login(form.username.trim().toLowerCase(), form.password);
     setSubmitting(false);
-    if (ok) navigate(from, { replace: true });
-    else setLocalError(error || 'Credenciales incorrectas. Intente de nuevo.');
+    if (result.ok) navigate(from, { replace: true });
+    else setLocalError(result.message || 'Credenciales incorrectas. Intente de nuevo.');
   };
 
   return (

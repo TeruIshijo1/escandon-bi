@@ -19,7 +19,7 @@ router.post('/login', async (req, res, next) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
+      return res.status(400).json({ message: 'Usuario y contraseña requeridos', error: 'Usuario y contraseña requeridos' });
     }
 
     const db   = getDb();

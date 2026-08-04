@@ -5,14 +5,15 @@
  */
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { canAccessRoute } from '../../utils/rbac';
+import { canAccessRoute, hasPermission } from '../../utils/rbac';
 
 /**
  * @param {string[]} allowedRoles  - Roles permitidos para la ruta
  * @param {string}   requiredArea  - Área requerida (opcional, para Jefes/Operativos)
+ * @param {string}   requiredUsername - Usuario específico requerido (opcional)
  * @param {ReactNode} children
  */
-export default function ProtectedRoute({ allowedRoles, requiredArea, children }) {
+export default function ProtectedRoute({ allowedRoles, requiredArea, requiredUsername, children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -35,6 +36,16 @@ export default function ProtectedRoute({ allowedRoles, requiredArea, children })
     : canAccessRoute(user.role, location.pathname, user.area, requiredArea);
 
   if (!allowed) {
+    return <Navigate to="/sin-acceso" replace />;
+  }
+
+  // Verificar username estricto (ej. Superadmin)
+  if (requiredUsername && user.username !== requiredUsername) {
+    return <Navigate to="/sin-acceso" replace />;
+  }
+
+  // Verificar permisos individuales del usuario
+  if (!hasPermission(user, location.pathname)) {
     return <Navigate to="/sin-acceso" replace />;
   }
 

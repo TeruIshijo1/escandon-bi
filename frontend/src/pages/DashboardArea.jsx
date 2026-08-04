@@ -11,9 +11,15 @@ import EditableKPIWrapper from '../components/shared/EditableKPIWrapper';
 import PBIModal        from '../components/shared/PBIModal';
 import ExportApiModal  from '../components/shared/ExportApiModal';
 import PremiumLoader   from '../components/shared/PremiumLoader';
+import GlobalFilterBar from '../components/dashboard/GlobalFilterBar';
 import DashboardUrgenciasNativo from '../components/dashboard/DashboardUrgenciasNativo';
 import DashboardQuirofanoNativo from '../components/dashboard/DashboardQuirofanoNativo';
-import { AREAS, AREAS_LABELS, can } from '../utils/rbac';
+import DashboardSitiAuxiliares from '../components/dashboard/DashboardSitiAuxiliares';
+import DashboardAuxiliaresNativo from '../components/dashboard/DashboardAuxiliaresNativo';
+import DashboardCunerosNativo from '../components/dashboard/DashboardCunerosNativo';
+import DashboardConsultaExternaNativo from '../components/dashboard/DashboardConsultaExternaNativo';
+import DashboardAseguradorasNativo from '../components/dashboard/DashboardAseguradorasNativo';
+import { AREAS, AREAS_LABELS, AREA_TO_PERMISSION, can } from '../utils/rbac';
 import { useKPIConfig } from '../hooks/useKPIConfig';
 
 const KPI_DB_MAP = {
@@ -34,8 +40,9 @@ const AREA_CONFIG = {
   [AREAS.IMAGENOLOGIA]: { icon:'🔬', color:'#8B5CF6' },
   [AREAS.LABORATORIO]:  { icon:'🧪', color:'#10B981' },
   [AREAS.CONSULTA_EXTERNA]: { icon:'🩺', color:'#0088C9' },
-  [AREAS.CARDIOLOGIA]:      { icon:'❤️', color:'#EF4444' },
+  [AREAS.FINANZAS]:         { icon:'💰', color:'#10B981' },
   [AREAS.HOSPITALIZACION]:  { icon:'🛏️', color:'#005FA9' },
+  [AREAS.ASEGURADORAS]:     { icon:'🛡️', color:'#10B981' },
 };
 
 const DEFAULT_AREA = AREAS.URGENCIAS;
@@ -99,7 +106,29 @@ export default function DashboardArea() {
   const { user }         = useAuth();
   const { getKPI }       = useKPIConfig();
   const isRestricted     = user?.role === 'JEFE_AREA' || user?.role === 'USUARIO_OPERATIVO';
-  const [area, setArea]  = useState(user?.area || DEFAULT_AREA);
+
+  // Calcular las áreas permitidas a partir de los permisos individuales del usuario
+  const permissionToArea = Object.fromEntries(
+    Object.entries(AREA_TO_PERMISSION).map(([areaKey, permId]) => [permId, areaKey])
+  );
+  const userPermisos = user?.permisos || [];
+  const allowedAreas = userPermisos
+    .filter(p => p.startsWith('area-'))
+    .map(p => permissionToArea[p])
+    .filter(Boolean);
+
+  // Determinar el área inicial:
+  // 1) Si el usuario tiene AreaAsignada fija, usar esa
+  // 2) Si tiene permisos individuales de área, usar la primera permitida
+  // 3) Fallback al área por defecto
+  const initialArea = user?.area || (allowedAreas.length > 0 ? allowedAreas[0] : DEFAULT_AREA);
+
+  // Determinar si el usuario puede cambiar de área:
+  // - ADMIN/DIRECTOR pueden ver todos los tableros
+  // - Usuarios con múltiples permisos de área pueden elegir entre sus áreas permitidas
+  const canSwitchArea = can(user?.role, 'verTodosTableros') || (!user?.area && allowedAreas.length > 1);
+
+  const [area, setArea]  = useState(initialArea);
   const [tab,  setTab]   = useState('kpis');
   const [urgenciasSearch, setUrgenciasSearch] = useState('');
 
@@ -110,6 +139,18 @@ export default function DashboardArea() {
   const [pbiModal, setPBIModal] = useState(null);
   const [showExportApi, setShowExportApi] = useState(false);
 
+  // Global filters
+  const [globalFilters, setGlobalFilters] = useState({
+    search: '',
+    startDate: '',
+    endDate: ''
+  });
+  const [applyTrigger, setApplyTrigger] = useState(0);
+
+  const handleApplyFilters = () => {
+    setApplyTrigger(prev => prev + 1);
+  };
+
   const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
@@ -118,7 +159,7 @@ export default function DashboardArea() {
   useEffect(() => {
     fetchAreaData();
     fetchAreaReport();
-  }, [area]);
+  }, [area, applyTrigger]);
 
   const fetchAreaData = async () => {
     try {
@@ -126,7 +167,12 @@ export default function DashboardArea() {
       
       if (area === AREAS.URGENCIAS) {
         // Para Urgencias usamos el endpoint nativo especializado
-        const res = await fetch('/api/dashboard/urgencias-nativo', {
+        let url = `/api/dashboard/urgencias-nativo?`;
+        if (globalFilters.startDate) url += `startDate=${globalFilters.startDate}&`;
+        if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
+        if (globalFilters.search || urgenciasSearch) url += `search=${encodeURIComponent(globalFilters.search || urgenciasSearch)}&`;
+
+        const res = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -144,7 +190,12 @@ export default function DashboardArea() {
         }
       } else if (area === AREAS.QUIROFANO) {
         // Endpoint nativo para Quirófanos
-        const res = await fetch('/api/dashboard/quirofano-nativo', {
+        let url = `/api/dashboard/quirofano-nativo?`;
+        if (globalFilters.startDate) url += `startDate=${globalFilters.startDate}&`;
+        if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
+        if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
+
+        const res = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();
@@ -154,6 +205,21 @@ export default function DashboardArea() {
             rawQuirofanoData: json.data
           });
         }
+      } else if (area === AREAS.CONSULTA_EXTERNA) {
+        let url = `/api/dashboard/consulta-externa-nativo?`;
+        if (globalFilters.startDate) url += `startDate=${globalFilters.startDate}&`;
+        if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
+        if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
+
+        console.log('[DashboardArea] Fetching CEX data from:', url);
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json();
+        if (json.ok) {
+          setAreaData({ kpis: [], rawConsultaData: json.data });
+        }
+      } else if (area === AREAS.IMAGENOLOGIA || area === AREAS.LABORATORIO || area === AREAS.FARMACIA || area === AREAS.ASEGURADORAS) {
+        // Para Imagenología, Laboratorio, Farmacia y Aseguradoras no usamos las tarjetas de hospitalización (camas, egresos)
+        setAreaData({ kpis: [] });
       } else {
         // Flujo normal para otras áreas
         const res = await fetch(`/api/dashboard/area/${area}`, {
@@ -231,17 +297,40 @@ export default function DashboardArea() {
 
       {/* Header Panel */}
       <div style={{ 
-        background: `linear-gradient(135deg, ${cfg.color} 0%, #0d253f 100%)`, 
-        borderRadius: '20px', padding: '1.75rem 2.25rem', color: 'white', marginBottom: '2rem', 
-        boxShadow: 'var(--shadow-md)', position: 'relative', overflow: 'hidden',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        flexWrap: 'wrap', gap: '1.25rem'
+        background: '#0B132B', // Sleek dark navy background
+        borderRadius: '20px', 
+        padding: '2rem 2.25rem', 
+        color: 'white', 
+        marginBottom: '2rem', 
+        boxShadow: '0 10px 30px rgba(11, 19, 43, 0.15)', 
+        position: 'relative', 
+        overflow: 'hidden',
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        flexWrap: 'wrap', 
+        gap: '1.25rem',
+        border: '1px solid rgba(255, 255, 255, 0.05)',
+        borderTop: '1.5px solid rgba(255, 255, 255, 0.12)'
       }}>
+        {/* Glowing mesh gradient background shapes using dynamic area color */}
+        <div style={{
+          position: 'absolute',
+          top: '-50%',
+          right: '-10%',
+          width: '350px',
+          height: '350px',
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${cfg.color}33 0%, rgba(13, 37, 63, 0) 70%)`,
+          filter: 'blur(40px)',
+          pointerEvents: 'none'
+        }} />
+
         {/* ECG visual details */}
         <div style={{
           position: 'absolute',
           inset: 0,
-          opacity: 0.04,
+          opacity: 0.05,
           pointerEvents: 'none',
           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 120' width='800' height='120'%3E%3Cpath d='M0 60h120l10-15 15 10 10-25 15 80 10-65 15 15h120l10-15 15 10 10-25 15 80 10-65 15 15h200' fill='none' stroke='%23ffffff' stroke-width='2'/%3E%3C/svg%3E")`,
           backgroundSize: '450px 60px',
@@ -252,27 +341,30 @@ export default function DashboardArea() {
         <div style={{ position:'relative', zIndex:1 }}>
           <div style={{
             fontFamily: 'var(--font-mono)',
-            fontSize:'0.64rem',
+            fontSize:'0.75rem',
             fontWeight:700,
-            letterSpacing:'0.12em',
+            letterSpacing:'0.15em',
             textTransform:'uppercase',
-            color:'rgba(255,255,255,0.65)',
-            marginBottom:'0.35rem'
+            color: '#38BDF8', // Cyan-blue highlight
+            marginBottom:'0.4rem'
           }}>
             Plataforma HE-BI · Gestión de Área
           </div>
           <h1 style={{
-            fontFamily:"var(--font-display)",
-            fontSize:'1.65rem',
+            fontFamily:"'Outfit', sans-serif",
+            fontSize:'2rem',
             fontWeight:800,
             color:'white',
             margin:0,
             display:'flex',
             alignItems:'center',
             gap:'0.75rem',
-            letterSpacing: '-0.01em'
+            letterSpacing: '-0.01em',
+            background: 'linear-gradient(to right, #FFFFFF, #CBD5E1)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
           }}>
-            <span style={{ fontSize:'1.8rem' }}>{cfg.icon}</span>
+            <span style={{ fontSize:'2.2rem', WebkitTextFillColor: 'initial' }}>{cfg.icon}</span>
             {AREAS_LABELS[area]}
           </h1>
         </div>
@@ -302,7 +394,7 @@ export default function DashboardArea() {
             <select 
               value={area} 
               onChange={(e) => setArea(e.target.value)}
-              disabled={!can(user?.role, 'verTodosTableros')}
+              disabled={!canSwitchArea}
               className="custom-select-area"
               style={{
                 padding: '0.55rem 2.25rem 0.55rem 1rem',
@@ -314,13 +406,24 @@ export default function DashboardArea() {
                 fontWeight: 700,
                 fontFamily: 'var(--font-display)',
                 outline: 'none',
-                cursor: can(user?.role, 'verTodosTableros') ? 'pointer' : 'not-allowed',
+                cursor: canSwitchArea ? 'pointer' : 'not-allowed',
                 minWidth: 160,
                 appearance: 'none',
                 WebkitAppearance: 'none',
               }}
             >
-              {Object.entries(AREAS_LABELS).map(([key, label]) => (
+              {Object.entries(AREAS_LABELS)
+                .filter(([key]) => {
+                  // ADMIN/DIRECTOR ven todas las áreas
+                  if (can(user?.role, 'verTodosTableros')) return true;
+                  // Usuario con área fija: solo su área
+                  if (user?.area) return key === user.area;
+                  // Usuario con permisos individuales: solo sus áreas permitidas
+                  if (allowedAreas.length > 0) return allowedAreas.includes(key);
+                  // Sin restricciones de permisos
+                  return true;
+                })
+                .map(([key, label]) => (
                 <option key={key} value={key} style={{ color:'var(--text-primary)', background: '#FFFFFF', fontWeight: 600 }}>{label}</option>
               ))}
             </select>
@@ -336,6 +439,12 @@ export default function DashboardArea() {
           </div>
         </div>
       </div>
+
+      <GlobalFilterBar 
+        filters={globalFilters} 
+        setFilters={setGlobalFilters} 
+        onApply={handleApplyFilters} 
+      />
 
       {/* Sliding Underline Tabs */}
       <div style={{
@@ -386,7 +495,7 @@ export default function DashboardArea() {
       {/* KPIs Grid */}
       {tab === 'kpis' && (
         <>
-          {area !== AREAS.QUIROFANO && (
+          {area !== AREAS.QUIROFANO && area !== AREAS.CUNEROS && (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
               {areaData.kpis.map((kpi, i) => {
                 const dbKey = KPI_DB_MAP[kpi.label] || kpi.label.replace(/\s+/g, '_').toLowerCase();
@@ -464,6 +573,32 @@ export default function DashboardArea() {
             <DashboardQuirofanoNativo 
               data={areaData.rawQuirofanoData} 
             />
+          ) : area === AREAS.IMAGENOLOGIA ? (
+            <div style={{ marginTop: '1rem' }}>
+              <DashboardAuxiliaresNativo type="imagenologia" globalFilters={globalFilters} globalTrigger={applyTrigger} />
+            </div>
+          ) : area === AREAS.LABORATORIO ? (
+            <div style={{ marginTop: '1rem' }}>
+              <DashboardAuxiliaresNativo type="laboratorio" globalFilters={globalFilters} globalTrigger={applyTrigger} />
+            </div>
+          ) : area === AREAS.FARMACIA ? (
+            <div style={{ marginTop: '1rem' }}>
+              <DashboardAuxiliaresNativo type="farmacia" globalFilters={globalFilters} globalTrigger={applyTrigger} />
+            </div>
+          ) : area === AREAS.CUNEROS ? (
+            <div style={{ marginTop: '1rem' }}>
+              <DashboardCunerosNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
+            </div>
+          ) : area === AREAS.CONSULTA_EXTERNA ? (
+            <DashboardConsultaExternaNativo 
+              data={areaData.rawConsultaData} 
+              searchFilter={globalFilters.search}
+              setSearchFilter={(val) => setGlobalFilters(prev => ({...prev, search: val}))}
+            />
+          ) : area === AREAS.ASEGURADORAS ? (
+            <div style={{ marginTop: '1rem' }}>
+              <DashboardAseguradorasNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
+            </div>
           ) : (
             <div style={{ marginTop: '2rem' }}>
               <EmbeddedBI

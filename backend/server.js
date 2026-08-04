@@ -24,10 +24,11 @@ const exportRoutes           = require('./routes/export.routes');
 const aiRoutes               = require('./routes/ai.routes');
 const biRoutes               = require('./routes/bi.routes');
 const adminRoutes            = require('./routes/admin.routes');
-const testRoutes             = require('./routes/test.routes');
 const auditRoutes            = require('./routes/audit.routes');
 const { auditMiddleware }    = require('./middleware/audit.middleware');
 const { connectRemoteDB }    = require('./config/remote-db');
+const { initPostgresDW }     = require('./config/pg-db');
+const { initCronJobs, runFullSync } = require('./services/sync.service');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -63,8 +64,8 @@ const globalLimiter = rateLimit({
 });
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max:      20,
+  windowMs: 5 * 60 * 1000, // 5 min
+  max:      200, // Límite alto por si están detrás del mismo NAT del hospital
   message: { message: 'Demasiados intentos de autenticación. Intente más tarde.', error: 'Demasiados intentos de autenticación. Intente más tarde.' },
 });
 
@@ -123,6 +124,7 @@ const dataQualityRoutes = require('./routes/dataQuality.routes');
 const ariaRoutes = require('./routes/aria.routes');
 const pharmacyRoutes = require('./routes/pharmacy.routes');
 const sapRoutes = require('./routes/sap.routes');
+const almacenRoutes = require('./routes/almacen.routes');
 
 app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/dashboard',     dashboardRoutes);
@@ -131,11 +133,11 @@ app.use('/api/ai',            aiRoutes);
 app.use('/api/aria',          ariaRoutes);
 app.use('/api/bi',            biRoutes);
 app.use('/api/admin',         adminRoutes);
-app.use('/api/test',          testRoutes);
 app.use('/api/siti',          sitiRoutes);
 app.use('/api/audit',         auditRoutes);
 app.use('/api/data-quality',  dataQualityRoutes);
 app.use('/api/pharmacy',      pharmacyRoutes);
+app.use('/api/almacen',       almacenRoutes);
 app.use('/api/sap',           sapRoutes);
 app.use('/api/files', authenticate, express.static(path.join(__dirname, 'uploads')));
 
@@ -188,6 +190,14 @@ app.get('/health', (req, res) => {
     
     // Inicializar conexión a SQL Server Remoto
     connectRemoteDB().catch(e => console.warn('⚠️ SQL Server Remoto no inicializado al arranque.'));
+    
+    // Inicializar PostgreSQL Data Warehouse y sincronización ETL
+    initPostgresDW().then(() => {
+      initCronJobs();
+      // Opcional: Ejecutar un volcado inicial al arrancar si es necesario
+      // runFullSync();
+    }).catch(e => console.warn('⚠️ Falló la inicialización de Postgres DW.'));
+
   } catch (err) {
     dbStatus = 'sin_conexion';
     console.warn('\n⚠️   SQLite no disponible:', err.message);

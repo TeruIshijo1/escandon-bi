@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate }         from 'react-router-dom';
 import { useAuth }             from '../context/AuthContext';
-import { AREAS_LABELS }        from '../utils/rbac';
+import { AREAS_LABELS, hasPermission, getNavItems } from '../utils/rbac';
 
 import { API_BASE } from '../api/config';
 import EditableKPIWrapper from '../components/shared/EditableKPIWrapper';
@@ -26,15 +26,15 @@ function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 
       style={{
         background:   '#FFFFFF',
         borderRadius:  '16px',
-        padding:      '1.35rem 1.25rem',
-        border:       '1px solid rgba(0, 70, 135, 0.08)',
-        borderLeft:   `4px solid ${color}`,
-        boxShadow:    hovered ? 'var(--shadow-md)' : 'var(--shadow-xs)',
+        padding:      '1.5rem',
+        border:       hovered ? `1.5px solid ${color}` : '1.5px solid rgba(0, 70, 135, 0.06)',
+        borderLeft:   `5px solid ${color}`,
+        boxShadow:    hovered ? `0 12px 24px -10px ${color}40, 0 4px 6px -2px rgba(0,0,0,0.02)` : '0 2px 4px rgba(0,0,0,0.02)',
         cursor:       'pointer',
-        transition:   'all 280ms cubic-bezier(0.16, 1, 0.3, 1)',
+        transition:   'all 250ms cubic-bezier(0.16, 1, 0.3, 1)',
         position:     'relative',
         overflow:     'hidden',
-        transform:    hovered ? 'translateY(-3px)' : 'translateY(0)',
+        transform:    hovered ? 'translateY(-4px)' : 'translateY(0)',
         animation:    'cardSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both',
         animationDelay: `${index * 60}ms`,
       }}
@@ -44,22 +44,9 @@ function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: `radial-gradient(circle at 10% 10%, ${color}08, transparent 60%)`,
+          background: `radial-gradient(circle at 10% 10%, ${color}0C, transparent 60%)`,
           pointerEvents: 'none',
         }}/>
-      )}
-
-      {/* Badge opcional */}
-      {badge && (
-        <div style={{
-          position:   'absolute', top:'1rem', right:'1rem',
-          background: `${color}12`, border:`1px solid ${color}25`,
-          borderRadius:100, padding:'0.15rem 0.6rem',
-          fontSize:'0.65rem', fontWeight:700, color,
-          fontFamily: 'var(--font-mono)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-        }}>{badge}</div>
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
@@ -77,20 +64,25 @@ function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 
         }}>{icon}</div>
         
         <h3 style={{
-          fontFamily: "var(--font-display)",
-          fontSize:    '0.88rem',
+          fontFamily: "'Outfit', sans-serif",
+          fontSize:    '0.95rem',
           fontWeight:   700,
-          color:       'var(--text-primary)',
+          color:       '#0D1B2A',
           margin:      0,
         }}>{title}</h3>
       </div>
 
       <p style={{
         fontFamily: 'var(--font-body)',
-        fontSize:'0.76rem',
-        color:'var(--text-secondary)',
+        fontSize:'0.82rem',
+        color:'#64748B',
         margin:0,
-        lineHeight:1.55
+        lineHeight:1.5,
+        height: '42px',
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden'
       }}>{desc}</p>
 
       {/* Ir al módulo button with underline reveal & arrow slide */}
@@ -150,42 +142,34 @@ export default function HomePage() {
 
   const fecha = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-  /* Tarjetas según rol */
-  const cardsByRole = {
-    ADMIN: [
-      { icon:'📊', title:'Dashboard Directivo', desc:'KPIs globales de eficiencia, eficacia y macropanel financiero', path:'/dashboard/directivo', color:'#004687' },
-      { icon:'🛏️', title:'Ocupación de Camas', desc:'Censo de pacientes y camas en tiempo real', path:'/dashboard/ocupacion', color:'#005FA9' },
-      { icon:'🔍', title:'Auditoría de Inventarios', desc:'Conciliación de órdenes del almacén y consumos clínicos', path:'/auditoria/inventarios', color:'#005FA9' },
-      { icon:'🏥', title:'Tablero de Área', desc:'Indicadores clínicos por área hospitalaria', path:'/dashboard/area', color:'#0088C9' },
-      { icon:'📈', title:'Estadísticas', desc:'Datos demográficos y procesos por servicio', path:'/estadisticas', color:'#0088C9' },
-      { icon:'⏳', title:'Dashboard SITI', desc:'Históricos financieros y operativos del sistema legado', path:'/siti/dashboard', color:'#6B7280' },
-      { icon:'⚖️', title:'Comparativo vs Vertical', desc:'Transición de ingresos entre sistemas', path:'/siti/comparativo', color:'#6B7280' },
-      { icon:'👥', title:'Gestión de Usuarios', desc:'Administrar roles, accesos y permisos del sistema', path:'/admin/usuarios', color:'#00974A' },
-      { icon:'🛡️', title:'Log de Auditoría', desc:'Historial completo de acciones del sistema', path:'/admin/auditoria-log', color:'#00974A' },
-      { icon:'⚙️', title:'Configuración', desc:'Parámetros del sistema y conexiones BI', path:'/admin/configuracion', color:'#8A97A8' },
-    ],
-    DIRECTOR: [
-      { icon:'📊', title:'Dashboard Directivo', desc:'KPIs globales de eficiencia, eficacia y macropanel financiero', path:'/dashboard/directivo', color:'#004687', badge:'Principal' },
-      { icon:'🛏️', title:'Ocupación de Camas', desc:'Censo de pacientes y camas en tiempo real', path:'/dashboard/ocupacion', color:'#005FA9' },
-      { icon:'🔍', title:'Auditoría de Inventarios', desc:'Conciliación de órdenes del almacén y consumos', path:'/auditoria/inventarios', color:'#005FA9' },
-      { icon:'🏥', title:'Tablero de Área', desc:'Indicadores clínicos por área hospitalaria', path:'/dashboard/area', color:'#0088C9' },
-      { icon:'📈', title:'Estadísticas', desc:'Datos demográficos y procesos por servicio', path:'/estadisticas', color:'#0088C9' },
-      { icon:'⏳', title:'Dashboard SITI', desc:'Históricos financieros y operativos del sistema legado', path:'/siti/dashboard', color:'#6B7280' },
-      { icon:'⚖️', title:'Comparativo vs Vertical', desc:'Transición de ingresos entre sistemas', path:'/siti/comparativo', color:'#6B7280' },
-    ],
-    JEFE_AREA: [
-      { icon:'🏥', title:`Tablero — ${AREAS_LABELS[user?.area] || 'Mi Área'}`, desc:'Indicadores operativos de tu área asignada', path:'/dashboard/area', color:'#004687', badge:'Mi Área' },
-      { icon:'🛏️', title:'Ocupación de Camas', desc:'Censo de pacientes y camas en tiempo real', path:'/dashboard/ocupacion', color:'#005FA9' },
-      { icon:'📈', title:'Estadísticas del Área', desc:'Productividad, estancias y tiempos de respuesta', path:'/estadisticas', color:'#0088C9' },
-    ],
-    USUARIO_OPERATIVO: [
-      { icon:'🏥', title:`Tablero — ${AREAS_LABELS[user?.area] || 'Mi Área'}`, desc:'Visualización de indicadores de tu área', path:'/dashboard/area', color:'#004687', badge:'Mi Área' },
-    ],
+  const SECTION_COLORS = {
+    'dirección': '#0088C9',       // Cyan-blue
+    'mi área': '#00974A',         // Green
+    'mi area': '#00974A',
+    'históricos siti': '#8A97A8', // Cool gray
+    'auditoría': '#8B5CF6',       // Purple
+    'farmacia': '#EC4899',        // Pink
+    'almacén general': '#E8853D', // Orange
+    'administración': '#6366F1',  // Indigo
   };
 
+  /* Tarjetas dinámicas según permisos (No un menú general) */
+  const rawCards = getNavItems(user?.role, user?.area, user?.username);
+  const cards = rawCards
+    .filter(item => item.path !== '/') // No mostrar la tarjeta de Inicio
+    .filter(item => hasPermission(user, item.path))
+    .map(item => {
+      const sectionKey = (item.section || '').toLowerCase().trim();
+      const color = SECTION_COLORS[sectionKey] || '#004687';
+      return {
+        icon: item.icon,
+        title: item.label,
+        desc: `Consulta y gestiona el módulo de ${item.label.toLowerCase()}.`,
+        path: item.path,
+        color: color
+      };
+    });
 
-
-  const cards  = cardsByRole[user?.role] || [];
   const isAdmin = user?.role === 'ADMIN';
 
   return (

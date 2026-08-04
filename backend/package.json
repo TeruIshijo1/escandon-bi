@@ -24,9 +24,11 @@
     "morgan": "^1.10.0",
     "mssql": "^12.7.0",
     "multer": "^2.1.1",
+    "node-cron": "^4.6.0",
     "pdfkit": "^0.15.0",
-    "pg": "^8.20.0",
-    "tedious": "^19.2.1"
+    "pg": "^8.22.0",
+    "tedious": "^19.2.1",
+    "xss-clean": "^0.1.4"
   },
   "devDependencies": {
     "eslint": "^9.5.0",

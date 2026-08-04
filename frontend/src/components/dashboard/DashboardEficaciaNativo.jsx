@@ -7,7 +7,7 @@ import { API_BASE } from '../../api/config';
 import ExportButton from '../shared/ExportButton';
 import PremiumLoader from '../shared/PremiumLoader';
 
-export default function DashboardEficaciaNativo() {
+export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,12 +16,11 @@ export default function DashboardEficaciaNativo() {
   const [filters, setFilters] = useState({
     medico: '',
     especialidad: '',
-    startDate: '',
-    endDate: '',
     search: ''
   });
 
   const [applyTrigger, setApplyTrigger] = useState(0);
+  const [selectedEstatus, setSelectedEstatus] = useState(null);
 
   useEffect(() => {
     fetchOptions();
@@ -29,7 +28,7 @@ export default function DashboardEficaciaNativo() {
 
   useEffect(() => {
     fetchData();
-  }, [applyTrigger]);
+  }, [applyTrigger, globalTrigger]);
 
   const fetchOptions = async () => {
     try {
@@ -51,17 +50,20 @@ export default function DashboardEficaciaNativo() {
       const token = sessionStorage.getItem('escandon_token');
 
       let url = `${API_BASE}/dashboard/eficacia-nativo?`;
-      if (filters.startDate) url += `startDate=${filters.startDate}&`;
-      if (filters.endDate) url += `endDate=${filters.endDate}&`;
+      if (globalFilters?.startDate) url += `startDate=${globalFilters.startDate}&`;
+      if (globalFilters?.endDate) url += `endDate=${globalFilters.endDate}&`;
       
       // We will combine 'medico' and 'search' conceptually in the backend by just passing the exact Medico if selected.
       // But we can just use the search parameter for both text search and exact dropdown selection for now.
       // Actually, if we have a specific Medico, let's pass it as search. 
       // If we have an especialidad, we need to update the backend to accept 'especialidad' filter. Wait, backend efficacy doesn't accept 'especialidad' yet.
       
-      let searchQuery = filters.search || filters.medico || filters.especialidad; // For now, we will just use 'search'
+      let medico = globalFilters?.medico || filters.medico || '';
+      let especialidad = globalFilters?.especialidad || filters.especialidad || '';
+      
+      let searchQuery = medico || especialidad;
       if (searchQuery) url += `search=${encodeURIComponent(searchQuery)}&`;
-      if (filters.especialidad) url += `especialidad=${encodeURIComponent(filters.especialidad)}&`; // We will need to update backend to support this if we want specific specialty filtering
+      if (especialidad) url += `especialidad=${encodeURIComponent(especialidad)}&`;
 
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -93,7 +95,8 @@ export default function DashboardEficaciaNativo() {
 
   const handleApply = () => setApplyTrigger(prev => prev + 1);
   const handleClear = () => {
-    setFilters({ medico: '', especialidad: '', startDate: '', endDate: '', search: '' });
+    setFilters({ medico: '', especialidad: '', search: '' });
+    setSelectedEstatus(null);
     setTimeout(() => setApplyTrigger(prev => prev + 1), 50);
   };
 
@@ -107,84 +110,17 @@ export default function DashboardEficaciaNativo() {
   return (
     <div id="dashboard-eficacia" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
       
-      {/* 🧠 Barra Inteligente (Slicers) */}
-      <div style={{
-        background: 'white', borderRadius: 12, padding: '1rem 1.5rem', marginBottom: '1.5rem',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.03)', border: '1px solid rgba(0,136,201,0.2)',
-        display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap'
-      }}>
-        <div style={{ flex: '1 1 200px' }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem' }}>
-            MÉDICO
-          </label>
-          <input
-            list="medicos-list"
-            value={filters.medico}
-            onChange={e => setFilters({...filters, medico: e.target.value, search: e.target.value})}
-            placeholder="Seleccionar o buscar..."
-            style={{ width: '100%', padding: '0.6rem', borderRadius: 6, border: '1px solid #CBD5E1', outline: 'none' }}
-          />
-          <datalist id="medicos-list">
-            {options.medicos.map((m, i) => <option key={i} value={m} />)}
-          </datalist>
-        </div>
-
-        <div style={{ flex: '1 1 200px' }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem' }}>
-            ESPECIALIDAD
-          </label>
-          <input
-            list="esp-list"
-            value={filters.especialidad}
-            onChange={e => setFilters({...filters, especialidad: e.target.value})}
-            placeholder="Seleccionar o buscar..."
-            style={{ width: '100%', padding: '0.6rem', borderRadius: 6, border: '1px solid #CBD5E1', outline: 'none' }}
-          />
-          <datalist id="esp-list">
-            {options.especialidades.map((e, i) => <option key={i} value={e} />)}
-          </datalist>
-        </div>
-
-        <div style={{ flex: '1 1 150px' }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem' }}>
-            DESDE
-          </label>
-          <input type="date" value={filters.startDate} onChange={e => setFilters({...filters, startDate: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 6, border: '1px solid #CBD5E1', outline: 'none' }} />
-        </div>
-        
-        <div style={{ flex: '1 1 150px' }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem' }}>
-            HASTA
-          </label>
-          <input type="date" value={filters.endDate} onChange={e => setFilters({...filters, endDate: e.target.value})} style={{ width: '100%', padding: '0.6rem', borderRadius: 6, border: '1px solid #CBD5E1', outline: 'none' }} />
-        </div>
-
-        <button onClick={handleApply} style={{ background: '#0088C9', color: 'white', border: 'none', padding: '0.65rem 1.5rem', borderRadius: 6, fontWeight: 600, cursor: 'pointer', height: 42 }}>Aplicar</button>
-        <button onClick={handleClear} style={{ background: 'transparent', color: '#64748B', border: '1px solid #CBD5E1', padding: '0.65rem 1rem', borderRadius: 6, fontWeight: 600, cursor: 'pointer', height: 42 }}>Limpiar</button>
-        
-        <div style={{ display: 'none', gap: '0.5rem', borderLeft: '1px solid #E2E8F0', paddingLeft: '1rem', marginLeft: 'auto' }}>
-          <ExportButton id="export-pdf-btn" type="pdf" targetId="dashboard-eficacia" compact={true} />
-          <ExportButton 
-            id="export-excel-btn"
-            type="excel" 
-            directUrl={`/dashboard/export-excel?dashboard=eficacia&startDate=${filters.startDate}&endDate=${filters.endDate}&search=${encodeURIComponent(filters.search)}&especialidad=${encodeURIComponent(filters.especialidad)}`} 
-            compact={true} 
-          />
-        </div>
+      <div style={{ display: 'none' }}>
+        <ExportButton id="export-pdf-btn" type="pdf" targetId="dashboard-eficacia" compact={true} />
+        <ExportButton 
+          id="export-excel-btn"
+          type="excel" 
+          directUrl={`/dashboard/export-excel?dashboard=eficacia&startDate=${globalFilters?.startDate || ''}&endDate=${globalFilters?.endDate || ''}&search=${encodeURIComponent(globalFilters?.medico || filters.medico || '')}&especialidad=${encodeURIComponent(globalFilters?.especialidad || filters.especialidad || '')}`} 
+          compact={true} 
+        />
       </div>
       
-      {/* Banner Superior */}
-      <div style={{ background: '#0D1B2A', color: 'white', padding: '1.25rem', borderRadius: 12, marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
-        <div>
-          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8A97A8' }}>Control de Rendimiento Médico</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '0.2rem' }}>
-            <span style={{ color: '#0088C9' }}>⚡ UDR_BI_PRODUCTIVIDAD_MEDICOS & V_UDR_CONSULTA_DIA</span>
-          </div>
-          <div style={{ fontSize: '0.85rem', color: '#CBD5E1', marginTop: '0.3rem' }}>
-            Análisis comparativo de consultas y productividad hospitalaria (100% Nativo).
-          </div>
-        </div>
-      </div>
+
 
       {/* Tarjetas de KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
@@ -236,6 +172,8 @@ export default function DashboardEficaciaNativo() {
                   outerRadius={100}
                   paddingAngle={5}
                   dataKey="valor"
+                  onClick={(entry) => setSelectedEstatus(entry.nombre)}
+                  style={{ cursor: 'pointer' }}
                 >
                   {estatusConsultas.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
@@ -300,17 +238,91 @@ export default function DashboardEficaciaNativo() {
 
       </div>
 
-      {/* Tabla de Detalle de Pacientes/Consultas */}
-      {data.listaConsultas && data.listaConsultas.length > 0 && (
-        <div data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)', marginTop: '1.5rem' }}>
+      {/* Tabla de Detalle de Pacientes/Consultas (Drill-down) */}
+      {selectedEstatus && data.detalleConsultas && data.detalleConsultas[selectedEstatus] && (
+        <div data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)', marginTop: '1.5rem', animation: 'fadeIn 0.3s' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>Detalle de Consultas (Top 100)</h3>
-            <span style={{ fontSize: '0.85rem', color: '#8A97A8' }}>{data.listaConsultas.length} registros encontrados</span>
+            <div>
+              <h3 style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>Detalle de Consultas: <span style={{ color: '#0088C9' }}>{selectedEstatus}</span></h3>
+              <div style={{ fontSize: '0.85rem', color: '#8A97A8', marginTop: '0.2rem' }}>Mostrando top {data.detalleConsultas[selectedEstatus].length} registros</div>
+            </div>
+            <button 
+              onClick={() => setSelectedEstatus(null)}
+              style={{ background: '#F1F5F9', border: 'none', padding: '0.4rem 0.8rem', borderRadius: 6, color: '#475569', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Cerrar Detalle
+            </button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', textAlign: 'left' }}>
+                  <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Fecha/Hora</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Cita</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Paciente</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Médico</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Especialidad</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.detalleConsultas[selectedEstatus].map((c, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                    <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{c.Fecha} {c.Hora && <span style={{fontSize: '0.75rem', marginLeft: '0.2rem'}}>{c.Hora.substring(0,5)}</span>}</td>
+                    
+                    <td 
+                      onClick={() => { setFilters({...filters, search: c.Numero_Cita.toString()}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#005FA9', cursor: 'pointer', textDecoration: 'underline' }}
+                      title="Filtrar por Cita"
+                    >
+                      #{c.Numero_Cita}
+                    </td>
+                    
+                    <td 
+                      onClick={() => { setFilters({...filters, search: c.Paciente}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      style={{ padding: '0.75rem 1rem', cursor: 'pointer', color: '#0D1B2A' }}
+                      title="Filtrar por Paciente"
+                      onMouseOver={(e) => e.currentTarget.style.color = '#005FA9'}
+                      onMouseOut={(e) => e.currentTarget.style.color = '#0D1B2A'}
+                    >
+                      {c.Paciente} <span style={{color: '#94A3B8', fontSize: '0.75rem'}}>({c.Edad_Anios || 'N/A'})</span>
+                    </td>
+                    
+                    <td 
+                      onClick={() => { setFilters({...filters, medico: c.Medico, search: c.Medico}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      style={{ padding: '0.75rem 1rem', color: '#005FA9', cursor: 'pointer', fontWeight: 600 }}
+                      title="Filtrar por Médico"
+                    >
+                      {c.Medico}
+                    </td>
+                    
+                    <td 
+                      onClick={() => { setFilters({...filters, especialidad: c.Especialidad}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      style={{ padding: '0.75rem 1rem', cursor: 'pointer', color: '#0D1B2A' }}
+                      title="Filtrar por Especialidad"
+                      onMouseOver={(e) => e.currentTarget.style.color = '#005FA9'}
+                      onMouseOut={(e) => e.currentTarget.style.color = '#0D1B2A'}
+                    >
+                      {c.Especialidad}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tabla de Detalle General (Top 100) */}
+      {data.listaConsultas && data.listaConsultas.length > 0 && (
+        <div data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)', marginTop: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>Últimas Consultas (General)</h3>
+            <span style={{ fontSize: '0.85rem', color: '#8A97A8' }}>{data.listaConsultas.length} registros encontrados</span>
+          </div>
+          <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#F8FAFC', zIndex: 1 }}>
+                <tr style={{ borderBottom: '2px solid #E2E8F0', textAlign: 'left' }}>
                   <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Fecha/Hora</th>
                   <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Cita</th>
                   <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Paciente</th>

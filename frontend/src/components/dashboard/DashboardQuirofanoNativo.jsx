@@ -24,17 +24,21 @@ export default function DashboardQuirofanoNativo({ data }) {
     availableYears,
     availableMedicos,
     availableRooms,
-    availableProcedures
+    availableProcedures,
+    kpisFinancieros,
+    topMedicosIngresos,
+    topServiciosIngresos
   } = useMemo(() => {
-    if (!data || data.length === 0) return { filteredData: [], kpis: {}, monthlyData: [], roomUsage: [], topProcedures: [], availableYears: [], availableMedicos: [], availableRooms: [], availableProcedures: [] };
+    if (!data || !data.lista || data.lista.length === 0) return { filteredData: [], kpis: {}, monthlyData: [], roomUsage: [], topProcedures: [], availableYears: [], availableMedicos: [], availableRooms: [], availableProcedures: [], kpisFinancieros: {}, topMedicosIngresos: [], topServiciosIngresos: [] };
 
+    const rawData = data.lista;
     // Extraer catálogos completos
     const yearsSet = new Set();
     const medicosSetAll = new Set();
     const roomsSetAll = new Set();
     const proceduresSetAll = new Set();
 
-    data.forEach(d => {
+    rawData.forEach(d => {
       const year = new Date(d.FechaInicio).getFullYear();
       if (!isNaN(year)) yearsSet.add(year);
       if (d.Medicos) {
@@ -50,7 +54,7 @@ export default function DashboardQuirofanoNativo({ data }) {
     const availableProcedures = Array.from(proceduresSetAll).sort();
 
     // Filtros de primer nivel (Año, Mes, Médico, Quirófano, Procedimiento)
-    const fullyFiltered = data.filter(d => {
+    const fullyFiltered = rawData.filter(d => {
       const date = new Date(d.FechaInicio);
       if (selectedYear !== 'Todas' && date.getFullYear() !== Number(selectedYear)) return false;
       if (selectedMonth !== 'Todos' && date.getMonth() !== Number(selectedMonth)) return false;
@@ -113,7 +117,7 @@ export default function DashboardQuirofanoNativo({ data }) {
 
     // 3. Room Usage
     // Si selectedRoom tiene valor, la dona solo muestra esa room. Si queremos que muestre todas para poder cambiar, filtramos sin `selectedRoom`
-    const dataForRooms = data.filter(d => {
+    const dataForRooms = rawData.filter(d => {
       const date = new Date(d.FechaInicio);
       if (selectedYear !== 'Todas' && date.getFullYear() !== Number(selectedYear)) return false;
       if (selectedMonth !== 'Todos' && date.getMonth() !== Number(selectedMonth)) return false;
@@ -131,7 +135,7 @@ export default function DashboardQuirofanoNativo({ data }) {
 
     // 4. Top Procedures
     // Igual para top procedures, filtramos sin `selectedProcedure` para que la lista siga visible
-    const dataForProcs = data.filter(d => {
+    const dataForProcs = rawData.filter(d => {
       const date = new Date(d.FechaInicio);
       if (selectedYear !== 'Todas' && date.getFullYear() !== Number(selectedYear)) return false;
       if (selectedMonth !== 'Todos' && date.getMonth() !== Number(selectedMonth)) return false;
@@ -147,8 +151,23 @@ export default function DashboardQuirofanoNativo({ data }) {
     });
     const topProcedures = Object.entries(procCount).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
 
-    return { filteredData: fullyFiltered, kpis, monthlyData, roomUsage, topProcedures, availableYears, availableMedicos, availableRooms, availableProcedures };
+    return { 
+      filteredData: fullyFiltered, 
+      kpis, 
+      monthlyData, 
+      roomUsage, 
+      topProcedures, 
+      availableYears, 
+      availableMedicos, 
+      availableRooms, 
+      availableProcedures,
+      kpisFinancieros: data.kpisFinancieros || {},
+      topMedicosIngresos: data.topMedicosIngresos || [],
+      topServiciosIngresos: data.topServiciosIngresos || []
+    };
   }, [data, selectedRoom, selectedProcedure, selectedYear, selectedMonth, selectedMedico]);
+
+  const formatCurrency = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
 
   if (!data) return <PremiumLoader text="Cargando información nativa de quirófano..." />;
 
@@ -169,85 +188,20 @@ export default function DashboardQuirofanoNativo({ data }) {
           <h2 style={{ margin: 0, fontFamily: 'var(--font-display)', color: '#004687', fontSize: '1.75rem', fontWeight: 800 }}>Analítica de Quirófanos</h2>
           <p style={{ margin: 0, color: '#64748B', fontSize: '0.9rem', fontWeight: 500 }}>Rendimiento y Ocupación</p>
         </div>
-        
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {(selectedRoom !== 'Todos' || selectedProcedure !== 'Todos' || selectedYear !== 'Todas' || selectedMonth !== 'Todos' || selectedMedico !== 'Todos') && (
-            <button 
-              onClick={clearFilters}
-              style={{ background: '#FEE2E2', color: '#EF4444', border: 'none', padding: '0.4rem 1rem', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
-            >
-              Borrar Filtros
-            </button>
-          )}
+      </div>
 
-          <div style={{ background: 'white', padding: '0.35rem 0.75rem', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem' }}>
-            <span style={{ color: '#64748B', marginRight: '0.5rem' }}>Quirófano</span>
-            <select 
-              value={selectedRoom}
-              onChange={(e) => setSelectedRoom(e.target.value)}
-              style={{ border: 'none', fontWeight: 700, outline: 'none', background: 'transparent', maxWidth: '120px' }}
-            >
-              <option value="Todos">Todos</option>
-              {availableRooms.map((room, i) => (
-                <option key={i} value={room}>{room.length > 20 ? room.substring(0,20)+'...' : room}</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ background: 'white', padding: '0.35rem 0.75rem', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem' }}>
-            <span style={{ color: '#64748B', marginRight: '0.5rem' }}>Procedimiento</span>
-            <select 
-              value={selectedProcedure}
-              onChange={(e) => setSelectedProcedure(e.target.value)}
-              style={{ border: 'none', fontWeight: 700, outline: 'none', background: 'transparent', maxWidth: '120px' }}
-            >
-              <option value="Todos">Todos</option>
-              {availableProcedures.map((proc, i) => (
-                <option key={i} value={proc}>{proc.length > 20 ? proc.substring(0,20)+'...' : proc}</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ background: 'white', padding: '0.35rem 0.75rem', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem' }}>
-            <span style={{ color: '#64748B', marginRight: '0.5rem' }}>Médico</span>
-            <select 
-              value={selectedMedico}
-              onChange={(e) => setSelectedMedico(e.target.value)}
-              style={{ border: 'none', fontWeight: 700, outline: 'none', background: 'transparent', maxWidth: '120px' }}
-            >
-              <option value="Todos">Todos</option>
-              {availableMedicos.map((med, i) => (
-                <option key={i} value={med}>{med.length > 20 ? med.substring(0,20)+'...' : med}</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ background: 'white', padding: '0.35rem 0.75rem', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem' }}>
-            <span style={{ color: '#64748B', marginRight: '0.5rem' }}>Mes</span>
-            <select 
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              style={{ border: 'none', fontWeight: 700, outline: 'none', background: 'transparent' }}
-            >
-              <option value="Todos">Todos</option>
-              {MONTHS.map((m, i) => (
-                <option key={i} value={i}>{m}</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ background: 'white', padding: '0.35rem 0.75rem', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem' }}>
-            <span style={{ color: '#64748B', marginRight: '0.5rem' }}>Año</span>
-            <select 
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              style={{ border: 'none', fontWeight: 700, outline: 'none', background: 'transparent' }}
-            >
-              <option value="Todas">Todos</option>
-              {availableYears.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
+      {/* Tarjeta de Ingreso Real Contabilizado (SAP) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', padding: '1.25rem', borderRadius: 12, color: 'white', boxShadow: '0 4px 6px rgba(16, 185, 129, 0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>Ingresos Quirófano (SAP)</div>
+              <div style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 800, marginTop: '0.5rem' }}>{formatCurrency(kpisFinancieros.ingresosSAP || 0)}</div>
+              <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem' }}>Contabilidad Oficial Grupo 111 (CIRUGIA QUIROFANO)</div>
+            </div>
+            <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.2)', borderRadius: 10 }}>
+              <span style={{ fontSize: '1.5rem' }}>💰</span>
+            </div>
           </div>
         </div>
       </div>
@@ -296,6 +250,45 @@ export default function DashboardQuirofanoNativo({ data }) {
               <LineChart data={monthlyData}>
                 <Line type="step" dataKey="Total_Cirugias" stroke="#10B981" strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Nuevas Gráficas de Ingresos */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Médicos por Ingreso (SAP)</h3>
+          <div style={{ width: '100%', height: 350 }}>
+            <ResponsiveContainer>
+              <BarChart layout="vertical" data={topMedicosIngresos} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
+                <YAxis dataKey="nombre" type="category" width={150} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#475569' }} />
+                <Tooltip 
+                  formatter={(value) => [formatCurrency(value), 'Ingresos']}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                />
+                <Bar dataKey="ingresos" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Servicios Facturados (SAP)</h3>
+          <div style={{ width: '100%', height: 350 }}>
+            <ResponsiveContainer>
+              <BarChart layout="vertical" data={topServiciosIngresos} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
+                <YAxis dataKey="nombre" type="category" width={150} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#475569' }} />
+                <Tooltip 
+                  formatter={(value) => [formatCurrency(value), 'Ingresos']}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                />
+                <Bar dataKey="ingresos" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>

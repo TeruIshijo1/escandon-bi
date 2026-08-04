@@ -13,9 +13,12 @@ import { useState, useEffect } from 'react';
 import EmbeddedBI    from './EmbeddedBI';
 import PremiumLoader from '../shared/PremiumLoader';
 import DashboardFinancieroNativo from './DashboardFinancieroNativo';
+import DashboardFinanzasNativo from './DashboardFinanzasNativo';
 import DashboardEficienciaNativo from './DashboardEficienciaNativo';
 import DashboardEficaciaNativo from './DashboardEficaciaNativo';
+import DashboardVidasSalvadas from './DashboardVidasSalvadas';
 import DashboardNuevoMapa from './DashboardNuevoMapa';
+import GlobalFilterBar from './GlobalFilterBar';
 import ExportButton  from '../shared/ExportButton';
 import ExportApiModal from '../shared/ExportApiModal';
 import { useAuth }   from '../../context/AuthContext';
@@ -47,6 +50,34 @@ function SectionHeader({ title, subtitle, accent = '#004687' }) {
 }
 
 
+const TAB_DETAILS = {
+  eficiencia: {
+    tag: 'Dashboard de Mando Directivo',
+    title: 'Eficiencia Operativa',
+    color: '#0088C9', // Cyan
+  },
+  eficacia: {
+    tag: 'Dashboard de Mando Directivo',
+    title: 'Eficacia Clínica',
+    color: '#00974A', // Green
+  },
+  financiero: {
+    tag: 'Dashboard de Mando Directivo',
+    title: 'Macropanel Financiero',
+    color: '#005FA9', // Blue
+  },
+  finanzas: {
+    tag: 'Dashboard de Mando Directivo',
+    title: 'Ingresos y Egresos',
+    color: '#E8853D', // Orange
+  },
+  demografia: {
+    tag: 'Dashboard de Mando Directivo',
+    title: 'Demografía Geográfica',
+    color: '#F59E0B', // Amber
+  }
+};
+
 export default function DashboardDirectivo() {
   const { user }             = useAuth();
   const [fecha,  setFecha]   = useState('');
@@ -55,6 +86,20 @@ export default function DashboardDirectivo() {
   const [data, setData]      = useState({ censo: [] });
   const [showExportApi, setShowExportApi] = useState(false);
   const [configList, setConfigList] = useState([]);
+  
+  // Global filters
+  const [globalFilters, setGlobalFilters] = useState({
+    search: '',
+    startDate: '',
+    endDate: '',
+    medico: '',
+    especialidad: ''
+  });
+  const [applyTrigger, setApplyTrigger] = useState(0);
+
+  const handleApplyFilters = () => {
+    setApplyTrigger(prev => prev + 1);
+  };
 
   useEffect(() => {
     const now = new Date();
@@ -108,76 +153,110 @@ export default function DashboardDirectivo() {
 
       {/* ── Header del dashboard ── */}
       <div style={{
-        background:    'linear-gradient(135deg, #004687 0%, #005FA9 50%, #0088C9 100%)',
+        background:    '#0B132B', // Deep navy black
         borderRadius:  20,
-        padding:       '1.75rem 2rem',
+        padding:       '2rem 2.25rem',
         marginBottom:  '1.5rem',
         position:      'relative',
         overflow:      'hidden',
+        boxShadow:     '0 10px 30px rgba(0, 70, 135, 0.15)',
+        border:        '1px solid rgba(255, 255, 255, 0.05)',
+        borderTop:     '1.5px solid rgba(255, 255, 255, 0.12)'
       }}>
-        {/* Patrón decorativo */}
+        {/* Glowing mesh gradient background shapes */}
         <div style={{
-          position:   'absolute',
-          right:      '-40px',
-          top:        '-40px',
-          width:       220,
-          height:      220,
-          borderRadius:'50%',
-          background: 'rgba(255,255,255,0.04)',
-          pointerEvents:'none',
-        }}/>
+          position: 'absolute',
+          top: '-50%',
+          right: '-10%',
+          width: '350px',
+          height: '350px',
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${TAB_DETAILS[activeTab]?.color || '#0088C9'}33 0%, rgba(13, 70, 135, 0) 70%)`,
+          filter: 'blur(40px)',
+          pointerEvents: 'none',
+          transition: 'background 0.5s ease'
+        }} />
         <div style={{
-          position:   'absolute',
-          right:       60,
-          bottom:     '-60px',
-          width:       160,
-          height:      160,
-          borderRadius:'50%',
-          background: 'rgba(255,255,255,0.03)',
-          pointerEvents:'none',
-        }}/>
+          position: 'absolute',
+          bottom: '-30%',
+          right: '20%',
+          width: '250px',
+          height: '250px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.03) 0%, rgba(0, 0, 0, 0) 70%)',
+          filter: 'blur(30px)',
+          pointerEvents: 'none'
+        }} />
 
-        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', position:'relative', zIndex:1 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', position:'relative', zIndex:1, flexWrap: 'wrap', gap: '1.5rem' }}>
           <div>
-            <div style={{ fontSize:'0.72rem', fontWeight:700, letterSpacing:'0.12em', textTransform:'uppercase', color:'rgba(255,255,255,0.6)', marginBottom:'0.35rem' }}>
-              Dashboard de Mando Directivo
+            <div style={{ 
+              fontSize:'0.75rem', 
+              fontWeight:700, 
+              letterSpacing:'0.15em', 
+              textTransform:'uppercase', 
+              color: TAB_DETAILS[activeTab]?.color || '#38BDF8', 
+              marginBottom:'0.4rem',
+              fontFamily: "'Inter', sans-serif",
+              transition: 'color 0.3s ease'
+            }}>
+              {TAB_DETAILS[activeTab]?.tag || 'Dashboard de Mando Directivo'}
             </div>
-            <h1 style={{ fontFamily:"var(--font-display)", fontSize:'1.7rem', fontWeight:800, color:'white', margin:0, lineHeight:1.1 }}>
-              Resumen Ejecutivo
+            <h1 style={{ 
+              fontFamily:"'Outfit', sans-serif", 
+              fontSize:'2rem', 
+              fontWeight:800, 
+              color:'white', 
+              margin:0, 
+              lineHeight:1.1,
+              background: 'linear-gradient(to right, #FFFFFF, #CBD5E1)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              {TAB_DETAILS[activeTab]?.title || 'Resumen Ejecutivo'}
             </h1>
-            <div style={{ fontSize:'0.82rem', color:'rgba(255,255,255,0.7)', marginTop:'0.35rem', textTransform:'capitalize' }}>
-              {fecha}
+            <div style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontSize:'0.82rem', 
+              color:'#94A3B8', 
+              marginTop:'0.5rem', 
+              textTransform:'capitalize' 
+            }}>
+              📅 {fecha}
             </div>
 
             {/* Chips de estado rápido */}
-            <div style={{ display:'flex', gap:'0.5rem', marginTop:'1rem', flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:'0.5rem', marginTop:'1.25rem', flexWrap:'wrap' }}>
               {data.censo.slice(0, 3).map(area => (
                 <span key={area.Area} style={{
-                  background:   'rgba(255,255,255,0.15)',
-                  border:       '1px solid rgba(255,255,255,0.2)',
+                  background:   'rgba(0, 136, 201, 0.12)',
+                  border:       '1px solid rgba(0, 136, 201, 0.25)',
                   borderRadius: 100,
-                  padding:      '0.25rem 0.75rem',
+                  padding:      '0.3rem 0.8rem',
                   fontSize:     '0.75rem',
-                  color:        'white',
-                  fontWeight:   500,
+                  color:        '#38BDF8',
+                  fontWeight:   600,
                   backdropFilter:'blur(8px)',
                 }}>{area.Area}: {area.Ocupadas}</span>
               ))}
-              {data.censo.length === 0 && (
-                <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>No hay pacientes activos</span>
-              )}
+
             </div>
           </div>
 
           {/* Botones de exportación */}
-          <div style={{ display:'flex', gap:'0.5rem', alignItems:'flex-start', flexShrink:0 }}>
+          <div style={{ display:'flex', gap:'0.75rem', alignItems:'center', flexShrink:0 }}>
             <button
               onClick={() => document.getElementById('export-pdf-btn')?.click()}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.6rem 1.1rem',
-                background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.22)',
-                borderRadius: 10, color: '#FFFFFF', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer'
+                display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem',
+                background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.12)',
+                borderRadius: 10, color: '#FFFFFF', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
+                transition: 'all 0.2s ease'
               }}
+              onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; }}
+              onMouseOut={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
               Exportar PDF
@@ -185,10 +264,13 @@ export default function DashboardDirectivo() {
             <button
               onClick={() => document.getElementById('export-excel-btn')?.click()}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.6rem 1.1rem',
-                background: '#00974A', border: '1.5px solid rgba(0,151,74,0.5)',
-                borderRadius: 10, color: '#FFFFFF', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer'
+                display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.65rem 1.25rem',
+                background: '#00974A', border: '1.5px solid rgba(0,151,74,0.3)',
+                borderRadius: 10, color: '#FFFFFF', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
+                transition: 'all 0.2s ease'
               }}
+              onMouseOver={e => { e.currentTarget.style.background = '#00803F'; e.currentTarget.style.boxShadow = '0 0 12px rgba(0,151,74,0.4)'; }}
+              onMouseOut={e => { e.currentTarget.style.background = '#00974A'; e.currentTarget.style.boxShadow = 'none'; }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
               Exportar Excel
@@ -196,6 +278,8 @@ export default function DashboardDirectivo() {
           </div>
         </div>
       </div>
+
+
 
       {/* ── Tabs de categoría ── */}
       <div style={{
@@ -209,6 +293,7 @@ export default function DashboardDirectivo() {
           { key:'eficiencia', label:'⚙️  Eficiencia Operativa' },
           { key:'eficacia',   label:'🎯  Eficacia Clínica' },
           { key:'financiero', label:'💼  Macropanel Financiero' },
+          { key:'finanzas',   label:'💰  Ingresos y Egresos' },
           { key:'demografia', label:'🗺️  Demografía Geográfica' },
         ].map(tab => (
           <button
@@ -238,6 +323,14 @@ export default function DashboardDirectivo() {
         ))}
       </div>
 
+      <GlobalFilterBar 
+        filters={globalFilters} 
+        setFilters={setGlobalFilters} 
+        onApply={handleApplyFilters} 
+        showSearch={activeTab !== 'eficacia' && activeTab !== 'eficiencia'}
+        activeTab={activeTab}
+      />
+
       {/* ── Contenido de tabs ── */}
 
       {activeTab === 'eficiencia' && (
@@ -247,7 +340,7 @@ export default function DashboardDirectivo() {
             subtitle="Acceso ultra-rápido a métricas operativas desde UDR_BI_INDICADORES_OPERATIVOS"
             accent="#0088C9"
           />
-          <DashboardEficienciaNativo />
+          <DashboardEficienciaNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
         </div>
       )}
 
@@ -258,18 +351,24 @@ export default function DashboardDirectivo() {
             subtitle="Acceso ultra-rápido a productividad de médicos y consultas"
             accent="#00974A"
           />
-          <DashboardEficaciaNativo />
+          <DashboardEficaciaNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
         </div>
       )}
 
       {activeTab === 'financiero' && (
         <div>
+          <DashboardFinancieroNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
+        </div>
+      )}
+
+      {activeTab === 'finanzas' && (
+        <div>
           <SectionHeader
-            title="Macropanel Financiero (Nativo Directo a SQL)"
-            subtitle="Datos en tiempo real sin Power BI. Interactivo, seguro y nativo."
-            accent="#005FA9"
+            title="Ingresos y Egresos"
+            subtitle="Detalle financiero de ingresos en caja y egresos en SAP"
+            accent="#E8853D"
           />
-          <DashboardFinancieroNativo />
+          <DashboardFinanzasNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
         </div>
       )}
 

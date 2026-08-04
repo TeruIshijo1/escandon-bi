@@ -11,6 +11,8 @@ INSERT OR IGNORE INTO Roles (NombreRol, Descripcion, Nivel) VALUES
 ('JEFE_AREA', 'Acceso restringido a su área hospitalaria asignada.', 3);
 INSERT OR IGNORE INTO Roles (NombreRol, Descripcion, Nivel) VALUES
 ('USUARIO_OPERATIVO', 'Solo visualización y descarga básica de datos de su área.', 4);
+INSERT OR IGNORE INTO Roles (NombreRol, Descripcion, Nivel) VALUES
+('ALMACEN_GENERAL', 'Acceso operativo a inventario general y traslados SAP.', 4);
 
 -- El administrador inicial se crea desde backend/config/init-db.js únicamente
 -- cuando SEED_ADMIN_PASSWORD está configurada en el archivo .env local.

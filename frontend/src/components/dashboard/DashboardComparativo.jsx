@@ -42,7 +42,7 @@ export default function DashboardComparativo() {
             'Vertical - Ingresos': d.Ingresos
           }));
           
-          // Podría haber empalme (2017), los agrupamos si existen
+          // Podría haber empalme (2026), los agrupamos si existen
           cirrusData.forEach(cd => {
             const existing = combined.find(c => c.month === cd.month);
             if (existing) {
@@ -112,7 +112,7 @@ export default function DashboardComparativo() {
       <div style={{ background: 'rgba(59, 130, 246, 0.05)', borderRadius: '12px', padding: '1.5rem', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
         <h4 style={{ fontFamily: 'var(--font-display)', color: '#1E3A8A', marginBottom: '0.5rem' }}>Evolución del Hospital</h4>
         <p style={{ color: '#3B82F6', fontSize: '0.9rem', lineHeight: '1.5' }}>
-          La gráfica superior demuestra la continuidad financiera del Hospital Escandón al migrar de la antigua arquitectura monolítica (SITI) hacia la plataforma integral moderna (Vertical) a partir del año 2017. Los picos y valles representan no solo la inflación, sino la eficiencia operativa mejorada que Vertical logró capturar al estandarizar los procesos hospitalarios.
+          La gráfica superior demuestra la continuidad financiera del Hospital Escandón al migrar de la antigua arquitectura monolítica (SITI) hacia la plataforma integral moderna (Vertical/Cirrus) que culminó en el primer trimestre de 2026. Los datos históricos hasta marzo de 2026 provienen de SITI, mientras que a partir de abril de 2026 se integran exclusivamente de Vertical.
         </p>
       </div>
 

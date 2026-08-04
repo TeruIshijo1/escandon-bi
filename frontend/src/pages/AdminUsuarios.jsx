@@ -3,9 +3,16 @@
  * Hospital Escandón BI Platform v4.0
  * Rediseño premium con identidad de marca
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { getPermissionSections } from '../utils/rbac';
 
 const API_BASE = '/api';
+
+/**
+ * PLATFORM_SECTIONS se genera dinámicamente desde rbac.js.
+ * Así, al agregar una nueva sección en rbac.js (getNavItems + ROUTE_TO_PERMISSION),
+ * automáticamente aparecerá en el modal de permisos sin necesidad de tocar este archivo.
+ */
 
 const ROL_COLORS = {
   ADMIN:            { bg:'rgba(0,70,135,0.08)',   text:'var(--color-azul-fuerte)'   },
@@ -25,6 +32,17 @@ const ROL_DISPLAY = {
 const AREAS_LIST = ['QUIROFANO', 'UCI', 'URGENCIAS', 'CUNEROS', 'IMAGENOLOGIA', 'LABORATORIO', 'CONSULTA_EXTERNA', 'HOSPITALIZACION'];
 
 export default function AdminUsuarios() {
+  // Genera dinámicamente la lista de secciones desde rbac.js
+  const PLATFORM_SECTIONS = useMemo(() => getPermissionSections(), []);
+  // Extraer las categorías únicas, en orden de aparición
+  const categories = useMemo(() => {
+    const cats = [];
+    for (const s of PLATFORM_SECTIONS) {
+      if (!cats.includes(s.category)) cats.push(s.category);
+    }
+    return cats;
+  }, [PLATFORM_SECTIONS]);
+
   const [users,   setUsers]   = useState([]);
   const [roles,   setRoles]   = useState([
     { id: 1, nombre: 'ADMIN' },
@@ -40,47 +58,13 @@ export default function AdminUsuarios() {
   const [toast, setToast] = useState('');
   const [modalEdit, setModalEdit] = useState(null);
   const [editForm, setEditForm] = useState({ username:'', nombre:'', email:'', password:'', roleId:4, area:'' });
-  const [availableReports, setAvailableReports] = useState([]);
 
   useEffect(() => {
     fetchUsers();
     fetchRoles();
-    fetchAvailableReports();
   }, []);
 
-  const fetchAvailableReports = async () => {
-    try {
-      const token = sessionStorage.getItem('escandon_token');
-      const [resConfig, resKPI] = await Promise.all([
-        fetch(`${API_BASE}/admin/config-bi`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE}/admin/kpi-config`, { headers: { 'Authorization': `Bearer ${token}` } })
-      ]);
-      const jsonConfig = await resConfig.json();
-      const jsonKPI = await resKPI.json();
-      
-      let allReports = [];
-      if (jsonConfig.ok) {
-        allReports = [...allReports, ...jsonConfig.data.map(r => ({
-          ...r,
-          type: 'TABLERO',
-          displayId: r.reportId
-        }))];
-      }
-      if (jsonKPI.ok) {
-        allReports = [...allReports, ...jsonKPI.data.map(k => ({
-          ...k,
-          reportId: k.ElementoId,
-          displayId: k.ElementoId,
-          name: k.NombreCustom || k.NombreDefault,
-          area: k.ElementoId.startsWith('area.') ? k.ElementoId.split('.')[1].toUpperCase() : 'GLOBAL',
-          type: 'BOTÓN KPI'
-        }))];
-      }
-      setAvailableReports(allReports);
-    } catch (err) {
-      console.error('Error fetching available reports:', err);
-    }
-  };
+
 
   const fetchUsers = async () => {
     try {
@@ -229,7 +213,7 @@ export default function AdminUsuarios() {
   const handleSelectAll = (select) => {
     if (select) {
       const all = new Set();
-      availableReports.forEach(r => all.add(r.reportId));
+      PLATFORM_SECTIONS.forEach(s => all.add(s.id));
       setSelectedReports(all);
     } else {
       setSelectedReports(new Set());
@@ -379,9 +363,9 @@ export default function AdminUsuarios() {
         overflow:'hidden', 
         boxShadow:'var(--shadow-xs)' 
       }}>
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
           <table className="users-table" style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.82rem' }}>
-            <thead>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
               <tr style={{ borderBottom: '2px solid rgba(0,70,135,0.06)' }}>
                 {['Usuario','Nombre Completo','Perfil','Área','Último Acceso','Estado','Acciones'].map(h => (
                   <th key={h} style={{ 
@@ -485,26 +469,29 @@ export default function AdminUsuarios() {
             </div>
 
             <div style={{ maxHeight:'420px', overflowY:'auto', paddingRight:'0.5rem' }}>
-              {/* Agrupación por Área */}
-              {['GLOBAL', ...AREAS_LIST].map(area => {
-                const reportsInArea = availableReports.filter(r => (r.area || 'GLOBAL') === area);
-                if (reportsInArea.length === 0) return null;
+              {/* Agrupación por Categoría de la Plataforma */}
+              {categories.map(category => {
+                const sectionsInCategory = PLATFORM_SECTIONS.filter(s => s.category === category);
+                if (sectionsInCategory.length === 0) return null;
                 
+                // Tomar el ícono del primer item de la categoría
+                const categoryIcon = sectionsInCategory[0]?.icon || '📌';
+
                 return (
-                  <div key={area} style={{ marginBottom:'1.5rem' }}>
+                  <div key={category} style={{ marginBottom:'1.5rem' }}>
                     <h4 style={{ fontFamily: 'var(--font-mono)', fontSize:'0.7rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--color-azul-fuerte)', borderBottom:'1px solid rgba(0,70,135,0.06)', paddingBottom:'0.45rem', marginBottom:'0.85rem' }}>
-                      {area === 'GLOBAL' ? '🌐 Reportes Generales' : `📍 Tablero ${area}`}
+                      {categoryIcon} {category}
                     </h4>
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:'0.75rem' }}>
-                      {reportsInArea.map(r => (
+                      {sectionsInCategory.map(s => (
                         <div 
-                          key={r.reportId} 
-                          onClick={() => handleToggleReport(r.reportId)}
+                          key={s.id} 
+                          onClick={() => handleToggleReport(s.id)}
                           style={{ 
                             padding:'0.85rem 1rem', 
                             borderRadius:12, 
-                            border:`1.5px solid ${selectedReports.has(r.reportId) ? 'var(--color-azul-claro)' : 'rgba(0,70,135,0.08)'}`,
-                            background: selectedReports.has(r.reportId) ? 'rgba(0,136,201,0.04)' : '#FFFFFF', 
+                            border:`1.5px solid ${selectedReports.has(s.id) ? 'var(--color-azul-claro)' : 'rgba(0,70,135,0.08)'}`,
+                            background: selectedReports.has(s.id) ? 'rgba(0,136,201,0.04)' : '#FFFFFF', 
                             cursor:'pointer',
                             display:'flex', 
                             alignItems:'center', 
@@ -512,13 +499,13 @@ export default function AdminUsuarios() {
                             transition:'all 150ms ease'
                           }}
                         >
-                          <input type="checkbox" checked={selectedReports.has(r.reportId)} readOnly style={{ cursor:'pointer' }} />
+                          <input type="checkbox" checked={selectedReports.has(s.id)} readOnly style={{ cursor:'pointer' }} />
                           <div style={{ overflow:'hidden', flex: 1 }}>
-                            <div style={{ fontFamily: 'var(--font-body)', fontSize:'0.82rem', fontWeight:700, color: selectedReports.has(r.reportId) ? 'var(--color-azul-fuerte)' : 'var(--text-primary)', whiteSpace:'nowrap', textOverflow:'ellipsis', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>{r.type === 'BOTÓN KPI' ? '🔘' : '📊'}</span>
-                              {r.name}
+                            <div style={{ fontFamily: 'var(--font-body)', fontSize:'0.82rem', fontWeight:700, color: selectedReports.has(s.id) ? 'var(--color-azul-fuerte)' : 'var(--text-primary)', whiteSpace:'nowrap', textOverflow:'ellipsis', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>{s.icon}</span>
+                              {s.name}
                             </div>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize:'0.65rem', color:'var(--text-muted)', marginTop: '2px' }}>ID: {r.reportId} {r.type === 'BOTÓN KPI' && '(Botón KPI)'}</div>
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize:'0.65rem', color:'var(--text-muted)', marginTop: '2px' }}>ID: {s.id}</div>
                           </div>
                         </div>
                       ))}

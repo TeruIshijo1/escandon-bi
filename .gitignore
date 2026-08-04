@@ -42,3 +42,10 @@ Thumbs.db
 backend/uploads/
 scratch/
 backend/scratch/
+
+# Scripts temporales
+scratch_*.js
+test_*.js
+check_*.js
+search_*.js
+pase_a_produccion/

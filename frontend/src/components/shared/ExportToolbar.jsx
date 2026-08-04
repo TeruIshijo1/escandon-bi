@@ -7,32 +7,53 @@ export default function ExportToolbar({ targetId, excelData, fileNamePrefix = 'D
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
 
-  // Generar Excel
+  // Generar Excel Institucional
   const handleExportExcel = () => {
     setIsExportingExcel(true);
     try {
-      const wb = XLSX.utils.book_new();
+      const fechaReporte = new Date().toLocaleString('es-MX');
+      let html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse;width:100%;margin-bottom:20px;}
+  .title-bar{background:#004687;color:#fff;font-size:16pt;font-weight:bold;padding:12px 16px}
+  .subtitle-bar{background:#0088C9;color:#fff;font-size:12pt;font-weight:bold;padding:8px 16px}
+  .info-row td{font-size:9pt;color:#475569;padding:4px 16px}
+  th{background:#004687;color:#fff;font-weight:bold;font-size:10pt;padding:10px 8px;border:1px solid #003366;text-align:center}
+  td{padding:7px 8px;font-size:9pt;border:1px solid #D1D5DB;color:#1E293B}
+  .even{background:#F4F6F9}.odd{background:#FFF}
+</style></head><body>`;
 
       Object.keys(excelData).forEach(sheetName => {
         const data = excelData[sheetName];
         if (data && data.length > 0) {
-          // Add institutional header rows to Excel
-          const headerRows = [
-            ['HOSPITAL ESCANDÓN - PLATAFORMA BI'],
-            ['Reporte:', fileNamePrefix],
-            ['Fecha de exportación:', new Date().toLocaleDateString('es-MX')],
-            [] // empty row
-          ];
-          
-          const ws = XLSX.utils.json_to_sheet(data, { origin: 'A5' });
-          XLSX.utils.sheet_add_aoa(ws, headerRows, { origin: 'A1' });
-          
-          XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
+          const keys = Object.keys(data[0]);
+          html += `<table>
+            <tr><td colspan="${keys.length}" class="title-bar">HOSPITAL ESCANDÓN - PLATAFORMA BI</td></tr>
+            <tr><td colspan="${keys.length}" class="subtitle-bar">Reporte: ${fileNamePrefix} — ${sheetName}</td></tr>
+            <tr class="info-row"><td colspan="${keys.length}">Fecha de exportación: ${fechaReporte} &nbsp;|&nbsp; Registros: ${data.length}</td></tr>
+            <tr><td colspan="${keys.length}" style="height:6px;border:none"></td></tr>
+            <tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr>
+            ${data.map((row, i) => `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">${keys.map(k => {
+              let val = row[k];
+              if (val == null) val = '';
+              return `<td>${String(val).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`;
+            }).join('')}</tr>`).join('')}
+          </table><br/>`;
         }
       });
+      html += `</body></html>`;
 
-      const today = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(wb, `${fileNamePrefix}_${today}.xlsx`);
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; 
+      a.download = `${fileNamePrefix}_${new Date().toISOString().split('T')[0]}.xls`;
+      document.body.appendChild(a); 
+      a.click(); 
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (e) {
       console.error('Error exportando Excel:', e);
       alert('Error exportando a Excel.');

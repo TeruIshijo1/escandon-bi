@@ -61,42 +61,69 @@ const EcgSVG = () => {
   const pathData = `M0,35 ${cycles.join(' ')}`;
 
   return (
-    <svg
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '100%',
-        width: '100%',
-        pointerEvents: 'none',
-      }}
-      viewBox="0 0 2400 55"
-      preserveAspectRatio="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {/* Línea ECG principal */}
-      <path
-        d={pathData}
-        fill="none"
-        stroke="var(--color-azul-claro)"
-        strokeWidth="2"
-        opacity="0.08"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      {/* Línea ECG secundaria (ligeramente offset para profundidad) */}
-      <path
-        d={pathData}
-        fill="none"
-        stroke="var(--color-azul-fuerte)"
-        strokeWidth="1.2"
-        opacity="0.03"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        transform="translate(100, 3)"
-      />
-    </svg>
+    <>
+      <style>{`
+        @keyframes ecgFlow {
+          from { transform: translateX(0); }
+          to { transform: translateX(-200px); }
+        }
+        .ecg-path-animated {
+          animation: ecgFlow 25s linear infinite;
+        }
+      `}</style>
+      <svg
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '100%',
+          width: '100%',
+          pointerEvents: 'none',
+        }}
+        viewBox="0 0 2400 55"
+        preserveAspectRatio="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <linearGradient id="ecg-glow-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#38BDF8" stopOpacity="0" />
+            <stop offset="15%" stopColor="#38BDF8" stopOpacity="0.04" />
+            <stop offset="45%" stopColor="#0088C9" stopOpacity="0.22" />
+            <stop offset="50%" stopColor="#0088C9" stopOpacity="0.3" />
+            <stop offset="55%" stopColor="#0088C9" stopOpacity="0.22" />
+            <stop offset="85%" stopColor="#38BDF8" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="#38BDF8" stopOpacity="0" />
+          </linearGradient>
+          <filter id="ecg-glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <path
+          className="ecg-path-animated"
+          d={pathData}
+          fill="none"
+          stroke="url(#ecg-glow-grad)"
+          strokeWidth="1.8"
+          filter="url(#ecg-glow-filter)"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <path
+          d={pathData}
+          fill="none"
+          stroke="var(--color-azul-claro)"
+          strokeWidth="1"
+          opacity="0.02"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      </svg>
+    </>
   );
 };
 

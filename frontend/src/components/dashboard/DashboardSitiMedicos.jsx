@@ -16,7 +16,12 @@ export default function DashboardSitiMedicos() {
   useEffect(() => {
     setLoading(true);
     const query = year !== 'Histórico' ? `?year=${year}` : '';
-    fetch(`${API_BASE}/siti/medicos${query}`)
+    const token = sessionStorage.getItem('escandon_token');
+    fetch(`${API_BASE}/siti/medicos${query}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
       .then(res => res.json())
       .then(res => {
         if(res.success) {

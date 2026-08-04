@@ -5,6 +5,7 @@
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { API_BASE } from '../api/config';
+import { CAPABILITIES } from '../utils/rbac';
 
 const AuthContext = createContext(null);
 
@@ -38,23 +39,35 @@ export function AuthProvider({ children }) {
   /* ── Login ───────────────────────────────────────────────── */
   const login = useCallback(async (username, password) => {
     setError(null);
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ username, password }),
-    });
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, password }),
+      });
 
-    const data = await res.json();
-    if (!res.ok) { setError(data.message || 'Error de autenticación'); return false; }
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.message || 'Error de autenticación';
+        setError(msg);
+        return { ok: false, message: msg };
+      }
 
-    sessionStorage.setItem('escandon_token', data.token);
-    setUser({ ...data.user, token: data.token });
-    return true;
+      sessionStorage.setItem('escandon_token', data.token);
+      localStorage.setItem('token', data.token);
+      setUser({ ...data.user, token: data.token });
+      return { ok: true };
+    } catch (err) {
+      const msg = 'No se pudo conectar al servidor. Verifique que el backend esté corriendo.';
+      setError(msg);
+      return { ok: false, message: msg };
+    }
   }, []);
 
   /* ── Logout ──────────────────────────────────────────────── */
   const logout = useCallback(() => {
     sessionStorage.removeItem('escandon_token');
+    localStorage.removeItem('token');
     setUser(null);
   }, []);
 
@@ -62,7 +75,6 @@ export function AuthProvider({ children }) {
   const hasRole = useCallback((role) => user?.role === role, [user]);
   const can     = useCallback((capability) => {
     if (!user) return false;
-    const { CAPABILITIES } = require('../utils/rbac');
     return CAPABILITIES[user.role]?.[capability] ?? false;
   }, [user]);
 

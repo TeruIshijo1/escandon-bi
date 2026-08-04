@@ -12,7 +12,215 @@ const fs          = require('fs');
 const path        = require('path');
 const { getDb }   = require('../config/db');
 const { authenticate, authorize, authorizeCapability } = require('../middleware/auth.middleware');
-const { getInventariosVsCargos } = require('../services/etl.service');
+const { getInventariosVsCargos, getDevolucionesFarmacia, getCargosFarmaciaSAP } = require('../services/etl.service');
+
+/* ══════════════════════════════════════════════════════════════
+   ESTILO INSTITUCIONAL — Formato Excel Hospital Escandón
+   Se aplica a TODOS los reportes generados por la plataforma.
+══════════════════════════════════════════════════════════════ */
+const BRAND = {
+  azulOscuro:   'FF004687',
+  azulClaro:    'FF0088C9',
+  blanco:       'FFFFFFFF',
+  grisFila:     'FFF4F6F9',
+  grisTexto:    'FF475569',
+  azulTotales:  'FFE0EAF4',
+  verdeMoneda:  'FF15803D',
+  ambarLote:    'FFB45309',
+  rojoCrit:     'FF991B1B',
+  rojoFondo:    'FFFEE2E2',
+  amarilloFondo:'FFFEF3C7',
+  amarilloTxt:  'FF92400E',
+  verdeFondo:   'FFD1FAE5',
+  verdeTxt:     'FF065F46',
+};
+
+/**
+ * Aplica el formato institucional completo a un workbook de ExcelJS.
+ * @param {ExcelJS.Workbook} workbook
+ * @param {ExcelJS.Worksheet} sheet
+ * @param {object} opts
+ * @param {string} opts.titulo - Título del reporte
+ * @param {object} opts.resumen - Objeto clave-valor con métricas de resumen (opcional)
+ * @param {Array}  opts.columnas - Array de {header, key, width}
+ * @param {Array}  opts.filas - Array de objetos con los datos
+ * @param {object} opts.totales - Objeto con fila de totales (opcional)
+ * @param {object} opts.meta - Info del usuario {nombre, role} (opcional)
+ * @param {string} opts.periodo - Texto descriptivo del período (opcional)
+ */
+function applyInstitutionalStyle(workbook, sheet, opts) {
+  const { titulo, resumen, columnas, filas, totales, meta, periodo } = opts;
+  const numCols = columnas.length;
+
+  // ── Fila 1: Barra de título ──
+  const titleRow = sheet.addRow([titulo || 'HOSPITAL ESCANDÓN']);
+  sheet.mergeCells(titleRow.number, 1, titleRow.number, numCols);
+  titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND.azulOscuro } };
+  titleRow.getCell(1).font = { color: { argb: BRAND.blanco }, bold: true, size: 14, name: 'Calibri' };
+  titleRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  titleRow.height = 32;
+
+  // ── Fila 2: Subtítulo ──
+  const subtitleText = 'Hospital Escandón — Plataforma BI';
+  const subRow = sheet.addRow([subtitleText]);
+  sheet.mergeCells(subRow.number, 1, subRow.number, numCols);
+  subRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND.azulClaro } };
+  subRow.getCell(1).font = { color: { argb: BRAND.blanco }, size: 10, name: 'Calibri' };
+  subRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  subRow.height = 22;
+
+  // ── Fila 3: Metadatos ──
+  const infoFragments = [];
+  if (periodo) infoFragments.push(`Período: ${periodo}`);
+  if (meta?.nombre) infoFragments.push(`Generado por: ${meta.nombre}`);
+  infoFragments.push(`Fecha: ${new Date().toLocaleString('es-MX')}`);
+  infoFragments.push(`Total registros: ${filas.length}`);
+  const infoRow = sheet.addRow([infoFragments.join('   |   ')]);
+  sheet.mergeCells(infoRow.number, 1, infoRow.number, numCols);
+  infoRow.getCell(1).font = { color: { argb: BRAND.grisTexto }, size: 9, name: 'Calibri', italic: true };
+  infoRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  infoRow.height = 20;
+
+  // ── Fila 4: Resumen (si hay) ──
+  if (resumen && Object.keys(resumen).length > 0) {
+    const resumenText = Object.entries(resumen).map(([k, v]) => `${k}: ${v}`).join('   |   ');
+    const resRow = sheet.addRow([resumenText]);
+    sheet.mergeCells(resRow.number, 1, resRow.number, numCols);
+    resRow.getCell(1).font = { color: { argb: BRAND.azulOscuro }, size: 10, name: 'Calibri', bold: true };
+    resRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    resRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND.azulTotales } };
+    resRow.height = 22;
+  }
+
+  // ── Fila separadora ──
+  const sepRow = sheet.addRow([]);
+  sepRow.height = 6;
+
+  // ── Fila de encabezados de columna ──
+  const headerValues = columnas.map(c => c.header);
+  const headerRow = sheet.addRow(headerValues);
+  const headerRowNum = headerRow.number;
+  headerRow.height = 30;
+  headerRow.eachCell((cell, colNumber) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND.azulOscuro } };
+    cell.font = { color: { argb: BRAND.blanco }, bold: true, size: 10, name: 'Calibri' };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top:    { style: 'thin', color: { argb: 'FF003366' } },
+      bottom: { style: 'thin', color: { argb: 'FF003366' } },
+      left:   { style: 'thin', color: { argb: 'FF003366' } },
+      right:  { style: 'thin', color: { argb: 'FF003366' } },
+    };
+  });
+
+  // ── Configurar anchos de columna ──
+  columnas.forEach((c, i) => {
+    sheet.getColumn(i + 1).width = c.width || 18;
+    sheet.getColumn(i + 1).key = c.key;
+  });
+
+  // ── Datos con formato ──
+  const thinBorder = {
+    top:    { style: 'hair', color: { argb: 'FFD1D5DB' } },
+    bottom: { style: 'hair', color: { argb: 'FFD1D5DB' } },
+    left:   { style: 'hair', color: { argb: 'FFD1D5DB' } },
+    right:  { style: 'hair', color: { argb: 'FFD1D5DB' } },
+  };
+
+  filas.forEach((row, idx) => {
+    const rowValues = columnas.map(c => row[c.key] ?? '');
+    const excelRow = sheet.addRow(rowValues);
+
+    excelRow.eachCell((cell, colNumber) => {
+      cell.font = { size: 9, name: 'Calibri', color: { argb: 'FF1E293B' } };
+      cell.border = thinBorder;
+      cell.alignment = { vertical: 'middle' };
+
+      // Fondo alternado
+      if (idx % 2 === 0) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND.grisFila } };
+      }
+    });
+
+    // Colorear columnas especiales por nombre de key
+    columnas.forEach((c, ci) => {
+      const cell = excelRow.getCell(ci + 1);
+      const val = row[c.key];
+
+      // Montos en verde
+      if (c.key && (c.key.toLowerCase().includes('monto') || c.key.toLowerCase().includes('precio') || c.key.toLowerCase().includes('total'))) {
+        if (val != null && val !== '') {
+          cell.font = { ...cell.font, color: { argb: BRAND.verdeMoneda }, bold: true };
+        }
+      }
+      // Lotes en ámbar
+      if (c.key && c.key.toLowerCase().includes('lote')) {
+        if (val != null && val !== '') {
+          cell.font = { ...cell.font, color: { argb: BRAND.ambarLote }, bold: true };
+        }
+      }
+    });
+
+    // Colorear celdas de estado (auditoría)
+    if (row.estado) {
+      const estadoIdx = columnas.findIndex(c => c.key === 'estado');
+      if (estadoIdx >= 0) {
+        const estadoCell = excelRow.getCell(estadoIdx + 1);
+        const estadoColors = {
+          'COINCIDE':                { bg: BRAND.verdeFondo, font: BRAND.verdeTxt },
+          'FALTANTE / NO COBRADO':   { bg: BRAND.rojoFondo, font: BRAND.rojoCrit },
+          'SOBRECARGO / NO SURTIDO': { bg: BRAND.amarilloFondo, font: BRAND.amarilloTxt },
+          'DIFERENCIA':              { bg: BRAND.amarilloFondo, font: BRAND.amarilloTxt },
+          'EXCEDENTE':               { bg: BRAND.amarilloFondo, font: BRAND.amarilloTxt },
+        };
+        const ec = estadoColors[row.estado] || null;
+        if (ec) {
+          estadoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ec.bg } };
+          estadoCell.font = { color: { argb: ec.font }, bold: true, size: 9, name: 'Calibri' };
+        }
+      }
+    }
+  });
+
+  // ── Fila de totales ──
+  if (totales) {
+    const totalRow = sheet.addRow(columnas.map(c => totales[c.key] ?? ''));
+    totalRow.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: BRAND.azulOscuro }, size: 10, name: 'Calibri' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND.azulTotales } };
+      cell.border = {
+        top: { style: 'medium', color: { argb: BRAND.azulOscuro } },
+        bottom: { style: 'medium', color: { argb: BRAND.azulOscuro } },
+      };
+    });
+    totalRow.height = 26;
+  }
+
+  // ── Autofilter en la fila de encabezados ──
+  sheet.autoFilter = {
+    from: { row: headerRowNum, column: 1 },
+    to:   { row: headerRowNum, column: numCols },
+  };
+
+  // ── Hoja de Información ──
+  const metaSheet = workbook.addWorksheet('Información');
+  const metaData = [
+    ['HOSPITAL ESCANDÓN'],
+    ['Plataforma BI — Reporte Generado Automáticamente'],
+    [''],
+    ['Reporte:', titulo],
+    ['Fecha generación:', new Date().toLocaleString('es-MX')],
+    ['Total registros:', filas.length],
+  ];
+  if (periodo) metaData.push(['Período:', periodo]);
+  if (meta?.nombre) metaData.push(['Generado por:', meta.nombre]);
+  if (meta?.role)   metaData.push(['Rol:', meta.role]);
+  metaData.forEach(row => metaSheet.addRow(row));
+  metaSheet.getRow(1).font = { bold: true, size: 14, color: { argb: BRAND.azulOscuro } };
+  metaSheet.getRow(2).font = { size: 10, color: { argb: BRAND.azulClaro } };
+  metaSheet.getColumn(1).width = 22;
+  metaSheet.getColumn(2).width = 40;
+}
 
 async function exportJsonToExcel(res, type, id) {
   try {
@@ -59,46 +267,28 @@ async function exportJsonToExcel(res, type, id) {
       return res.status(400).json({ error: 'El JSON no es un array válido o está vacío.' });
     }
 
-    // 2. Generar Excel
+    // 2. Generar Excel con estilo institucional
     const workbook  = new ExcelJS.Workbook();
     workbook.creator = 'Hospital Escandón — Plataforma BI';
     workbook.created = new Date();
 
-    // Limitar nombre de hoja a 31 caracteres
     let sheetName = (config.nombre || 'Exportación').substring(0, 31).replace(/[/\\?*\[\]]/g, '');
     const sheet = workbook.addWorksheet(sheetName, {
       pageSetup: { paperSize: 9, orientation: 'landscape' },
     });
 
-    // Obtener columnas dinámicamente del primer objeto
     const keys = Object.keys(rows[0] || {});
-    sheet.columns = keys.map(key => ({
+    const columnas = keys.map(key => ({
       header: key.toUpperCase(),
       key: key,
       width: Math.max(15, key.length + 5)
     }));
 
-    // Estilo de encabezado institucional
-    sheet.getRow(1).eachCell(cell => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF004687' } }; // Azul Fuerte
-      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 11, name: 'Calibri' };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    applyInstitutionalStyle(workbook, sheet, {
+      titulo: config.nombre || 'Exportación de Datos',
+      columnas,
+      filas: rows,
     });
-    sheet.getRow(1).height = 25;
-
-    // Insertar datos
-    rows.forEach((row, index) => {
-      const excelRow = sheet.addRow(row);
-      // Filas alternadas
-      if (index % 2 === 0) {
-        excelRow.eachCell(cell => {
-          cell.fill = { type:'pattern', pattern:'solid', fgColor: { argb: 'FFF4F6F9' } };
-        });
-      }
-    });
-
-    // Filtros automáticos
-    sheet.autoFilter = { from: 'A1', to: { row: 1, column: keys.length } };
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="Exportacion_${sheetName}.xlsx"`);
@@ -139,6 +329,29 @@ router.get(
     try {
       const { reportId } = req.params;
       const { area, estado, fechaDesde, fechaHasta } = req.query;
+      const hasFilters = Boolean(area || estado || fechaDesde || fechaHasta);
+
+      // Si NO hay filtros seleccionados en auditoría, generar CSV con TODOS los registros sin tope (23,000+)
+      if (!hasFilters && (reportId === 'auditoria-inventarios' || reportId === 'directivo-main' || reportId === 'devoluciones-farmacia')) {
+        const reporte = await resolveReportData(reportId, { limit: 100000 });
+        const escapeCsv = (str) => `"${String(str ?? '').replace(/"/g, '""')}"`;
+        const headers = reporte.columnas.map(c => escapeCsv(c.header)).join(',');
+        const rows = reporte.filas.map(row =>
+          reporte.columnas.map(c => escapeCsv(row[c.key])).join(',')
+        );
+
+        const csvContent = '\uFEFF' + [headers, ...rows].join('\r\n');
+        
+        let filenamePrefix = 'Auditoria_Inventarios_TODOS';
+        if (reportId === 'devoluciones-farmacia') {
+          filenamePrefix = 'Devoluciones_Farmacia_TODAS';
+        }
+        const filename = `${filenamePrefix}_${Date.now()}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(csvContent);
+      }
 
       // Verificar si el reporte tiene un JSON asignado (override)
       const db = require('../config/db').getDb();
@@ -154,7 +367,11 @@ router.get(
       }
 
       // Obtener datos (fuente dinámica según reportId)
-      const reporte = await resolveReportData(reportId, { area, estado, fechaDesde, fechaHasta, userRole: req.user.role, userArea: req.user.area });
+      const reporte = await resolveReportData(reportId, { 
+        ...req.query, 
+        userRole: req.user.role, 
+        userArea: req.user.area 
+      });
 
       const workbook  = new ExcelJS.Workbook();
       workbook.creator = 'Hospital Escandón — Plataforma BI';
@@ -164,80 +381,21 @@ router.get(
         pageSetup: { paperSize: 9, orientation: 'landscape' },
       });
 
-      // ── Estilo de encabezado ──
-      const headerFill = {
-        type: 'pattern', pattern: 'solid',
-        fgColor: { argb: 'FF004687' }, // Azul Fuerte
-      };
-      const headerFont = { color: { argb: 'FFFFFFFF' }, bold: true, size: 11, name: 'Calibri' };
+      // Construir texto de período
+      const periodoFragments = [];
+      if (fechaDesde) periodoFragments.push(`Desde: ${fechaDesde}`);
+      if (fechaHasta) periodoFragments.push(`Hasta: ${fechaHasta}`);
+      if (area)       periodoFragments.push(`Área: ${area}`);
 
-      // ── Columnas ──
-      sheet.columns = reporte.columnas.map(c => ({
-        header:  c.header,
-        key:     c.key,
-        width:   c.width || 18,
-      }));
-
-      // Aplicar estilo a encabezados
-      sheet.getRow(1).eachCell(cell => {
-        cell.fill = headerFill;
-        cell.font = headerFont;
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        cell.border = {
-          bottom: { style: 'thin', color: { argb: 'FF0088C9' } },
-        };
+      applyInstitutionalStyle(workbook, sheet, {
+        titulo: reporte.titulo,
+        resumen: reporte.resumen,
+        columnas: reporte.columnas,
+        filas: reporte.filas,
+        totales: reporte.totales,
+        meta: { nombre: req.user.nombre, role: req.user.role },
+        periodo: periodoFragments.join('   |   ') || null,
       });
-      sheet.getRow(1).height = 28;
-
-      // ── Datos ──
-      reporte.filas.forEach((row, idx) => {
-        const excelRow = sheet.addRow(row);
-        // Alternar fondo
-        if (idx % 2 === 0) {
-          excelRow.eachCell(cell => {
-            cell.fill = { type:'pattern', pattern:'solid', fgColor: { argb: 'FFF4F6F9' } };
-          });
-        }
-        // Colorear celdas de estado
-        if (row.estado) {
-          const estadoCell = excelRow.getCell('estado');
-          const colors = {
-            COINCIDE:   { bg: 'FFD1FAE5', font: 'FF065F46' },
-            DIFERENCIA: { bg: 'FFFEF3C7', font: 'FF92400E' },
-            FALTANTE:   { bg: 'FFFEE2E2', font: 'FF991B1B' },
-            EXCEDENTE:  { bg: 'FFFEF3C7', font: 'FF92400E' },
-          };
-          const c = colors[row.estado];
-          if (c) {
-            estadoCell.fill = { type:'pattern', pattern:'solid', fgColor: { argb: c.bg } };
-            estadoCell.font = { color: { argb: c.font }, bold: true };
-          }
-        }
-      });
-
-      // ── Fila de totales ──
-      if (reporte.totales) {
-        const totalRow = sheet.addRow(reporte.totales);
-        totalRow.eachCell(cell => {
-          cell.font = { bold: true, color: { argb: 'FF004687' } };
-          cell.fill = { type:'pattern', pattern:'solid', fgColor: { argb: 'FFE0EAF4' } };
-        });
-      }
-
-      // ── Autofilter ──
-      sheet.autoFilter = { from: 'A1', to: { row: 1, column: reporte.columnas.length } };
-
-      // ── Metadatos en hoja separada ──
-      const metaSheet = workbook.addWorksheet('Información del Reporte');
-      [
-        ['Hospital Escandón — Plataforma BI v1.0'],
-        [''],
-        ['Reporte:',       reporte.titulo],
-        ['Generado por:',  req.user.nombre],
-        ['Rol:',           req.user.role],
-        ['Fecha:',         new Date().toLocaleString('es-MX')],
-        ['Total registros:', reporte.filas.length],
-      ].forEach(row => metaSheet.addRow(row));
 
       // ── Respuesta HTTP ──
       const filename = `escandon_${reportId}_${Date.now()}.xlsx`;
@@ -325,15 +483,26 @@ router.get(
 
         // Filas
         reporte.filas.slice(0, 50).forEach((row, idx) => {
-          if (y > 680) { doc.addPage(); y = 50; }
+          // Calcular la altura máxima necesaria para esta fila
+          let rowHeight = 18;
+          doc.font('Helvetica').fontSize(7.5); // Asegurar fuente para cálculo correcto
+          cols.forEach((col, i) => {
+            const val = String(row[col.key] ?? '');
+            const h = doc.heightOfString(val, { width: colW - 8 });
+            if (h + 10 > rowHeight) {
+              rowHeight = h + 10;
+            }
+          });
+
+          if (y + rowHeight > 680) { doc.addPage(); y = 50; }
           const bg = idx % 2 === 0 ? '#F4F6F9' : '#FFFFFF';
-          doc.rect(startX, y, 512, 18).fill(bg);
+          doc.rect(startX, y, 512, rowHeight).fill(bg);
           cols.forEach((col, i) => {
             const val = String(row[col.key] ?? '');
             doc.fillColor('#0D1B2A').font('Helvetica').fontSize(7.5)
-               .text(val, startX + i * colW + 4, y + 5, { width: colW - 8, ellipsis: true });
+               .text(val, startX + i * colW + 4, y + 5, { width: colW - 8 });
           });
-          y += 18;
+          y += rowHeight;
         });
 
         if (reporte.filas.length > 50) {
@@ -374,18 +543,87 @@ async function resolveReportData(reportId, filters) {
         },
         columnas: [
           { header:'# Orden',    key:'orden',       width:14 },
+          { header:'Folio Atención', key:'folio',   width:16 },
           { header:'Paciente',   key:'paciente',    width:24 },
           { header:'Área',       key:'area',        width:16 },
-          { header:'Insumo',     key:'insumo',      width:28 },
+          { header:'Categoría', key:'categoria',   width:20 },
+          { header:'Código / SKU', key:'codigo',    width:14 },
+          { header:'Insumo / Medicamento', key:'insumo', width:30 },
+          { header:'Precio Unitario ($)', key:'precioUnitario', width:16 },
           { header:'Cant. Almacén', key:'cantAlmacen', width:14 },
           { header:'Cant. Cargo',   key:'cantCargo',   width:14 },
+          { header:'Cant. Devuelta', key:'devuelto',   width:14 },
           { header:'Diferencia', key:'diferencia',  width:12 },
           { header:'Monto ($)',  key:'monto',       width:14 },
+          { header:'Descuento ($)', key:'descuento', width:14 },
           { header:'Estado',     key:'estado',      width:14 },
-          { header:'Enfermera',  key:'enfermera',   width:20 },
-          { header:'Fecha',      key:'fecha',       width:14 },
+          { header:'Estatus Devolución', key:'estatusDevolucion', width:18 },
+          { header:'Fecha Devolución', key:'fechaDevolucion', width:16 },
+          { header:'Médico Tratante', key:'medicoTratante', width:22 },
+          { header:'Responsable Cargo', key:'enfermera', width:20 },
+          { header:'Fecha Cargo', key:'fecha',       width:14 },
         ],
         filas: raw.partidas || [],
+      };
+    }
+    case 'devoluciones-farmacia': {
+      const { fechaDesde, fechaHasta } = filters;
+      const raw = await getDevolucionesFarmacia(fechaDesde, fechaHasta);
+      const data = raw?.data || [];
+      return {
+        titulo: 'Devoluciones de Farmacia',
+        resumen: {
+          'Total Registros': data.length,
+        },
+        columnas: [
+          { header: 'Fecha Devolución', key: 'FechaDevolucion', width: 22 },
+          { header: 'Estado', key: 'EstadoLinea', width: 18 },
+          { header: 'Solicita', key: 'UAbierto', width: 18 },
+          { header: 'Acepta', key: 'UConfirma', width: 18 },
+          { header: 'Paciente', key: 'Paciente', width: 30 },
+          { header: 'Cama', key: 'Cama', width: 14 },
+          { header: 'Código', key: 'Codigo', width: 14 },
+          { header: 'Insumo', key: 'Insumo', width: 35 },
+          { header: 'Cant. Devuelta', key: 'CantidadDevuelta', width: 15 },
+          { header: 'P. Unitario ($)', key: 'PrecioUnitario', width: 15 },
+          { header: 'Monto ($)', key: 'Monto', width: 15 },
+        ],
+        filas: data,
+      };
+    }
+    case 'cargos-sap': {
+      const { fechaDesde, fechaHasta, area, token, userRole, userArea, ...extraFilters } = filters;
+      const dataRaw = await getCargosFarmaciaSAP({ fechaDesde, fechaHasta, area });
+      let data = dataRaw || [];
+
+      if (Object.keys(extraFilters).length > 0) {
+        data = data.filter(row => {
+          return Object.entries(extraFilters).every(([key, val]) => {
+            if (!val) return true;
+            return String(row[key] ?? '') == String(val);
+          });
+        });
+      }
+
+      return {
+        titulo: 'Cargos a Pacientes (SAP)',
+        resumen: {
+          'Total Registros': data.length,
+        },
+        columnas: [
+          { header: 'Folio/Orden', key: 'OrdenId', width: 14 },
+          { header: 'Paciente', key: 'NombrePaciente', width: 30 },
+          { header: 'Área / Cama', key: 'AreaHospitalaria', width: 20 },
+          { header: 'Código', key: 'Codigo', width: 14 },
+          { header: 'Insumo', key: 'Insumo', width: 35 },
+          { header: 'Cantidad', key: 'CantidadCargada', width: 14 },
+          { header: 'Lote', key: 'Lote', width: 15 },
+          { header: 'Caducidad', key: 'Caducidad', width: 15 },
+          { header: 'Total ($)', key: 'MontoCobrado', width: 15 },
+          { header: 'Fecha Cargo', key: 'FechaCargo', width: 22 },
+          { header: 'Médico', key: 'MedicoTratante', width: 25 },
+        ],
+        filas: data,
       };
     }
     default:
@@ -449,25 +687,27 @@ router.post(
         sheet.columns = [{ header: 'Valor', key: 'valor', width: 30 }];
         rows.forEach(val => sheet.addRow({ valor: String(val) }));
       } else {
-        sheet.columns = colArray.map(key => ({
-          header: key.toUpperCase(),
-          key: key,
-          width: 20
-        }));
-
-        sheet.getRow(1).eachCell(cell => {
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF004687' } };
-          cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-        });
-
-        rows.forEach(row => {
+        // Aplanar objetos anidados
+        const flatRows = rows.map(row => {
           const flatRow = {};
           colArray.forEach(k => {
             let val = row[k];
             if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
             flatRow[k] = val;
           });
-          sheet.addRow(flatRow);
+          return flatRow;
+        });
+
+        const columnas = colArray.map(key => ({
+          header: key.toUpperCase(),
+          key: key,
+          width: 20
+        }));
+
+        applyInstitutionalStyle(workbook, sheet, {
+          titulo: 'Extracción de Datos API',
+          columnas,
+          filas: flatRows,
         });
       }
 

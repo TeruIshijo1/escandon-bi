@@ -5,10 +5,19 @@ import {
 } from 'recharts';
 
 export default function DashboardUrgenciasNativo({ data, searchFilter, setSearchFilter }) {
+  const [selectedEstatus, setSelectedEstatus] = useState(null);
+
   if (!data) return null;
 
-  // Filtrar la tabla de pacientes localmente si el usuario hace clic en una fila
+  // Filtrar la tabla de pacientes localmente
   const filteredList = data.lista.filter(c => {
+    // Filtro por estatus de la gráfica
+    if (selectedEstatus) {
+      const e = c.Estatus === 'CL' ? 'Alta (Cerrada)' : (c.Estatus === 'OP' ? 'En Piso (Abierta)' : c.Estatus);
+      if (e !== selectedEstatus) return false;
+    }
+
+    // Filtro de búsqueda
     if (!searchFilter) return true;
     const term = searchFilter.toLowerCase();
     const pcnum = (c.PCNum || '').toString().toLowerCase();
@@ -18,8 +27,27 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
 
   const COLORS = ['#E8853D', '#005FA9', '#10B981', '#EF4444', '#8B5CF6'];
 
+  const formatCurrency = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
+
   return (
     <div style={{ marginTop: '2rem' }}>
+      
+      {/* Tarjeta de Ingresos Totales */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', padding: '1.5rem', borderRadius: 12, color: 'white', boxShadow: '0 4px 6px rgba(16,185,129,0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>Ingresos Urgencias (SAP)</div>
+              <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '0.5rem' }}>{formatCurrency(data.kpisFinancieros?.ingresosSAP || 0)}</div>
+              <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem' }}>Contabilidad Oficial Grupo 104 (AMBULANCIAS / URGENCIAS)</div>
+            </div>
+            <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.2)', borderRadius: 10 }}>
+              <span style={{ fontSize: '1.5rem' }}>💰</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
         
         {/* Gráfica: Tendencia de Llegadas */}
@@ -64,6 +92,8 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                   nameKey="nombre"
                   isAnimationActive={false}
                   label={({ nombre, percent }) => `${nombre} ${(percent * 100).toFixed(0)}%`}
+                  onClick={(entry) => setSelectedEstatus(entry.nombre)}
+                  style={{ cursor: 'pointer' }}
                 >
                   {data.estatus.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -77,15 +107,59 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
 
       </div>
 
+      {/* Gráficas de Ingresos */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Médicos por Ingreso</h3>
+          <div style={{ width: '100%', height: 350 }}>
+            <ResponsiveContainer>
+              <BarChart layout="vertical" data={data.topMedicos} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
+                <YAxis dataKey="nombre" type="category" width={150} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#475569' }} />
+                <Tooltip 
+                  formatter={(value) => [formatCurrency(value), 'Ingresos']}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                />
+                <Bar dataKey="ingresos" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Servicios Facturados</h3>
+          <div style={{ width: '100%', height: 350 }}>
+            <ResponsiveContainer>
+              <BarChart layout="vertical" data={data.topServicios} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
+                <YAxis dataKey="nombre" type="category" width={150} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#475569' }} />
+                <Tooltip 
+                  formatter={(value) => [formatCurrency(value), 'Ingresos']}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                />
+                <Bar dataKey="ingresos" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       {/* Tabla de Detalle */}
       <div data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h3 style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>Detalle de Pacientes (Top 100)</h3>
           
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            {searchFilter && (
+            {selectedEstatus && (
+              <span style={{ fontSize: '0.85rem', color: '#005FA9', fontWeight: 600, background: '#E0F2FE', padding: '0.2rem 0.6rem', borderRadius: 12 }}>
+                Estatus: {selectedEstatus}
+              </span>
+            )}
+            {(searchFilter || selectedEstatus) && (
               <button 
-                onClick={() => setSearchFilter('')}
+                onClick={() => { setSearchFilter(''); setSelectedEstatus(null); }}
                 style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
               >
                 Limpiar filtro

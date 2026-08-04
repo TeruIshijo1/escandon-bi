@@ -5,6 +5,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE } from '../../api/config';
 
+function formatMarkdown(text) {
+  if (!text) return '';
+  let formatted = String(text);
+
+  formatted = formatted
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Headers
+  formatted = formatted.replace(/^### (.*$)/gim, '<div style="font-weight:700; font-size:0.88rem; color:#004687; margin:0.3rem 0 0.15rem;">$1</div>');
+  formatted = formatted.replace(/^## (.*$)/gim, '<div style="font-weight:800; font-size:0.92rem; color:#004687; margin:0.4rem 0 0.2rem;">$1</div>');
+
+  // Bold (**text** or __text__)
+  formatted = formatted.replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="font-weight:700; color:#004687;">$1</strong>');
+  formatted = formatted.replace(/__([\s\S]+?)__/g, '<strong style="font-weight:700; color:#004687;">$1</strong>');
+
+  // Italics (*text*)
+  formatted = formatted.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+
+  // Inline Code / Highlights (`text`)
+  formatted = formatted.replace(/`([^`]+)`/g, '<code style="background:rgba(0,70,135,0.08); color:#005FA9; padding:2px 5px; border-radius:4px; font-family:var(--font-mono); font-size:0.78rem; font-weight:600;">$1</code>');
+
+  // Bullet Lists
+  formatted = formatted.replace(/^\s*[-*]\s+(.*$)/gim, '<div style="display:flex; gap:6px; margin:2px 0 2px 6px;"><span style="color:#0088C9; font-weight:bold;">•</span><span>$1</span></div>');
+
+  // Line breaks
+  formatted = formatted.replace(/\n/g, '<br/>');
+
+  return formatted;
+}
+
 export default function AriaCopilotWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -13,18 +45,49 @@ export default function AriaCopilotWidget() {
       text: '¡Hola! Soy **MAR-IA**, tu asistente de inteligencia analítica del Hospital Escandón. 🏥✨\n\n¿En qué te puedo ayudar hoy con los datos en vivo?',
       kpis: null,
       table: null,
-      suggestions: [
-        '🛏️ ¿Cómo está la ocupación de camas por área?',
-        '🔍 ¿Cuáles son las partidas con faltantes hoy?',
-        '💰 ¿Quién es el paciente con mayor gasto acumulado?',
-        '💊 ¿Cuáles son los 5 insumos más consumidos?',
-        '🛡️ ¿Qué anomalías de calidad se detectaron?',
-      ],
+      suggestions: null, // Will be loaded dynamically
     },
   ]);
   const [inputQuery, setInputQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
   const chatEndRef = useRef(null);
+
+  // Load suggestions dynamically from API based on user's IA profile
+  useEffect(() => {
+    if (isOpen && !suggestionsLoaded) {
+      (async () => {
+        try {
+          const token = sessionStorage.getItem('escandon_token') || localStorage.getItem('token');
+          const res = await fetch(`${API_BASE}/aria/suggestions`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (data.success && data.suggestions) {
+            setMessages(prev => {
+              const updated = [...prev];
+              if (updated[0] && updated[0].sender === 'maria') {
+                updated[0] = { ...updated[0], suggestions: data.suggestions };
+              }
+              return updated;
+            });
+          }
+          setSuggestionsLoaded(true);
+        } catch (err) {
+          console.error('[MAR-IA] Error loading suggestions:', err);
+          // Fallback: show generic suggestion
+          setMessages(prev => {
+            const updated = [...prev];
+            if (updated[0] && updated[0].sender === 'maria') {
+              updated[0] = { ...updated[0], suggestions: ['📊 Muéstrame un resumen general'] };
+            }
+            return updated;
+          });
+          setSuggestionsLoaded(true);
+        }
+      })();
+    }
+  }, [isOpen, suggestionsLoaded]);
 
   useEffect(() => {
     if (isOpen) {
@@ -80,33 +143,32 @@ export default function AriaCopilotWidget() {
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999, fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ position: 'fixed', bottom: '8px', right: '8px', zIndex: 9999, fontFamily: 'Inter, system-ui, sans-serif' }}>
       
       {/* Botón Flotante para Abrir Chat */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
+          title="Abrir MAR-IA"
           style={{
             background: 'linear-gradient(135deg, #004687 0%, #0088C9 100%)',
             color: '#FFFFFF',
             border: 'none',
-            borderRadius: '50px',
-            padding: '12px 20px',
-            fontSize: '0.92rem',
-            fontWeight: '700',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            fontSize: '1.2rem',
             cursor: 'pointer',
-            boxShadow: '0 8px 24px rgba(0, 70, 135, 0.4)',
+            boxShadow: '0 4px 12px rgba(0, 70, 135, 0.4)',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            justifyContent: 'center',
             transition: 'transform 0.2s ease',
           }}
           onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
           onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
         >
-          <span style={{ fontSize: '1.2rem' }}>🤖</span>
-          <span>MAR-IA Copilot</span>
-          <span style={{ background: '#10B981', width: 8, height: 8, borderRadius: '50%', display: 'inline-block' }}></span>
+          <span>🤖</span>
         </button>
       )}
 
@@ -114,8 +176,13 @@ export default function AriaCopilotWidget() {
       {isOpen && (
         <div
           style={{
-            width: '420px',
-            height: '580px',
+            position: 'fixed',
+            bottom: '16px',
+            right: '16px',
+            width: 'calc(100vw - 32px)',
+            maxWidth: '420px',
+            height: 'min(580px, calc(100vh - 30px))',
+            maxHeight: 'calc(100vh - 30px)',
             background: '#FFFFFF',
             borderRadius: '16px',
             boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
@@ -123,6 +190,7 @@ export default function AriaCopilotWidget() {
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            zIndex: 9999,
           }}
         >
           {/* Header */}
@@ -152,7 +220,7 @@ export default function AriaCopilotWidget() {
                 🤖
               </div>
               <div>
-                <div style={{ fontWeight: '800', fontSize: '1rem', letterSpacing: '0.02em' }}>MAR-IA Copilot</div>
+                <div style={{ fontWeight: '800', fontSize: '1rem', letterSpacing: '0.02em' }}>MAR-IA</div>
                 <div style={{ fontSize: '0.72rem', color: '#93C5FD', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ background: '#10B981', width: 6, height: 6, borderRadius: '50%' }}></span>
                   En Línea
@@ -194,11 +262,9 @@ export default function AriaCopilotWidget() {
                     fontSize: '0.88rem',
                     lineHeight: '1.45',
                     border: msg.sender === 'user' ? 'none' : '1px solid #E2E8F0',
-                    whiteSpace: 'pre-wrap',
                   }}
-                >
-                  {msg.text}
-                </div>
+                  dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.text) }}
+                />
 
                 {/* Tarjetas KPI renderizadas */}
                 {msg.kpis && msg.kpis.length > 0 && (
