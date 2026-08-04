@@ -1630,31 +1630,52 @@ router.get('/quirofano-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
     const pool = await connectRemoteDB();
     const request = pool.request();
 
-    let whereClauses = ["1=1"];
+    let whereClauses = ["UNIDAD_DE_SERVICIO = 'CQX'"];
 
     if (startDate) {
-      whereClauses.push("FechaInicio >= @startDate");
+      whereClauses.push("FECHA_DE_CARGO >= @startDate");
       request.input('startDate', startDate);
     }
     if (endDate) {
-      whereClauses.push("FechaInicio <= @endDate");
+      whereClauses.push("FECHA_DE_CARGO <= @endDate");
       request.input('endDate', endDate);
     }
     if (search) {
-      whereClauses.push("(Procedimientos LIKE @search OR Paciente LIKE @search OR Medicos LIKE @search)");
+      whereClauses.push("(NOMBRE_DEL_PACIENTE LIKE @search OR Medico_Tratante LIKE @search OR DESCRIPCION_DEL_ARTICULO LIKE @search)");
       request.input('search', `%${search}%`);
     }
 
     const queryStr = `
+      WITH Agrupado AS (
+        SELECT 
+          FOLIO_DE_ATENCION,
+          MIN(FECHA_DE_CARGO) as FechaInicio,
+          MAX(FECHA_DE_CARGO) as FechaFin,
+          MAX(NOMBRE_DEL_PACIENTE) as Paciente,
+          MAX(Medico_Tratante) as Medicos,
+          STRING_AGG(CAST(DESCRIPCION_DEL_ARTICULO AS NVARCHAR(MAX)), ', ') as Procedimientos
+        FROM UDR_CUENTAS_SERVICIOS
+        WHERE ${whereClauses.join(' AND ')}
+        GROUP BY FOLIO_DE_ATENCION
+      )
       SELECT 
-        Quirofano,
-        FechaInicio,
-        FechaFin,
-        Medicos,
-        Procedimientos
-      FROM UDR_USOQX
-      WHERE ${whereClauses.join(' AND ')}
-      ORDER BY FechaInicio DESC
+        A.FOLIO_DE_ATENCION,
+        COALESCE(U.UDR_Inicio, A.FechaInicio) as FechaInicio,
+        COALESCE(U.UDR_Fin, A.FechaInicio) as FechaFin,
+        A.Paciente,
+        COALESCE(U.Quirofano, 'CQX') as Quirofano,
+        A.Medicos,
+        A.Procedimientos, U.Procedimientos as Procedimiento_Bitacora,
+        CASE WHEN U.PCFRNum IS NULL THEN 'Facturado sin registro en Quirófano (Consultorio/Omisión)' ELSE 'Cirugía Registrada' END as Notas
+      FROM Agrupado A
+      OUTER APPLY (
+        SELECT TOP 1 PCFRNum, FechaInicio as UDR_Inicio, FechaFin as UDR_Fin, Quirofano, Procedimientos
+        FROM UDR_USOQX 
+        WHERE Paciente = A.Paciente 
+          AND FechaInicio >= DATEADD(day, -3, A.FechaInicio)
+          AND FechaInicio <= DATEADD(day, 3, A.FechaInicio)
+      ) U
+      ORDER BY A.FechaInicio DESC
     `;
 
     const result = await request.query(queryStr);

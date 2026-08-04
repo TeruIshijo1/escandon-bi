@@ -10,6 +10,7 @@ const COLORS = ['#10B981', '#E8853D', '#005FA9', '#EF4444', '#8B5CF6'];
 
 export default function DashboardQuirofanoNativo({ data }) {
   const [selectedRoom, setSelectedRoom] = useState('Todos');
+  const [selectedStatus, setSelectedStatus] = useState('Todos');
   const [selectedProcedure, setSelectedProcedure] = useState('Todos');
   const [selectedYear, setSelectedYear] = useState('Todas');
   const [selectedMonth, setSelectedMonth] = useState('Todos');
@@ -20,6 +21,7 @@ export default function DashboardQuirofanoNativo({ data }) {
     kpis,
     monthlyData,
     roomUsage,
+    statusUsage,
     topProcedures,
     availableYears,
     availableMedicos,
@@ -60,6 +62,7 @@ export default function DashboardQuirofanoNativo({ data }) {
       if (selectedMonth !== 'Todos' && date.getMonth() !== Number(selectedMonth)) return false;
       if (selectedMedico !== 'Todos' && (!d.Medicos || !d.Medicos.includes(selectedMedico))) return false;
       if (selectedRoom !== 'Todos' && d.Quirofano !== selectedRoom) return false;
+      if (selectedStatus !== 'Todos' && d.Notas !== selectedStatus) return false;
       if (selectedProcedure !== 'Todos' && d.Procedimientos !== selectedProcedure) return false;
       return true;
     });
@@ -127,11 +130,14 @@ export default function DashboardQuirofanoNativo({ data }) {
     });
 
     const roomsCount = {};
+    const statusCount = {};
     dataForRooms.forEach(d => {
+      if (d.Notas) statusCount[d.Notas] = (statusCount[d.Notas] || 0) + 1;
       if (!d.Quirofano) return;
       roomsCount[d.Quirofano] = (roomsCount[d.Quirofano] || 0) + 1;
     });
     const roomUsage = Object.entries(roomsCount).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
+    const statusUsage = Object.entries(statusCount).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
 
     // 4. Top Procedures
     // Igual para top procedures, filtramos sin `selectedProcedure` para que la lista siga visible
@@ -150,12 +156,42 @@ export default function DashboardQuirofanoNativo({ data }) {
       procCount[d.Procedimientos] = (procCount[d.Procedimientos] || 0) + 1;
     });
     const topProcedures = Object.entries(procCount).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
+    const excelCategories = {
+      maternidad: { title: 'Maternidad', count: 0, items: { 'Partos': 0, 'Cesárea': 0, 'Histerectomía': 0, 'Miomectomía': 0, 'Salpingo': 0, 'AMEU': 0, 'LUI': 0, 'Otros': 0 } },
+      endoscopias: { title: 'Endoscopías', count: 0, items: { 'Colonoscopías': 0, 'Endoscopías': 0, 'Broncoscopías': 0 } },
+      gastro: { title: 'Gastroenterología', count: 0, items: { 'CPRE': 0 } },
+      quirofano: { title: 'Quirófano', count: 0, items: { 'Cirugías': 0 } }
+    };
+
+    fullyFiltered.forEach(d => {
+      const p = (d.Procedimiento_Bitacora || d.Procedimientos || '').toUpperCase();
+      let matchedAny = false;
+      
+      if (p.includes('PARTO')) { excelCategories.maternidad.items['Partos']++; excelCategories.maternidad.count++; matchedAny = true; }
+      if (p.includes('CESAREA') || p.includes('CESÁREA')) { excelCategories.maternidad.items['Cesárea']++; excelCategories.maternidad.count++; matchedAny = true; }
+      if (p.includes('HISTERECTOM')) { excelCategories.maternidad.items['Histerectomía']++; excelCategories.maternidad.count++; matchedAny = true; }
+      if (p.includes('MIOMECTOM')) { excelCategories.maternidad.items['Miomectomía']++; excelCategories.maternidad.count++; matchedAny = true; }
+      if (p.includes('SALPINGO')) { excelCategories.maternidad.items['Salpingo']++; excelCategories.maternidad.count++; matchedAny = true; }
+      if (p.includes('AMEU')) { excelCategories.maternidad.items['AMEU']++; excelCategories.maternidad.count++; matchedAny = true; }
+      if (p.includes('LEGRADO') || p.includes('LUI')) { excelCategories.maternidad.items['LUI']++; excelCategories.maternidad.count++; matchedAny = true; }
+      
+      if (p.includes('COLONOSCOPIA')) { excelCategories.endoscopias.items['Colonoscopías']++; excelCategories.endoscopias.count++; matchedAny = true; }
+      if (p.includes('ENDOSCOPIA') || p.includes('PANENDOSCOPIA')) { excelCategories.endoscopias.items['Endoscopías']++; excelCategories.endoscopias.count++; matchedAny = true; }
+      if (p.includes('BRONCOSCOPIA')) { excelCategories.endoscopias.items['Broncoscopías']++; excelCategories.endoscopias.count++; matchedAny = true; }
+      
+      if (p.includes('CPRE')) { excelCategories.gastro.items['CPRE']++; excelCategories.gastro.count++; matchedAny = true; }
+      
+      if (!matchedAny && d.Notas === 'Cirugía Registrada') {
+        excelCategories.quirofano.items['Cirugías']++; excelCategories.quirofano.count++;
+      }
+    });
 
     return { 
       filteredData: fullyFiltered, 
       kpis, 
       monthlyData, 
       roomUsage, 
+      statusUsage,
       topProcedures, 
       availableYears, 
       availableMedicos, 
@@ -163,9 +199,10 @@ export default function DashboardQuirofanoNativo({ data }) {
       availableProcedures,
       kpisFinancieros: data.kpisFinancieros || {},
       topMedicosIngresos: data.topMedicosIngresos || [],
-      topServiciosIngresos: data.topServiciosIngresos || []
+      topServiciosIngresos: data.topServiciosIngresos || [],
+      excelCategories
     };
-  }, [data, selectedRoom, selectedProcedure, selectedYear, selectedMonth, selectedMedico]);
+  }, [data, selectedRoom, selectedProcedure, selectedYear, selectedMonth, selectedMedico, selectedStatus]);
 
   const formatCurrency = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
 
@@ -177,6 +214,7 @@ export default function DashboardQuirofanoNativo({ data }) {
     setSelectedYear('Todas');
     setSelectedMonth('Todos');
     setSelectedMedico('Todos');
+    setSelectedStatus('Todos');
   };
 
   return (
@@ -318,21 +356,21 @@ export default function DashboardQuirofanoNativo({ data }) {
           </div>
         </div>
 
-        {/* Uso de Salas (Dona) */}
+        {/* Estado de Registro (Dona) */}
         <div data-html2canvas-ignore="false" style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: '#475569', fontWeight: 600, textAlign: 'center' }}>Uso de Salas</h3>
+          <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: '#475569', fontWeight: 600, textAlign: 'center' }}>Estado de Registro (SAP vs Bitácora)</h3>
           <div style={{ width: '100%', flex: 1, minHeight: 250 }}>
             <ResponsiveContainer>
               <PieChart>
                 <Pie
-                  data={roomUsage}
+                  data={statusUsage}
                   cx="50%"
                   cy="50%"
                   innerRadius="50%"
                   outerRadius="70%"
                   dataKey="value"
                   isAnimationActive={false}
-                  onClick={(entry) => setSelectedRoom(selectedRoom === entry.name ? 'Todos' : entry.name)}
+                  onClick={(entry) => setSelectedStatus(selectedStatus === entry.name ? 'Todos' : entry.name)}
                   style={{ cursor: 'pointer' }}
                   label={({ name, percent, value }) => {
                     if (percent < 0.05) return null;
@@ -340,11 +378,11 @@ export default function DashboardQuirofanoNativo({ data }) {
                   }}
                   labelLine={true}
                 >
-                  {roomUsage.map((entry, index) => (
+                  {statusUsage.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
-                      fill={COLORS[index % COLORS.length]} 
-                      opacity={selectedRoom !== 'Todos' ? (selectedRoom === entry.name ? 1 : 0.3) : 1}
+                      fill={entry.name === 'Cirugía Registrada' ? '#10B981' : '#EF4444'} 
+                      opacity={selectedStatus !== 'Todos' ? (selectedStatus === entry.name ? 1 : 0.3) : 1}
                     />
                   ))}
                 </Pie>
@@ -352,7 +390,7 @@ export default function DashboardQuirofanoNativo({ data }) {
                 <Legend 
                   iconType="circle" 
                   wrapperStyle={{ fontSize: '10px' }} 
-                  onClick={(e) => setSelectedRoom(selectedRoom === e.value ? 'Todos' : e.value)}
+                  onClick={(e) => setSelectedStatus(selectedStatus === e.value ? 'Todos' : e.value)}
                   style={{ cursor: 'pointer' }}
                 />
               </PieChart>
@@ -404,6 +442,94 @@ export default function DashboardQuirofanoNativo({ data }) {
 
       </div>
 
+      {/* Productividad por Especialidades (Estilo Excel) */}
+      <div data-html2canvas-ignore="false" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', marginTop: '1.5rem' }}>
+        <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Productividad por Especialidades (Ref. Excel)</h3>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ background: '#005FA9', color: 'white' }}>
+                <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600, border: '1px solid #4784C7' }}>ÁREA</th>
+                <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: 600, border: '1px solid #4784C7' }}>PROCEDIMIENTO</th>
+                <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 600, border: '1px solid #4784C7' }}>TOTAL (Mes Seleccionado)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* QUIRÓFANO */}
+              <tr style={{ background: '#E6F0FA' }}>
+                <td rowSpan={1} style={{ padding: '0.75rem', fontWeight: 700, border: '1px solid #BBD4F0' }}>QUIRÓFANO</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #BBD4F0' }}>Cirugías Generales</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 600, border: '1px solid #BBD4F0' }}>{excelCategories.quirofano.items['Cirugías']}</td>
+              </tr>
+              {/* MATERNIDAD */}
+              <tr style={{ background: '#FCE7EB' }}>
+                <td rowSpan={7} style={{ padding: '0.75rem', fontWeight: 700, border: '1px solid #F6BCC7' }}>MATERNIDAD</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #F6BCC7' }}>Partos</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F6BCC7' }}>{excelCategories.maternidad.items['Partos']}</td>
+              </tr>
+              <tr style={{ background: '#FCE7EB' }}>
+                <td style={{ padding: '0.75rem', border: '1px solid #F6BCC7' }}>Cesárea</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F6BCC7' }}>{excelCategories.maternidad.items['Cesárea']}</td>
+              </tr>
+              <tr style={{ background: '#FCE7EB' }}>
+                <td style={{ padding: '0.75rem', border: '1px solid #F6BCC7' }}>Histerectomía</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F6BCC7' }}>{excelCategories.maternidad.items['Histerectomía']}</td>
+              </tr>
+              <tr style={{ background: '#FCE7EB' }}>
+                <td style={{ padding: '0.75rem', border: '1px solid #F6BCC7' }}>Miomectomía</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F6BCC7' }}>{excelCategories.maternidad.items['Miomectomía']}</td>
+              </tr>
+              <tr style={{ background: '#FCE7EB' }}>
+                <td style={{ padding: '0.75rem', border: '1px solid #F6BCC7' }}>Salpingo</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F6BCC7' }}>{excelCategories.maternidad.items['Salpingo']}</td>
+              </tr>
+              <tr style={{ background: '#FCE7EB' }}>
+                <td style={{ padding: '0.75rem', border: '1px solid #F6BCC7' }}>AMEU</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F6BCC7' }}>{excelCategories.maternidad.items['AMEU']}</td>
+              </tr>
+              <tr style={{ background: '#FCE7EB' }}>
+                <td style={{ padding: '0.75rem', border: '1px solid #F6BCC7' }}>LUI / Legrado</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F6BCC7' }}>{excelCategories.maternidad.items['LUI']}</td>
+              </tr>
+              
+              {/* ENDOSCOPIAS */}
+              <tr style={{ background: '#FDF2E2' }}>
+                <td rowSpan={3} style={{ padding: '0.75rem', fontWeight: 700, border: '1px solid #F5D5A5' }}>ENDOSCOPÍAS</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #F5D5A5' }}>Colonoscopías</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F5D5A5' }}>{excelCategories.endoscopias.items['Colonoscopías']}</td>
+              </tr>
+              <tr style={{ background: '#FDF2E2' }}>
+                <td style={{ padding: '0.75rem', border: '1px solid #F5D5A5' }}>Endoscopías</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F5D5A5' }}>{excelCategories.endoscopias.items['Endoscopías']}</td>
+              </tr>
+              <tr style={{ background: '#FDF2E2' }}>
+                <td style={{ padding: '0.75rem', border: '1px solid #F5D5A5' }}>Broncoscopías</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F5D5A5' }}>{excelCategories.endoscopias.items['Broncoscopías']}</td>
+              </tr>
+
+              {/* GASTROENTEROLOGIA */}
+              <tr style={{ background: '#EAF6E8' }}>
+                <td rowSpan={1} style={{ padding: '0.75rem', fontWeight: 700, border: '1px solid #C4E6BE' }}>GASTROENTEROLOGÍA</td>
+                <td style={{ padding: '0.75rem', border: '1px solid #C4E6BE' }}>CPRE</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #C4E6BE' }}>{excelCategories.gastro.items['CPRE']}</td>
+              </tr>
+
+              {/* TOTAL */}
+              <tr style={{ background: '#E0E7FF', fontWeight: 700 }}>
+                <td colSpan={2} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #A5B4FC' }}>TOTAL PROCEDIMIENTOS (Aprox)</td>
+                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #A5B4FC', fontSize: '1rem', color: '#1E40AF' }}>
+                  {excelCategories.quirofano.count + excelCategories.maternidad.count + excelCategories.endoscopias.count + excelCategories.gastro.count}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.5rem', fontStyle: 'italic' }}>
+            *Nota: El conteo se realiza buscando palabras clave ("CESAREA", "COLONOSCOPIA", etc.) en los procedimientos registrados en bitácora. 
+            Si un paciente tiene 2 procedimientos en su texto (ej. "Endoscopía, Colonoscopía"), sumará en ambas categorías. Las cirugías que no coincidan con Maternidad/Endoscopia/Gastro caen en la cubeta general de "Cirugías Generales".
+          </p>
+        </div>
+      </div>
+
       {/* Tabla de Detalle de Cirugías */}
       <div data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', marginTop: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -424,6 +550,7 @@ export default function DashboardQuirofanoNativo({ data }) {
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Inicio</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Fin</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Duración</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Estado (SAP)</th>
               </tr>
             </thead>
             <tbody>
@@ -447,6 +574,7 @@ export default function DashboardQuirofanoNativo({ data }) {
                     <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{startDate}</td>
                     <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{endDate}</td>
                     <td style={{ padding: '0.75rem 1rem', color: '#004687', fontWeight: 600, textAlign: 'right' }}>{durText}</td>
+                    <td style={{ padding: '0.75rem 1rem', color: row.Notas === 'Cirugía Registrada' ? '#10B981' : '#EF4444', fontWeight: 600, fontSize: '0.75rem' }}>{row.Notas}</td>
                   </tr>
                 );
               })}
