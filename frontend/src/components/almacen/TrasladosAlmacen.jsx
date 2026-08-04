@@ -12,17 +12,24 @@ export default function TrasladosAlmacen() {
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   // Filtros
+  const today = new Date().toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchTraslados();
-  }, []);
+  }, [startDate, endDate]);
 
   const fetchTraslados = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE}/almacen/traslados`, {
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append('startDate', startDate);
+      if (endDate) queryParams.append('endDate', endDate);
+
+      const response = await fetch(`${API_BASE}/almacen/traslados?${queryParams.toString()}`, {
         headers: authHeaders()
       });
       const json = await response.json();
@@ -93,17 +100,38 @@ export default function TrasladosAlmacen() {
 
         {/* Filtros */}
         <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            
+            {/* Buscador de texto */}
+            <div style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
               <span style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>🔍</span>
               <input 
                 type="text" 
-                placeholder="Buscar por Folio, Destino o Comentarios..."
+                placeholder="Buscar por Folio, Destino o Comentarios..." 
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '1rem' }}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
               />
             </div>
+
+            {/* Filtros de Fecha */}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <label style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 'bold' }}>Desde:</label>
+              <input 
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+              />
+              <label style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 'bold', marginLeft: '0.5rem' }}>Hasta:</label>
+              <input 
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+              />
+            </div>
+            
           </div>
         </div>
 

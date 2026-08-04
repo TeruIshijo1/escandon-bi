@@ -94,11 +94,18 @@ router.get('/ubicaciones/:itemCode', authenticate, authorize(['ADMIN', 'DIRECTOR
  */
 router.get('/traslados', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
+    const { startDate, endDate } = req.query;
     const sapService = require('../services/sap.service');
     await sapService._ensureSession();
     
-    // Obtener los últimos 100 traslados
-    const response = await sapService.get('/InventoryTransferRequests?%24orderby=DocEntry%20desc&%24top=100&%24select=DocEntry,DocNum,DocDate,DueDate,FromWarehouse,ToWarehouse,Comments,DocumentStatus');
+    let url = '/InventoryTransferRequests?%24orderby=DocEntry%20desc&%24top=500&%24select=DocEntry,DocNum,DocDate,DueDate,FromWarehouse,ToWarehouse,Comments,DocumentStatus';
+    
+    if (startDate && endDate) {
+      // In OData, DocDate format usually requires just the date 'YYYY-MM-DD'
+      url += `&%24filter=DocDate ge '${startDate}' and DocDate le '${endDate}'`;
+    }
+    
+    const response = await sapService.get(url);
     
     res.json({ ok: true, data: response.data.value || [] });
   } catch (err) {
