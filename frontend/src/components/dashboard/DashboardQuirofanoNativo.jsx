@@ -29,9 +29,18 @@ export default function DashboardQuirofanoNativo({ data }) {
     availableProcedures,
     kpisFinancieros,
     topMedicosIngresos,
-    topServiciosIngresos
+    topServiciosIngresos,
+    excelCategories
   } = useMemo(() => {
-    if (!data || !data.lista || data.lista.length === 0) return { filteredData: [], kpis: {}, monthlyData: [], roomUsage: [], topProcedures: [], availableYears: [], availableMedicos: [], availableRooms: [], availableProcedures: [], kpisFinancieros: {}, topMedicosIngresos: [], topServiciosIngresos: [] };
+    if (!data || !data.lista || data.lista.length === 0) return { 
+      filteredData: [], kpis: {}, monthlyData: [], roomUsage: [], statusUsage: [], topProcedures: [], availableYears: [], availableMedicos: [], availableRooms: [], availableProcedures: [], kpisFinancieros: {}, topMedicosIngresos: [], topServiciosIngresos: [],
+      excelCategories: {
+        maternidad: { title: 'Maternidad', count: 0, items: { 'Partos': 0, 'Cesárea': 0, 'Histerectomía': 0, 'Miomectomía': 0, 'Salpingo': 0, 'AMEU': 0, 'LUI': 0, 'Otros': 0 } },
+        endoscopias: { title: 'Endoscopías', count: 0, items: { 'Colonoscopías': 0, 'Endoscopías': 0, 'Broncoscopías': 0 } },
+        gastro: { title: 'Gastroenterología', count: 0, items: { 'CPRE': 0 } },
+        quirofano: { title: 'Quirófano', count: 0, items: { 'Cirugías': 0 } }
+      }
+    };
 
     const rawData = data.lista;
     // Extraer catálogos completos
