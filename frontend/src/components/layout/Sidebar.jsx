@@ -34,25 +34,14 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* Logo Section */}
       <div className="sidebar-logo">
-        <div style={{
-          background:    '#FFFFFF',
-          borderRadius:  '20px',
-          padding:       '6px 16px',
-          display:       'flex',
-          alignItems:    'center',
-          justifyContent:'center',
-          boxShadow:     '0 4px 12px rgba(0,0,0,0.15), inset 0 -1px 0 rgba(0,0,0,0.05)',
-          transition:    'transform var(--transition-base)',
-          cursor:        'pointer',
-        }}
-        onClick={() => navigate('/')}
-        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
-        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+        <div 
+          className="brand-logo-badge"
+          onClick={() => navigate('/')}
         >
           <img
             src="/logo-escandon.png"
             alt="Hospital Escandón"
-            style={{ height: 30, width: 'auto', objectFit: 'contain', display: 'block' }}
+            className="brand-logo-img"
           />
         </div>
         <div className="sidebar-logo-text">

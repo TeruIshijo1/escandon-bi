@@ -49,3 +49,4 @@ test_*.js
 check_*.js
 search_*.js
 pase_a_produccion/
+.obsidian/

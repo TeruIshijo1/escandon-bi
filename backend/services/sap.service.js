@@ -132,12 +132,28 @@ class SapService {
   }
 
   /**
+   * Helper interno con reintentos automáticos para errores temporales (502, 503, 504, drop de red)
+   */
+  async _requestWithRetry(endpoint, method, payload = null, headers = {}, retries = 2) {
+    try {
+      return await this._request(endpoint, method, payload, headers);
+    } catch (err) {
+      if (retries > 0 && (err.status === 502 || err.status === 503 || err.status === 504 || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT')) {
+        console.warn(`[SAP] Error HTTP ${err.status || err.code} al consultar ${endpoint}. Reintentando en 1.5s (${retries} restantes)...`);
+        await new Promise(r => setTimeout(r, 1500));
+        return this._requestWithRetry(endpoint, method, payload, headers, retries - 1);
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Petición GET genérica a SAP
-   * Ej: await sapService.get('/Orders?$top=5')
+   * Ej: await sapService.get('/Items')
    */
   async get(endpoint, additionalHeaders = {}) {
     await this._ensureSession();
-    return this._request(endpoint, 'GET', null, {
+    return this._requestWithRetry(endpoint, 'GET', null, {
       'Cookie': this.sessionCookie,
       ...additionalHeaders
     });
@@ -149,7 +165,7 @@ class SapService {
    */
   async post(endpoint, payload, additionalHeaders = {}) {
     await this._ensureSession();
-    return this._request(endpoint, 'POST', payload, {
+    return this._requestWithRetry(endpoint, 'POST', payload, {
       'Cookie': this.sessionCookie,
       ...additionalHeaders
     });
@@ -160,7 +176,7 @@ class SapService {
    */
   async patch(endpoint, payload, additionalHeaders = {}) {
     await this._ensureSession();
-    return this._request(endpoint, 'PATCH', payload, {
+    return this._requestWithRetry(endpoint, 'PATCH', payload, {
       'Cookie': this.sessionCookie,
       ...additionalHeaders
     });

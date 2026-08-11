@@ -25,6 +25,8 @@
   --surface-2:          #EDF1F7;
   --surface-raised:     #FFFFFF;
   --surface-tinted:     rgba(0, 46, 87, 0.025);
+  --sub-bg:             #F8FAFC;
+  --card-sub-bg:        #F8FAFC;
 
   /* Gradientes */
   --gradient-dash:      linear-gradient(135deg, #004687 0%, #0077B6 100%);
@@ -45,6 +47,13 @@
   --font-display:       'Plus Jakarta Sans', system-ui, sans-serif;
   --font-body:          'DM Sans', system-ui, sans-serif;
   --font-mono:          'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Estructura Navbar y Tabla */
+  --navbar-bg:          rgba(255, 255, 255, 0.85);
+  --navbar-border:      rgba(0, 70, 135, 0.08);
+  --table-border:       rgba(0, 46, 87, 0.05);
+  --table-row-even-bg:  rgba(0, 46, 87, 0.015);
+  --table-row-hover-bg: rgba(0, 136, 201, 0.03);
 
   /* Espaciado */
   --sidebar-width:      210px;
@@ -89,6 +98,745 @@
 
   /* Glow IA */
   --glow-ai:            0 0 24px rgba(0,151,74,0.40), 0 0 64px rgba(0,151,74,0.12);
+}
+/* ── MODO OSCURO (Variables del Tema) ─────────────────────────── */
+[data-theme="dark"] {
+  --color-bg-base:      #080E1E;
+  --color-bg-white:     #0F172A;
+  --color-bg-sidebar:   #0B132B;
+  --surface-1:          #1E293B;
+  --surface-2:          #334155;
+  --surface-raised:     #0F172A;
+  --surface-tinted:     rgba(255, 255, 255, 0.03);
+  --sub-bg:             #1E293B;
+  --card-sub-bg:        #1E293B;
+
+  --text-primary:       #F1F5F9;
+  --text-secondary:     #CBD5E1;
+  --text-muted:         #94A3B8;
+
+  --glass-bg:           rgba(15, 23, 42, 0.45);
+  --glass-bg-strong:    rgba(15, 23, 42, 0.65);
+  --glass-border:       rgba(255, 255, 255, 0.08);
+  --glass-shadow:       0 8px 32px rgba(0, 0, 0, 0.4);
+
+  --navbar-bg:          rgba(11, 19, 43, 0.92);
+  --navbar-border:      rgba(255, 255, 255, 0.06);
+
+  --table-border:       rgba(255, 255, 255, 0.06);
+  --table-row-even-bg:  rgba(255, 255, 255, 0.02);
+  --table-row-hover-bg: rgba(0, 136, 201, 0.08);
+
+  --shadow-xs:          0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm:          0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md:          0 4px 14px rgba(0, 0, 0, 0.5);
+  --shadow-lg:          0 10px 40px rgba(0, 0, 0, 0.6);
+  --shadow-xl:          0 20px 60px rgba(0, 0, 0, 0.7);
+  --shadow-sidebar:     4px 0 24px rgba(0, 0, 0, 0.5);
+
+  --gradient-dash:      linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  --gradient-hero:      linear-gradient(160deg, #0B132B 0%, #0F172A 50%, #1E293B 100%);
+
+  color-scheme: dark;
+}
+
+/* ── Transición suave para cambio de tema ─────────────────────── */
+*, *::before, *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease, box-shadow 0.3s ease, fill 0.2s ease;
+}
+
+/* ▸ background: white / #FFFFFF / #fff / rgb(255, 255, 255) */
+[data-theme="dark"] [style*="background"][style*="white"],
+[data-theme="dark"] [style*="background"][style*="255, 255, 255"],
+[data-theme="dark"] [style*="background"][style*="255,255,255"],
+[data-theme="dark"] [style*="background"][style*="#fff"],
+[data-theme="dark"] [style*="background"][style*="#FFF"] {
+  background: var(--color-bg-white) !important;
+}
+
+/* ▸ background: #F8FAFC / #FAFBFD / #F7FAFC / #F1F5F9 / #EDF2F7 and parsed rgb variants */
+[data-theme="dark"] [style*="background"][style*="248, 250, 252"],
+[data-theme="dark"] [style*="background"][style*="248,250,252"],
+[data-theme="dark"] [style*="background"][style*="250, 251, 253"],
+[data-theme="dark"] [style*="background"][style*="250,251,253"],
+[data-theme="dark"] [style*="background"][style*="247, 250, 252"],
+[data-theme="dark"] [style*="background"][style*="247,250,252"],
+[data-theme="dark"] [style*="background"][style*="241, 245, 249"],
+[data-theme="dark"] [style*="background"][style*="241,245,249"],
+[data-theme="dark"] [style*="background"][style*="237, 242, 247"],
+[data-theme="dark"] [style*="background"][style*="237,242,247"],
+[data-theme="dark"] [style*="background"][style*="#F8FAFC"],
+[data-theme="dark"] [style*="background"][style*="#f8fafc"],
+[data-theme="dark"] [style*="background"][style*="#FAFBFD"],
+[data-theme="dark"] [style*="background"][style*="#fafbfd"],
+[data-theme="dark"] [style*="background"][style*="#F7FAFC"],
+[data-theme="dark"] [style*="background"][style*="#f7fafc"],
+[data-theme="dark"] [style*="background"][style*="#F1F5F9"],
+[data-theme="dark"] [style*="background"][style*="#f1f5f9"],
+[data-theme="dark"] [style*="background"][style*="#EDF2F7"],
+[data-theme="dark"] [style*="background"][style*="#edf2f7"] {
+  background: var(--surface-1) !important;
+}
+
+/* ▸ background: #e2e8f0 (badges, tags, pills) */
+[data-theme="dark"] [style*="background"][style*="#e2e8f0"],
+[data-theme="dark"] [style*="background"][style*="#E2E8F0"] {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #CBD5E1 !important;
+}
+
+/* ▸ .lote-badge específico */
+[data-theme="dark"] .lote-badge {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: #93C5FD !important;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Colores de texto oscuros (invertir a claro)
+   ───────────────────────────────────────────────────────────────── */
+
+/* ▸ color: #004687 (azul institucional en texto) */
+[data-theme="dark"] [style*="color: #004687"],
+[data-theme="dark"] [style*="color:#004687"] {
+  color: #60A5FA !important;
+}
+
+/* ▸ Textos negros/oscuros → --text-primary */
+[data-theme="dark"] [style*="color: #0D1B2A"],
+[data-theme="dark"] [style*="color:#0D1B2A"],
+[data-theme="dark"] [style*="color: #0d1b2a"],
+[data-theme="dark"] [style*="color: #0F172A"],
+[data-theme="dark"] [style*="color: #0f172a"],
+[data-theme="dark"] [style*="color:#0F172A"],
+[data-theme="dark"] [style*="color: #09152b"],
+[data-theme="dark"] [style*="color: #111827"],
+[data-theme="dark"] [style*="color: #1E293B"],
+[data-theme="dark"] [style*="color: black"] {
+  color: var(--text-primary) !important;
+}
+
+/* ▸ Textos grises medios → --text-secondary */
+[data-theme="dark"] [style*="color: #3D4F65"],
+[data-theme="dark"] [style*="color: #3d4f65"],
+[data-theme="dark"] [style*="color: #475569"],
+[data-theme="dark"] [style*="color:#475569"],
+[data-theme="dark"] [style*="color: #4B5563"],
+[data-theme="dark"] [style*="color: #4b5563"],
+[data-theme="dark"] [style*="color: #64748B"],
+[data-theme="dark"] [style*="color: #64748b"],
+[data-theme="dark"] [style*="color:#64748B"],
+[data-theme="dark"] [style*="color: #6B7280"],
+[data-theme="dark"] [style*="color: #6b7280"] {
+  color: var(--text-secondary) !important;
+}
+
+/* ▸ Textos grises claros → --text-muted */
+[data-theme="dark"] [style*="color: #7B8DA0"],
+[data-theme="dark"] [style*="color: #7b8da0"],
+[data-theme="dark"] [style*="color: #8A97A8"],
+[data-theme="dark"] [style*="color:#8A97A8"],
+[data-theme="dark"] [style*="color: #94A3B8"],
+[data-theme="dark"] [style*="color: #94a3b8"],
+[data-theme="dark"] [style*="color:#94A3B8"],
+[data-theme="dark"] [style*="color: #B45309"] {
+  color: var(--text-muted) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Bordes hardcodeados
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="border"][style*="226, 232, 240"],
+[data-theme="dark"] [style*="border"][style*="226,232,240"],
+[data-theme="dark"] [style*="border"][style*="203, 213, 225"],
+[data-theme="dark"] [style*="border"][style*="203,213,225"],
+[data-theme="dark"] [style*="border"][style*="241, 245, 249"],
+[data-theme="dark"] [style*="border"][style*="241,245,249"],
+[data-theme="dark"] [style*="border"][style*="#E2E8F0"],
+[data-theme="dark"] [style*="border"][style*="#e2e8f0"],
+[data-theme="dark"] [style*="border"][style*="#CBD5E1"],
+[data-theme="dark"] [style*="border"][style*="#cbd5e1"] {
+  border-color: var(--navbar-border) !important;
+}
+
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Inputs, Selects, Textareas (incluye inline)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--surface-1) !important;
+  color: var(--text-primary) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+[data-theme="dark"] select option {
+  background: var(--color-bg-white);
+  color: var(--text-primary);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Tablas (premium-table, audit-table, y genéricas)
+   ───────────────────────────────────────────────────────────────── */
+
+/* Thead con fondo gris claro (#F8FAFC / #F1F5F9) usado en farmacia, almacén, etc. */
+[data-theme="dark"] thead[style*="background: #F8FAFC"],
+[data-theme="dark"] thead[style*="background:#F8FAFC"],
+[data-theme="dark"] thead[style*="background: #f8fafc"],
+[data-theme="dark"] thead[style*="background:#f8fafc"],
+[data-theme="dark"] thead[style*="background: rgb(248, 250, 252)"],
+[data-theme="dark"] thead[style*="background: rgb(241, 245, 249)"],
+[data-theme="dark"] thead [style*="background: rgb(248, 250, 252)"],
+[data-theme="dark"] thead [style*="background: rgb(241, 245, 249)"],
+[data-theme="dark"] thead [style*="background: #F8FAFC"],
+[data-theme="dark"] thead [style*="background: #F1F5F9"] {
+  background: var(--surface-1) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+}
+
+/* td y tr con background gris claro */
+[data-theme="dark"] tr[style*="background: #F8FAFC"],
+[data-theme="dark"] tr[style*="background:#F8FAFC"],
+[data-theme="dark"] tr[style*="background: rgb(248, 250, 252)"],
+[data-theme="dark"] tr[style*="background:rgb(248,250,252)"],
+[data-theme="dark"] td[style*="background: #F8FAFC"],
+[data-theme="dark"] td[style*="background:#F8FAFC"],
+[data-theme="dark"] td[style*="background: rgb(248, 250, 252)"],
+[data-theme="dark"] td[style*="background:rgb(248,250,252)"] {
+  background: var(--table-row-even-bg) !important;
+}
+
+
+/* Tablas genéricas */
+[data-theme="dark"] table {
+  color: var(--text-primary);
+}
+[data-theme="dark"] th {
+  color: var(--text-secondary);
+}
+[data-theme="dark"] td {
+  color: var(--text-primary);
+  border-color: var(--table-border);
+}
+[data-theme="dark"] code {
+  color: var(--text-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Badges de estado (DEVUELTO, PENDIENTE, etc.)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="background: #D1FAE5"] {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #6EE7B7 !important;
+}
+[data-theme="dark"] [style*="background: #FEF3C7"],
+[data-theme="dark"] [style*="background:#FEF3C7"] {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #FCD34D !important;
+}
+[data-theme="dark"] [style*="background: #FEE2E2"],
+[data-theme="dark"] [style*="background:#FEE2E2"] {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #FCA5A5 !important;
+}
+[data-theme="dark"] [style*="background: #DBEAFE"],
+[data-theme="dark"] [style*="background:#DBEAFE"] {
+  background: rgba(59, 130, 246, 0.15) !important;
+  color: #93C5FD !important;
+}
+[data-theme="dark"] [style*="background"][style*="241, 245, 249"],
+[data-theme="dark"] [style*="background"][style*="241,245,249"] {
+  background: var(--surface-1) !important;
+}
+
+/* Cama badges, código badges, etc. */
+[data-theme="dark"] span[style*="background"][style*="241, 245, 249"],
+[data-theme="dark"] span[style*="background"][style*="241,245,249"] {
+  background: var(--surface-2) !important;
+  color: var(--text-secondary) !important;
+}
+
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Error/Warning alerts
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="background: #FEF2F2"],
+[data-theme="dark"] [style*="background:#FEF2F2"] {
+  background: rgba(220, 38, 38, 0.1) !important;
+  border-color: rgba(220, 38, 38, 0.3) !important;
+}
+[data-theme="dark"] [style*="background: #FEF3C7"][style*="color: #B45309"] {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #FBBF24 !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Pagination footer & buttons
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] button[style*="background: white"],
+[data-theme="dark"] button[style*="background:white"] {
+  background: var(--color-bg-white) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--navbar-border) !important;
+}
+[data-theme="dark"] button[style*="background: #F1F5F9"],
+[data-theme="dark"] button[style*="background:#F1F5F9"] {
+  background: var(--surface-1) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--navbar-border) !important;
+}
+[data-theme="dark"] button[disabled] {
+  opacity: 0.4;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Modals & Overlays
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="background: rgba(15, 26, 46, 0.4)"] {
+  background: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Recharts (tooltips, grids, text)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .recharts-default-tooltip {
+  background-color: var(--color-bg-white) !important;
+  border: 1px solid var(--navbar-border) !important;
+}
+[data-theme="dark"] .recharts-tooltip-item {
+  color: var(--text-secondary) !important;
+}
+[data-theme="dark"] .recharts-tooltip-label {
+  color: var(--text-primary) !important;
+}
+[data-theme="dark"] .recharts-cartesian-grid-horizontal line,
+[data-theme="dark"] .recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.06) !important;
+}
+[data-theme="dark"] .recharts-text,
+[data-theme="dark"] .recharts-label {
+  fill: var(--text-muted) !important;
+}
+[data-theme="dark"] .recharts-legend-item-text {
+  color: var(--text-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Scrollbar adaptativa
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--color-bg-base);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--surface-2);
+  border-radius: 4px;
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Sidebar (el fondo ya es oscuro, ajustar detalles)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .sidebar {
+  border-right: 1px solid rgba(255,255,255,0.04);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Noise texture overlay (atenuar en dark)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] body::after {
+  opacity: 0.008;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Gradientes de fondo (linear-gradient con colores claros)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="linear-gradient(135deg, #f8fafc"],
+[data-theme="dark"] [style*="linear-gradient(135deg, #F8FAFC"] {
+  background: var(--surface-1) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Badges de éxito/advertencia adicionales
+   ───────────────────────────────────────────────────────────────── */
+/* Success green badges */
+[data-theme="dark"] [style*="background"][style*="236, 253, 245"],
+[data-theme="dark"] [style*="background"][style*="236,253,245"],
+[data-theme="dark"] [style*="background"][style*="240, 253, 244"],
+[data-theme="dark"] [style*="background"][style*="240,253,244"],
+[data-theme="dark"] [style*="background"][style*="#ecfdf5"],
+[data-theme="dark"] [style*="background"][style*="#f0fdf4"] {
+  background: rgba(16, 185, 129, 0.15) !important;
+}
+/* Info/Blue badges */
+[data-theme="dark"] [style*="background"][style*="239, 246, 255"],
+[data-theme="dark"] [style*="background"][style*="239,246,255"],
+[data-theme="dark"] [style*="background"][style*="224, 242, 254"],
+[data-theme="dark"] [style*="background"][style*="224,242,254"],
+[data-theme="dark"] [style*="background"][style*="224, 231, 255"],
+[data-theme="dark"] [style*="background"][style*="224,231,255"],
+[data-theme="dark"] [style*="background"][style*="#EFF6FF"],
+[data-theme="dark"] [style*="background"][style*="#e0f2fe"],
+[data-theme="dark"] [style*="background"][style*="#e0e7ff"] {
+  background: rgba(59, 130, 246, 0.15) !important;
+}
+/* Warning badges (#fffbeb, #fef3c7) */
+[data-theme="dark"] [style*="background"][style*="255, 251, 235"],
+[data-theme="dark"] [style*="background"][style*="255,251,235"],
+[data-theme="dark"] [style*="background"][style*="254, 243, 199"],
+[data-theme="dark"] [style*="background"][style*="254,243,199"],
+[data-theme="dark"] [style*="background"][style*="#fffbeb"],
+[data-theme="dark"] [style*="background"][style*="#fef3c7"] {
+  background: rgba(245, 158, 11, 0.15) !important;
+}
+/* Error badges (#fef2f2, #fee2e2) */
+[data-theme="dark"] [style*="background"][style*="254, 242, 242"],
+[data-theme="dark"] [style*="background"][style*="254,242,242"],
+[data-theme="dark"] [style*="background"][style*="254, 226, 226"],
+[data-theme="dark"] [style*="background"][style*="254,226,226"],
+[data-theme="dark"] [style*="background"][style*="#fef2f2"],
+[data-theme="dark"] [style*="background"][style*="#fee2e2"] {
+  background: rgba(239, 68, 68, 0.15) !important;
+}
+
+
+/* Indigo/purple badges */
+[data-theme="dark"] [style*="background: linear-gradient(135deg, #e0e7ff, #c7d2fe)"] {
+  background: rgba(99, 102, 241, 0.15) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Productividad por Especialidades (Excel Style Rows)
+   ───────────────────────────────────────────────────────────────── */
+/* Quirófano (Light Blue → Dark Blue) */
+[data-theme="dark"] [style*="background"][style*="230, 240, 250"],
+[data-theme="dark"] [style*="background"][style*="230,240,250"],
+[data-theme="dark"] [style*="background"][style*="#E6F0FA"],
+[data-theme="dark"] [style*="background"][style*="#e6f0fa"] {
+  background: #0D213F !important;
+}
+[data-theme="dark"] [style*="border"][style*="187, 212, 240"],
+[data-theme="dark"] [style*="border"][style*="187,212,240"],
+[data-theme="dark"] [style*="border"][style*="#BBD4F0"],
+[data-theme="dark"] [style*="border"][style*="#bbd4f0"] {
+  border-color: rgba(71, 132, 199, 0.3) !important;
+}
+
+/* Maternidad (Light Pink → Dark Burgundy) */
+[data-theme="dark"] [style*="background"][style*="252, 231, 235"],
+[data-theme="dark"] [style*="background"][style*="252,231,235"],
+[data-theme="dark"] [style*="background"][style*="#FCE7EB"],
+[data-theme="dark"] [style*="background"][style*="#fce7eb"] {
+  background: #2D141C !important;
+}
+[data-theme="dark"] [style*="border"][style*="246, 188, 199"],
+[data-theme="dark"] [style*="border"][style*="246,188,199"],
+[data-theme="dark"] [style*="border"][style*="#F6BCC7"],
+[data-theme="dark"] [style*="border"][style*="#f6bcc7"] {
+  border-color: rgba(246, 188, 199, 0.25) !important;
+}
+
+/* Endoscopías (Light Yellow → Dark Amber) */
+[data-theme="dark"] [style*="background"][style*="253, 242, 226"],
+[data-theme="dark"] [style*="background"][style*="253,242,226"],
+[data-theme="dark"] [style*="background"][style*="#FDF2E2"],
+[data-theme="dark"] [style*="background"][style*="#fdf2e2"] {
+  background: #2E1B05 !important;
+}
+[data-theme="dark"] [style*="border"][style*="245, 213, 165"],
+[data-theme="dark"] [style*="border"][style*="245,213,165"],
+[data-theme="dark"] [style*="border"][style*="#F5D5A5"],
+[data-theme="dark"] [style*="border"][style*="#f5d5a5"] {
+  border-color: rgba(245, 213, 165, 0.25) !important;
+}
+
+/* Gastroenterología (Light Green → Dark Green) */
+[data-theme="dark"] [style*="background"][style*="234, 246, 232"],
+[data-theme="dark"] [style*="background"][style*="234,246,232"],
+[data-theme="dark"] [style*="background"][style*="#EAF6E8"],
+[data-theme="dark"] [style*="background"][style*="#eaf6e8"] {
+  background: #0F2514 !important;
+}
+[data-theme="dark"] [style*="border"][style*="196, 230, 190"],
+[data-theme="dark"] [style*="border"][style*="196,230,190"],
+[data-theme="dark"] [style*="border"][style*="#C4E6BE"],
+[data-theme="dark"] [style*="border"][style*="#c4e6be"] {
+  border-color: rgba(196, 230, 190, 0.25) !important;
+}
+
+/* Indigo row (TOTAL) */
+[data-theme="dark"] [style*="background"][style*="224, 231, 255"],
+[data-theme="dark"] [style*="background"][style*="224,231,255"] {
+  background: #141738 !important;
+}
+
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Modal overlays (rgba(0,0,0,0.5) pattern)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="background: rgba(0, 0, 0, 0.5)"],
+[data-theme="dark"] [style*="background: rgba(0,0,0,0.5)"],
+[data-theme="dark"] [style*="background:rgba(0,0,0,0.5)"],
+[data-theme="dark"] [style*="background: rgba(13, 27, 42, 0.7)"] {
+  background: rgba(0, 0, 0, 0.75) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Botones con bordes y fondos claros
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] button[style*="border: 1px solid #CBD5E1"],
+[data-theme="dark"] button[style*="border: 1px solid #cbd5e1"],
+[data-theme="dark"] button[style*="border: 1px solid #E2E8F0"],
+[data-theme="dark"] button[style*="border: 1px solid #e2e8f0"] {
+  border-color: var(--navbar-border) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Colores de texto específicos en data cells y títulos
+   ───────────────────────────────────────────────────────────────── */
+/* ▸ color: #004687 (azul institucional en texto) / rgb(0, 70, 135) */
+[data-theme="dark"] [style*="color"][style*="0, 70, 135"],
+[data-theme="dark"] [style*="color"][style*="0,70,135"],
+[data-theme="dark"] [style*="color"][style*="#004687"],
+[data-theme="dark"] [style*="color"][style*="#004687"] {
+  color: #60A5FA !important;
+}
+
+/* ▸ Textos negros/oscuros → --text-primary (rgb(15, 23, 42) y rgb(13, 27, 42)) */
+[data-theme="dark"] [style*="color"][style*="15, 23, 42"],
+[data-theme="dark"] [style*="color"][style*="15,23,42"],
+[data-theme="dark"] [style*="color"][style*="13, 27, 42"],
+[data-theme="dark"] [style*="color"][style*="13,27,42"],
+[data-theme="dark"] [style*="color"][style*="#0F172A"],
+[data-theme="dark"] [style*="color"][style*="#0f172a"],
+[data-theme="dark"] [style*="color"][style*="#0D1B2A"],
+[data-theme="dark"] [style*="color"][style*="#0d1b2a"] {
+  color: var(--text-primary) !important;
+}
+
+/* ▸ Textos grises medios → --text-secondary (rgb(30, 41, 59) y rgb(51, 65, 85)) */
+[data-theme="dark"] [style*="color"][style*="30, 41, 59"],
+[data-theme="dark"] [style*="color"][style*="30,41,59"],
+[data-theme="dark"] [style*="color"][style*="51, 65, 85"],
+[data-theme="dark"] [style*="color"][style*="51,65,85"],
+[data-theme="dark"] [style*="color"][style*="#1e293b"],
+[data-theme="dark"] [style*="color"][style*="#334155"] {
+  color: var(--text-secondary) !important;
+}
+
+/* ▸ Textos grises claros → --text-muted (rgb(71, 85, 105), rgb(100, 116, 139), rgb(148, 163, 184)) */
+[data-theme="dark"] [style*="color"][style*="71, 85, 105"],
+[data-theme="dark"] [style*="color"][style*="71,85,105"],
+[data-theme="dark"] [style*="color"][style*="100, 116, 139"],
+[data-theme="dark"] [style*="color"][style*="100,116,139"],
+[data-theme="dark"] [style*="color"][style*="148, 163, 184"],
+[data-theme="dark"] [style*="color"][style*="148,163,184"],
+[data-theme="dark"] [style*="color"][style*="#475569"],
+[data-theme="dark"] [style*="color"][style*="#64748b"],
+[data-theme="dark"] [style*="color"][style*="#94a3b8"] {
+  color: var(--text-muted) !important;
+}
+
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Filas alternadas de tabla con fondo blanco/#f8fafc
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="background: #ffffff"],
+[data-theme="dark"] [style*="background:#ffffff"] {
+  background: var(--color-bg-white) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Líneas de borde (#e2e8f0, #cbd5e1, #f1f5f9)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="border-bottom: 1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-bottom: 1px solid #f1f5f9"],
+[data-theme="dark"] [style*="border-bottom: 2px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-bottom: 2px solid #E2E8F0"],
+[data-theme="dark"] [style*="borderBottom: 1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-top: 1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-top: 2px solid #E2E8F0"],
+[data-theme="dark"] [style*="border-top: 2px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-right: 1px solid #E2E8F0"],
+[data-theme="dark"] [style*="border-right: 1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border: 1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border: 1px solid #cbd5e1"] {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — CargosSAP / ResumenMaestro (thead con #004687)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] th[style*="background: #004687"],
+[data-theme="dark"] th[style*="background:#004687"] {
+  background: #0B2447 !important;
+  border-color: rgba(0, 136, 201, 0.3) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Tailwind utility class overrides (ReportesAlmacen)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .bg-white {
+  background-color: var(--color-bg-white) !important;
+}
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-gray-100 {
+  background-color: var(--surface-1) !important;
+}
+[data-theme="dark"] .border-gray-200,
+[data-theme="dark"] .border-gray-300 {
+  border-color: var(--navbar-border) !important;
+}
+[data-theme="dark"] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--table-border) !important;
+}
+[data-theme="dark"] .text-gray-900 {
+  color: var(--text-primary) !important;
+}
+[data-theme="dark"] .text-gray-700 {
+  color: var(--text-secondary) !important;
+}
+[data-theme="dark"] .text-gray-500 {
+  color: var(--text-muted) !important;
+}
+[data-theme="dark"] .bg-red-50,
+[data-theme="dark"] .bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+[data-theme="dark"] .text-red-600 {
+  color: #FCA5A5 !important;
+}
+[data-theme="dark"] .hover\:bg-blue-50:hover {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — LoginPage
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .login-input-field {
+  background-color: var(--surface-1) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-primary) !important;
+}
+[data-theme="dark"] .login-input-field:focus {
+  background-color: var(--color-bg-white) !important;
+  border-color: rgba(0, 136, 201, 0.5) !important;
+}
+[data-theme="dark"] .login-label {
+  color: var(--text-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — SinAcceso (error 403) page
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] div[style*="background: #FFFFFF"][style*="border: 1px solid rgba(0, 70, 135"] {
+  background: var(--color-bg-white) !important;
+  border-color: var(--navbar-border) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — AdminUsuarios: focus states, table rows, modals
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .search-input-field,
+[data-theme="dark"] .custom-select-perfil,
+[data-theme="dark"] .edit-form-input,
+[data-theme="dark"] .edit-form-select {
+  background-color: var(--surface-1) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: var(--text-primary) !important;
+}
+[data-theme="dark"] .search-input-field:focus,
+[data-theme="dark"] .custom-select-perfil:focus,
+[data-theme="dark"] .edit-form-input:focus,
+[data-theme="dark"] .edit-form-select:focus {
+  background-color: var(--color-bg-white) !important;
+  border-color: rgba(0, 136, 201, 0.4) !important;
+}
+[data-theme="dark"] .users-table tr:nth-child(even) {
+  background-color: var(--table-row-even-bg) !important;
+}
+[data-theme="dark"] .users-table tr:hover {
+  background-color: var(--table-row-hover-bg) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — AdminAuditoriaLog: tables, focus states
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .audit-search-input:focus {
+  background-color: var(--color-bg-white) !important;
+  border-color: rgba(0, 136, 201, 0.4) !important;
+}
+[data-theme="dark"] .audit-table tr:nth-child(even) {
+  background-color: var(--table-row-even-bg) !important;
+}
+[data-theme="dark"] .audit-table tr:hover {
+  background-color: var(--table-row-hover-bg) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — InventarioFarmacia/InventarioAlmacen: table hover
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] tbody tr:hover {
+  background-color: var(--table-row-hover-bg) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — DashboardDirectivo/DashboardArea: tab buttons
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] button[style*="background: white"][style*="color: #4A5568"],
+[data-theme="dark"] button[style*="background: white"][style*="color: #4a5568"] {
+  background: var(--color-bg-white) !important;
+  color: var(--text-secondary) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Estadisticas page: period filter capsules
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] button[style*="background: #FFFFFF"][style*="color: var(--color-azul-fuerte)"],
+[data-theme="dark"] [style*="background: #FFFFFF"][style*="color: var(--color-azul-fuerte)"] {
+  background: var(--surface-2) !important;
+  color: #60A5FA !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — CargosSAP/ResumenMaestro: row hover (#EFF6FF)
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .table-row-hover:hover {
+  background-color: var(--table-row-hover-bg) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — DashboardArea: reportes asignados card gradients
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="background: linear-gradient(135deg, white, #f3e8ff)"] {
+  background: linear-gradient(135deg, var(--color-bg-white), rgba(139, 92, 246, 0.08)) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — GlobalFilterBar: quick date buttons
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] [style*="background: #F1F5F9"][style*="border: 1px solid #CBD5E1"] {
+  background: var(--surface-1) !important;
+  border-color: var(--navbar-border) !important;
+  color: var(--text-secondary) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — AIAssistant / AriaCopilotWidget
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .ai-messages[style*="background: #FAFBFD"] {
+  background: var(--color-bg-white) !important;
 }
 
 /* ── Reset Base ──────────────────────────────────────────────── */
@@ -159,7 +907,7 @@ code, pre, .mono {
   top: 0;
   bottom: 0;
   width: var(--sidebar-width);
-  background: var(--color-azul-fuerte);
+  background: var(--color-bg-sidebar);
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -227,6 +975,59 @@ code, pre, .mono {
 
 .sidebar-logo-icon:hover {
   transform: scale(1.05);
+}
+
+/* ── Brand Logo Badge (Pill Container) ────────────────────────── */
+.brand-logo-badge {
+  background: #ffffff;
+  border-radius: 9999px;
+  padding: 6px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: transform var(--transition-base), box-shadow var(--transition-base), background var(--transition-base), border-color var(--transition-base);
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.brand-logo-badge:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+}
+
+.brand-logo-img {
+  height: 30px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  mix-blend-mode: multiply;
+  filter: contrast(102%) brightness(98%);
+}
+
+/* Estilo para Modo Oscuro — Capsula suave flotante con brillo institucional */
+[data-theme="dark"] .brand-logo-badge {
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 9999px;
+  padding: 6px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 16px rgba(0, 168, 89, 0.22),
+    0 0 28px rgba(29, 82, 159, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+}
+
+[data-theme="dark"] .brand-logo-badge:hover {
+  background: #ffffff;
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 
+    0 6px 24px rgba(0, 0, 0, 0.6),
+    0 0 22px rgba(0, 168, 89, 0.35),
+    0 0 35px rgba(29, 82, 159, 0.28);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .sidebar-logo-text {
@@ -802,22 +1603,22 @@ code, pre, .mono {
 
 .audit-table td {
   padding: 0.7rem 1rem;
-  border-bottom: 1px solid rgba(0, 46, 87, 0.05);
+  border-bottom: 1px solid var(--table-border);
   color: var(--text-primary);
   transition: background var(--transition-fast);
 }
 
 .audit-table tr:hover td {
-  background: rgba(0, 136, 201, 0.03);
+  background: var(--table-row-hover-bg);
 }
 
 /* Alternating subtle tint */
 .audit-table tbody tr:nth-child(even) td {
-  background: rgba(0, 46, 87, 0.015);
+  background: var(--table-row-even-bg);
 }
 
 .audit-table tbody tr:nth-child(even):hover td {
-  background: rgba(0, 136, 201, 0.04);
+  background: var(--table-row-hover-bg);
 }
 
 .badge {
@@ -982,53 +1783,53 @@ code, pre, .mono {
   overflow-x: auto !important;
   overflow-y: auto !important;
   width: 100%;
-  border-top: 1px solid #D1D5DB;
-  border-bottom: 1px solid #D1D5DB;
-  background: #FFFFFF;
-  scrollbar-color: #C1C9D2 #F3F4F6;
+  border-top: 1px solid var(--table-border, #D1D5DB);
+  border-bottom: 1px solid var(--table-border, #D1D5DB);
+  background: var(--color-bg-white, #FFFFFF);
+  scrollbar-color: var(--text-muted, #C1C9D2) var(--surface-1, #F3F4F6);
   scrollbar-width: thin;
 }
 
 .custom-table-scroll::-webkit-scrollbar {
   height: 17px !important;
   width: 12px !important;
-  background-color: #F3F4F6 !important;
+  background-color: var(--surface-1, #F3F4F6) !important;
 }
 
 .custom-table-scroll::-webkit-scrollbar-track {
-  background: #F3F4F6 !important;
-  border-top: 1px solid #D1D5DB;
-  box-shadow: inset 0 1px 0 #FFFFFF;
+  background: var(--surface-1, #F3F4F6) !important;
+  border-top: 1px solid var(--table-border, #D1D5DB);
+  box-shadow: none !important;
 }
 
 .custom-table-scroll::-webkit-scrollbar-thumb {
-  background: #C1C9D2 !important;
+  background: var(--text-muted, #C1C9D2) !important;
   border-radius: 2px;
-  border: 2px solid #F3F4F6 !important;
+  border: 2px solid var(--surface-1, #F3F4F6) !important;
   box-shadow: inset 0 0 1px rgba(0,0,0,0.1);
 }
 
 .custom-table-scroll::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8 !important;
+  background: var(--text-secondary, #94A3B8) !important;
 }
 
 .custom-table-scroll::-webkit-scrollbar-thumb:active {
-  background: #64748B !important;
+  background: var(--text-primary, #64748B) !important;
 }
 
 .custom-table-scroll::-webkit-scrollbar-button {
   display: block !important;
   height: 17px !important;
   width: 17px !important;
-  background-color: #E5E7EB !important;
-  border: 1px solid #D1D5DB !important;
+  background-color: var(--surface-2, #E5E7EB) !important;
+  border: 1px solid var(--table-border, #D1D5DB) !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
   cursor: pointer !important;
 }
 
 .custom-table-scroll::-webkit-scrollbar-button:hover {
-  background-color: #D1D5DB !important;
+  background-color: var(--surface-1, #D1D5DB) !important;
 }
 
 .custom-table-scroll::-webkit-scrollbar-button:horizontal:decrement {
@@ -1039,14 +1840,21 @@ code, pre, .mono {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='%23374151'%3E%3Cpolygon points='9,4 17,12 9,20'/%3E%3C/svg%3E") !important;
 }
 
-/* Tabla de Auditoría */
+[data-theme="dark"] .custom-table-scroll::-webkit-scrollbar-button:horizontal:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='%2394A3B8'%3E%3Cpolygon points='15,4 7,12 15,20'/%3E%3C/svg%3E") !important;
+}
+
+[data-theme="dark"] .custom-table-scroll::-webkit-scrollbar-button:horizontal:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='%2394A3B8'%3E%3Cpolygon points='9,4 17,12 9,20'/%3E%3C/svg%3E") !important;
+}
+
 .audit-table {
   width: 100%;
   min-width: 1750px !important;
   border-collapse: separate !important;
   border-spacing: 0 !important;
   font-size: 0.84rem;
-  background: #FFFFFF;
+  background: var(--color-bg-white, #FFFFFF);
 }
 
 .audit-table thead {
@@ -1072,7 +1880,7 @@ code, pre, .mono {
 
 .audit-table td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid var(--table-border);
   color: var(--text-primary);
   white-space: normal;
   line-height: 1.4;
@@ -1080,11 +1888,11 @@ code, pre, .mono {
 }
 
 .audit-table tr:nth-child(even) td {
-  background: #F8FAFC;
+  background: var(--table-row-even-bg);
 }
 
 .audit-table tr:hover td {
-  background: rgba(0, 136, 201, 0.06) !important;
+  background: var(--table-row-hover-bg) !important;
 }
 
 /* Columnas fijas / Sticky columns */
@@ -1092,16 +1900,16 @@ code, pre, .mono {
   position: sticky !important;
   left: 0 !important;
   z-index: 4 !important;
-  background: #FFFFFF !important;
+  background: var(--color-bg-white) !important;
   box-shadow: 2px 0 4px rgba(0, 70, 135, 0.08);
 }
 
 .audit-table tr:nth-child(even) td.sticky-col-1 {
-  background: #F8FAFC !important;
+  background: var(--surface-1) !important;
 }
 
 .audit-table tr:hover td.sticky-col-1 {
-  background: #EFF6FF !important;
+  background: var(--table-row-hover-bg) !important;
 }
 
 .audit-table th.sticky-col-1 {
@@ -1113,16 +1921,16 @@ code, pre, .mono {
   position: sticky !important;
   left: 100px !important;
   z-index: 4 !important;
-  background: #FFFFFF !important;
+  background: var(--color-bg-white) !important;
   box-shadow: 4px 0 8px -2px rgba(0, 0, 0, 0.12);
 }
 
 .audit-table tr:nth-child(even) td.sticky-col-3 {
-  background: #F8FAFC !important;
+  background: var(--surface-1) !important;
 }
 
 .audit-table tr:hover td.sticky-col-3 {
-  background: #EFF6FF !important;
+  background: var(--table-row-hover-bg) !important;
 }
 
 .audit-table th.sticky-col-3 {

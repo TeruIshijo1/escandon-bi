@@ -1,0 +1,5609 @@
+[
+  {
+    "code": "ALG0394",
+    "desc": "LIMPIADOR PARA ELECTROCAUTERIO",
+    "min_stock": 2,
+    "max_stock": 7,
+    "note": ""
+  },
+  {
+    "code": "ALG0693",
+    "desc": "MONOGOGLES DE ALTA SEGURIDAD",
+    "min_stock": 5,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0174",
+    "desc": "AGUJA AMARILLA 20X32",
+    "min_stock": 40,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0200",
+    "desc": "BANDITA REDONDA CAJA C/100",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0357",
+    "desc": "HOJA BISTURI NUM 10",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0052",
+    "desc": "HOJA BISTURI NUM 11",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0358",
+    "desc": "HOJA BISTURI NUM 12",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0053",
+    "desc": "HOJA BISTURI NUM 15",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0054",
+    "desc": "HOJA BISTURI NUM 20",
+    "min_stock": 20,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0359",
+    "desc": "HOJA BISTURI NUM 21",
+    "min_stock": 10,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0360",
+    "desc": "HOJA BISTURI NUM 22",
+    "min_stock": 10,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0361",
+    "desc": "HOJA BISTURI NUM 23",
+    "min_stock": 10,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0179",
+    "desc": "AGUJA INSULINA 25X16",
+    "min_stock": 20,
+    "max_stock": 400,
+    "note": ""
+  },
+  {
+    "code": "ALG0066",
+    "desc": "JERINGA 10ML 21X32",
+    "min_stock": 400,
+    "max_stock": 2500,
+    "note": ""
+  },
+  {
+    "code": "ALG0067",
+    "desc": "JERINGA 20ML",
+    "min_stock": 150,
+    "max_stock": 750,
+    "note": ""
+  },
+  {
+    "code": "ALG0068",
+    "desc": "JERINGA 3ML 21X32",
+    "min_stock": 100,
+    "max_stock": 700,
+    "note": ""
+  },
+  {
+    "code": "ALG0069",
+    "desc": "JERINGA 5ML 21X32",
+    "min_stock": 150,
+    "max_stock": 700,
+    "note": ""
+  },
+  {
+    "code": "ALG0379",
+    "desc": "JERINGA 60ML",
+    "min_stock": 10,
+    "max_stock": 80,
+    "note": ""
+  },
+  {
+    "code": "ALG0381",
+    "desc": "JERINGA ASEPTO 90 REUSABLE",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0380",
+    "desc": "JERINGA ASEPTO 60 DESECHABLE",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0377",
+    "desc": "JERINGA 1ML INSULINA BD326716",
+    "min_stock": 150,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0378",
+    "desc": "JERINGA 50ML P/PERFUSOR",
+    "min_stock": 10,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0391",
+    "desc": "LANCETA PRESTIGE",
+    "min_stock": 100,
+    "max_stock": 1500,
+    "note": ""
+  },
+  {
+    "code": "ALG0181",
+    "desc": "AGUJA NEGRA 22X32",
+    "min_stock": 20,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0074",
+    "desc": "PUNZO INTROCAN 14 (NARANJA)",
+    "min_stock": 15,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0075",
+    "desc": "PUNZO INTROCAN 16 (GRIS)",
+    "min_stock": 15,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0076",
+    "desc": "PUNZO INTROCAN 18 (VERDE)",
+    "min_stock": 50,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0077",
+    "desc": "PUNZO INTROCAN 20 (ROSA)",
+    "min_stock": 50,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0078",
+    "desc": "PUNZO INTROCAN 22 (AZUL)",
+    "min_stock": 20,
+    "max_stock": 150,
+    "note": ""
+  },
+  {
+    "code": "ALG0079",
+    "desc": "PUNZO INTROCAN 24 (AMARILLO)",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0476",
+    "desc": "RASTRILLO DESECHABLE AMBIDERM",
+    "min_stock": 5,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0182",
+    "desc": "AGUJA ROSA 18X38",
+    "min_stock": 500,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0573",
+    "desc": "TIRA REACTIVA ACCU-CHEK ACTIVE",
+    "min_stock": 100,
+    "max_stock": 1500,
+    "note": ""
+  },
+  {
+    "code": "ALG0001",
+    "desc": "CONTOUR PLUS TIRAS REACT 0609",
+    "min_stock": 50,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0579",
+    "desc": "TOALLITA ALCOHOLADA",
+    "min_stock": 300,
+    "max_stock": 3000,
+    "note": ""
+  },
+  {
+    "code": "ALG0183",
+    "desc": "AGUJA VERDE 21X32",
+    "min_stock": 20,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0045",
+    "desc": "AGUJA ESPINAL LARGA 25GX4",
+    "min_stock": 3,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0046",
+    "desc": "AGUJA ESPINAL LARGA 27GX4",
+    "min_stock": 3,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0317",
+    "desc": "ESPONJA HEMOSTATICA 8x5 CM",
+    "min_stock": 3,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0252",
+    "desc": "CINTA UMBILICAL",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0303",
+    "desc": "ENGRAPADORA PARA PIEL-35mm",
+    "min_stock": 3,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0198",
+    "desc": "AQUAPLAST FERULA NASAL 15X15 CM",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0329",
+    "desc": "GASA JELONET VASELINADA",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0362",
+    "desc": "HOMEPUMP ECLIPSE 60ML 2ML/HR",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0047",
+    "desc": "SPINOCAN 18G",
+    "min_stock": 3,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0048",
+    "desc": "SPINOCAN 22G",
+    "min_stock": 5,
+    "max_stock": 25,
+    "note": ""
+  },
+  {
+    "code": "ALG0049",
+    "desc": "SPINOCAN 25G",
+    "min_stock": 5,
+    "max_stock": 25,
+    "note": ""
+  },
+  {
+    "code": "ALG0050",
+    "desc": "SPINOCAN 26G",
+    "min_stock": 5,
+    "max_stock": 25,
+    "note": ""
+  },
+  {
+    "code": "ALG0051",
+    "desc": "SPINOCAN 27G",
+    "min_stock": 5,
+    "max_stock": 25,
+    "note": ""
+  },
+  {
+    "code": "ALG0549",
+    "desc": "STERI STRIP TIRAS COD. R1546",
+    "min_stock": 5,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0938",
+    "desc": "FERULA NASAL DOYLE",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0551",
+    "desc": "SURGICEL FIBRILLAR 411961",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0552",
+    "desc": "SURGICEL ORIGINAL 1952",
+    "min_stock": 2,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0364",
+    "desc": "HYPAFIX TEJIDO EN ROLLO 15 cm x 10mts 7144303",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0556",
+    "desc": "TAPON NASAL MEROCEL 8.0 CM",
+    "min_stock": 1,
+    "max_stock": 4,
+    "note": ""
+  },
+  {
+    "code": "ALG0700",
+    "desc": "TRAMPA D/AGUA DRAGER",
+    "min_stock": 4,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0702",
+    "desc": "TRAMPA P/AGUA MINDRAY REF. 9200-10-10530",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0583",
+    "desc": "TRAMPA DE AGUA PARA CAPNOGRAFO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0154",
+    "desc": "ESCOBILLON CITOBRUSH BROCHA PAQ/50",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0937",
+    "desc": "ESPATULA P/PAPANICOLAO PAQ/100",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0180",
+    "desc": "AGUJA INTRAOSEA JAMSHIDI TJC3513",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0189",
+    "desc": "APLICADOR C/PUNTA DE ALGODÓN PAQ/3",
+    "min_stock": 50,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0204",
+    "desc": "BOLSA DE ORINA P/NIÑA",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0205",
+    "desc": "BOLSA DE ORINA P/NIÑO",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0060",
+    "desc": "CONECTOR SIMS GRUESO",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0059",
+    "desc": "CONECTOR SIMS DELGADO",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0265",
+    "desc": "CONECTOR EN Y",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0429",
+    "desc": "MONOCONECTOR O NEUTRON REF.4049008 (4031209)",
+    "min_stock": 15,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0268",
+    "desc": "CONO ADULTO OTOSCOPIO",
+    "min_stock": 5,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0269",
+    "desc": "CONO PEDIATRICO OTOSCOPIO",
+    "min_stock": 34,
+    "max_stock": 68,
+    "note": ""
+  },
+  {
+    "code": "ALG0278",
+    "desc": "CUBREBOCA ALTA FILTRACION N95",
+    "min_stock": 80,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0297",
+    "desc": "ELECTRODO NEONATAL COD.31424743",
+    "min_stock": 3,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0319",
+    "desc": "EXTENSION PARA OXIGENO",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0320",
+    "desc": "EXTENSION PARA PERFUSOR 4012551",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0321",
+    "desc": "FIJACION P/SONDA  ALIMENTACION",
+    "min_stock": 15,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0333",
+    "desc": "GIRATEK REF.4003549",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0334",
+    "desc": "GIRATEK C/EXT. 80CM. REF.4003550 C/150",
+    "min_stock": 50,
+    "max_stock": 450,
+    "note": ""
+  },
+  {
+    "code": "QUI0113",
+    "desc": "MASCARILLA LARINGEA I-GEL #3",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "QUI0114",
+    "desc": "MASCARILLA LARINGEA I-GEL #4",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "QUI0115",
+    "desc": "MASCARILLA LARINGEA I-GEL #5",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0421",
+    "desc": "MICRO CLAVE C/EXT.30CM 3VIAS REF.4031208",
+    "min_stock": 60,
+    "max_stock": 150,
+    "note": ""
+  },
+  {
+    "code": "ALG0296",
+    "desc": "ELECTRODO MULTIFUNCIONAL \"UTI\"",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0298",
+    "desc": "ELECTRODO P/DESFIBRILADOR MINDRAY",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0475",
+    "desc": "PUNTAS NASALES PEDIATRICAS P/OXIGENO",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0474",
+    "desc": "PUNTAS NASALES NEONATALES P/OXIGENO",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0247",
+    "desc": "CEPILLO CITOBRUSH CITOLOGICO PAQ",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0584",
+    "desc": "TRAMPA DE SECRECIONES",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0503",
+    "desc": "SONDA ASPIRACION 14 FR",
+    "min_stock": 5,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0392",
+    "desc": "LAPIZ BOVIE P/CAUTERIZAR",
+    "min_stock": 15,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0070",
+    "desc": "PENROSE 1/2",
+    "min_stock": 8,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0071",
+    "desc": "PENROSE 1/4",
+    "min_stock": 8,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0226",
+    "desc": "CANULA YANKAUER",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0459",
+    "desc": "PINZA CLAMP UMB. AMSINO UCC100",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG1037",
+    "desc": "MASCARILLA LARINGEA NUM 4 AMBU",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0407",
+    "desc": "MASCARILLA LARINGEA NUM 4 LMA",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0403",
+    "desc": "MASCARILLA LARINGEA NUM 1.5",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0404",
+    "desc": "MASCARILLA LARINGEA NUM 2",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0405",
+    "desc": "MASCARILLA LARINGEA NUM. 2.5",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0406",
+    "desc": "MASCARILLA LARINGEA  3",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0408",
+    "desc": "MASCARILLA LARINGEA NUM 5",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0402",
+    "desc": "MASCARILLA LARINGEA NUM.1",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0701",
+    "desc": "TRAMPA D/AGUA DRYLINE REF. 100-000080",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0175",
+    "desc": "AGUJA ANGIOGRAFICA 18G",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0251",
+    "desc": "CINTA KINESIOLOGICA P/REHABI.",
+    "min_stock": 5,
+    "max_stock": 25,
+    "note": ""
+  },
+  {
+    "code": "ALG0275",
+    "desc": "CUBIERTA P/TERMOMETRO WELCH ALLYN",
+    "min_stock": 5,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0008",
+    "desc": "TUBO DE VENTILACION SHEPARD 1.14 MM CON ALAMBRE",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0294",
+    "desc": "ELECTRODO FINA 7.2CM ES02",
+    "min_stock": 3,
+    "max_stock": 6,
+    "note": ""
+  },
+  {
+    "code": "ALG0419",
+    "desc": "MEROCEL KENNEDY SINUS-PAK DRAWSTRING 3.5CM X 1.2CM",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0018",
+    "desc": "EXTRACTOR DE GRAPAS",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0912",
+    "desc": "PLACA REM POLYHESIVE II CON CABE INFANTIL",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0262",
+    "desc": "COMPRESA D/ARENA SILICA 30X25",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0295",
+    "desc": "ELECTRODO MARCAPASO TEMPORAL",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0299",
+    "desc": "ELECTRODO P/TERAPIA FISICA 40X40MM CUADRADO",
+    "min_stock": 5,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0368",
+    "desc": "INTRODUCTOR PERCUTANEO 6 FR",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0396",
+    "desc": "MARCADOR PARA PIEL",
+    "min_stock": 5,
+    "max_stock": 25,
+    "note": ""
+  },
+  {
+    "code": "ALG0585",
+    "desc": "TRANSDUCTOR DE PRESION MEDEX MX9505T",
+    "min_stock": 2,
+    "max_stock": 4,
+    "note": ""
+  },
+  {
+    "code": "ALG0369",
+    "desc": "INTRODUCTOR PERCUTANEO 7 FR",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0502",
+    "desc": "SONDA ASPIRACION 10FR TRANSP.",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0940",
+    "desc": "SONDA ASPIRACION 8FR TRANSP.",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0504",
+    "desc": "SONDA ASPIRACION 5FR TRANSP.",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0505",
+    "desc": "SONDA ASPIRACION 6FR TRANSP.",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0521",
+    "desc": "SONDA ENDOT. 6.0 DOBLE ARMADA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0522",
+    "desc": "SONDA ENDOT. 6.5 DOBLE ARMADA",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0523",
+    "desc": "SONDA ENDOT. 7.0 DOBLE ARMADA",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0524",
+    "desc": "SONDA ENDOT. 7.5 DOBLE ARMADA",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0525",
+    "desc": "SONDA ENDOT. 8.0 DOBLE ARMADA",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0526",
+    "desc": "SONDA ENDOT. 8.5 DOBLE ARMADA",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0514",
+    "desc": "SONDA ENDOT. 4.0 SIN GLOBO",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0513",
+    "desc": "SONDA ENDOT. 4.0 CON GLOBO",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0516",
+    "desc": "SONDA ENDOT. 4.5 SIN GLOBO",
+    "min_stock": 2,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0515",
+    "desc": "SONDA ENDOT. 4.5 CON GLOBO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0518",
+    "desc": "SONDA ENDOT. 5.0 SIN GLOBO",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0517",
+    "desc": "SONDA ENDOT. 5.0 CON GLOBO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0520",
+    "desc": "SONDA ENDOT. 5.5 SIN GLOBO",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0519",
+    "desc": "SONDA ENDOT. 5.5 CON GLOBO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0090",
+    "desc": "SONDA ENDOT. 6.0 CON GLOBO",
+    "min_stock": 3,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0091",
+    "desc": "SONDA ENDOT. 6.5 CON GLOBO",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0092",
+    "desc": "SONDA ENDOT. 7.0 CON GLOBO",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0093",
+    "desc": "SONDA ENDOT. 7.5 CON GLOBO",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0094",
+    "desc": "SONDA ENDOT. 8.0 CON GLOBO",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0095",
+    "desc": "SONDA ENDOT. 8.5 CON GLOBO",
+    "min_stock": 3,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0096",
+    "desc": "SONDA ENDOT. 9.0 CON GLOBO",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0508",
+    "desc": "SONDA ENDOT. 2.0 SIN GLOBO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0509",
+    "desc": "SONDA ENDOT. 2.5 SIN GLOBO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0510",
+    "desc": "SONDA ENDOT. 3.0 SIN GLOBO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0512",
+    "desc": "SONDA ENDOT. 3.5 SIN GLOBO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0511",
+    "desc": "SONDA ENDOT. 3.5 CON GLOBO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0220",
+    "desc": "CANULA DE GUEDEL NUM 0 (50MM)",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0221",
+    "desc": "CANULA DE GUEDEL NUM 00 (40MM)",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0222",
+    "desc": "CANULA DE GUEDEL NUM 1 (60MM)",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0223",
+    "desc": "CANULA DE GUEDEL NUM 2 (70MM)",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0224",
+    "desc": "CANULA DE GUEDEL NUM 3 (80MM)",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0055",
+    "desc": "CANULA DE GUEDEL NUM 4 (90MM)",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0056",
+    "desc": "CANULA DE GUEDEL NUM 5 (100MM)",
+    "min_stock": 10,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0057",
+    "desc": "CANULA DE GUEDEL NUM 6 (110MM)",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0058",
+    "desc": "CANULA DE GUEDEL NUM 7 (120MM)",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0590",
+    "desc": "TUBO D/ASPIRACION",
+    "min_stock": 50,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0208",
+    "desc": "BOLSA P/COLOSTOMIA COD125371",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0274",
+    "desc": "CREMA CORPORAL",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0482",
+    "desc": "RETRACTOR DE HERIDAS ALEXIS GD 9-14 CM  C8403",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0382",
+    "desc": "KENGUARD BOLSA DE DRENAJE URINARIO C/SISTEMA CERRADO Y CAMARA ANTIREFLUJODE 2000",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0286",
+    "desc": "CYSTOFLOW BOLSA RECOLECCION D/ORINA REF.4000791",
+    "min_stock": 30,
+    "max_stock": 180,
+    "note": ""
+  },
+  {
+    "code": "ALG0206",
+    "desc": "BOLSA ENTEROBAG 1000 ML NTPISA REF.4053951",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG1101",
+    "desc": "BOLSA ENTEROBAG 500ML NTPISA REF.4053946",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0316",
+    "desc": "EQUIPO TRANSFUSION BLOTEN",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0315",
+    "desc": "EQUIPO P/VENOCLISIS NORMOGOTERO REF.4000489",
+    "min_stock": 50,
+    "max_stock": 384,
+    "note": ""
+  },
+  {
+    "code": "ALG0318",
+    "desc": "EXTENSION P/CAPNOGRAFO REF. 8290286",
+    "min_stock": 15,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0323",
+    "desc": "FIJACION TUBO ENDOTRAQUEAL ADULTO",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG1100",
+    "desc": "EQUIPO HEMOTEK P/TRANF NTPISA REF.4058832",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG1098",
+    "desc": "INFUSOMAT P/BOMBA NTPISA REF.4053956",
+    "min_stock": 100,
+    "max_stock": 360,
+    "note": ""
+  },
+  {
+    "code": "ALG0506",
+    "desc": "SONDA D/ALIMENTACION 5 FR",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0507",
+    "desc": "SONDA D/ALIMENTACION 8 FR",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0538",
+    "desc": "SONDA LEVIN 10 FR",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0539",
+    "desc": "SONDA LEVIN 12 FR",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0540",
+    "desc": "SONDA LEVIN 14 FR",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0541",
+    "desc": "SONDA LEVIN 16 FR",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0542",
+    "desc": "SONDA LEVIN 18 FR",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG1097",
+    "desc": "METRISET P/BOMBA  0-150 ML NTPISA REF.4053947",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG1099",
+    "desc": "INFUSOMAT AMBAR NTPISA REF.4058830",
+    "min_stock": 30,
+    "max_stock": 120,
+    "note": ""
+  },
+  {
+    "code": "ALG0477",
+    "desc": "REGLA DE PVC CLAVE REF.4003539",
+    "min_stock": 10,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0203",
+    "desc": "BIO-VAC DRENAJE CERRADO 10MM",
+    "min_stock": 2,
+    "max_stock": 8,
+    "note": ""
+  },
+  {
+    "code": "ALG0289",
+    "desc": "DRENAJE BLAKE 10FR D/SILICON REF2226",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0290",
+    "desc": "DRENAJE BLAKE 19FR D/SILICON REF2232",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0309",
+    "desc": "EQUIPO IRRIGATEK 2 VIAS4000847",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0462",
+    "desc": "PLEUROVAC DRENAJE TORAXICO",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0478",
+    "desc": "RESERVORIO J-VAC 100ML REF2160",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0548",
+    "desc": "STERI CATH 14 FR CATETER D/SUCCION",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0109",
+    "desc": "CATGUT CROMICO \"0\" SG3611-90 A-36MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0110",
+    "desc": "CATGUT CROMICO \"1\" SG3618-75 A-36MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0111",
+    "desc": "CATGUT CROMICO 2-0 SR2612-75 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0112",
+    "desc": "CATGUT CROMICO 3-0 SR2613-75 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0113",
+    "desc": "CATGUT CROMICO 4-0 SR1714-75 A-17MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0245",
+    "desc": "CATGUT CROMICO 2-0 SG3612-75 A-36MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0114",
+    "desc": "CATGUT SIMPLE 4-0 PE1924-75 19MM",
+    "min_stock": 0,
+    "max_stock": 12,
+    "note": "nuevo"
+  },
+  {
+    "code": "ALG0250",
+    "desc": "CERA P/HUESO CH-2.5G BONEWAX",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0115",
+    "desc": "NYLON NEGRO 2-0 PE1942-N A-19MM",
+    "min_stock": 12,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0434",
+    "desc": "NYLON NEGRO 2-0 PE2442-N A-24MM",
+    "min_stock": 12,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0116",
+    "desc": "NYLON NEGRO 3-0 PE1943-N A-19MM",
+    "min_stock": 12,
+    "max_stock": 36,
+    "note": ""
+  },
+  {
+    "code": "ALG0436",
+    "desc": "NYLON NEGRO 4-0 PE1244-N A-12MM",
+    "min_stock": 12,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0437",
+    "desc": "NYLON NEGRO 4-0 PE1944-N A-19MM",
+    "min_stock": 12,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0117",
+    "desc": "NYLON NEGRO 5-0 PE1245-N A-12MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0438",
+    "desc": "NYLON NEGRO 5-0 PE1945-N A-19MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0439",
+    "desc": "NYLON NEGRO 6-0 PE1346-N A-12MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0435",
+    "desc": "NYLON NEGRO 3-0 PE2443-75 A-24MM",
+    "min_stock": 12,
+    "max_stock": 36,
+    "note": ""
+  },
+  {
+    "code": "ALG0454",
+    "desc": "PGA POLIGLICOLICO 2-0 SR2692 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0452",
+    "desc": "PGA POLIGLICOLICO \"0\" SG3691 A-36MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0119",
+    "desc": "PGA POLIGLICOLICO \"1\" SG3798 A-36MM",
+    "min_stock": 24,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0118",
+    "desc": "PGA POLIGLICOLICO \"1\" 5/8 GH2698 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0120",
+    "desc": "PGA POLIGLICOLICO 2-0 SG3692 A-36MM",
+    "min_stock": 12,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0453",
+    "desc": "PGA POLIGLICOLICO 2-0 5/8 GH2692 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0455",
+    "desc": "PGA POLIGLICOLICO 3-0 SG3693 A-36MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0121",
+    "desc": "PGA POLIGLICOLICO 3-0 SR2693 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0456",
+    "desc": "PGA POLIGLICOLICO 4-0 SR2694 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0451",
+    "desc": "PGA POLIGLICOLICO \"0\" 5/8 GH2691 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0457",
+    "desc": "VICRYL 5-0 45 CM  3/8 16MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0464",
+    "desc": "POLIPROPILENE \"1\" SG3668-75 A-36MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0465",
+    "desc": "POLIPROPILENE 2-0 S2562/2 DOBLE AGU-25MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0122",
+    "desc": "POLIPROPILENE 3-0 CE2463 A-24MM",
+    "min_stock": 12,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0463",
+    "desc": "POLIPROPILENE \"0\" SG3661-75 A-36MM",
+    "min_stock": 0,
+    "max_stock": 12,
+    "note": "solicitar cada que quirofano tenga pocas"
+  },
+  {
+    "code": "ALG0466",
+    "desc": "POLIPROPILENE 2-0 SR2662-75 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0469",
+    "desc": "POLIPROPILENE 5-0 SE1365/2-75 DOBLE AGU-13MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0467",
+    "desc": "POLIPROPILENE 4-0 PE1964 A-19MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0468",
+    "desc": "POLIPROPILENE 5-0 PE1965 A-19MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0486",
+    "desc": "SEDA NEGRA \"0\" SR2631 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0487",
+    "desc": "SEDA NEGRA \"0\" SS1031 S/AGUJA",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0488",
+    "desc": "SEDA NEGRA \"1\" SR2638 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0489",
+    "desc": "SEDA NEGRA \"1\" SS1038 S/AGUJA",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0492",
+    "desc": "SEDA NEGRA 2-0 SS1032 S/AGUJA",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0491",
+    "desc": "SEDA NEGRA 2-0 SR2632 A-26MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0494",
+    "desc": "SEDA NEGRA 3-0 SS1033 S/AGUJA",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0493",
+    "desc": "SEDA NEGRA 3-0 SR2633 A-29MM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0490",
+    "desc": "SEDA NEGRA 2-0 PE2632 A-26MM CORT.",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0931",
+    "desc": "ANTIFAZ P/FOTOTERAPIA NEONATO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0228",
+    "desc": "CATETER CENTRAL 2L 4 FR 13CM PED",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0229",
+    "desc": "CATETER CENTRAL 2L 5 FR 13CM PED",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0243",
+    "desc": "CATETER UMBILICAL 3.5 FR",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0244",
+    "desc": "CATETER UMBILICAL 5.0 FR",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0383",
+    "desc": "KIT CATETER P/DIALISIS PERITONEAL",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0934",
+    "desc": "CATETER EPICUTANEO 24G 2 FR",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0230",
+    "desc": "CATETER CENTRAL 2L 7 FR ADULTO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0231",
+    "desc": "CATETER CENTRAL 3L 7 FR ADULTO",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0239",
+    "desc": "CATETER PIG TAIL12FR C/LINEA DE EXT. UNICO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0356",
+    "desc": "GUIA HIDROFILICA 0.035 MM",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0238",
+    "desc": "CATETER MAHURKAR C/EXT. RECTO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1058",
+    "desc": "CATETER MAHURCAR ELITE CURVO REF 8888222220",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0199",
+    "desc": "ASA POLIPECTOMIA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0543",
+    "desc": "SONDA NASOYEYUNAL 14 FR",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0936",
+    "desc": "SONDA ALIMENTACION NASOGASTRICA 12FR",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0209",
+    "desc": "BOLSA PARA DRENAJE SUBDURAL",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0235",
+    "desc": "CATETER FOGARTY 5 FR EMBOLECTOMIA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0234",
+    "desc": "CATETER FOGARTY 4 FR EMBOLECTOMIA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0233",
+    "desc": "CATETER FOGARTY 3 FR EMBOLECTOMIA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0232",
+    "desc": "CATETER DOBLE \"J\" 6X24 URETERAL",
+    "min_stock": 2,
+    "max_stock": 6,
+    "note": ""
+  },
+  {
+    "code": "ALG0273",
+    "desc": "COTONOIDE NEUROQUIRURGICO 15X50",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0291",
+    "desc": "DRENOVAC 1/4 EQUIPO P/DRENAJE",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0292",
+    "desc": "DRENOVAC 1/8 EQUIPO P/DRENAJE",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0301",
+    "desc": "ENDOLOOP LAZO DE TEFLON EJ10C",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0302",
+    "desc": "ENGRAPADORA LINEAL GIA 60MM-4.8MM",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0370",
+    "desc": "INYECTOR VARICES O AGUJA ESCLEROTERAPIA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0387",
+    "desc": "KIT ENDOPROTESIS P/VIA BILIAR 10FX10CM",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0388",
+    "desc": "KIT GASTROSTOMIA ENDOSC.PEG-24",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0983",
+    "desc": "MALLA PROLENE 6x6 15X15cm ATRAMAT",
+    "min_stock": 1,
+    "max_stock": 4,
+    "note": ""
+  },
+  {
+    "code": "ALG0217",
+    "desc": "CANULA D/TRAQUEOSTOMIA 7 FR",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0218",
+    "desc": "CANULA D/TRAQUEOSTOMIA 8 FR",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0219",
+    "desc": "CANULA D/TRAQUEOSTOMIA 9 FR",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0225",
+    "desc": "CANULA TRAQ. FENEST 8MM",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0592",
+    "desc": "VALVULA P/DERIV LIQ.CEFALORRAQ ALTA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0593",
+    "desc": "VALVULA P/DERIV LIQ.CEFALORRAQ BAJA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0285",
+    "desc": "CURACION DE CATETER CENTRAL",
+    "min_stock": 15,
+    "max_stock": 40,
+    "note": ""
+  },
+  {
+    "code": "ALG0322",
+    "desc": "FIJACION P/SONDA FOLEY",
+    "min_stock": 25,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0432",
+    "desc": "MORTAJA PAQUETE INFANTIL",
+    "min_stock": 1,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0263",
+    "desc": "COMPRESA ESTERIL C/5 REF.4000663",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0097",
+    "desc": "SONDA FOLEY 10 FR 2 VIAS, 3CC",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0098",
+    "desc": "SONDA FOLEY 12 FR 2 VIAS, 5CC",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0099",
+    "desc": "SONDA FOLEY 14 FR 2 VIAS, 3CC",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0100",
+    "desc": "SONDA FOLEY 16 FR 2 VIAS, 5CC",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0101",
+    "desc": "SONDA FOLEY 18 FR 2 VIAS, 5CC",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0531",
+    "desc": "SONDA FOLEY 18FR 3 VIAS 100% SILICON 30CC",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0102",
+    "desc": "SONDA FOLEY 20 FR 2 VIAS, 5CC",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0533",
+    "desc": "SONDA FOLEY 22 FR 2 VIAS, 5CC",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0527",
+    "desc": "SONDA FOLEY 08 FR 2 VIAS, 3CC",
+    "min_stock": 2,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0528",
+    "desc": "SONDA FOLEY 14 FR 2 VIAS SILICON",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0529",
+    "desc": "SONDA FOLEY 16 FR 2 VIAS SILICON",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0530",
+    "desc": "SONDA FOLEY 18 FR 2 VIAS SILICON",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0537",
+    "desc": "SONDA FOLEY 3 VIAS 22FR GLOBO 30ML HEMATURIA",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0536",
+    "desc": "SONDA FOLEY 3 VIAS 20FR GLOBO 30ML HIDROGEL HEMATURIA",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0108",
+    "desc": "SONDA NELATON 8 FR",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0103",
+    "desc": "SONDA NELATON 10 FR",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0104",
+    "desc": "SONDA NELATON 12 FR",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0105",
+    "desc": "SONDA NELATON 14 FR",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0106",
+    "desc": "SONDA NELATON 16 FR",
+    "min_stock": 5,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0107",
+    "desc": "SONDA NELATON 18 FR",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0532",
+    "desc": "SONDA FOLEY 20FR 3 VIAS 100% SILICON 30CC",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0534",
+    "desc": "SONDA FOLEY 22FR 3 VIAS 100% SILICON 30CC",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0535",
+    "desc": "SONDA FOLEY 24FR 3 VIAS 100% SILICON 30CC",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0236",
+    "desc": "CATETER LARGO 16 CENTRAL",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0237",
+    "desc": "CATETER LARGO 18 CENTRAL",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0935",
+    "desc": "CATETER PLEURAL 24 FR TORAXICO",
+    "min_stock": 2,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0240",
+    "desc": "CATETER PLEURAL 28 FR TORAXICO",
+    "min_stock": 2,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0241",
+    "desc": "CATETER PLEURAL 32 FR TORAXICO",
+    "min_stock": 2,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0242",
+    "desc": "CATETER PLEURAL 36 FR TORAXICO",
+    "min_stock": 2,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0212",
+    "desc": "BOTA DESECHABLE QX PAQ/25",
+    "min_stock": 30,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0327",
+    "desc": "FRASCOS VIDRIO NO ESTERIL 235 ML",
+    "min_stock": 50,
+    "max_stock": 240,
+    "note": ""
+  },
+  {
+    "code": "ALG0192",
+    "desc": "APLICADOR SIMPLE CAJA C/750",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0197",
+    "desc": "APOSITO QX. 20X8 ESTERIL",
+    "min_stock": 50,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0196",
+    "desc": "APOSITO CUTIMED SILTEC 23X23 SACRUM",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0194",
+    "desc": "APOSITO CUTIMED SILTEC 10X10CM",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0195",
+    "desc": "APOSITO CUTIMED SILTEC 20X20CM",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0166",
+    "desc": "APOSITO CUTIMED SILTEC 15X15CM",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0165",
+    "desc": "APOSITO CUTIMED ALGINATO 10X20CM",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0547",
+    "desc": "SPRAY SENSI-CARE ELIM. ADH 50ML",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0201",
+    "desc": "BATA NO ESTERIL DESECHABLE",
+    "min_stock": 100,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0249",
+    "desc": "CEPILLO REUSABLE CERDAS FINAS",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0283",
+    "desc": "CUBREBOCAS NORMAL",
+    "min_stock": 100,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0328",
+    "desc": "GASA 10X10 ESTERIL REF.4000681",
+    "min_stock": 200,
+    "max_stock": 390,
+    "note": ""
+  },
+  {
+    "code": "ALG0330",
+    "desc": "GASA RAYTEX ESTERIL REF.4000669",
+    "min_stock": 50,
+    "max_stock": 225,
+    "note": ""
+  },
+  {
+    "code": "ALG0331",
+    "desc": "GASA PAQUETE/200 PIEZAS  COD.4000680",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG1073",
+    "desc": "GUANTE NEOPRENO 6.5 ESTERIL",
+    "min_stock": 20,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0343",
+    "desc": "GUANTE NEOPRENO 7.0 ESTERIL",
+    "min_stock": 50,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0348",
+    "desc": "GUANTE ORTOPEDICO 7.0 ESTERIL",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0344",
+    "desc": "GUANTE NEOPRENO 7.5 ESTERIL",
+    "min_stock": 10,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0349",
+    "desc": "GUANTE ORTOPEDICO 7.5 ESTERIL",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0350",
+    "desc": "GUANTE ORTOPEDICO 8.0 ESTERIL",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0599",
+    "desc": "VENDA HUATA 10CM",
+    "min_stock": 15,
+    "max_stock": 48,
+    "note": ""
+  },
+  {
+    "code": "ALG0600",
+    "desc": "VENDA HUATA 15CM",
+    "min_stock": 15,
+    "max_stock": 48,
+    "note": ""
+  },
+  {
+    "code": "ALG0601",
+    "desc": "VENDA HUATA 5CM",
+    "min_stock": 10,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0605",
+    "desc": "VENDA SCOTH CASTH 3 PULGADAS",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0606",
+    "desc": "VENDA SCOTH CASTH 4 PULGADAS",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0550",
+    "desc": "STOCKINETE 7.5CM 3M COD. MS03",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0566",
+    "desc": "TELA ADHESIVA 1 PULG. ROLLO",
+    "min_stock": 10,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0568",
+    "desc": "TELA ADHESIVA 2 PULG. ROLLO",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0567",
+    "desc": "TELA ADHESIVA 1/2 PULG. ROLLO",
+    "min_stock": 5,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0569",
+    "desc": "TELA ADHESIVA 3 PULG. ROLLO",
+    "min_stock": 4,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0581",
+    "desc": "TRAJE O PIJAMA QX. DESECHABLE",
+    "min_stock": 30,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0594",
+    "desc": "VENDA AUTOADHERIBLE TENSOPLAST",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0608",
+    "desc": "VENDA YESO 10CM",
+    "min_stock": 15,
+    "max_stock": 36,
+    "note": ""
+  },
+  {
+    "code": "ALG0609",
+    "desc": "VENDA YESO 15CM",
+    "min_stock": 15,
+    "max_stock": 36,
+    "note": ""
+  },
+  {
+    "code": "ALG0610",
+    "desc": "VENDA YESO 5CM",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0248",
+    "desc": "CEPILLO QX. CEPESPON 3%",
+    "min_stock": 100,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0417",
+    "desc": "MEDIVAC 1500 ML",
+    "min_stock": 15,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0418",
+    "desc": "MEDIVAC 3000 ML",
+    "min_stock": 15,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0072",
+    "desc": "PULSERA AZUL INFANTIL",
+    "min_stock": 50,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0471",
+    "desc": "PULSERA BLANCA ADULTO",
+    "min_stock": 100,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0073",
+    "desc": "PULSERA ROSA INFANTIL",
+    "min_stock": 50,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0969",
+    "desc": "BRAZALETE NEONATAL DESECHABLE PAR#1 1 VIA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0970",
+    "desc": "BRAZALETE NEONATAL DESECHABLE #2 1 VIA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0971",
+    "desc": "BRAZALETE NEONATAL DESECHABLE #3 1 VIA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0972",
+    "desc": "BRAZALETE NEONATAL DESECHABLE #4 1 VIA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0973",
+    "desc": "BRAZALETE NEONATAL DESECHABLE #5 1 VIA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0980",
+    "desc": "BRAZALETE VINIL CARA ANCHA AZUL REY",
+    "min_stock": 0,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0981",
+    "desc": "BRAZALETE VINIL CARA ANCHA ROSA",
+    "min_stock": 0,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0607",
+    "desc": "VENDA SMARCH 15CM",
+    "min_stock": 1,
+    "max_stock": 4,
+    "note": ""
+  },
+  {
+    "code": "ALG0276",
+    "desc": "CUBRE ZAPATO PAQUETE",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0389",
+    "desc": "INSTALACION DE CATETER CENTRAL",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0367",
+    "desc": "INSTALACION DE SONDA FOLEY",
+    "min_stock": 20,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0390",
+    "desc": "KIT VENOPUNCION ADULTO",
+    "min_stock": 50,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0460",
+    "desc": "PLACA P/BOVIE 3M COD. 9165",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0293",
+    "desc": "ELECTRODO ADULTO RED DOT 3M REF.2239",
+    "min_stock": 100,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0445",
+    "desc": "PAQUETE EST. CABEZA Y CUELLO",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0446",
+    "desc": "PAQUETE ESTERIL CESAREA",
+    "min_stock": 8,
+    "max_stock": 16,
+    "note": ""
+  },
+  {
+    "code": "ALG0447",
+    "desc": "PAQUETE ESTERIL CX MAYOR",
+    "min_stock": 10,
+    "max_stock": 40,
+    "note": ""
+  },
+  {
+    "code": "ALG0448",
+    "desc": "PAQUETE ESTERIL CX MENOR",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0449",
+    "desc": "PAQUETE ESTERIL PARTO",
+    "min_stock": 5,
+    "max_stock": 26,
+    "note": ""
+  },
+  {
+    "code": "ALG0444",
+    "desc": "PAQUETE DE ROPA ESTERIL PARA CRANEOTOMIA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0202",
+    "desc": "BATA QUIRURGICA ESTERIL",
+    "min_stock": 20,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0933",
+    "desc": "BATA QUIRURGICA ESTERIL GRANDE",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0027",
+    "desc": "GUANTE EXPLORACION LATEX NO ESTERIL",
+    "min_stock": 300,
+    "max_stock": 2000,
+    "note": ""
+  },
+  {
+    "code": "ALG0168",
+    "desc": "ABATELENGUA DE MADERA PAQUETE",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0186",
+    "desc": "ALCOHOL ETILICO 96",
+    "min_stock": 20,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0187",
+    "desc": "ALGODÓN  EN ROLLO 500GR",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0188",
+    "desc": "ALGODON PLISADO 300 GR.",
+    "min_stock": 2,
+    "max_stock": 7,
+    "note": ""
+  },
+  {
+    "code": "ALG0450",
+    "desc": "PAQUETE RECEPCION DE BEBE",
+    "min_stock": 10,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0281",
+    "desc": "CUBREBOCAS DE 3 PLIEGUES",
+    "min_stock": 500,
+    "max_stock": 5000,
+    "note": ""
+  },
+  {
+    "code": "ALG0337",
+    "desc": "GORRO PACIENTE TIPO GUSANO",
+    "min_stock": 500,
+    "max_stock": 2000,
+    "note": ""
+  },
+  {
+    "code": "ALG0336",
+    "desc": "GORRO CIRUJANO PAQ/100",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0061",
+    "desc": "GUANTE CIRUJANO 6.5 ESTERIL",
+    "min_stock": 50,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0062",
+    "desc": "GUANTE CIRUJANO 7.0 ESTERIL",
+    "min_stock": 50,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0063",
+    "desc": "GUANTE CIRUJANO 7.5 ESTERIL",
+    "min_stock": 50,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0064",
+    "desc": "GUANTE CIRUJANO 8.0 ESTERIL",
+    "min_stock": 25,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "#REF!",
+    "desc": "GUANTE CIRUJANO 8.5 ESTERIL",
+    "min_stock": 15,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0345",
+    "desc": "GUANTE NITRILO N/ESTERIL GRANDE",
+    "min_stock": 300,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0346",
+    "desc": "GUANTE NITRILO N/ESTERIL MEDIANO",
+    "min_stock": 1000,
+    "max_stock": 8000,
+    "note": ""
+  },
+  {
+    "code": "ALG0347",
+    "desc": "GUANTE NITRILO N/ESTERIL CHICO",
+    "min_stock": 0,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0342",
+    "desc": "GUANTE ESTERIL MEDIANO",
+    "min_stock": 300,
+    "max_stock": 1500,
+    "note": ""
+  },
+  {
+    "code": "ALG0441",
+    "desc": "PAÑAL ADULTO / PROTECTOR D/CAMA",
+    "min_stock": 200,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0472",
+    "desc": "PUNTAS NASALES ADULTO P/OXIGENO",
+    "min_stock": 50,
+    "max_stock": 150,
+    "note": ""
+  },
+  {
+    "code": "ALG0580",
+    "desc": "TORUNDAS DE ALGODÓN BOLSA 500g",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0595",
+    "desc": "VENDA ELASTICA 10 CM",
+    "min_stock": 10,
+    "max_stock": 90,
+    "note": ""
+  },
+  {
+    "code": "ALG0596",
+    "desc": "VENDA ELASTICA 15 CM",
+    "min_stock": 10,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0597",
+    "desc": "VENDA ELASTICA 30 CM",
+    "min_stock": 10,
+    "max_stock": 90,
+    "note": ""
+  },
+  {
+    "code": "ALG0598",
+    "desc": "VENDA ELASTICA 5 CM",
+    "min_stock": 10,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0431",
+    "desc": "MORTAJA PAQUETE COVID",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0430",
+    "desc": "MORTAJA PAQUETE ADULTO",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0171",
+    "desc": "AGUA IRRIGACION 1000 ML REF.4000253",
+    "min_stock": 50,
+    "max_stock": 240,
+    "note": ""
+  },
+  {
+    "code": "ALG0172",
+    "desc": "AGUA IRRIGACION 500 ML REF.4000252",
+    "min_stock": 50,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0080",
+    "desc": "SOLUCION CS 1000 ML REF.4000079",
+    "min_stock": 30,
+    "max_stock": 180,
+    "note": ""
+  },
+  {
+    "code": "ALG0086",
+    "desc": "SOLUCION CS 500 ML REF.4000078",
+    "min_stock": 50,
+    "max_stock": 120,
+    "note": ""
+  },
+  {
+    "code": "ALG0496",
+    "desc": "SOLUCION CS 250 ML REF.4049546",
+    "min_stock": 72,
+    "max_stock": 144,
+    "note": ""
+  },
+  {
+    "code": "ALG0084",
+    "desc": "SOLUCION CS 100 ML REF.4000394",
+    "min_stock": 200,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0498",
+    "desc": "SOLUCION CS 50 ML REF.4000393",
+    "min_stock": 150,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0497",
+    "desc": "SOLUCION CS 3000 ML REF.4006697",
+    "min_stock": 30,
+    "max_stock": 120,
+    "note": ""
+  },
+  {
+    "code": "ALG0081",
+    "desc": "SOLUCION DX 5% 1000 ML REF.4000104",
+    "min_stock": 12,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0087",
+    "desc": "SOLUCION DX 5% 500 ML 4000103",
+    "min_stock": 12,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0501",
+    "desc": "SOLUCION DX 5% 250 ML REF.4049551",
+    "min_stock": 12,
+    "max_stock": 72,
+    "note": ""
+  },
+  {
+    "code": "ALG0499",
+    "desc": "SOLUCION DX 10% 1000 ML REF.4000107",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0500",
+    "desc": "SOLUCION DX 10% 500 ML",
+    "min_stock": 5,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0085",
+    "desc": "SOLUCION DX 5% 100 ML REF.4000392",
+    "min_stock": 20,
+    "max_stock": 150,
+    "note": ""
+  },
+  {
+    "code": "ALG0082",
+    "desc": "SOLUCION HT 1000 ML REF.4000089",
+    "min_stock": 72,
+    "max_stock": 360,
+    "note": ""
+  },
+  {
+    "code": "ALG0088",
+    "desc": "SOLUCION HT 500 ML REF.4000088",
+    "min_stock": 48,
+    "max_stock": 150,
+    "note": ""
+  },
+  {
+    "code": "ALG0083",
+    "desc": "SOLUCION MX 1000 ML REF. 4000083",
+    "min_stock": 12,
+    "max_stock": 48,
+    "note": ""
+  },
+  {
+    "code": "ALG0089",
+    "desc": "SOLUCION MX 500 ML REF.4000082",
+    "min_stock": 5,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0191",
+    "desc": "APLICADOR CHLORAPREP 26 ML",
+    "min_stock": 50,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0173",
+    "desc": "AGUA OXIGENADA",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0125",
+    "desc": "SOLUCION ANTIFEX JABON DESINFECTANTE 5 LTS 4053829",
+    "min_stock": 4,
+    "max_stock": 6,
+    "note": ""
+  },
+  {
+    "code": "ALG0136",
+    "desc": "DETERGENTE P/LAVADORA SCICAN",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0140",
+    "desc": "ESTERICIDE QX 5 LTS DESINFECTANTE",
+    "min_stock": 3,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0139",
+    "desc": "ESTERICIDE D/IRRIGACION 0.002%",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0325",
+    "desc": "FOE ELIMINADOR DE OLORES FECAL REF.4014512",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0190",
+    "desc": "APLICADOR CHLORAPREP 1 ML",
+    "min_stock": 20,
+    "max_stock": 120,
+    "note": ""
+  },
+  {
+    "code": "ALG0374",
+    "desc": "JABON CON CLORHEXIDINA 0.12% 60ML",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0304",
+    "desc": "ENJUAGUE BUCAL CLORHEXIDINA 0.12% 35ML REF.4038243",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0373",
+    "desc": "JABON C/CLORHEXIDINA 2% 750 ML REF.4044122",
+    "min_stock": 2,
+    "max_stock": 6,
+    "note": ""
+  },
+  {
+    "code": "ALG0185",
+    "desc": "ALCOHOL C/CLORHEXIDINA 0.5% 750 ML REF.4044124",
+    "min_stock": 6,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0495",
+    "desc": "SHAMPOO C/CLORHEXIDINA 0.12% 250 ML REF.4038244",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0577",
+    "desc": "TOALLAS P/BAÑO CLORHEXIDINA 2% REF.4038240",
+    "min_stock": 10,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0996",
+    "desc": "ORTHOZIME 4 LTS 4057408",
+    "min_stock": 1,
+    "max_stock": 4,
+    "note": ""
+  },
+  {
+    "code": "ALG0146",
+    "desc": "ROLLO MIXTO 7.5X200 PAR 361",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0143",
+    "desc": "ROLLO MIXTO 10X200 PAR 362",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0144",
+    "desc": "ROLLO MIXTO 15X200 PAR 364",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0145",
+    "desc": "ROLLO MIXTO 30X200 PAR 367",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0134",
+    "desc": "CINTA TESTIGO P/VAPOR GTV001",
+    "min_stock": 5,
+    "max_stock": 16,
+    "note": ""
+  },
+  {
+    "code": "ALG0133",
+    "desc": "CINTA TESTIGO P/GAS CTG001",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG1016",
+    "desc": "ROLLO TYVEK PARA ENVOL. DE BAJA TEMP. 7.5CM-70",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1017",
+    "desc": "ROLLO TYVEK PARA ENVOL. DE BAJA TEMP. 10CM-70",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1018",
+    "desc": "ROLLO TYVEK PARA ENVOL. DE BAJA TEMP. 15CM-70",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1019",
+    "desc": "ROLLO TYVEK PARA ENVOL. DE BAJA TEMP. 20CM-70",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1020",
+    "desc": "CONTROL QUIMICO 3M PLASMA BOLSA CON 250PZ",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1021",
+    "desc": "CONTROL BIOLOGICO 3M PLASMA CAJA CON 30PZ",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1022",
+    "desc": "CINTA TESTIGO 3M PLASMA",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0988",
+    "desc": "CAMPO PARA ESTERILIZACION DE ALTA DENSIDAD 70GR 114X114 CM",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0332",
+    "desc": "GEL P/MANOS ANTIBACTERIAL",
+    "min_stock": 20,
+    "max_stock": 80,
+    "note": ""
+  },
+  {
+    "code": "ALG0372",
+    "desc": "ISODINE ESPUMA 120ML",
+    "min_stock": 36,
+    "max_stock": 360,
+    "note": ""
+  },
+  {
+    "code": "ALG0375",
+    "desc": "JABON QUIRURGICO 120ML",
+    "min_stock": 36,
+    "max_stock": 360,
+    "note": ""
+  },
+  {
+    "code": "ALG0376",
+    "desc": "JALEA LUBRICANTE",
+    "min_stock": 15,
+    "max_stock": 70,
+    "note": ""
+  },
+  {
+    "code": "ALG0213",
+    "desc": "BOTE TOALLA HUMEDA OXIVIR TB-WIPES",
+    "min_stock": 5,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0611",
+    "desc": "VIOLETA DE GENCIANA 2%",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0612",
+    "desc": "SOLUCION MICRODACYN ANTISEPTICA 5 LTS",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0137",
+    "desc": "ENDOZIME AW PLUS CON APA 4000ML 4057395",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0470",
+    "desc": "PREPZYME XF ESPUMA 14OZ REF.4006860",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0572",
+    "desc": "TIENDA FACIAL ADULTO REF 1095",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0015",
+    "desc": "CAMARA DE HUMIDIFICACION DESECHABLE DE ALIMENTACION AUTOMATICA",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0256",
+    "desc": "CIRCUITO P/SISTEMA ALTO FLUJO P5VZ00361",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0310",
+    "desc": "EQUIPO P/CPAP NUM 0   CIRCUITO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0311",
+    "desc": "EQUIPO P/CPAP NUM 00 CIRCUITO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0312",
+    "desc": "EQUIPO P/CPAP NUM 01 CIRCUITO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0313",
+    "desc": "EQUIPO P/CPAP NUM 02 CIRCUITO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0314",
+    "desc": "EQUIPO P/CPAP NUM 03 CIRCUITO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0977",
+    "desc": "KIT BUBBLE CPAP MARCA FISHER& PAYKEL TAMAÑO CHICA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0978",
+    "desc": "KIT BUBBLE CPAP MARCA FISHER&PAYKEL TAMAÑO MEDIANA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0975",
+    "desc": "KIT BUBBLE CPAP MARCA FISHER& PAYKEL TAMAÑO GRANDE",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1134",
+    "desc": "PUNTA NASAL DE ALTO FLUJO NEONATAL PED XL",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1135",
+    "desc": "PUNTA NASAL DE ALTO FLUJO NEONATAL PED L",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1136",
+    "desc": "PUNTA NASAL DE ALTO FLUJO NEONATAL PED M",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1137",
+    "desc": "PUNTA NASAL DE ALTO FLUJO NEONATAL PED FP",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1138",
+    "desc": "PUNTA NASAL DE ALTO FLUJO NEONATAL PED XS",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1139",
+    "desc": "CIRCUITO ALTO FLUJO AIRVO PEDIATRICO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1140",
+    "desc": "UPGRADE CPAP ALMOHADILLA DE NARIZ P/MASCARA FACIAL",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0149",
+    "desc": "SAL O CLORURO D/SODIO EN PELLETS BULTO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0479",
+    "desc": "RESUCITADOR AMBU ADULTO",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0481",
+    "desc": "RESUCITADOR AMBU PEDIATRICO",
+    "min_stock": 2,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0480",
+    "desc": "RESUCITADOR AMBU NEONATO",
+    "min_stock": 2,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0259",
+    "desc": "CIRCUITO VENT. PEDIT. NEONATAL",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0258",
+    "desc": "CIRCUITO VENT. ADULTO REF3291",
+    "min_stock": 3,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0409",
+    "desc": "MASCARILLA PARA TRAQUEOSTOMIA",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0266",
+    "desc": "CONECTOR P/TUBO EN \"T\" REF. 1639",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0264",
+    "desc": "CONECTOR  EN T CON VALV.22mm REF1743",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0410",
+    "desc": "MASCARILLA RESERVORIO COD 1060",
+    "min_stock": 15,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0411",
+    "desc": "MASCARILLA RESERVORIO PEDIA.REF1127-7",
+    "min_stock": 5,
+    "max_stock": 25,
+    "note": ""
+  },
+  {
+    "code": "ALG0400",
+    "desc": "MASCARILLA FACIAL NEONATAL #1",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0397",
+    "desc": "MASCARILLA FACIAL NEONATAL #2",
+    "min_stock": 1,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0401",
+    "desc": "MASCARILLA FACIAL PEDIATRICA#3",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0399",
+    "desc": "MASCARILLA FACIAL JOVEN #4",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0423",
+    "desc": "MICRONEBULIZ ADULTO REF 1885",
+    "min_stock": 15,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0424",
+    "desc": "MICRONEBULIZ PEDIATRICO REF 1886",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0324",
+    "desc": "FILTRO O NARIZ ARTIFICIAL ADULTO",
+    "min_stock": 15,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0927",
+    "desc": "FILTRO ANTIBACTERIAL PARA VENTILADOR AF00",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0588",
+    "desc": "TRIFLO INSPIROMETRO  CAT-",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0589",
+    "desc": "TUBO CORRUGADO",
+    "min_stock": 15,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0433",
+    "desc": "NEBULIZADOR AQUAPAK 428SW 440ML",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0215",
+    "desc": "CAL SODADA CUBETA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0254",
+    "desc": "CIRCUITO P/VENTILADOR INVASIVO RT204",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0260",
+    "desc": "CIRCUITO \"Y\" P/ANEST. PEDIATRICO",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0040",
+    "desc": "CIRCUITO DE ALTO FLUJO RT-202",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0257",
+    "desc": "CIRCUITO UNIV. P/ANEST. ADULTO",
+    "min_stock": 5,
+    "max_stock": 45,
+    "note": ""
+  },
+  {
+    "code": "ALG0985",
+    "desc": "CIRCUITO ANESTESIA ADULTO UNIVERSAL #22 42272500",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0473",
+    "desc": "PUNTAS NASALES DE ALTO FLUJO (LARGE O MEDIUM)",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0039",
+    "desc": "BANDA  TORAC.P/CHALECO PERC.DIF.MED.",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0412",
+    "desc": "MASCARILLA REUSABLE MARCA DRAGER CHICA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0414",
+    "desc": "MASCARILLA REUSABLE MARCA DRAGER MEDIANA",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0413",
+    "desc": "MASCARILLA REUSABLE MARCA DRAGER GRANDE",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0253",
+    "desc": "CIRCUITO P/SISTEM ALT. FLUJO AIRVO II FISHER",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0415",
+    "desc": "MASCARILLA SIMPLE ADULTO REF8110-7",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0028",
+    "desc": "HUMIDIFICADOR RESPIRATORIO REF.7600-0",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0677",
+    "desc": "FILTRO MINI-SPIKE2 4000617",
+    "min_stock": 5,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0267",
+    "desc": "CONECTOR PLASTICO O COLA RATON",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0976",
+    "desc": "CLIPS NASALESAM-SYSTEMS",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0968",
+    "desc": "FLOW TUBES UNIDAD",
+    "min_stock": 5,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0979",
+    "desc": "FILTRO PARA FLOWTUBE NDD",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0141",
+    "desc": "FILTRO PARA ASPIRADOR",
+    "min_stock": 3,
+    "max_stock": 6,
+    "note": ""
+  },
+  {
+    "code": "ALG0032",
+    "desc": "VASO PARA ASPIRADOR 800ML.",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0042",
+    "desc": "ESCOBILLON P/TUBO D/ENSAYE 13X",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0623",
+    "desc": "FRASCO P/HECES 100ML. POLIPROPI",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0917",
+    "desc": "PROBETA O PIPETA GRADUADA V/MED",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0440",
+    "desc": "ORINAL GRADUADO 1000ML.",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0613",
+    "desc": "AGUJA VAC.ECLIPCE BD368607",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0615",
+    "desc": "DEXTROSOL, SOL. 250ML HYCEL537 CAT. 5375",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0616",
+    "desc": "EQUIPO ALADO COD. 367287",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0911",
+    "desc": "LIMPIADOR LIQUIDO MULTIUSOS REKORD",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0916",
+    "desc": "DETERGENTE EXTRAN ALCALINO",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0617",
+    "desc": "LANCETA QUIKHEL",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0621",
+    "desc": "TUBO MICROT. LILA 365974",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0618",
+    "desc": "RECOLECTOR ORINA D/24HRS.2.7L.",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0941",
+    "desc": "TUBO TAPA AZUL 2.7 ML REF. 363083",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0620",
+    "desc": "TUBO H/A TAPA ROJO/NEGRO 6ML",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0624",
+    "desc": "TUBO VACUT. LILA T.H/A 4ML",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0681",
+    "desc": "FORMALDEHIDO DIF % (FORMOL)",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0815",
+    "desc": "PAPEL P/ESPIROMETRO CG70175",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0148",
+    "desc": "ROLLO TERMICO P/IMPRESORA 57X40",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0483",
+    "desc": "ROLLO PAPEL P/ELCTRO NT1011205",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0484",
+    "desc": "ROLLO PAPEL P/TOCOCARDI NT1021400",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0147",
+    "desc": "ROLLO STERI-VAC 79X30MM 3M REF1217",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0037",
+    "desc": "PAPEL P/DESFIBRILADOR MINDRAY D2",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0043",
+    "desc": "ROLLO D/ PAPEL P/DESFIBRILADOR QX",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0004",
+    "desc": "PAPEL P/DESFIBRILADOR 50MM PHILIPS",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0914",
+    "desc": "PAPEL P/ELECTRO T/CART.PAQ.",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0038",
+    "desc": "PAPEL P/ELECTRO MORTARA 215*280*250",
+    "min_stock": 1,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0005",
+    "desc": "PAPEL P/ELECTROCARDIOGRAFO PHILIPS",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG1023",
+    "desc": "PAPEL TERMICO EN Z PARA ELECTROCARDIOGRAFO. MARCA MINDRAY",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0909",
+    "desc": "GEL P/ULTRASONIDO",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0843",
+    "desc": "ROLLO PAPEL TERMICO REF. BAT-NM-AA",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0814",
+    "desc": "PAPEL P/ELECTROCARDIOGRAFO COMEN CM300",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0007",
+    "desc": "PAPEL P/TOCOCARDIOGRAFO P/100",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0002",
+    "desc": "PAPEL P/TOCOCARDIOGRAFO COROMETRICS 170S",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0913",
+    "desc": "ULTRAVIST 300/50ML",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0813",
+    "desc": "PAPEL P/DESFIBRILADOR Z9090/200RS USIN",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0670",
+    "desc": "EMPAQUE P/OLLA EXPRESS PRESTO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0698",
+    "desc": "REACTIVO EN POLVO PH CLORO 100 PBS",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0688",
+    "desc": "KIT DE REACTIVO PARA PH/H193710-01",
+    "min_stock": 2,
+    "max_stock": 6,
+    "note": ""
+  },
+  {
+    "code": "ALG0142",
+    "desc": "INDICADORES DE LAVADO MULTINIVEL P/LAVAD.PAQ.",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0129",
+    "desc": "BOWIE DICK 1233 PAQ.PRUEBA C/20PZ",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0578",
+    "desc": "TOALLAS SCOTT SHOP TOWELS MULTIUSOS AZUL",
+    "min_stock": 3,
+    "max_stock": 8,
+    "note": ""
+  },
+  {
+    "code": "ALG0575",
+    "desc": "TOALLA DESINFECTANTE LYSOL",
+    "min_stock": 5,
+    "max_stock": 40,
+    "note": ""
+  },
+  {
+    "code": "ALG0030",
+    "desc": "OXIMETRO DE PULSO",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0571",
+    "desc": "TERMOMETRO INFRAROJO",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0570",
+    "desc": "TERMOMETRO DIGITAL",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0879",
+    "desc": "PARAFINA EN BARRA 450 GR",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0820",
+    "desc": "PILA 9V  LITIO CUADRADA GASOMETRO",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0821",
+    "desc": "PILA O BATERIA DE BOTON CR2025",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0216",
+    "desc": "CANDADO P/CARRO ROJO PAQ/100",
+    "min_stock": 1,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0013",
+    "desc": "ADAPTADOR P/SENSOR CO2 YG-211 NIHON KOHDEN",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0280",
+    "desc": "CUBREBOCAS CON CARETA QX",
+    "min_stock": 10,
+    "max_stock": 40,
+    "note": ""
+  },
+  {
+    "code": "ALG0158",
+    "desc": "FIBRA AZUL",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0946",
+    "desc": "FIBRA BLANCA",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0947",
+    "desc": "FIBRA NEGRA",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0159",
+    "desc": "FIBRA VERDE",
+    "min_stock": 5,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0647",
+    "desc": "JABON EN POLVO BOLSA10 KG",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0629",
+    "desc": "BOLSA AMARILLA MEDIANA 55X60 PAQUETE",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0942",
+    "desc": "ATOMIZADOR 1 LT.",
+    "min_stock": 5,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0943",
+    "desc": "BOLSA NEGRA 50X70 PAQUETE",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0630",
+    "desc": "BOLSA NEGRA 70X90 PAQUETE",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0631",
+    "desc": "BOLSA NEGRA 90X120 PAQUETE",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0656",
+    "desc": "CLORO O CLARASOL PRO 6% CAJA",
+    "min_stock": 2,
+    "max_stock": 6,
+    "note": ""
+  },
+  {
+    "code": "ALG0966",
+    "desc": "ESCOBA",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0951",
+    "desc": "TOALLA BLANCA  MICROFIBRA",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0660",
+    "desc": "TOALLA VERDE MICROFIBRA",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0967",
+    "desc": "TOALLA ROJA  MICROFIBRA",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0644",
+    "desc": "GUANTE ROJO P/LIMPIEZA N.9 (GRANDE)",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0642",
+    "desc": "GUANTE AMARILLO P/LIMPIEZA N.8 (MEDIANO)",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0949",
+    "desc": "GUANTE AMARILLO P/LIMPIEZA N.9 (GRANDE)",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0646",
+    "desc": "JABON DE TOCADOR 100GR.",
+    "min_stock": 10,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0999",
+    "desc": "PINO DESINFECTANTE 20 LTS",
+    "min_stock": 1,
+    "max_stock": 4,
+    "note": ""
+  },
+  {
+    "code": "ALG0648",
+    "desc": "JABON LIQUIDO 20 LTS",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0948",
+    "desc": "GUANTE AMARILLO P/LIMPIEZA #7",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0950",
+    "desc": "GUANTE ROJO P/LIMPIEZA #7",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0649",
+    "desc": "JALADOR",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0650",
+    "desc": "JERGA O TRAPEADOR EN ROLLO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0654",
+    "desc": "PAPEL JUMBO EXCELLENCE",
+    "min_stock": 60,
+    "max_stock": 240,
+    "note": ""
+  },
+  {
+    "code": "ALG0652",
+    "desc": "MECHUDO BLANCO",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0651",
+    "desc": "MECHUDO AZUL",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0653",
+    "desc": "MECHUDO VERDE",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0659",
+    "desc": "TOALLA EN ROLLO P/MANOS EXCELLENCE",
+    "min_stock": 60,
+    "max_stock": 180,
+    "note": ""
+  },
+  {
+    "code": "ALG0657",
+    "desc": "RECOGEDOR CON BASTON",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0632",
+    "desc": "BOLSA ROJA CHICA 30X40 PAQ.",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0633",
+    "desc": "BOLSA ROJA GRANDE 60X90 PAQ/100",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0634",
+    "desc": "BOLSA ROJA MEDIANA 55X60 PAQ/100",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0658",
+    "desc": "SHAMPOO P/MANOS PRO LAVAM LIQUIDO",
+    "min_stock": 2,
+    "max_stock": 4,
+    "note": ""
+  },
+  {
+    "code": "ALG0661",
+    "desc": "TOALLAS SANITAS  PAQUETE",
+    "min_stock": 40,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0643",
+    "desc": "GUANTE ROJO P/LIMPIEZA N. 8 (MEDIANO)",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0690",
+    "desc": "LIMPIADOR DE VIDRIOS WINDEX",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0655",
+    "desc": "PASTILLA DESODORANTE C/REJILLA P/MIJ",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0272",
+    "desc": "CONTENEDOR ROJO 4 LTS RPBI",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0271",
+    "desc": "CONTENEDOR ROJO 1 LITRO RPBI",
+    "min_stock": 5,
+    "max_stock": 45,
+    "note": ""
+  },
+  {
+    "code": "ALG0270",
+    "desc": "CONTENEDOR GRANDE 13 LTS RPBI",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0662",
+    "desc": "VINAGRE 1 LT",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0628",
+    "desc": "SUAVILAV SF 20LTS.LAUNDRY SOFT CON AROMA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0156",
+    "desc": "CUCHARA CHICA DESECH.PAQ",
+    "min_stock": 5,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0161",
+    "desc": "SERVILLETAS DESECH. PAQ.",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0128",
+    "desc": "BOLSA ZIPLOC GUM",
+    "min_stock": 1,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0163",
+    "desc": "VASO PLASTICO NUM. 5.5 PAQ.",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0162",
+    "desc": "VASO PLASTICO No. 8 PAQ.",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0164",
+    "desc": "VASO UNISEL TERMICO.#10 PAQ.",
+    "min_stock": 10,
+    "max_stock": 80,
+    "note": ""
+  },
+  {
+    "code": "ALG0041",
+    "desc": "BOLSA DE PLASTICO TRANSPARENTE 6CM X 10CM",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0944",
+    "desc": "BOLSA TRANSPARENTE 20X25 ROLLO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0635",
+    "desc": "BOLSA TRANSPARENTE 35X45 ROLLO",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0945",
+    "desc": "BOLSA TRANSPARENTE 50X70 ROLLO",
+    "min_stock": 2,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0636",
+    "desc": "BOLSA TRANSPARENTE 60X90 ROLLO.",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0011",
+    "desc": "EGAPACK BOBINA 1200 MTSX 45CMS",
+    "min_stock": 1,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0803",
+    "desc": "PAÑUELOS KLEENEX CAJA",
+    "min_stock": 5,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0546",
+    "desc": "SPRAY DESINFECTANTE LYSOL",
+    "min_stock": 2,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0908",
+    "desc": "DVD-R VERBATIM 4.7 GB 16X",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0705",
+    "desc": "BICOLOR ROJO/ AZUL",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0708",
+    "desc": "BROCHE BACO 8CM. C/50",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0955",
+    "desc": "BROCHE PARA GAFETE METALICO",
+    "min_stock": 50,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0806",
+    "desc": "PAPEL CARBON O CALCA",
+    "min_stock": 20,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0733",
+    "desc": "CHINCHES O/PIN D/PLAST.D/COLOR",
+    "min_stock": 10,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0742",
+    "desc": "CINTA TRANSPARENTE DIUREX 48X150 METROS",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0707",
+    "desc": "BORRADOR P/PIZARRON BLANCO",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0745",
+    "desc": "CLIPS CAJA C/100 NUM.1",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0746",
+    "desc": "CLIPS MARIPOSA CAJA C/50 NUM",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0747",
+    "desc": "COJIN PARA SELLO (GRANDE)",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0748",
+    "desc": "CORDON PARA GAFETE AZUL",
+    "min_stock": 1,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0749",
+    "desc": "CORRECTOR LIQ. 20ML.",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0751",
+    "desc": "DEDAL DE HULE No. 11",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0752",
+    "desc": "DESODORANTE P/AMBIENTE AEROSOL",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0754",
+    "desc": "DIUREX O CINTA SCOCH CHICO",
+    "min_stock": 10,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0755",
+    "desc": "ESPUMA LIMPIAD.P/COMPUTADORA",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0960",
+    "desc": "FOLDER TAMAÑO CARTA AZUL",
+    "min_stock": 50,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0765",
+    "desc": "FOLDER TAMAÑO OFICIO AZUL",
+    "min_stock": 30,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0764",
+    "desc": "FOLDER  CARTA C/CREMA",
+    "min_stock": 500,
+    "max_stock": 2000,
+    "note": ""
+  },
+  {
+    "code": "ALG0781",
+    "desc": "LIBRETA FRANCESA PASTA DURA",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0767",
+    "desc": "GOMA DE MIGAJON",
+    "min_stock": 2,
+    "max_stock": 8,
+    "note": ""
+  },
+  {
+    "code": "ALG0770",
+    "desc": "GRAPAS PILOT STANDAR NUM 400",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0768",
+    "desc": "GRAPA SB35 HD 3/8 C/1000 BOSTICH 36500",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0807",
+    "desc": "PAPEL HOJA BLANCA BOND",
+    "min_stock": 2000,
+    "max_stock": 50000,
+    "note": ""
+  },
+  {
+    "code": "ALG0809",
+    "desc": "PAPEL HOJA T/CARTA AMARILLO",
+    "min_stock": 100,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0811",
+    "desc": "PAPEL HOJA T/CARTA ROSA",
+    "min_stock": 100,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0812",
+    "desc": "PAPEL HOJA T/CARTA VERDE",
+    "min_stock": 100,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0808",
+    "desc": "PAPEL HOJA BLANCA OFICIO",
+    "min_stock": 500,
+    "max_stock": 5000,
+    "note": ""
+  },
+  {
+    "code": "ALG0810",
+    "desc": "PAPEL HOJA T/CARTA AZUL",
+    "min_stock": 100,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0735",
+    "desc": "CINTA DOBLE CARA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0734",
+    "desc": "CINTA DOBLE CARA 24m X 33mt 3mm  DE GROSOR",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0774",
+    "desc": "HOJA OPALINA T CARTA BLANCA 180 GR",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0779",
+    "desc": "LAPIZ DE CARBON MIRADO 2",
+    "min_stock": 5,
+    "max_stock": 36,
+    "note": ""
+  },
+  {
+    "code": "ALG0780",
+    "desc": "LAPIZ ROJO",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0714",
+    "desc": "CARPETA LEFORT REGISTRADOR",
+    "min_stock": 5,
+    "max_stock": 40,
+    "note": ""
+  },
+  {
+    "code": "ALG0785",
+    "desc": "LIGAS DE HULE NUM 18",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0796",
+    "desc": "MARCADOR STERBROOK NEGRO",
+    "min_stock": 5,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0795",
+    "desc": "MARCADOR STERBROOK AZUL",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0797",
+    "desc": "MARCADOR STERBROOK ROJO",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0792",
+    "desc": "MARCADOR DOBLE PUNTA FINO 1.3MM NEGRO",
+    "min_stock": 5,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0961",
+    "desc": "MARCADOR PERMANENTE PUNTO FINO",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0798",
+    "desc": "MARCADOR STERBROOK VERDE",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0793",
+    "desc": "MARCADOR MAGISTRAL PIZARRON P/ BLANCO",
+    "min_stock": 10,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0794",
+    "desc": "MARCADOR P/BILLETE FALSO",
+    "min_stock": 5,
+    "max_stock": 24,
+    "note": ""
+  },
+  {
+    "code": "ALG0791",
+    "desc": "MARCADOR CERA ROJO",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0789",
+    "desc": "MARCA TEXTO VISION ROSA",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0787",
+    "desc": "MARCA TEXTO VISION AMARILLO",
+    "min_stock": 5,
+    "max_stock": 48,
+    "note": ""
+  },
+  {
+    "code": "ALG0790",
+    "desc": "MARCA TEXTO VISION VERDE",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0788",
+    "desc": "MARCA TEXTO VISION AZUL",
+    "min_stock": 3,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0786",
+    "desc": "MARCA TEXTO PUNTO FINO AMARILLO",
+    "min_stock": 1,
+    "max_stock": 12,
+    "note": ""
+  },
+  {
+    "code": "ALG0799",
+    "desc": "MASKING TAPE JANEL 24X50 121",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0802",
+    "desc": "MICAS EN PLIEGO",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0958",
+    "desc": "CUTTER",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0801",
+    "desc": "MICA T/CARTA TERMICA",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0825",
+    "desc": "PILAS DURACEL AA ALCALINA",
+    "min_stock": 10,
+    "max_stock": 80,
+    "note": ""
+  },
+  {
+    "code": "ALG0826",
+    "desc": "PILAS DURACEL AAA ALCALINA",
+    "min_stock": 10,
+    "max_stock": 80,
+    "note": ""
+  },
+  {
+    "code": "ALG0827",
+    "desc": "PILAS DURACEL K-C ALCALINA",
+    "min_stock": 10,
+    "max_stock": 80,
+    "note": ""
+  },
+  {
+    "code": "ALG0880",
+    "desc": "BATERIA LITHIUM BOTON A76",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0824",
+    "desc": "PILAS CUADRADA 9.V ALCALINA",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0822",
+    "desc": "PILA P/TERMOMETRO LR41",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0823",
+    "desc": "PILA PARA GLUCOMETRO CR2032",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0829",
+    "desc": "PLUMAS O BOLIGRAFO NEGRO",
+    "min_stock": 12,
+    "max_stock": 60,
+    "note": ""
+  },
+  {
+    "code": "ALG0828",
+    "desc": "PLUMAS O BOLIGRAFO AZUL",
+    "min_stock": 12,
+    "max_stock": 84,
+    "note": ""
+  },
+  {
+    "code": "ALG0830",
+    "desc": "PLUMAS O BOLIGRAFO ROJO",
+    "min_stock": 5,
+    "max_stock": 36,
+    "note": ""
+  },
+  {
+    "code": "ALG0831",
+    "desc": "PLUMAS O BOLIGRAFO VERDE",
+    "min_stock": 5,
+    "max_stock": 48,
+    "note": ""
+  },
+  {
+    "code": "ALG0832",
+    "desc": "POSTIS O NOTAS ADHESIVAS BLOCK 7.5x7.5 CM",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0833",
+    "desc": "PRITT O LAPIZ ADHES. RES.40G.",
+    "min_stock": 5,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0750",
+    "desc": "CUADERNO PROFESIONAL CUADRO CHICO",
+    "min_stock": 3,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0834",
+    "desc": "PROTECTOR DE HOJAS GUARDA",
+    "min_stock": 100,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0835",
+    "desc": "REGLA DE METAL DE 30CM",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0895",
+    "desc": "ROLLO RIBBON DE CERA DE 64MM X",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0850",
+    "desc": "SEPARADOR DE HOJAS COLORES",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0855",
+    "desc": "TABLA DE APOYO TAM.CARTA ACRILICO",
+    "min_stock": 1,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0763",
+    "desc": "FICHA O TARJETA BIBLIOGRAFICA PAQ/100",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0861",
+    "desc": "TINTA P/COJIN NEGRO AZOR",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0860",
+    "desc": "TINTA P/COJIN AZUL AZOR",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0859",
+    "desc": "TINTA P/COJIN ROJA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0849",
+    "desc": "UÑAS SACA GRAPAS",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0703",
+    "desc": "AIRE COMPRIMIDO REMOVEDOR POLV",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0704",
+    "desc": "ALCOHOL ISOPROPILICO 1LT",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0894",
+    "desc": "LIMPIADOR DIELECTRICO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0739",
+    "desc": "CINTA METRICA",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0766",
+    "desc": "FOLIO DE CARGOS DE CIRUGIA QX",
+    "min_stock": 5,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0773",
+    "desc": "HOJA DE REGISTRO SALESFORCE BLQ/100",
+    "min_stock": 3,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0772",
+    "desc": "HOJA DE ATENCION SALESFORCE ARCHIVO C/100",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0711",
+    "desc": "CARPETA CLEAR VIEW1.0 BLANCA O",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0712",
+    "desc": "CARPETA CLEAR VIEW2.0 BLANCA O",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0713",
+    "desc": "CARPETA CLEAR VIEW3.0 BLANCA O",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0753",
+    "desc": "DISCO CD-R VERBATIN  700",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0706",
+    "desc": "BLOCK DE CONTRA RECIBO AUTOCOPIANTE C/50",
+    "min_stock": 2,
+    "max_stock": 20,
+    "note": ""
+  },
+  {
+    "code": "ALG0760",
+    "desc": "ETIQUETAS CIRCULOS 6MM SURT",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0756",
+    "desc": "ETIQUETA 6-B P/PREcIO FARMACIA",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0959",
+    "desc": "ETIQUETA LASER #J-5165 BCA PAQ",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0759",
+    "desc": "ETIQUETAS AUTOADHERIBLES P/SOLUCION",
+    "min_stock": 200,
+    "max_stock": 10000,
+    "note": ""
+  },
+  {
+    "code": "ALG0758",
+    "desc": "ETIQUETA AVR5260 2.5X6.5 CM BLANCA",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0757",
+    "desc": "ETIQUETA ADHES. 32MMX64MM BLANCA LIM.",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0777",
+    "desc": "KARDEX 1/2CARTA 2 LADOS P/ENFERMERIA",
+    "min_stock": 100,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0778",
+    "desc": "LAMPARA DETECT.BILLETE FALSO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0783",
+    "desc": "LIBRO TAB/FLORETE C/96H. 24COL",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0784",
+    "desc": "LIBRO TAB/FLORETE RAYADA FRANC",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0804",
+    "desc": "PAPEL 1 TANTOS STOCK  BLANCO3195",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0805",
+    "desc": "PAPEL 2 TANTOS STOCK BLACO C/3295",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0817",
+    "desc": "PASTA P/ENGARGOLAR PAQ. T/CARTA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0839",
+    "desc": "ROLLO P/CREDENCIAL FOTOGRAFIA ZEBRA",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0743",
+    "desc": "CINTA ZEBRA RIBBON YMCKO 200 IMAG ZC100",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0962",
+    "desc": "ROLLO D/ETIQUETAS ZEBRA 5X2.5 CM",
+    "min_stock": 3,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0842",
+    "desc": "ROLLO PAPEL KRAF 51CM",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0845",
+    "desc": "ROLLO TERMICO 80X80",
+    "min_stock": 50,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0954",
+    "desc": "BLOCK FICHA DE IDENTIF.C/50H",
+    "min_stock": 5,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0840",
+    "desc": "ROLLO P/SUMADORA 57MM.",
+    "min_stock": 5,
+    "max_stock": 30,
+    "note": ""
+  },
+  {
+    "code": "ALG0771",
+    "desc": "H/EVAL.ENFER Y REGIS HE-DIRMED-SIMPRO-PLT-03",
+    "min_stock": 0,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0009",
+    "desc": "HOJAS DE EVALUACION DE ENFERMERIA Y REGISTROS C",
+    "min_stock": 0,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0848",
+    "desc": "SABANA UTI ADULTO UTI",
+    "min_stock": 100,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0847",
+    "desc": "SABANA USIN PEDIATRICA CUNAS",
+    "min_stock": 100,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0846",
+    "desc": "SABANA QX REGISTRO DE ANESTESIA",
+    "min_stock": 100,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0775",
+    "desc": "HOJAS DE REGISTRO CLINICO QX (PLT-09)",
+    "min_stock": 100,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0854",
+    "desc": "SOBRE OFICIO TIPO CARTERA BLANCO",
+    "min_stock": 100,
+    "max_stock": 500,
+    "note": ""
+  },
+  {
+    "code": "ALG0852",
+    "desc": "SOBRE MANILA T/CARTA PAQ/100",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0853",
+    "desc": "SOBRE MANILA T/OFICIO PAQ/100",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0851",
+    "desc": "SOBRE MANILA P/NOMINA PAQ/100",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0619",
+    "desc": "SOBRE OFICIO P/LABORATORIO IMPRESO",
+    "min_stock": 500,
+    "max_stock": 1000,
+    "note": ""
+  },
+  {
+    "code": "ALG0856",
+    "desc": "TARJETAS P/CHECAR CAJA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0857",
+    "desc": "TICKET PARA TURNO EN ROLLO",
+    "min_stock": 3,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0716",
+    "desc": "CARTUCHO BROTHER LC61BK NEGRA",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0012",
+    "desc": "LIMPIADOR LIQUIDO DESENGRASANT",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0695",
+    "desc": "OVEROL BLANCO DE SEGURIDAD TYVEK",
+    "min_stock": 50,
+    "max_stock": 300,
+    "note": ""
+  },
+  {
+    "code": "ALG0169",
+    "desc": "AGUA EMBOTELLADA 250ML",
+    "min_stock": 30,
+    "max_stock": 200,
+    "note": ""
+  },
+  {
+    "code": "ALG0170",
+    "desc": "AGUA EMBOTELLADA 500 ML",
+    "min_stock": 0,
+    "max_stock": 0,
+    "note": ""
+  },
+  {
+    "code": "ALG0671",
+    "desc": "ESCAFANDRA AL HOMBRO RPBI",
+    "min_stock": 10,
+    "max_stock": 50,
+    "note": ""
+  },
+  {
+    "code": "ALG0261",
+    "desc": "COMODO ADULTO DESECHABLE",
+    "min_stock": 5,
+    "max_stock": 15,
+    "note": ""
+  },
+  {
+    "code": "ALG0639",
+    "desc": "DIOXIDO O HIPOCLORITO DE SODIO 6%",
+    "min_stock": 1,
+    "max_stock": 4,
+    "note": ""
+  },
+  {
+    "code": "ALG0669",
+    "desc": "DIVOSAN G-8 SACO 25KG",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0384",
+    "desc": "KIT DE BIENVENIDA",
+    "min_stock": 30,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG1006",
+    "desc": "ALMOHADAS DIFERENTES MED.",
+    "min_stock": 40,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG1002",
+    "desc": "FUNDA P/ALMOHADA",
+    "min_stock": 40,
+    "max_stock": 100,
+    "note": ""
+  },
+  {
+    "code": "ALG0717",
+    "desc": "CARTUCHO BROTHER LC61C CYAN",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0718",
+    "desc": "CARTUCHO BROTHER LC61M MAGENTA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0719",
+    "desc": "CARTUCHO BROTHER LC61YAMARILLO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0726",
+    "desc": "CARTUCHO HP662XL TINTA NEGRA",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0725",
+    "desc": "CARTUCHO HP662 TINTA TRICOLOR",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0744",
+    "desc": "CINTAS EPSON LX-300/350 SO15631",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0740",
+    "desc": "CINTA P/SUMADORA KORES 241 16437",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0741",
+    "desc": "CINTA REPUESTO DYMO",
+    "min_stock": 1,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0837",
+    "desc": "RODILLO ENTINTADOR CASIO IR-40",
+    "min_stock": 2,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0738",
+    "desc": "CINTA EPSON SO15337 P/LQ590",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0891",
+    "desc": "CINTA EPSON 890 REF. SO15329",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0800",
+    "desc": "MASTER RICOH JP 1030 DEX 3340",
+    "min_stock": 2,
+    "max_stock": 6,
+    "note": ""
+  },
+  {
+    "code": "ALG0858",
+    "desc": "TINTA NEGRA RICOH JP30 COD.717113 DUPLICADOR",
+    "min_stock": 2,
+    "max_stock": 10,
+    "note": ""
+  },
+  {
+    "code": "ALG0875",
+    "desc": "TONER NEGRO SAMSUNG 111S",
+    "min_stock": 3,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0905",
+    "desc": "TONER HP CE505A NEGRO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0874",
+    "desc": "TONER MLT-D104S SCX3200 SANSUN",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0878",
+    "desc": "TONER XEROX M20 106R01047",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0869",
+    "desc": "TONER HP58A CF258A",
+    "min_stock": 1,
+    "max_stock": 4,
+    "note": ""
+  },
+  {
+    "code": "ALG0867",
+    "desc": "TONER HP35A CB435 O CARTUCHO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0868",
+    "desc": "TONER HP36A CB436A NEGRO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0863",
+    "desc": "MASTER RICOH JP 1030 DEX 3340",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0984",
+    "desc": "PATUM GENERICO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG1172",
+    "desc": "CARTUCHO DE TONER XEROX B225.GENERICO",
+    "min_stock": 1,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0870",
+    "desc": "TONER HP78A CE278A P/LASSER JET",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0871",
+    "desc": "TONER HP80A O CARTUCHO",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  },
+  {
+    "code": "ALG0872",
+    "desc": "TONER HP85A CE285 O CARTUCHO",
+    "min_stock": 1,
+    "max_stock": 3,
+    "note": ""
+  },
+  {
+    "code": "ALG0964",
+    "desc": "TONER HP48A-CF248ACOMP-AI",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0893",
+    "desc": "FUENTE DE PODER R500W EDGE SYSTEMS",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0900",
+    "desc": "TINTA EPSON T673220 CYAN",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0902",
+    "desc": "TINTA EPSON T673420 AMARILLO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0963",
+    "desc": "TINTA EPSON T673120 NEGRA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0901",
+    "desc": "TINTA EPSON T673320 MAGENTA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0904",
+    "desc": "TINTA EPSON T673620 MAGENTA L",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0903",
+    "desc": "TINTA EPSON T673520 CYAN L",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0724",
+    "desc": "CARTUCHO BROTHER GT53 NEGRO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0721",
+    "desc": "CARTUCHO BROTHER GT52C CYAN",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0722",
+    "desc": "CARTUCHO BROTHER GT52M MAGENTA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0723",
+    "desc": "CARTUCHO BROTHER GT52Y AMARILLO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0896",
+    "desc": "TINTA BROTHER T544120 NEGRA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0897",
+    "desc": "TINTA BROTHER T544220 CYAN",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0898",
+    "desc": "TINTA EPSON T544320 MAGENTA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0899",
+    "desc": "TINTA EPSON T544420 AMARILLA",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG0354",
+    "desc": "GUIA ESTILETE P/INTUBACION 14/FR",
+    "min_stock": 1,
+    "max_stock": 5,
+    "note": ""
+  },
+  {
+    "code": "ALG0355",
+    "desc": "GUIA ESTILETE P/INTUBACION PEDIATRICO",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG1087",
+    "desc": "GUIA ESTILETE P/INTUBACION NEONATAL",
+    "min_stock": 0,
+    "max_stock": 1,
+    "note": ""
+  },
+  {
+    "code": "ALG1071",
+    "desc": "TELEFONOS NORMALES Y CON DIADEMA",
+    "min_stock": 0,
+    "max_stock": 2,
+    "note": ""
+  }
+]

@@ -2,28 +2,27 @@
 
 /**
  * Verifica si el usuario tiene un permiso IA específico
- * ADMIN siempre tiene acceso total.
+ * ADMIN y DIRECTOR siempre tienen acceso total.
  * @param {object} user
- * @param {string} iaPermId - Ej: 'ia-ocupacion-camas'
+ * @param {string} iaPermId - Ej: 'ia-quirofano', 'ia-almacen', 'ia-farmacia'
  * @returns {boolean}
  */
 function hasIAPermission(user, iaPermId) {
   if (!user) return false;
-  if (user.role === 'ADMIN') return true;
+  if (user.role === 'ADMIN' || user.role === 'DIRECTOR') return true;
   const permisos = user.permisos || [];
-  // Si no tiene permisos IA asignados, denegar por defecto
   const hasAnyIAPerm = permisos.some(p => p.startsWith('ia-'));
-  if (!hasAnyIAPerm) return false; // Compatibilidad: si no se han configurado permisos IA, denegar por defecto
+  if (!hasAnyIAPerm) return true; // Compatibilidad: si aún no hay permisos IA granulares asignados, permitir por defecto
   return permisos.includes(iaPermId);
 }
 
 /**
  * Verifica si el usuario tiene un permiso de dashboard/sección
- * ADMIN siempre tiene acceso total.
+ * ADMIN y DIRECTOR siempre tienen acceso total.
  */
 function hasSectionPermission(user, permId) {
   if (!user) return false;
-  if (user.role === 'ADMIN') return true;
+  if (user.role === 'ADMIN' || user.role === 'DIRECTOR') return true;
   return (user.permisos || []).includes(permId);
 }
 

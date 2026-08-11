@@ -135,6 +135,7 @@ export default function DashboardArea() {
   const [toast, setToast] = useState(null);
   const [dynamicReport, setDynamicReport] = useState(null);
   const [loadingReport, setLoadingReport] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
   const [areaData, setAreaData] = useState({ kpis: [] });
   const [pbiModal, setPBIModal] = useState(null);
   const [showExportApi, setShowExportApi] = useState(false);
@@ -162,6 +163,7 @@ export default function DashboardArea() {
   }, [area, applyTrigger]);
 
   const fetchAreaData = async () => {
+    setLoadingData(true);
     try {
       const token = sessionStorage.getItem('escandon_token');
       
@@ -241,6 +243,8 @@ export default function DashboardArea() {
       }
     } catch (err) {
       console.error('[DashboardArea]', err);
+    } finally {
+      setLoadingData(false);
     }
   };
 
@@ -414,6 +418,10 @@ export default function DashboardArea() {
             >
               {Object.entries(AREAS_LABELS)
                 .filter(([key]) => {
+                  // Ocultar Farmacia, Finanzas, Almacén General y Cardiología (ya que tienen sus propios módulos dedicados o no requieren tablero clínico)
+                  if (key === AREAS.FARMACIA || key === AREAS.FINANZAS || key === AREAS.ALMACEN_GENERAL || key === AREAS.CARDIOLOGIA) {
+                    return user?.area === key;
+                  }
                   // ADMIN/DIRECTOR ven todas las áreas
                   if (can(user?.role, 'verTodosTableros')) return true;
                   // Usuario con área fija: solo su área
@@ -495,118 +503,126 @@ export default function DashboardArea() {
       {/* KPIs Grid */}
       {tab === 'kpis' && (
         <>
-          {area !== AREAS.QUIROFANO && area !== AREAS.CUNEROS && (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
-              {areaData.kpis.map((kpi, i) => {
-                const dbKey = KPI_DB_MAP[kpi.label] || kpi.label.replace(/\s+/g, '_').toLowerCase();
-                const elementId = `area.${area.toLowerCase()}.${dbKey}`;
-                const kpiConfig = getKPI(elementId);
-                const displayName = kpiConfig?.nombre || kpi.label;
-                return (
-                  <EditableKPIWrapper 
-                    key={i} 
-                    elementoId={elementId} 
-                    isAdmin={user?.role === 'ADMIN'} 
-                    onKPIClick={(url, title, url2, url3, multiPagina, hasJson) => setPBIModal({ url, title, url2, url3, multiPagina, reportId: elementId, hasJson })}
-                    accentColor={cfg.color}
-                  >
-                    <AreaKPICard {...kpi} label={displayName} accent={cfg.color} />
-                  </EditableKPIWrapper>
-                );
-              })}
-              
-              {/* KPIs ADICIONALES ASIGNADOS AL USUARIO (solo para no admins) */}
-              {user?.role !== 'ADMIN' && user?.role !== 'DIRECTOR' && user?.permisos?.map((permId, i) => {
-                // No duplicar los KPIs que ya se muestran en el área actual
-                if (permId.startsWith(`area.${area.toLowerCase()}`)) return null;
-                
-                const kpiConfig = getKPI(permId);
-                if (!kpiConfig) return null;
-                
-                return (
-                  <EditableKPIWrapper 
-                    key={`custom-${i}`} 
-                    elementoId={permId} 
-                    isAdmin={false} 
-                    onKPIClick={(url, title, url2, url3, multiPagina, hasJson) => setPBIModal({ url, title, url2, url3, multiPagina, reportId: permId, hasJson })}
-                    accentColor="#8b5cf6"
-                  >
-                    <div style={{ 
-                      background: 'linear-gradient(135deg, white, #f3e8ff)', 
-                      borderRadius: 12, padding: '1.25rem', 
-                      boxShadow: '0 4px 6px rgba(139, 92, 246, 0.1)',
-                      border: '1px solid rgba(139, 92, 246, 0.2)',
-                      display: 'flex', flexDirection: 'column', gap: '0.5rem',
-                      height: '100%'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#8b5cf6', fontSize: '1.2rem' }}>
-                        <span>{kpiConfig.icono || '📊'}</span>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Reporte Asignado</span>
-                      </div>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1e293b' }}>
-                        {kpiConfig.nombre || kpiConfig.titulo || 'Reporte Personalizado'}
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 'auto' }}>
-                        Haz clic para ver el reporte interactivo
-                      </div>
-                    </div>
-                  </EditableKPIWrapper>
-                );
-              })}
-
-              {areaData.kpis.length === 0 && (!user?.permisos || user.permisos.length === 0) && (
-                <div style={{ background:'white', borderRadius:12, padding:'3rem', textAlign:'center', border:'1px solid var(--border-color)', boxShadow:'var(--shadow-sm)' }}>
-              <PremiumLoader text="Cargando indicadores..." style={{ padding: '1rem' }} />
-            </div>
-              )}
-            </div>
-          )}
-
-          {/* Renderizado Condicional del Dashboard Inferior */}
-          {area === AREAS.URGENCIAS ? (
-            <DashboardUrgenciasNativo 
-              data={areaData.rawUrgenciasData} 
-              searchFilter={urgenciasSearch}
-              setSearchFilter={setUrgenciasSearch}
-            />
-          ) : area === AREAS.QUIROFANO ? (
-            <DashboardQuirofanoNativo 
-              data={areaData.rawQuirofanoData} 
-            />
-          ) : area === AREAS.IMAGENOLOGIA ? (
-            <div style={{ marginTop: '1rem' }}>
-              <DashboardAuxiliaresNativo type="imagenologia" globalFilters={globalFilters} globalTrigger={applyTrigger} />
-            </div>
-          ) : area === AREAS.LABORATORIO ? (
-            <div style={{ marginTop: '1rem' }}>
-              <DashboardAuxiliaresNativo type="laboratorio" globalFilters={globalFilters} globalTrigger={applyTrigger} />
-            </div>
-          ) : area === AREAS.FARMACIA ? (
-            <div style={{ marginTop: '1rem' }}>
-              <DashboardAuxiliaresNativo type="farmacia" globalFilters={globalFilters} globalTrigger={applyTrigger} />
-            </div>
-          ) : area === AREAS.CUNEROS ? (
-            <div style={{ marginTop: '1rem' }}>
-              <DashboardCunerosNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
-            </div>
-          ) : area === AREAS.CONSULTA_EXTERNA ? (
-            <DashboardConsultaExternaNativo 
-              data={areaData.rawConsultaData} 
-              searchFilter={globalFilters.search}
-              setSearchFilter={(val) => setGlobalFilters(prev => ({...prev, search: val}))}
-            />
-          ) : area === AREAS.ASEGURADORAS ? (
-            <div style={{ marginTop: '1rem' }}>
-              <DashboardAseguradorasNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
+          {loadingData ? (
+            <div style={{ background: 'var(--color-bg-white, white)', borderRadius: 14, padding: '5rem 3rem', textAlign: 'center', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '350px', marginTop: '1rem' }}>
+              <PremiumLoader text={`Cargando información nativa de ${(AREAS_LABELS[area] || area).toLowerCase()}...`} />
             </div>
           ) : (
-            <div style={{ marginTop: '2rem' }}>
-              <EmbeddedBI
-                report={dynamicReport}
-                loading={loadingReport}
-                onExportApi={() => setShowExportApi(true)}
-              />
-            </div>
+            <>
+              {area !== AREAS.QUIROFANO && area !== AREAS.CUNEROS && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
+                  {areaData.kpis.map((kpi, i) => {
+                    const dbKey = KPI_DB_MAP[kpi.label] || kpi.label.replace(/\s+/g, '_').toLowerCase();
+                    const elementId = `area.${area.toLowerCase()}.${dbKey}`;
+                    const kpiConfig = getKPI(elementId);
+                    const displayName = kpiConfig?.nombre || kpi.label;
+                    return (
+                      <EditableKPIWrapper 
+                        key={i} 
+                        elementoId={elementId} 
+                        isAdmin={user?.role === 'ADMIN'} 
+                        onKPIClick={(url, title, url2, url3, multiPagina, hasJson) => setPBIModal({ url, title, url2, url3, multiPagina, reportId: elementId, hasJson })}
+                        accentColor={cfg.color}
+                      >
+                        <AreaKPICard {...kpi} label={displayName} accent={cfg.color} />
+                      </EditableKPIWrapper>
+                    );
+                  })}
+                  
+                  {/* KPIs ADICIONALES ASIGNADOS AL USUARIO (solo para no admins) */}
+                  {user?.role !== 'ADMIN' && user?.role !== 'DIRECTOR' && user?.permisos?.map((permId, i) => {
+                    // No duplicar los KPIs que ya se muestran en el área actual
+                    if (permId.startsWith(`area.${area.toLowerCase()}`)) return null;
+                    
+                    const kpiConfig = getKPI(permId);
+                    if (!kpiConfig) return null;
+                    
+                    return (
+                      <EditableKPIWrapper 
+                        key={`custom-${i}`} 
+                        elementoId={permId} 
+                        isAdmin={false} 
+                        onKPIClick={(url, title, url2, url3, multiPagina, hasJson) => setPBIModal({ url, title, url2, url3, multiPagina, reportId: permId, hasJson })}
+                        accentColor="#8b5cf6"
+                      >
+                        <div style={{ 
+                          background: 'linear-gradient(135deg, white, #f3e8ff)', 
+                          borderRadius: 12, padding: '1.25rem', 
+                          boxShadow: '0 4px 6px rgba(139, 92, 246, 0.1)',
+                          border: '1px solid rgba(139, 92, 246, 0.2)',
+                          display: 'flex', flexDirection: 'column', gap: '0.5rem',
+                          height: '100%'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#8b5cf6', fontSize: '1.2rem' }}>
+                            <span>{kpiConfig.icono || '📊'}</span>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Reporte Asignado</span>
+                          </div>
+                          <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1e293b' }}>
+                            {kpiConfig.nombre || kpiConfig.titulo || 'Reporte Personalizado'}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 'auto' }}>
+                            Haz clic para ver el reporte interactivo
+                          </div>
+                        </div>
+                      </EditableKPIWrapper>
+                    );
+                  })}
+
+                  {areaData.kpis.length === 0 && (!user?.permisos || user.permisos.length === 0) && (
+                    <div style={{ background:'white', borderRadius:12, padding:'3rem', textAlign:'center', border:'1px solid var(--border-color)', boxShadow:'var(--shadow-sm)' }}>
+                      <PremiumLoader text="Cargando indicadores..." style={{ padding: '1rem' }} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Renderizado Condicional del Dashboard Inferior */}
+              {area === AREAS.URGENCIAS ? (
+                <DashboardUrgenciasNativo 
+                  data={areaData.rawUrgenciasData} 
+                  searchFilter={urgenciasSearch}
+                  setSearchFilter={setUrgenciasSearch}
+                />
+              ) : area === AREAS.QUIROFANO ? (
+                <DashboardQuirofanoNativo 
+                  data={areaData.rawQuirofanoData} 
+                />
+              ) : area === AREAS.IMAGENOLOGIA ? (
+                <div style={{ marginTop: '1rem' }}>
+                  <DashboardAuxiliaresNativo type="imagenologia" globalFilters={globalFilters} globalTrigger={applyTrigger} />
+                </div>
+              ) : area === AREAS.LABORATORIO ? (
+                <div style={{ marginTop: '1rem' }}>
+                  <DashboardAuxiliaresNativo type="laboratorio" globalFilters={globalFilters} globalTrigger={applyTrigger} />
+                </div>
+              ) : area === AREAS.FARMACIA ? (
+                <div style={{ marginTop: '1rem' }}>
+                  <DashboardAuxiliaresNativo type="farmacia" globalFilters={globalFilters} globalTrigger={applyTrigger} />
+                </div>
+              ) : area === AREAS.CUNEROS ? (
+                <div style={{ marginTop: '1rem' }}>
+                  <DashboardCunerosNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
+                </div>
+              ) : area === AREAS.CONSULTA_EXTERNA ? (
+                <DashboardConsultaExternaNativo 
+                  data={areaData.rawConsultaData} 
+                  searchFilter={globalFilters.search}
+                  setSearchFilter={(val) => setGlobalFilters(prev => ({...prev, search: val}))}
+                />
+              ) : area === AREAS.ASEGURADORAS ? (
+                <div style={{ marginTop: '1rem' }}>
+                  <DashboardAseguradorasNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
+                </div>
+              ) : (
+                <div style={{ marginTop: '2rem' }}>
+                  <EmbeddedBI
+                    report={dynamicReport}
+                    loading={loadingReport}
+                    onExportApi={() => setShowExportApi(true)}
+                  />
+                </div>
+              )}
+            </>
           )}
         </>
       )}

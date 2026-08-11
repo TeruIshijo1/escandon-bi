@@ -212,18 +212,15 @@ export default function LoginPage() {
           `}</style>
 
           {/* Logo & Subtitle */}
-          <div style={{ textAlign:'center', marginBottom:'2rem' }}>
-            <img
-              src="/logo-escandon.png"
-              alt="Hospital Escandón"
-              style={{
-                height:       76,
-                width:        'auto',
-                margin:       '0 auto 0.75rem',
-                display:      'block',
-                objectFit:    'contain',
-              }}
-            />
+          <div style={{ textAlign:'center', marginBottom:'2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="brand-logo-badge" style={{ marginBottom: '1rem', cursor: 'default' }}>
+              <img
+                src="/logo-escandon.png"
+                alt="Hospital Escandón"
+                className="brand-logo-img"
+                style={{ height: 50 }}
+              />
+            </div>
             <p style={{
               fontFamily: 'var(--font-display)',
               fontSize: '0.8rem',

@@ -397,6 +397,8 @@ export default function DevolucionesFarmacia() {
           <table className="premium-table" style={{ width: '100%', minWidth: '1000px' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
               <tr>
+                <ColumnFilter columnKey="Cuenta" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="FOLIO TICKET" maxWidth="90px" />
+                <ColumnFilter columnKey="Orden" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="NO. REQ." maxWidth="90px" />
                 <th style={{ textAlign: 'left', fontSize: '0.65rem', color: '#8A97A8', paddingBottom: '20px' }}>FECHA</th>
                 <ColumnFilter columnKey="EstadoLinea" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="ESTADO" />
                 <ColumnFilter columnKey="UAbierto" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="SOLICITA" />
@@ -413,13 +415,15 @@ export default function DevolucionesFarmacia() {
             <tbody>
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan="10" style={{ textAlign: 'center', padding: '3rem', color: '#94A3B8' }}>
+                  <td colSpan="12" style={{ textAlign: 'center', padding: '3rem', color: '#94A3B8' }}>
                     No se encontraron registros de devoluciones.
                   </td>
                 </tr>
               ) : (
                 paginated.map((p, idx) => (
                   <tr key={idx} style={{ transition: 'background 0.2s' }}>
+                    <td><strong style={{ color: '#004687', fontFamily: 'var(--font-mono)' }}>{p.Cuenta || 'N/A'}</strong></td>
+                    <td><span style={{ color: '#475569', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>{p.Orden || 'N/A'}</span></td>
                     <td style={{ whiteSpace: 'nowrap' }}>{new Date(p.FechaDevolucion).toLocaleDateString('es-MX')} {new Date(p.FechaDevolucion).toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'})}</td>
                     <td>
                       <span style={{ 

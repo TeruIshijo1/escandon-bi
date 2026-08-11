@@ -111,6 +111,16 @@ async function runFullSync() {
   console.log('🔄 Iniciando ciclo de sincronización ETL hacia Postgres DW...');
   await syncIncomingPayments();
   await syncPurchaseInvoices();
+  
+  try {
+    console.log('🔄 Iniciando sincronización de traslados desde SAP...');
+    const { syncTraslados } = require('./sapTrasladosSync.service');
+    const count = await syncTraslados();
+    console.log(`✅ Sincronizados ${count} traslados desde SAP.`);
+  } catch (err) {
+    console.error('❌ Error sincronizando traslados en ETL:', err.message);
+  }
+
   console.log('✅ Ciclo de sincronización ETL finalizado.');
 }
 

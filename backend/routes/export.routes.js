@@ -576,6 +576,8 @@ async function resolveReportData(reportId, filters) {
           'Total Registros': data.length,
         },
         columnas: [
+          { header: 'Folio Ticket', key: 'Cuenta', width: 14 },
+          { header: 'No. Requisición', key: 'Orden', width: 16 },
           { header: 'Fecha Devolución', key: 'FechaDevolucion', width: 22 },
           { header: 'Estado', key: 'EstadoLinea', width: 18 },
           { header: 'Solicita', key: 'UAbierto', width: 18 },

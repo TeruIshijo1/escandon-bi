@@ -1,19 +1,8 @@
-/**
- * rag.service.js — Pipeline RAG para Mar-IA
- * Hospital Escandón BI Platform v1.0
- *
- * Flujo:
- *  1. Recibe pregunta en lenguaje natural
- *  2. Clasifica intención y extrae entidades (LLM paso 1)
- *  3. Valida permisos del usuario para la intención detectada
- *  4. Genera y ejecuta query SQL filtrado por rol/área
- *  5. Pasa datos + pregunta al LLM con system prompt estricto
- *  6. Devuelve respuesta en lenguaje natural
- */
 'use strict';
 
 const { getDb } = require('../config/db');
 const { buildSystemPrompt, buildUserMessage, ROLE_DATA_ACCESS } = require('./prompts/ai.system.prompt');
+const ariaService = require('./aria');
 const ExcelJS = require('exceljs');
 
 const LLM_API_KEY = process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
@@ -28,7 +17,7 @@ const INTENT_PERMISSIONS = {
   ocupacion_camas:  ['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO'],
   censo_pacientes:  ['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO'],
   tasa_mortalidad:  ['ADMIN', 'DIRECTOR'],
-  cirugias_dia:     ['ADMIN', 'DIRECTOR', 'JEFE_AREA'],
+  cirugias_dia:     ['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO'],
   rotacion_area:    ['ADMIN', 'DIRECTOR', 'JEFE_AREA'],
   readmision:       ['ADMIN', 'DIRECTOR'],
   auditoria:        ['ADMIN', 'DIRECTOR'],
@@ -199,14 +188,46 @@ const INTENT_QUERIES = {
    Función principal: processRAGQuery
 ══════════════════════════════════════════════════════════════ */
 async function processRAGQuery({ question, userRole, userArea, userName, file, screenImage, currentContext }) {
-  // 1. Clasificar intención con el LLM
-  const intent = await classifyIntent(question);
+  // Procesar primero con el motor de intenciones analíticas de ARIA (que incluye Quirófano, Almacén, Farmacia, Censo, etc.)
+  const ariaUser = { role: userRole, area: userArea, nombre: userName };
+  const ariaResponse = await ariaService.processAriaQuery(question, ariaUser);
 
-  // 2. Verificar permisos
+  if (ariaResponse && ariaResponse.answer) {
+    let excelSources = [];
+    let excelDataStr = null;
+    if (file && file.buffer) {
+      try {
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(file.buffer);
+        const sheet = workbook.worksheets[0];
+        const excelRows = [];
+        sheet.eachRow((row, rowNumber) => {
+          if (rowNumber <= 50) excelRows.push(row.values.slice(1));
+        });
+        excelDataStr = JSON.stringify(excelRows);
+        excelSources.push('Archivo Excel adjunto');
+      } catch (e) {
+        console.error('[Mar-IA] Error parseando Excel:', e.message);
+      }
+    }
+
+    return {
+      answer: ariaResponse.answer,
+      sources: ['Plataforma BI — Datos en vivo', ariaResponse.topic || 'Consulta Operativa', ...excelSources],
+      intent: ariaResponse.topic || 'general',
+      assistant: 'Mar-IA',
+      timestamp: new Date().toISOString(),
+      kpis: ariaResponse.kpis || null,
+      table: ariaResponse.table || null,
+      suggestions: ariaResponse.suggestions || null,
+    };
+  }
+
+  // 1. Clasificar intención si no hubo match en ARIA
+  const intent = await classifyIntent(question);
   const allowed = INTENT_PERMISSIONS[intent] || INTENT_PERMISSIONS.general;
   const hasPermission = allowed.includes(userRole);
 
-  // 3. Obtener datos (solo si tiene permiso y hay query)
   let data = [];
   let executedSQL = null;
   let sources = [];
@@ -217,7 +238,6 @@ async function processRAGQuery({ question, userRole, userArea, userName, file, s
     executedSQL = result.sql;
     sources = result.sources;
   } else if (!hasPermission) {
-    // Pasamos contexto al LLM para que rechace amablemente
     data = [{ _rbac_denied: true, intent, userRole }];
     sources = ['Acceso denegado por RBAC'];
   }
@@ -239,7 +259,6 @@ async function processRAGQuery({ question, userRole, userArea, userName, file, s
     }
   }
 
-  // 4. Generar respuesta con Mar-IA
   const systemPrompt = buildSystemPrompt(userRole, userArea, currentContext);
   const answer = await generateAnswer({ question, data, intent, userRole, userName, systemPrompt, excelData, screenImage });
 
@@ -317,7 +336,6 @@ async function generateAnswer({ question, data, intent, userRole, userName, syst
 
   let userMessage;
   if (screenImage) {
-    // Si hay imagen, la añadimos al mensaje
     userMessage = {
       role: 'user',
       content: [
@@ -338,10 +356,7 @@ async function generateAnswer({ question, data, intent, userRole, userName, syst
 }
 
 /* ── Cliente OpenAI / Azure OpenAI (MODO DEMO) ──────────────────────── */
-/* ── Cliente OpenAI / Azure OpenAI (MODO DEMO) ──────────────────────── */
 async function callLLM(messages, options = {}) {
-  // MODO DEMO: No consumir tokens reales y devolver respuestas simuladas pero REALES usando los datos extraídos.
-  
   const isClassification = messages[0]?.content?.includes("Clasifica la pregunta");
   
   if (isClassification) {
@@ -359,7 +374,6 @@ async function callLLM(messages, options = {}) {
     return 'general';
   }
 
-  // Generación de respuesta
   const userMsg = messages.find(m => m.role === 'user');
   let qText = '';
   if (userMsg && typeof userMsg.content === 'string') {
@@ -368,11 +382,9 @@ async function callLLM(messages, options = {}) {
     qText = userMsg.content.find(c => c.type === 'text')?.text?.toLowerCase() || '';
   }
 
-  // Extraer la intención real enviada por el prompt
   const intentMatch = qText.match(/intención detectada:\s*([a-z_]+)/);
   const detectedIntent = intentMatch ? intentMatch[1] : 'general';
 
-  // Extraer los datos JSON de la base de datos inyectados en el prompt
   let dbData = [];
   const jsonMatch = qText.match(/```json\n([\s\S]*?)\n```/);
   if (jsonMatch) {
@@ -383,14 +395,13 @@ async function callLLM(messages, options = {}) {
      }
   }
 
-  let response = "🤖 **[MODO DEMO ACTIVADO]**\n\n";
+  let response = "🤖 **[MAR-IA BI]**\n\n";
 
   if (detectedIntent === 'saludo') {
-      response += "¡Hola! 👋 Soy Mar-IA, tu asistente de inteligencia analítica del Hospital Escandón. ¿En qué te puedo ayudar hoy? (Ej. Puedes preguntarme por la ocupación de camas o censo de pacientes).";
+      response += "¡Hola! 👋 Soy Mar-IA, tu asistente de inteligencia analítica del Hospital Escandón. ¿En qué te puedo ayudar hoy? Puedo informarte sobre la ocupación de camas, cirugías del momento, censo de pacientes, inventarios de Almacén General y recetas pendientes en Farmacia. 📊";
   } else if (detectedIntent === 'plataforma') {
-      response += "Para usar la plataforma, puedes navegar por el menú lateral izquierdo. Allí encontrarás los Dashboards directivos, información por áreas, reportes de auditoría y configuración general.";
+      response += "Para usar la plataforma, puedes navegar por el menú lateral izquierdo. Allí encontrarás los Dashboards directivos, Quirófano, Almacén General, Farmacia, auditoría de inventarios y configuración general.";
   } else if (Array.isArray(dbData) && dbData.length > 0 && !dbData[0]._rbac_denied) {
-      // Generar una tabla o lista real basada en los datos extraídos
       response += "Aquí tienes la información solicitada basada en los datos actuales del hospital:\n\n";
       
       if (detectedIntent === 'ocupacion_camas') {
@@ -418,7 +429,6 @@ async function callLLM(messages, options = {}) {
               response += `- Tasa de readmisión global a 30 días: **${row.TasaReadmision}%** (${row.ReadmisionesCount} readmisiones de ${row.TotalEgresados} egresos totales).\n`;
           });
       } else {
-          // Fallback genérico sin JSON crudo
           response += "Resumen de datos encontrados:\n";
           dbData.forEach((row) => {
               response += "- ";
@@ -434,12 +444,10 @@ async function callLLM(messages, options = {}) {
   } else if (Array.isArray(dbData) && dbData.length > 0 && dbData[0]._rbac_denied) {
       response += "🔒 Lo siento, no tienes los permisos suficientes para consultar esta información con tu rol actual.";
   } else {
-      response += "No he encontrado datos específicos para responder a tu consulta en este momento, o tu perfil no tiene información asignada a esta métrica. ¿Puedo ayudarte con alguna otra consulta operativa?";
+      response += "No he encontrado datos específicos para responder a tu consulta en este momento. ¿Puedo ayudarte con alguna consulta de Quirófano, Almacén General o Farmacia?";
   }
 
   return response;
 }
-
-
 
 module.exports = { processRAGQuery };

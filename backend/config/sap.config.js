@@ -21,7 +21,6 @@ const sapConfig = {
   companyDb: process.env.SAP_COMPANY_DB,
   username: process.env.SAP_USERNAME,
   password: process.env.SAP_PASSWORD,
-  // Para certificados autofirmados (usar 'true' en producción si tienen certificado SSL oficial)
   rejectUnauthorized: process.env.SAP_REJECT_UNAUTHORIZED === 'true'
 };
 

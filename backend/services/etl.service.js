@@ -173,7 +173,6 @@ const sapService = require('./sap.service');
   }
 
 async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, limit = 5000 }) {
-  const db = getDb();
   let pool;
   try {
     pool = await getRemoteDb();
@@ -467,7 +466,7 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
         PCPR.PCPRNum AS OrdenId,
         PC.PCNum AS Cuenta,
         PT.FullName AS NombrePaciente,
-        ISNULL(VFR.FRName, 'NO ESPECIFICADA') AS AreaHospitalaria,
+        ISNULL(VFR.FRName, ISNULL(CURR_FR.FRName, 'NO ESPECIFICADA')) AS AreaHospitalaria,
         PCPRIT.ItemCode AS Codigo,
         ISNULL(VIT.ItemDescription, PCIT.ItemCode) AS Insumo,
         PCIT.Quantity AS CantidadCargada,
@@ -488,6 +487,13 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
     LEFT JOIN dbo.V_IT VIT ON PCPRIT.ItemCode = VIT.ItemCode
     LEFT JOIN dbo.PCBL PCBL ON PCPRIT.PCPRITNum = PCBL.PCPRITNum
     LEFT JOIN dbo.V_FR VFR ON PCBL.FRCode = VFR.FRCode
+    OUTER APPLY (
+      SELECT TOP 1 FR.FRName 
+      FROM dbo.PCFR PCFR
+      INNER JOIN dbo.V_FR FR ON PCFR.FRCode = FR.FRCode
+      WHERE PCFR.PCNum = PC.PCNum 
+      ORDER BY PCFR.EntryDate DESC
+    ) CURR_FR
     WHERE PCIT.PCIT_ST = N'CH'
   `;
 

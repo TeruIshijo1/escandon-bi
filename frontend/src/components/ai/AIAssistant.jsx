@@ -1,7 +1,7 @@
 /**
  * AIAssistant.jsx — Asistente de IA (chat flotante)
  * Hospital Escandón BI Platform v4.0
- * Rediseño premium con consistencia tipográfica
+ * Rediseño premium con soporte para Quirófano, Almacén y Farmacia
  */
 import { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
@@ -9,11 +9,12 @@ import { useAuth } from '../../context/AuthContext';
 import { API_BASE } from '../../api/config';
 
 const SUGGESTED_QUESTIONS = [
-  '¿Cuál es la ocupación de camas hoy?',
-  '¿Cuántos pacientes hay en UCI?',
-  '¿Qué área tiene mayor rotación este mes?',
-  '¿Cuál es la tasa de mortalidad del mes?',
-  'Resumen de cirugías de la semana',
+  '🏥 ¿Cuáles son las cirugías del momento?',
+  '📦 ¿Cuáles son los traslados de Almacén General?',
+  '💊 ¿Qué recetas están pendientes en Farmacia?',
+  '🛏️ ¿Cuál es la ocupación de camas hoy?',
+  '🩺 ¿Qué materiales incluye el kit quirúrgico?',
+  '📋 Ver el libro de medicamentos controlados',
 ];
 
 function formatMarkdown(text) {
@@ -54,7 +55,7 @@ export default function AIAssistant() {
   const [messages, setMessages] = useState([
     {
       role:    'assistant',
-      content: `Hola, soy **Mar-IA**. Puedo responder preguntas sobre los datos clínicos del hospital, apoyarte en la navegación de la plataforma, y proveer indicadores en tiempo real. ¿En qué puedo ayudarte hoy?`,
+      content: `Hola, soy **Mar-IA**. Puedo responder preguntas sobre Quirófano, Almacén General, Farmacia, censo de pacientes e indicadores en tiempo real. ¿En qué puedo ayudarte hoy?`,
     },
   ]);
   const [input,   setInput]   = useState('');
@@ -129,6 +130,8 @@ export default function AIAssistant() {
             content: json.answer,
             sources: json.sources,
             intent:  json.intent,
+            kpis:    json.kpis || null,
+            table:   json.table || null,
           },
         ]);
         setSelectedFile(null);
@@ -214,6 +217,43 @@ export default function AIAssistant() {
             {messages.map((msg, i) => (
               <div key={i} className={`ai-message ${msg.role}`} style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', padding: '0.75rem 0.9rem', borderRadius: '12px' }}>
                 <span dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} />
+
+                {/* KPIs */}
+                {msg.kpis && msg.kpis.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginTop: '8px' }}>
+                    {msg.kpis.map((kpi, kIdx) => (
+                      <div key={kIdx} style={{ background: '#FFFFFF', padding: '6px 8px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+                        <div style={{ fontSize: '0.65rem', color: '#64748B', fontWeight: '600' }}>{kpi.label}</div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: '800', color: kpi.color || '#004687' }}>{kpi.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Tabla */}
+                {msg.table && msg.table.rows && (
+                  <div style={{ marginTop: '8px', overflowX: 'auto', background: '#FFFFFF', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+                    <table style={{ width: '100%', fontSize: '0.72rem', borderCollapse: 'collapse', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ background: '#F1F5F9', color: '#475569' }}>
+                          {msg.table.headers.map((h, hIdx) => (
+                            <th key={hIdx} style={{ padding: '5px 6px', fontWeight: '700' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {msg.table.rows.map((row, rIdx) => (
+                          <tr key={rIdx} style={{ borderBottom: '1px solid #F8FAFC' }}>
+                            {row.map((cell, cIdx) => (
+                              <td key={cIdx} style={{ padding: '5px 6px', color: '#1E293B' }}>{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
                 {msg.sources && (
                   <div style={{ marginTop:'0.4rem', fontSize:'0.66rem', opacity:0.7, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                     📊 Fuente: {msg.sources.join(', ')}

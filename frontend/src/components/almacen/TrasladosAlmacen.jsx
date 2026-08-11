@@ -13,21 +13,41 @@ export default function TrasladosAlmacen() {
 
   // Filtros
   const today = new Date().toISOString().split('T')[0];
-  const [startDate, setStartDate] = useState(today);
+  const defaultStart = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(defaultStart);
   const [endDate, setEndDate] = useState(today);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    // dateStr normally comes as YYYY-MM-DDTHH:MM:SSZ
+    const [year, month, day] = dateStr.split('T')[0].split('-');
+    return new Date(year, month - 1, day).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   useEffect(() => {
     fetchTraslados();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, debouncedSearch]);
 
   const fetchTraslados = async () => {
     try {
       setLoading(true);
       setError(null);
       const queryParams = new URLSearchParams();
-      if (startDate) queryParams.append('startDate', startDate);
-      if (endDate) queryParams.append('endDate', endDate);
+      if (debouncedSearch) {
+        queryParams.append('search', debouncedSearch);
+      } else {
+        if (startDate) queryParams.append('startDate', startDate);
+        if (endDate) queryParams.append('endDate', endDate);
+      }
 
       const response = await fetch(`${API_BASE}/almacen/traslados?${queryParams.toString()}`, {
         headers: authHeaders()
@@ -154,11 +174,18 @@ export default function TrasladosAlmacen() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTraslados.map(t => (
+                {filteredTraslados.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.95rem' }}>
+                      No se encontraron solicitudes de traslado para el rango de fechas o filtro seleccionado.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTraslados.map(t => (
                   <tr key={t.DocEntry} style={{ borderBottom: '1px solid #e2e8f0', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = 'white'}>
                     <td style={{ padding: '1rem 1.5rem', fontWeight: 'bold', color: '#0f172a' }}>{t.DocNum}</td>
                     <td style={{ padding: '1rem 1.5rem', color: '#475569' }}>
-                      {t.DocDate ? new Date(t.DocDate).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}
+                      {formatDate(t.DocDate)}
                     </td>
                     <td style={{ padding: '1rem 1.5rem', color: '#0f172a' }}>{t.FromWarehouse}</td>
                     <td style={{ padding: '1rem 1.5rem', color: '#0f172a', fontWeight: '500' }}>{t.ToWarehouse}</td>
@@ -180,7 +207,7 @@ export default function TrasladosAlmacen() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           )}
@@ -215,8 +242,8 @@ export default function TrasladosAlmacen() {
                 </div>
                 <div style={{ textAlign: 'right', color: '#475569', fontSize: '0.85rem', lineHeight: '1.4' }}>
                   <div><strong>ID SAP:</strong> {selectedTraslado.DocEntry}</div>
-                  <div><strong>Fecha de Creación:</strong> {selectedTraslado.DocDate ? new Date(selectedTraslado.DocDate).toLocaleDateString() : '-'}</div>
-                  <div><strong>Fecha de Vencimiento:</strong> {selectedTraslado.DueDate ? new Date(selectedTraslado.DueDate).toLocaleDateString() : '-'}</div>
+                  <div><strong>Fecha de Creación:</strong> {formatDate(selectedTraslado.DocDate)}</div>
+                  <div><strong>Fecha de Vencimiento:</strong> {formatDate(selectedTraslado.DueDate)}</div>
                 </div>
               </div>
 

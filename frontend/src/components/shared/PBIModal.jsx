@@ -176,7 +176,9 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
           flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <img src="/logo-escandon.png" alt="Hospital Escandón" style={{ height: '50px', objectFit: 'contain' }} />
+            <div className="brand-logo-badge" style={{ padding: '4px 12px', cursor: 'default' }}>
+              <img src="/logo-escandon.png" alt="Hospital Escandón" className="brand-logo-img" style={{ height: '36px' }} />
+            </div>
             <div>
               <h2 style={{ margin: 0, color: '#004687', fontSize: '1.2rem', fontFamily: 'var(--font-display)' }}>Hospital Escandón</h2>
               <p style={{ margin: 0, color: '#4A5568', fontSize: '0.8rem' }}>Reporte de Inteligencia de Negocios</p>

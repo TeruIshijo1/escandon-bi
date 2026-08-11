@@ -62,7 +62,7 @@ export default function ControlledLedger() {
                     {row.Medicamento}
                   </td>
                   <td style={{ padding: '1rem' }}>
-                    <span style={{ background: '#e2e8f0', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 'bold' }}>{row.Lote}</span>
+                    <span className="lote-badge" style={{ background: '#e2e8f0', color: '#334155', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.82rem' }}>{row.Lote}</span>
                   </td>
                   <td style={{ padding: '1rem', fontWeight: 'bold', textAlign: 'center' }}>{row.Cantidad}</td>
                 </tr>

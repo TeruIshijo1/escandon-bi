@@ -33,10 +33,13 @@ const AuditoriaInventarios = lazy(() => import('./components/audit/InventarioVsC
 const AuditoriaCargos     = lazy(() => import('./pages/AuditoriaCargos'));
 const DevolucionesFarmacia = lazy(() => import('./components/pharmacy/DevolucionesFarmacia'));
 const InventarioFarmacia   = lazy(() => import('./components/pharmacy/InventarioFarmacia'));
+const QuirofanoPage        = lazy(() => import('./pages/QuirofanoPage'));
 const CargosSAP            = lazy(() => import('./components/pharmacy/CargosSAP'));
 const ResumenMaestro       = lazy(() => import('./components/pharmacy/ResumenMaestro'));
 const InventarioAlmacen    = lazy(() => import('./components/almacen/InventarioAlmacen'));
+const PuntoReordenAlmacen   = lazy(() => import('./components/almacen/PuntoReordenAlmacen'));
 const TrasladosAlmacen    = lazy(() => import('./components/almacen/TrasladosAlmacen'));
+const ReportesAlmacen      = lazy(() => import('./components/almacen/ReportesAlmacen'));
 const Estadisticas        = lazy(() => import('./pages/Estadisticas'));
 const AdminUsuarios       = lazy(() => import('./pages/AdminUsuarios'));
 const AdminAuditoriaLog   = lazy(() => import('./pages/AdminAuditoriaLog'));
@@ -228,6 +231,39 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route path="quirofano" element={<Navigate to="/quirofano/agenda" replace />} />
+              <Route
+                path="quirofano/agenda"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL]}>
+                    <QuirofanoPage defaultTab="agenda" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="quirofano/kits"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL]}>
+                    <QuirofanoPage defaultTab="kits" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="quirofano/variaciones"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL]}>
+                    <QuirofanoPage defaultTab="variations" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="quirofano/almacen"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL]}>
+                    <QuirofanoPage defaultTab="almacen" />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="almacen/inventario"
                 element={
@@ -237,10 +273,26 @@ export default function App() {
                 }
               />
               <Route
+                path="almacen/reorden"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO]}>
+                    <PuntoReordenAlmacen />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="almacen/traslados"
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL]}>
                     <TrasladosAlmacen />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="almacen/reportes"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL]}>
+                    <ReportesAlmacen />
                   </ProtectedRoute>
                 }
               />

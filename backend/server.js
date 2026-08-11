@@ -14,10 +14,12 @@ const rateLimit     = require('express-rate-limit');
 const morgan        = require('morgan');
 const path          = require('path');
 const fs            = require('fs');
+const os            = require('os');
 const multer        = require('multer');
 const xss           = require('xss-clean');
 
 const { connectDB }         = require('./config/db');
+const { connectRemoteDB }   = require('./config/remote-db');
 const authRoutes             = require('./routes/auth.routes');
 const dashboardRoutes        = require('./routes/dashboard.routes');
 const exportRoutes           = require('./routes/export.routes');
@@ -26,9 +28,10 @@ const biRoutes               = require('./routes/bi.routes');
 const adminRoutes            = require('./routes/admin.routes');
 const auditRoutes            = require('./routes/audit.routes');
 const { auditMiddleware }    = require('./middleware/audit.middleware');
-const { connectRemoteDB }    = require('./config/remote-db');
-const { initPostgresDW }     = require('./config/pg-db');
+const { initPostgresDW, pool }     = require('./config/pg-db');
 const { initCronJobs, runFullSync } = require('./services/sync.service');
+const { initQuirofanoDW, syncQuirofanoData, initQuirofanoCron } = require('./services/quirofanoSync.service');
+const { syncAllDashboards, initDashboardCron } = require('./services/dashboardSync.service');
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
@@ -38,12 +41,16 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "'unsafe-inline'", 'https://app.powerbi.com', 'blob:'],
+      scriptSrc:  ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://app.powerbi.com', 'blob:'],
+      styleSrc:   ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc:    ["'self'", 'https://fonts.gstatic.com'],
       frameSrc:   ["'self'", 'https://app.powerbi.com', 'blob:'],
       imgSrc:     ["'self'", 'data:', 'blob:', 'https://*', 'http://*'],
       connectSrc: ["'self'", 'https://*', 'http://*', 'ws://*', 'wss://*'],
+      upgradeInsecureRequests: null,
     },
   },
+  hsts: false,
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
@@ -141,6 +148,16 @@ app.use('/api/almacen',       almacenRoutes);
 app.use('/api/sap',           sapRoutes);
 app.use('/api/files', authenticate, express.static(path.join(__dirname, 'uploads')));
 
+// Servir Frontend compilado en Producción
+const frontendPath = path.join(__dirname, '../frontend');
+if (fs.existsSync(path.join(frontendPath, 'index.html'))) {
+  app.use(express.static(frontendPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
+
 /* ── Manejo de errores global ───────────────────────────────── */
 app.use((err, req, res, next) => {
   console.error('[ERROR]', err.message);
@@ -176,12 +193,35 @@ app.get('/health', (req, res) => {
 
 /* ── Arranque ───────────────────────────────────────────────── */
 (() => {
+  let localIp = 'localhost';
+  try {
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === 'IPv4' && !net.internal) {
+          localIp = net.address;
+          break;
+        }
+      }
+    }
+  } catch (e) {}
+
   // El servidor arranca siempre, con o sin BD
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🏥  Hospital Escandón BI — Backend v1.0`);
-    console.log(`🚀  Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`🚀  Servidor corriendo en:`);
+    console.log(`   ➜ Local:    http://localhost:${PORT}`);
+    console.log(`   ➜ Intranet: http://${localIp}:${PORT} (Desde cualquier otra PC o Tablet en la red)`);
     console.log(`🛡️   Entorno: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🔌  Intentando conectar a SQLite...\n`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ [ERROR EADDRINUSE] El puerto ${PORT} ya está ocupado por otro proceso de Node.js.`);
+      console.error(`💡 Solución: Ejecuta "taskkill /F /IM node.exe" para liberar el puerto e inicia nuevamente.\n`);
+      process.exit(1);
+    }
   });
 
   try {
@@ -192,11 +232,68 @@ app.get('/health', (req, res) => {
     connectRemoteDB().catch(e => console.warn('⚠️ SQL Server Remoto no inicializado al arranque.'));
     
     // Inicializar PostgreSQL Data Warehouse y sincronización ETL
-    initPostgresDW().then(() => {
+    initPostgresDW().then(async () => {
       initCronJobs();
-      // Opcional: Ejecutar un volcado inicial al arrancar si es necesario
-      // runFullSync();
+      await initQuirofanoDW();
+      initQuirofanoCron();
+
+      // Sincronización de Quirófano (fullSync si está vacía)
+      try {
+        const countQx = await pool.query('SELECT COUNT(*) as count FROM dw_quirofano_eventos');
+        const isQxEmpty = parseInt(countQx.rows[0].count, 10) === 0;
+        console.log(`[Quirofano Sync Startup] ¿Tabla de quirofano vacía?: ${isQxEmpty}`);
+        syncQuirofanoData({ fullSync: isQxEmpty }).catch(e => console.warn('⚠️ Sync Quirófano DW error:', e.message));
+      } catch (err) {
+        syncQuirofanoData({ fullSync: false }).catch(e => console.warn('⚠️ Sync Quirófano DW error:', e.message));
+      }
+
+      // Sincronizar todos los tableros en PostgreSQL DW (fullSync si alguna tabla clave está vacía)
+      initDashboardCron();
+      try {
+        const countPC = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_pc');
+        const countSrv = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_cuentas_servicios');
+        const countCons = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_consulta_dia');
+        const countSol = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_solicitudes_estudios');
+        
+        const isDbEmpty = 
+          parseInt(countPC.rows[0].count, 10) === 0 ||
+          parseInt(countSrv.rows[0].count, 10) === 0 ||
+          parseInt(countCons.rows[0].count, 10) === 0 ||
+          parseInt(countSol.rows[0].count, 10) === 0;
+
+        console.log(`[Dashboard Sync Startup] ¿Base de datos local vacía o incompleta?: ${isDbEmpty}`);
+        syncAllDashboards({ fullSync: isDbEmpty }).catch(e => console.warn('⚠️ Sync Dashboard DW error:', e.message));
+      } catch (err) {
+        console.warn('⚠️ Error al comprobar estado de DW Dashboards, ejecutando incremental:', err.message);
+        syncAllDashboards({ fullSync: false }).catch(e => console.warn('⚠️ Sync Dashboard DW error:', e.message));
+      }
+
+      // Sincronizar traslados en PostgreSQL DW (si está vacía o para actualización rápida)
+      try {
+        const countT = await pool.query('SELECT COUNT(*) as count FROM dw_sap_traslados');
+        const isTEmpty = parseInt(countT.rows[0].count, 10) === 0;
+        console.log(`[Traslados Sync Startup] ¿Tabla de traslados vacía?: ${isTEmpty}`);
+        const { syncTraslados } = require('./services/sapTrasladosSync.service');
+        syncTraslados().then(c => console.log(`[Traslados Sync Startup] Sincronizados ${c} traslados desde SAP.`)).catch(e => console.warn('⚠️ Sync Traslados error:', e.message));
+      } catch (err) {
+        console.warn('⚠️ Error al comprobar estado de DW Traslados en inicio:', err.message);
+      }
     }).catch(e => console.warn('⚠️ Falló la inicialización de Postgres DW.'));
+
+    // Inicializar Sincronización de Data Warehouse Almacén/Cirrus a SQLite
+    try {
+      const { runAlmacenSync } = require('./services/almacenSync.service');
+      runAlmacenSync().then(() => {
+        console.log('✅ Sincronización inicial de Almacén/Censo completada.');
+      }).catch(err => console.warn('⚠️ Sincronización inicial de Almacén incompleta:', err.message));
+      
+      // Ejecutar sincronización cada 15 minutos
+      setInterval(() => {
+        runAlmacenSync().catch(err => console.warn('⚠️ Sync background almacén error:', err.message));
+      }, 15 * 60 * 1000);
+    } catch(err) {
+      console.warn('⚠️ No se pudo iniciar el servicio de sync de Almacén.');
+    }
 
   } catch (err) {
     dbStatus = 'sin_conexion';

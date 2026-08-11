@@ -17,9 +17,9 @@ echo  Frontend:   http://localhost:5173
 if defined LOCAL_IP echo  Red Local:  http://%LOCAL_IP%:5173
 echo.
 
-:: Instalar y arrancar todo en la misma ventana con concurrently
-echo  Iniciando servicios...
-echo  (Presiona Ctrl+C en esta ventana para detener todos los servicios)
+echo  Iniciando Backend y Frontend en 1 solo CMD...
+echo  (Presiona Ctrl+C para detener)
 echo.
 
-npx concurrently -n "BACKEND,FRONTEND,NGROK" -c "bgBlue.bold,bgGreen.bold,bgMagenta.bold" "cd backend && node server.js" "cd frontend && npx vite --host" "ngrok http 5173 --host-header=localhost --log=stdout --authtoken 3H6A6J7ZzbGOQQIt865EStbmcYj_5T1WE7kvnxNnz74dPgSBg"
+npx concurrently -n "BACKEND,FRONTEND" -c "bgBlue.bold,bgGreen.bold" "cd backend && node server.js" "cd frontend && npx vite --host"
+

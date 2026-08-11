@@ -3,6 +3,7 @@ const router = express.Router();
 const etlService = require('../services/etl.service');
 const sapService = require('../services/sap.service');
 const { connectRemoteDB } = require('../config/remote-db');
+const { pool: pgPool } = require('../config/pg-db');
 const { getDb } = require('../config/db');
 const sql = require('mssql');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
@@ -201,18 +202,24 @@ router.get('/pending-prescriptions', authenticate, authorize(['ADMIN', 'DIRECTOR
     const dbRes = await pool.request().query(`
       SELECT TOP 100
         i.PCPRITNum AS Id,
+        p.PCPRNum AS Requisicion,
+        c.PCNum AS Cuenta,
         p.CreatedOn AS FechaSolicitud,
+        p.CreatedBy AS UsuarioSolicito,
         t.FullName AS Paciente,
         COALESCE(NULLIF(LTRIM(RTRIM(pr.FullName)), ''), NULLIF(LTRIM(RTRIM(pr.Name)) + ' ' + LTRIM(RTRIM(pr.LastName)), ''), 'NO ESPECIFICADO') AS Medico,
         i.ItemCode AS Codigo,
         ISNULL(i.ItemDescription, 'Material/Medicamento') AS Medicamento,
         i.Quantity AS Solicitado,
-        c.AuxiliaryField2 AS CamaCuarto
+        i.Notes AS Indicaciones,
+        COALESCE(pcfr_req.FRName, pcfr_req.FRCode, pcfr_act.FRName, pcfr_act.FRCode, NULLIF(LTRIM(RTRIM(c.AuxiliaryField2)), ''), 'Ambulatorio') AS CamaCuarto
       FROM PCPRIT i
       INNER JOIN PCPR p ON i.PCPRNum = p.PCPRNum
       INNER JOIN PC c ON p.PCNum = c.PCNum
       INNER JOIN PT t ON c.PTNum = t.PTNum
       LEFT JOIN PR pr ON p.PR_PC_ID = pr.PRID
+      LEFT JOIN dbo.PCFR pcfr_req ON p.PCFRNum = pcfr_req.PCFRNum
+      LEFT JOIN dbo.PCFR pcfr_act ON c.PCNum = pcfr_act.PCNum AND pcfr_act.ExitDate IS NULL
       WHERE i.PCPRITNum NOT IN (SELECT PCPRITNum FROM PCPRBT)
       AND p.CreatedOn >= DATEADD(day, -7, GETDATE())
       AND i.ItemCode IS NOT NULL
@@ -220,16 +227,26 @@ router.get('/pending-prescriptions', authenticate, authorize(['ADMIN', 'DIRECTOR
       ORDER BY p.CreatedOn ASC
     `);
 
-    // Obtener los IDs ocultos de SQLite
-    const localDb = getDb();
-    const hiddenRows = localDb.prepare('SELECT pcprit_num FROM hidden_prescriptions').all();
-    const hiddenIds = new Set(hiddenRows.map(r => r.pcprit_num));
+    // Obtener los IDs ocultos de PostgreSQL
+    const hiddenRes = await pgPool.query('SELECT pcprit_num FROM dw_hidden_prescriptions');
+    const hiddenIds = new Set(hiddenRes.rows.map(r => r.pcprit_num));
 
     let enrichedData = [];
+    const inventoryMap = sapInventoryService.getInventoryMap();
+    const batchesCache = sapInventoryService.getBatchesCache() || [];
+
     for (const row of dbRes.recordset) {
       if (!hiddenIds.has(String(row.Id))) {
-        const sapItem = sapInventoryService.getInventoryMap().get(row.Codigo);
-        enrichedData.push({ ...row, Medicamento: sapItem ? sapItem.ItemName : row.Medicamento });
+        const sapItem = inventoryMap.get(row.Codigo);
+        const sapBatches = batchesCache.filter(b => b.ItemCode === row.Codigo && (b.WhsCode === 'FAR' || !b.WhsCode) && b.Quantity > 0);
+        const stockActual = sapItem ? (sapItem.QuantityOnStock ?? sapItem.OnHand ?? 0) : 0;
+
+        enrichedData.push({ 
+          ...row, 
+          Medicamento: sapItem ? sapItem.ItemName : row.Medicamento,
+          StockActual: stockActual,
+          LotesDisponibles: sapBatches.map(b => ({ lote: b.Batch || b.BatchNum, exp: b.ExpirationDate || b.ExpDate, cant: b.Quantity }))
+        });
       }
     }
 
@@ -246,8 +263,7 @@ router.get('/pending-prescriptions', authenticate, authorize(['ADMIN', 'DIRECTOR
  */
 router.post('/pending-prescriptions/hide/:id', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
-    const localDb = getDb();
-    localDb.prepare('INSERT OR IGNORE INTO hidden_prescriptions (pcprit_num) VALUES (?)').run(req.params.id);
+    await pgPool.query('INSERT INTO dw_hidden_prescriptions (pcprit_num) VALUES ($1) ON CONFLICT (pcprit_num) DO NOTHING', [req.params.id]);
     res.json({ ok: true });
   } catch (err) {
     console.error('Error al ocultar receta:', err);
@@ -301,52 +317,249 @@ router.get('/patient-history/:search', authenticate, authorize(['ADMIN', 'DIRECT
 
 /**
  * GET /api/pharmacy/surgical-kits
- * Calculadora Estadística de Kits Quirúrgicos
+ * Calculadora Estadística de Kits Quirúrgicos desde PostgreSQL DW
  */
 router.get('/surgical-kits', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
-    const pool = await connectRemoteDB();
-    const dbRes = await pool.request().query(`
-      SELECT TOP 200
-        ISNULL(c.UDF_Diagnostico_presuntivo, 'CIRUGÍA GENERAL') AS Cirugia,
-        i.ItemCode AS Codigo,
-        ISNULL(i.ItemDescription, 'Material/Medicamento') AS Medicamento,
-        AVG(b.Quantity) AS PromedioPiezas
-      FROM PCPRBT b
-      INNER JOIN PCPRIT i ON b.PCPRITNum = i.PCPRITNum
-      INNER JOIN PCPR p ON i.PCPRNum = p.PCPRNum
-      INNER JOIN PC c ON p.PCNum = c.PCNum
-      WHERE i.WarehouseCode IN ('QX', 'QXCR')
-      AND p.CreatedOn >= DATEADD(month, -6, GETDATE())
-      GROUP BY c.UDF_Diagnostico_presuntivo, i.ItemCode, i.ItemDescription
-      HAVING AVG(b.Quantity) > 0
+    const pgRes = await pgPool.query(`
+      SELECT 
+        cirugia AS "Cirugia",
+        num_cirugias AS "NumCirugias",
+        jsonb_array_length(items_json) AS "ItemsCount",
+        items_json AS "Items"
+      FROM dw_quirofano_kits_cache
+      ORDER BY num_cirugias DESC, jsonb_array_length(items_json) DESC;
     `);
-    
-    const rawData = dbRes.recordset;
-    const kitsBySurgery = {};
-    rawData.forEach(row => {
-      if (!kitsBySurgery[row.Cirugia]) kitsBySurgery[row.Cirugia] = [];
-      const sapItem = sapInventoryService.getInventoryMap().get(row.Codigo);
-      kitsBySurgery[row.Cirugia].push({
+
+    res.json({ ok: true, data: pgRes.rows, totalKits: pgRes.rows.length });
+  } catch (err) {
+    console.error('Error en surgical-kits:', err);
+    res.status(500).json({ ok: false, error: 'Error interno al consultar kits desde DW' });
+  }
+});
+
+/**
+ * GET /api/pharmacy/surgical-events
+ * Agenda y Registro de Eventos Quirúrgicos desde PostgreSQL DW
+ */
+router.get('/surgical-events', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const clampedDays = Math.min(Math.max(days, 1), 365);
+
+    const pgRes = await pgPool.query(`
+      SELECT 
+        e.pcfr_num AS "PCFRNum",
+        e.numero_paciente AS "Numero_Paciente",
+        e.paciente AS "Paciente",
+        e.quirofano AS "Quirofano",
+        e.fecha_inicio AS "FechaInicio",
+        e.fecha_fin AS "FechaFin",
+        e.medicos AS "Medicos",
+        e.procedimientos AS "Procedimiento",
+        COALESCE(
+          json_agg(
+            json_build_object('Codigo', c.item_code, 'Medicamento', c.item_description, 'Cantidad', c.cantidad)
+            ORDER BY c.cantidad DESC
+          ) FILTER (WHERE c.item_code IS NOT NULL), '[]'
+        ) AS "ActualItems"
+      FROM dw_quirofano_eventos e
+      LEFT JOIN dw_quirofano_consumos c ON e.pcfr_num = c.pcfr_num
+      WHERE e.fecha_inicio >= NOW() - ($1 || ' days')::INTERVAL
+      GROUP BY e.pcfr_num, e.numero_paciente, e.paciente, e.quirofano, e.fecha_inicio, e.fecha_fin, e.medicos, e.procedimientos
+      ORDER BY e.fecha_inicio DESC
+      LIMIT 300;
+    `, [clampedDays]);
+
+    const result = pgRes.rows.map(row => ({
+      ...row,
+      ActualItemsCount: (row.ActualItems || []).length
+    }));
+
+    res.json({ ok: true, data: result, days: clampedDays });
+  } catch (err) {
+    console.error('Error en surgical-events:', err);
+    res.status(500).json({ ok: false, error: 'Error interno al consultar eventos quirúrgicos desde DW' });
+  }
+});
+
+/**
+ * GET /api/pharmacy/doctor-variations
+ * Comparativo de consumo de insumos por cirujano agrupado por procedimiento desde PostgreSQL DW
+ */
+router.get('/doctor-variations', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
+  try {
+    const months = parseInt(req.query.months) || 6;
+    const clampedMonths = Math.min(Math.max(months, 1), 24);
+
+    const pgRes = await pgPool.query(`
+      SELECT 
+        e.procedimiento_norm AS "ProcedimientoNorm",
+        e.medicos AS "Medico",
+        c.item_code AS "Codigo",
+        c.item_description AS "Medicamento",
+        AVG(c.cantidad) AS "PromedioPiezas",
+        COUNT(DISTINCT e.pcfr_num) AS "NumCirugias"
+      FROM dw_quirofano_eventos e
+      INNER JOIN dw_quirofano_consumos c ON e.pcfr_num = c.pcfr_num
+      WHERE e.fecha_inicio >= NOW() - ($1 || ' months')::INTERVAL
+      AND e.medicos IS NOT NULL AND TRIM(e.medicos) <> ''
+      AND e.procedimientos IS NOT NULL AND TRIM(e.procedimientos) <> ''
+      GROUP BY e.procedimiento_norm, e.medicos, c.item_code, c.item_description
+      HAVING AVG(c.cantidad) > 0;
+    `, [clampedMonths]);
+
+    const sapInventoryService = require('../services/sapInventory.service');
+    const sapMap = sapInventoryService.getInventoryMap();
+    const result = {};
+
+    pgRes.rows.forEach(row => {
+      const proc = row.ProcedimientoNorm;
+      const med = row.Medico;
+      if (!result[proc]) result[proc] = {};
+      if (!result[proc][med]) {
+        result[proc][med] = {
+          Medico: med,
+          NumCirugias: parseInt(row.NumCirugias),
+          Items: []
+        };
+      }
+      const sapItem = sapMap.get(row.Codigo);
+      const name = (sapItem && sapItem.ItemName && sapItem.ItemName !== 'Material/Medicamento') 
+        ? sapItem.ItemName 
+        : (row.Medicamento && row.Medicamento !== 'Material/Medicamento' ? row.Medicamento : row.Codigo);
+
+      result[proc][med].Items.push({
         Codigo: row.Codigo,
-        Medicamento: sapItem ? sapItem.ItemName : row.Medicamento,
-        PromedioPiezas: row.PromedioPiezas
+        Medicamento: name,
+        PromedioPiezas: Math.round(parseFloat(row.PromedioPiezas) * 10) / 10
       });
     });
 
-    // Sort items within kits and return the top 15 most robust kits
-    const kitsArray = Object.keys(kitsBySurgery)
-      .map(surgery => ({
-        Cirugia: surgery,
-        Items: kitsBySurgery[surgery].sort((a,b) => b.PromedioPiezas - a.PromedioPiezas).slice(0, 20) // up to 20 items per kit
-      }))
-      .sort((a,b) => b.Items.length - a.Items.length)
-      .slice(0, 15);
-
-    res.json({ ok: true, data: kitsArray });
+    res.json({ ok: true, data: result, months: clampedMonths });
   } catch (err) {
-    console.error('Error en surgical-kits:', err);
-    res.status(500).json({ ok: false, error: 'Error interno' });
+    console.error('Error en doctor-variations:', err);
+    res.status(500).json({ ok: false, error: 'Error interno al consultar variaciones por médico desde DW' });
+  }
+});
+
+/**
+ * GET /api/pharmacy/quirofano-inventory
+ * Stock en tiempo real del Almacén Quirófano (QX) y Quirófano Controlados (QXCR)
+ */
+router.get('/quirofano-inventory', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const sapInventoryService = require('../services/sapInventory.service');
+    const cache = sapInventoryService.getInventoryCache();
+    
+    // Filtrar solo insumos con presencia en almacenes QX y QXCR
+    const qxItems = cache.filter(item => item.WhsCode === 'QX' || item.WhsCode === 'QXCR');
+
+    // Calcular estadísticas
+    let totalItems = qxItems.length;
+    let totalStock = 0;
+    let totalValue = 0;
+    let qxcrCount = 0;
+
+    qxItems.forEach(item => {
+      totalStock += item.QuantityOnStock || 0;
+      totalValue += (item.QuantityOnStock || 0) * (item.SalesPrice || 0);
+      if (item.WhsCode === 'QXCR') qxcrCount++;
+    });
+
+    res.json({
+      ok: true,
+      data: qxItems,
+      stats: {
+        totalItems,
+        totalStock,
+        totalValue: Math.round(totalValue * 100) / 100,
+        qxcrCount
+      }
+    });
+  } catch (err) {
+    console.error('Error en quirofano-inventory:', err);
+    res.status(500).json({ ok: false, error: 'Error interno al obtener inventario de Quirófano' });
+  }
+});
+
+/**
+ * GET /api/pharmacy/quirofano-movements
+ * Historial de Movimientos: Salidas a Pacientes y Devoluciones/Retornos en Quirófano (QX/QXCR)
+ */
+router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const type = req.query.type || 'all'; // 'salidas', 'devoluciones', 'all'
+    const days = parseInt(req.query.days) || 30;
+    const clampedDays = Math.min(Math.max(days, 1), 180);
+
+    const pool = await connectRemoteDB();
+    
+    let quantityCondition = '';
+    if (type === 'salidas') {
+      quantityCondition = 'AND b.Quantity > 0';
+    } else if (type === 'devoluciones') {
+      quantityCondition = 'AND b.Quantity < 0';
+    }
+
+    const dbRes = await pool.request().query(`
+      SELECT TOP 500
+        p.PCNum,
+        fr.PCFRNum,
+        ISNULL(NULLIF(TRIM(q.Paciente), ''), 'PACIENTE N/A') AS Paciente,
+        ISNULL(NULLIF(TRIM(q.Quirofano), ''), 'QUIROFANO') AS Quirofano,
+        ISNULL(NULLIF(TRIM(q.Medicos), ''), 'MEDICO N/A') AS Medicos,
+        ISNULL(NULLIF(TRIM(q.Procedimientos), ''), 'PROCEDIMIENTO N/A') AS Procedimiento,
+        p.CreatedOn AS Fecha,
+        i.ItemCode AS Codigo,
+        ISNULL(i.ItemDescription, 'Material/Medicamento') AS Medicamento,
+        b.Quantity AS Cantidad,
+        i.WarehouseCode AS Almacen,
+        CASE WHEN b.Quantity < 0 THEN 'DEVOLUCION' ELSE 'SALIDA_CARGO' END AS TipoMovimiento
+      FROM PCPR p
+      INNER JOIN PCPRIT i ON p.PCPRNum = i.PCPRNum
+      INNER JOIN PCPRBT b ON i.PCPRITNum = b.PCPRITNum
+      LEFT JOIN PC c ON p.PCNum = c.PCNum
+      LEFT JOIN PCFR fr ON c.PCNum = fr.PCNum
+      LEFT JOIN UDR_USOQX q ON fr.PCFRNum = q.PCFRNum
+      WHERE i.WarehouseCode IN ('QX', 'QXCR')
+      AND p.CreatedOn >= DATEADD(day, -${clampedDays}, GETDATE())
+      ${quantityCondition}
+      ORDER BY p.CreatedOn DESC
+    `);
+
+    const movements = dbRes.recordset || [];
+    
+    // Contadores
+    let totalSalidas = 0;
+    let totalDevoluciones = 0;
+    let piezasSalidas = 0;
+    let piezasDevueltas = 0;
+
+    movements.forEach(m => {
+      if (m.Cantidad < 0) {
+        totalDevoluciones++;
+        piezasDevueltas += Math.abs(m.Cantidad);
+      } else {
+        totalSalidas++;
+        piezasSalidas += m.Cantidad;
+      }
+    });
+
+    res.json({
+      ok: true,
+      data: movements,
+      stats: {
+        totalMovimientos: movements.length,
+        totalSalidas,
+        totalDevoluciones,
+        piezasSalidas,
+        piezasDevueltas
+      }
+    });
+  } catch (err) {
+    console.error('Error en quirofano-movements:', err);
+    res.status(500).json({ ok: false, error: 'Error interno al consultar movimientos de Quirófano' });
   }
 });
 

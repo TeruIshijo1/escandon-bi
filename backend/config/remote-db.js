@@ -12,6 +12,8 @@ const dbConfig = {
   server: process.env.REMOTE_DB_SERVER,
   database: process.env.REMOTE_DB_NAME,
   port: parseInt(process.env.REMOTE_DB_PORT) || 1433,
+  connectionTimeout: 30000, // 30 seconds
+  requestTimeout: 90000,    // 90 seconds
   pool: {
     max: 10,
     min: 0,

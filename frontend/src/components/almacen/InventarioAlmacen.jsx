@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
 
 export default function InventarioAlmacen() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState('FAR');
   const [loading, setLoading] = useState(true);
@@ -172,29 +174,48 @@ export default function InventarioAlmacen() {
   return (
     <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
       
-      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '2rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span style={{ fontSize: '2.5rem' }}>📦</span> Inventario General <span style={{ fontSize: '1.25rem', color: '#64748b', fontWeight: 'normal', marginTop: '0.5rem' }}>(SAP)</span>
           </h1>
         </div>
-        <button 
-          onClick={fetchInventory}
-          disabled={loading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: '#0284c7',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontWeight: '600',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.7 : 1,
-            transition: 'background 0.2s'
-          }}
-        >
-          {loading ? 'Sincronizando...' : '↻ Refrescar SAP'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button 
+            onClick={() => navigate('/almacen/reorden')}
+            style={{
+              padding: '0.75rem 1.25rem',
+              background: '#0f172a',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            📋 Punto de Reorden & Pedidos SAP
+          </button>
+          <button 
+            onClick={fetchInventory}
+            disabled={loading}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: '#0284c7',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              transition: 'background 0.2s'
+            }}
+          >
+            {loading ? 'Sincronizando...' : '↻ Refrescar SAP'}
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -226,9 +247,9 @@ export default function InventarioAlmacen() {
           </div>
         </div>
 
-        {/* Card 3 (Interactivo) */}
+        {/* Card 3 (Interactivo - Abre Punto de Reorden) */}
         <div 
-          onClick={() => setShowReplenishmentModal(true)}
+          onClick={() => navigate('/almacen/reorden')}
           style={{ 
             background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
             border: '1px solid #e2e8f0', borderTop: '4px solid #f59e0b', cursor: 'pointer', transition: 'transform 0.2s'
@@ -236,10 +257,10 @@ export default function InventarioAlmacen() {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <h3 style={{ margin: '0 0 0.5rem 0', color: '#64748b', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Artículos Bajo Stock
+              Punto de Reorden & Alertas
             </h3>
             <span style={{ fontSize: '0.75rem', background: '#fef3c7', color: '#d97706', padding: '0.2rem 0.5rem', borderRadius: '9999px', fontWeight: 'bold' }}>
-              VER SUGERENCIAS &rarr;
+              VER MATRIZ &rarr;
             </span>
           </div>
           <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>

@@ -1,6 +1,6 @@
 /**
  * rbac.js — Mapa de permisos por rol
- * Hospital Escandón BI Platform v3.5
+ * Hospital Escandón BI Platform v4.0
  *
  * ROLES:
  *   ADMIN           → Acceso total + auditoría + gestión de usuarios
@@ -36,7 +36,6 @@ export const AREAS = {
 /**
  * ROUTE_PERMISSIONS
  * Mapea cada ruta a los roles que pueden accederla.
- * Para JEFE_AREA y USUARIO_OPERATIVO se valida también el área.
  */
 export const ROUTE_PERMISSIONS = {
   '/':                      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
@@ -51,8 +50,15 @@ export const ROUTE_PERMISSIONS = {
   '/farmacia/cargos-sap':   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
   '/farmacia/resumen-maestro': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
   '/farmacia/inventario':   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
+  '/quirofano':             [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
+  '/quirofano/agenda':      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
+  '/quirofano/kits':        [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
+  '/quirofano/variaciones': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
+  '/quirofano/almacen':     [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
   '/almacen/inventario':    [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
+  '/almacen/reorden':       [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
   '/almacen/traslados':     [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
+  '/almacen/reportes':      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
   '/calidad-datos':         [ROLES.ADMIN, ROLES.DIRECTOR],
   '/estadisticas':          [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
   '/admin/usuarios':        [ROLES.ADMIN],
@@ -63,14 +69,13 @@ export const ROUTE_PERMISSIONS = {
 
 /**
  * ROUTE_TO_PERMISSION
- * Mapea cada ruta de la plataforma al ID de permiso que se asigna en AdminUsuarios.
- * Las rutas de admin no necesitan mapeo porque solo ADMIN accede (sin filtro individual).
+ * Mapea cada ruta de la plataforma al ID de permiso que asigna amendoza en AdminUsuarios.
  */
 export const ROUTE_TO_PERMISSION = {
   '/':                      'home',
   '/dashboard/directivo':   'dashboard-directivo',
   '/dashboard/ocupacion':   'dashboard-ocupacion',
-  '/dashboard/area':        'dashboard-area',   // Se valida adicionalmente por área
+  '/dashboard/area':        'dashboard-area',
   '/estadisticas':          'estadisticas',
   '/siti/dashboard':        'siti-dashboard',
   '/siti/comparativo':      'siti-comparativo',
@@ -81,8 +86,18 @@ export const ROUTE_TO_PERMISSION = {
   '/farmacia/cargos-sap':   'farmacia-cargos-sap',
   '/farmacia/resumen-maestro': 'farmacia-resumen-maestro',
   '/farmacia/inventario':   'farmacia-inventario',
+  '/quirofano':             'quirofano',
+  '/quirofano/agenda':      'quirofano-agenda',
+  '/quirofano/kits':        'quirofano-kits',
+  '/quirofano/variaciones': 'quirofano-variaciones',
+  '/quirofano/almacen':     'quirofano-almacen',
   '/almacen/inventario':    'almacen-inventario',
+  '/almacen/reorden':       'almacen-reorden',
   '/almacen/traslados':     'almacen-traslados',
+  '/almacen/reportes':      'almacen-reportes',
+  '/admin/usuarios':        'admin-usuarios',
+  '/admin/auditoria-log':   'admin-auditoria-log',
+  '/admin/configuracion':   'admin-configuracion',
 };
 
 /**
@@ -106,46 +121,45 @@ export const AREA_TO_PERMISSION = {
 
 /**
  * Verifica si un usuario tiene permiso individual para acceder a una ruta.
- * ADMIN siempre tiene acceso total (no se filtra por permisos individuales).
- * @param {object} user - Objeto de usuario con { role, permisos, area }
+ * REGLA MAESTRA: Solo amendoza tiene acceso total sin requerir permisos otorgados.
+ * Todos los demás usuarios (incluyendo ADMINs) requieren que amendoza les otorgue permiso explícito.
+ * @param {object} user - Objeto de usuario con { role, permisos, area, username }
  * @param {string} path - Ruta a verificar
  * @returns {boolean}
  */
 export function hasPermission(user, path) {
   if (!user) return false;
   
-  // El inicio siempre es visible, los módulos adentro se filtran
+  const username = (user.username || user.Username || '').toLowerCase();
+
+  // REGLA MAESTRA: Solo el usuario amendoza tiene acceso total absoluto a todas las implementaciones sin requerir permisos explícitos
+  if (username === 'amendoza') return true;
+
+  // El inicio siempre es accesible
   if (path === '/') return true;
 
-  // ADMIN siempre tiene acceso total
-  if (user.role === ROLES.ADMIN) return true;
+  // Ruta exclusiva de pruebas de amendoza
+  if (path === '/admin/prueba-sap') return username === 'amendoza';
 
   const permisos = user.permisos || [];
-
-  // Si no tiene permisos asignados, no restringir (compatibilidad con usuarios sin permisos configurados)
-  if (permisos.length === 0) return true;
-
   const permId = ROUTE_TO_PERMISSION[path];
 
-  // Rutas de admin o sin mapeo de permiso → solo se valida por rol
+  // Si la ruta no requiere permiso específico
   if (!permId) return true;
 
   // Para /dashboard/area, verificar permisos de área:
-  // 1) Si el usuario tiene área fija, verificar el permiso de su área
-  // 2) Si no tiene área fija, verificar si tiene CUALQUIER permiso area-*
   if (path === '/dashboard/area') {
     if (user.area) {
       const areaPermId = AREA_TO_PERMISSION[user.area];
-      if (areaPermId) return permisos.includes(areaPermId);
+      if (areaPermId && permisos.includes(areaPermId)) return true;
     }
-    // Sin área fija → permitir si tiene cualquier permiso de área individual
     const allAreaPermIds = Object.values(AREA_TO_PERMISSION);
     const hasAnyAreaPerm = permisos.some(p => allAreaPermIds.includes(p));
     if (hasAnyAreaPerm) return true;
-    // Fallback: verificar si tiene 'dashboard-area' explícito
     return permisos.includes(permId);
   }
 
+  // Absolutamente TODOS los demás usuarios (incluso con rol 'ADMIN') requieren que amendoza les otorgue el permiso explícito
   return permisos.includes(permId);
 }
 
@@ -178,7 +192,7 @@ export const CAPABILITIES = {
     usarAsistenteIA:     true,
   },
   [ROLES.JEFE_AREA]: {
-    verTodosTableros:    false,  // Solo su área
+    verTodosTableros:    false,
     verDashboardDirectivo: false,
     verAuditoria:        false,
     exportarPDF:         true,
@@ -194,7 +208,7 @@ export const CAPABILITIES = {
     verDashboardDirectivo: false,
     verAuditoria:        false,
     exportarPDF:         false,
-    exportarExcel:       true,  // Solo descarga básica
+    exportarExcel:       true,
     gestionarUsuarios:   false,
     verLogAuditoria:     false,
     verMacropanelFinanciero: false,
@@ -216,19 +230,13 @@ export const CAPABILITIES = {
 };
 
 /**
- * Verifica si un usuario puede acceder a una ruta.
- * @param {string} role
- * @param {string} path
- * @param {string|null} userArea
- * @param {string|null} routeArea
- * @returns {boolean}
+ * Verifica si un usuario puede acceder a una ruta por su rol/área.
  */
 export function canAccessRoute(role, path, userArea = null, routeArea = null) {
   const allowed = ROUTE_PERMISSIONS[path];
   if (!allowed) return false;
   if (!allowed.includes(role)) return false;
 
-  // Validación adicional de área para roles restringidos
   if (
     (role === ROLES.JEFE_AREA || role === ROLES.USUARIO_OPERATIVO) &&
     routeArea && userArea &&
@@ -242,22 +250,46 @@ export function canAccessRoute(role, path, userArea = null, routeArea = null) {
 
 /**
  * Verifica si un usuario tiene una capacidad específica.
- * @param {string} role
- * @param {string} capability
- * @returns {boolean}
  */
 export function can(role, capability) {
   return CAPABILITIES[role]?.[capability] ?? false;
 }
 
+export const AREAS_LABELS = {
+  [AREAS.QUIROFANO]:        'Quirófano',
+  [AREAS.IMAGENOLOGIA]:     'Imagenología',
+  [AREAS.URGENCIAS]:        'Urgencias',
+  [AREAS.CUNEROS]:          'Cuneros',
+  [AREAS.UCI]:              'UCI',
+  [AREAS.CONSULTA_EXTERNA]: 'Consulta Externa',
+  [AREAS.CARDIOLOGIA]:      'Cardiología',
+  [AREAS.LABORATORIO]:      'Laboratorio',
+  [AREAS.HOSPITALIZACION]:  'Hospitalización',
+  [AREAS.FARMACIA]:         'Farmacia',
+  [AREAS.FINANZAS]:         'Finanzas',
+  [AREAS.ASEGURADORAS]:     'Aseguradoras',
+  [AREAS.ALMACEN_GENERAL]:  'Almacén General',
+};
+
 /**
- * Menú de navegación filtrado por rol.
- * @param {string} role
- * @param {string|null} area
- * @param {string|null} username
+ * Menú de navegación filtrado por rol y username.
+ * @param {string|object} roleOrUser
+ * @param {string|null} areaArg
+ * @param {string|null} usernameArg
  * @returns {Array}
  */
-export function getNavItems(role, area = null, username = null) {
+export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
+  let role = roleOrUser;
+  let area = areaArg;
+  let username = usernameArg;
+
+  if (roleOrUser && typeof roleOrUser === 'object') {
+    role = roleOrUser.role || roleOrUser.Rol;
+    area = roleOrUser.area || roleOrUser.AreaAsignada;
+    username = roleOrUser.username || roleOrUser.Username;
+  }
+
+  const uName = (username || '').toLowerCase();
   const areaLabel = area ? AREAS_LABELS[area] ?? area : '';
 
   const allItems = [
@@ -323,10 +355,17 @@ export function getNavItems(role, area = null, username = null) {
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
     {
+      section: 'Auditoría',
+      icon:    '📋',
+      label:   'Auditoría: Análisis de Cargos (Cirrus/SAP)',
+      path:    '/auditoria/cargos',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
+    },
+    {
       section: 'Farmacia',
-      icon:    '💊',
-      label:   'Devoluciones',
-      path:    '/farmacia/devoluciones',
+      icon:    '📦',
+      label:   'Inventario (SAP)',
+      path:    '/farmacia/inventario',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
     },
     {
@@ -345,10 +384,38 @@ export function getNavItems(role, area = null, username = null) {
     },
     {
       section: 'Farmacia',
-      icon:    '📦',
-      label:   'Inventario (SAP)',
-      path:    '/farmacia/inventario',
+      icon:    '💊',
+      label:   'Devoluciones',
+      path:    '/farmacia/devoluciones',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
+    },
+    {
+      section: 'Quirófano',
+      icon:    '📅',
+      label:   'Agenda y Proyección',
+      path:    '/quirofano/agenda',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
+    },
+    {
+      section: 'Quirófano',
+      icon:    '🔪',
+      label:   'Kits Quirúrgicos',
+      path:    '/quirofano/kits',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
+    },
+    {
+      section: 'Quirófano',
+      icon:    '👨‍⚕️',
+      label:   'Variaciones por Cirujano',
+      path:    '/quirofano/variaciones',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
+    },
+    {
+      section: 'Quirófano',
+      icon:    '📦',
+      label:   'Almacén Quirófano (QX)',
+      path:    '/quirofano/almacen',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
     },
     {
       section: 'Almacén General',
@@ -356,7 +423,13 @@ export function getNavItems(role, area = null, username = null) {
       label:   'Inventario General (SAP)',
       path:    '/almacen/inventario',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
-      areas:   [AREAS.ALMACEN_GENERAL]
+    },
+    {
+      section: 'Almacén General',
+      icon:    '📋',
+      label:   'Punto de Reorden & Pedidos SAP',
+      path:    '/almacen/reorden',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
     },
     {
       section: 'Almacén General',
@@ -364,7 +437,13 @@ export function getNavItems(role, area = null, username = null) {
       label:   'Traslados (SAP)',
       path:    '/almacen/traslados',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
-      areas:   [AREAS.ALMACEN_GENERAL]
+    },
+    {
+      section: 'Almacén General',
+      icon:    '📑',
+      label:   'Reportes (SAP)',
+      path:    '/almacen/reportes',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
     },
     {
       section: 'Auditoría',
@@ -406,47 +485,29 @@ export function getNavItems(role, area = null, username = null) {
     },
   ];
 
+  // REGLA MAESTRA: Solo el usuario amendoza ve todo en el menú automáticamente.
+  if (uName === 'amendoza') {
+    return allItems;
+  }
+
+  // Filtrar items por rol y username. El filtrado granular por permisos individuales (user.permisos) lo realiza hasPermission(user, item.path).
   return allItems.filter(item => {
-    if (!item.roles.includes(role)) return false;
-    if (item.requiredUsername && item.requiredUsername !== username) return false;
+    if (role !== ROLES.ADMIN && !item.roles.includes(role)) return false;
+    if (item.requiredUsername && item.requiredUsername !== uName) return false;
     return true;
   });
 }
 
-export const AREAS_LABELS = {
-  [AREAS.QUIROFANO]:        'Quirófano',
-  [AREAS.IMAGENOLOGIA]:     'Imagenología',
-  [AREAS.URGENCIAS]:        'Urgencias',
-  [AREAS.CUNEROS]:          'Cuneros',
-  [AREAS.UCI]:              'UCI',
-  [AREAS.CONSULTA_EXTERNA]: 'Consulta Externa',
-  [AREAS.CARDIOLOGIA]:      'Cardiología',
-  [AREAS.LABORATORIO]:      'Laboratorio',
-  [AREAS.HOSPITALIZACION]:  'Hospitalización',
-  [AREAS.FARMACIA]:         'Farmacia',
-  [AREAS.FINANZAS]:         'Finanzas',
-  [AREAS.ASEGURADORAS]:     'Aseguradoras',
-  [AREAS.ALMACEN_GENERAL]:  'Almacén General',
-};
-
 /**
  * getPermissionSections()
- * Genera dinámicamente la lista de secciones asignables como permisos individuales.
- * Se nutre de getNavItems() para que siempre esté sincronizada con la navegación real.
- * Las rutas de Administración se excluyen porque solo ADMIN accede a ellas.
- * Las rutas de área se expanden en 9 tableros individuales.
+ * Genera dinámicamente la lista de secciones asignables como permisos individuales por amendoza en AdminUsuarios.
  */
 export function getPermissionSections() {
-  // Obtenemos todos los items de navegación como ADMIN (para ver el máximo)
-  const navItems = getNavItems(ROLES.ADMIN, null, null);
-
-  // Filtrar secciones de administración (ADMIN tiene acceso implícito total)
-  const permItems = navItems.filter(item => item.section !== 'Administración');
-
+  const navItems = getNavItems({ username: 'amendoza', role: ROLES.ADMIN });
   const sections = [];
   const seen = new Set();
 
-  for (const item of permItems) {
+  for (const item of navItems) {
     const permId = ROUTE_TO_PERMISSION[item.path];
     if (!permId) continue;
 
@@ -489,6 +550,7 @@ export function getPermissionSections() {
     { id: 'ia-busqueda-insumos',     name: 'Búsqueda de Insumos',      icon: '💊' },
     { id: 'ia-busqueda-financiera',  name: 'Datos Financieros',        icon: '💰' },
     { id: 'ia-farmacia',             name: 'Módulo de Farmacia',       icon: '⚕️' },
+    { id: 'ia-quirofano',            name: 'Módulo de Quirófano',      icon: '🔪' },
   ];
 
   for (const iaPerm of IA_PERMISSIONS) {

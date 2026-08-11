@@ -14,6 +14,8 @@ const { connectRemoteDB } = require('../config/remote-db');
 const sapService = require('../services/sap.service');
 const fs = require('fs');
 const path = require('path');
+const { splitDateRange } = require('../utils/dashboard-helper');
+const { pool: pgPool } = require('../config/pg-db');
 
 // Asegurar que las consultas de analíticas de Quirófano de SAP B1 existan al arrancar
 const initSapQueries = async () => {
@@ -763,25 +765,61 @@ router.get('/financiero-nativo/cuenta/:pcNum', authenticate, authorize(['ADMIN',
       return res.json({ success: true, data: [] });
     }
 
-    const pool = await connectRemoteDB();
-    const result = await pool.request()
-      .input('pcNum', parseInt(pcNum, 10))
-      .query(`
+    const pcNumInt = parseInt(pcNum, 10);
+    let records = [];
+
+    // 1. Intentar buscar en PostgreSQL DW (local)
+    try {
+      const pgRes = await pgPool.query(`
         SELECT 
-          PCITNum,
-          ChargeDate,
-          SUCode,
-          ItemCode,
-          ItemDescription,
-          Quantity,
-          UnitPrice,
-          (Quantity * UnitPrice) as Total
-        FROM PCIT
-        WHERE PCNum = @pcNum
-        ORDER BY ChargeDate ASC
-      `);
+          pcitnum as "PCITNum",
+          chargedate as "ChargeDate",
+          sucode as "SUCode",
+          itemcode as "ItemCode",
+          itemdescription as "ItemDescription",
+          quantity as "Quantity",
+          unitprice as "UnitPrice",
+          (quantity * unitprice) as "Total"
+        FROM dw_vertical_pcit
+        WHERE pcnum = $1
+        ORDER BY chargedate ASC
+      `, [pcNumInt]);
       
-    const records = result.recordset;
+      records = pgRes.rows.map(row => ({
+        PCITNum: Number(row.PCITNum),
+        ChargeDate: row.ChargeDate,
+        SUCode: row.SUCode,
+        ItemCode: row.ItemCode,
+        ItemDescription: row.ItemDescription,
+        Quantity: Number(row.Quantity),
+        UnitPrice: Number(row.UnitPrice),
+        Total: Number(row.Total)
+      }));
+    } catch (pgErr) {
+      console.warn('[PCIT pg lookup warning]', pgErr.message);
+    }
+
+    // 2. Si no hay registros locales, consultar SQL Server (en vivo)
+    if (records.length === 0) {
+      const pool = await connectRemoteDB();
+      const result = await pool.request()
+        .input('pcNum', pcNumInt)
+        .query(`
+          SELECT 
+            PCITNum,
+            ChargeDate,
+            SUCode,
+            ItemCode,
+            ItemDescription,
+            Quantity,
+            UnitPrice,
+            (Quantity * UnitPrice) as Total
+          FROM PCIT
+          WHERE PCNum = @pcNum
+          ORDER BY ChargeDate ASC
+        `);
+      records = result.recordset;
+    }
     
     // Obtener los códigos de artículo distintos que no tienen descripción
     const missingDescItems = [...new Set(records.filter(r => !r.ItemDescription && r.ItemCode).map(r => r.ItemCode))];
@@ -826,10 +864,6 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
   try {
     let { startDate, endDate, search } = req.query;
     if (endDate && endDate.length === 10) endDate += ' 23:59:59';
-    const pool = await connectRemoteDB();
-    const request = pool.request();
-
-    let whereClauses = ["1=1"];
 
     // HARD CUTOFF: Ignorar datos antes del 1 de abril de 2026 (periodo de migración con errores)
     const MIN_DATE = '2026-04-01';
@@ -848,47 +882,83 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       });
     }
 
-    if (startDate) {
-      // Forzar que la fecha de inicio no sea anterior a MIN_DATE
-      const effectiveStartDate = startDate < MIN_DATE ? MIN_DATE : startDate;
-      whereClauses.push("PC.Date >= @startDate");
-      request.input('startDate', effectiveStartDate);
-    } else {
-      // Default: últimos 6 meses, pero garantizando que no rebase MIN_DATE
-      whereClauses.push(`PC.Date >= CASE WHEN DATEADD(month, -6, GETDATE()) < '${MIN_DATE}' THEN '${MIN_DATE}' ELSE DATEADD(month, -6, GETDATE()) END`);
+    const effectiveStartDate = !startDate ? MIN_DATE : (startDate < MIN_DATE ? MIN_DATE : startDate);
+    const effectiveEndDate = endDate || new Date().toISOString().split('T')[0] + ' 23:59:59';
+
+    const split = splitDateRange(effectiveStartDate, effectiveEndDate);
+    let rawData = [];
+
+    // 1. Obtener histórico desde PostgreSQL local
+    if (split.pgStart && split.pgEnd) {
+      let pgWhere = ["entrydate >= $1", "entrydate <= $2"];
+      let params = [split.pgStart, split.pgEnd + ' 23:59:59'];
+      
+      if (search) {
+        pgWhere.push("(fullname ILIKE $3 OR CAST(pcnum AS VARCHAR) ILIKE $3)");
+        params.push(`%${search}%`);
+      }
+      
+      const pgRes = await pgPool.query(`
+        SELECT 
+          pcnum as "PCNum",
+          pc_st as "PC_ST",
+          medicaldischargedate as "MedicalDischargeDate",
+          entrydate as "EntryDate",
+          total as "Total",
+          profit as "Profit",
+          subtotalcost as "SubtotalCost",
+          balance as "Balance",
+          fullname as "FullName"
+        FROM dw_vertical_pc
+        WHERE ${pgWhere.join(' AND ')}
+      `, params);
+      
+      rawData = rawData.concat(pgRes.rows.map(row => ({
+        PCNum: Number(row.PCNum),
+        PC_ST: row.PC_ST,
+        MedicalDischargeDate: row.MedicalDischargeDate,
+        EntryDate: row.EntryDate,
+        Total: Number(row.Total),
+        Profit: Number(row.Profit),
+        SubtotalCost: Number(row.SubtotalCost),
+        Balance: Number(row.Balance),
+        FullName: row.FullName
+      })));
     }
 
-    if (endDate) {
-      whereClauses.push("PC.Date <= @endDate");
-      request.input('endDate', endDate);
-    } else {
-      whereClauses.push("PC.Date <= GETDATE()");
+    // 2. Obtener lo nuevo (del día de hoy) desde SQL Server
+    if (split.hasToday && split.remoteStart) {
+      const pool = await connectRemoteDB();
+      const request = pool.request();
+      
+      let whereClauses = ["PC.Date >= @startDate", "PC.Date <= @endDate"];
+      request.input('startDate', split.remoteStart);
+      request.input('endDate', split.remoteEnd || new Date());
+      
+      if (search) {
+        whereClauses.push("(PT.FullName LIKE @search OR CAST(PC.PCNum AS VARCHAR) LIKE @search)");
+        request.input('search', `%${search}%`);
+      }
+
+      const queryStr = `
+        SELECT 
+          PC.PCNum,
+          PC.PC_ST,
+          PC.MedicalDischargeDate,
+          PC.Date as EntryDate,
+          PC.Total,
+          PC.Profit,
+          PC.SubtotalCost,
+          PC.Balance,
+          PT.FullName
+        FROM PC
+        LEFT JOIN PT ON PC.PTNum = PT.PTNum
+        WHERE ${whereClauses.join(' AND ')}
+      `;
+      
+      const result = await request.query(queryStr);
+      rawData = rawData.concat(result.recordset);
     }
-
-    if (search) {
-      whereClauses.push("(PT.FullName LIKE @search OR CAST(PC.PCNum AS VARCHAR) LIKE @search)");
-      request.input('search', `%${search}%`);
-    }
-
-    const queryStr = `
-      SELECT 
-        PC.PCNum,
-        PC.PC_ST,
-        PC.MedicalDischargeDate,
-        PC.Date as EntryDate,
-        PC.Total,
-        PC.Profit,
-        PC.SubtotalCost,
-        PC.Balance,
-        PT.FullName
-      FROM PC
-      LEFT JOIN PT ON PC.PTNum = PT.PTNum
-      WHERE ${whereClauses.join(' AND ')}
-    `;
-    
-    const result = await request.query(queryStr);
-
-    const rawData = result.recordset;
     const audit = {
       totalCrudo: rawData.length,
       valido: 0,
@@ -1102,39 +1172,64 @@ router.get('/eficiencia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
   try {
     let { startDate, endDate } = req.query;
     if (endDate && endDate.length === 10) endDate += ' 23:59:59';
-    const pool = await connectRemoteDB();
-    const request = pool.request();
 
     let whereClauses = ["1=1"];
+    let params = [];
+    let paramIndex = 1;
 
     if (startDate) {
-      whereClauses.push("FechaPeriodo >= @startDate");
-      request.input('startDate', startDate);
+      whereClauses.push(`fechaperiodo >= $${paramIndex++}`);
+      params.push(startDate);
     }
     if (endDate) {
-      whereClauses.push("FechaPeriodo <= @endDate");
-      request.input('endDate', endDate);
+      whereClauses.push(`fechaperiodo <= $${paramIndex++}`);
+      params.push(endDate);
     }
 
     const queryStr = `
-      SELECT ${(!startDate && !endDate) ? 'TOP 6' : ''}
-        Anio, Mes,
-        CONVERT(varchar(7), FechaPeriodo, 120) AS monthStr,
-        CamasOcupadas, QuirofanosActivos, Urgencias, Hospitalizacion,
-        TriajeMin, TriajeMeta, TriajeOutliers,
-        LaboratorioMin, LaboratorioMeta, LaboratorioOutliers,
-        ImagenologiaMin, ImagenologiaMeta, ImagenologiaOutliers,
-        EgresoHoras, EgresoMeta,
-        EstadoTriaje, EstadoLaboratorio, EstadoImagenologia, EstadoEgreso
-      FROM UDR_BI_INDICADORES_OPERATIVOS
+      SELECT 
+        anio as "Anio", mes as "Mes",
+        TO_CHAR(fechaperiodo, 'YYYY-MM') AS "monthStr",
+        camasocupadas as "CamasOcupadas", quirofanosactivos as "QuirofanosActivos", 
+        urgencias as "Urgencias", hospitalizacion as "Hospitalizacion",
+        triajemin as "TriajeMin", triajemeta as "TriajeMeta", triajeoutliers as "TriajeOutliers",
+        laboratoriomin as "LaboratorioMin", laboratoriometa as "LaboratorioMeta", laboratoriooutliers as "LaboratorioOutliers",
+        imagenologiamin as "ImagenologiaMin", imagenologiameta as "ImagenologiaMeta", imagenologiaoutliers as "ImagenologiaOutliers",
+        egresohoras as "EgresoHoras", egresometa as "EgresoMeta",
+        estadotriaje as "EstadoTriaje", estadolaboratorio as "EstadoLaboratorio", estadoimagenologia as "EstadoImagenologia", estadoegreso as "EstadoEgreso"
+      FROM dw_vertical_indicadores_operativos
       WHERE ${whereClauses.join(' AND ')}
-      ORDER BY FechaPeriodo DESC
+      ORDER BY fechaperiodo DESC
+      ${(!startDate && !endDate) ? 'LIMIT 6' : ''}
     `;
 
-    const result = await request.query(queryStr);
-
+    const pgRes = await pgPool.query(queryStr, params);
+    
     // Invertir para que el orden cronológico sea ASC
-    const data = result.recordset.reverse();
+    const data = pgRes.rows.map(row => ({
+      Anio: Number(row.Anio),
+      Mes: Number(row.Mes),
+      monthStr: row.monthStr,
+      CamasOcupadas: Number(row.CamasOcupadas),
+      QuirofanosActivos: Number(row.QuirofanosActivos),
+      Urgencias: Number(row.Urgencias),
+      Hospitalizacion: Number(row.Hospitalizacion),
+      TriajeMin: Number(row.TriajeMin),
+      TriajeMeta: Number(row.TriajeMeta),
+      TriajeOutliers: Number(row.TriajeOutliers),
+      LaboratorioMin: Number(row.LaboratorioMin),
+      LaboratorioMeta: Number(row.LaboratorioMeta),
+      LaboratorioOutliers: Number(row.LaboratorioOutliers),
+      ImagenologiaMin: Number(row.ImagenologiaMin),
+      ImagenologiaMeta: Number(row.ImagenologiaMeta),
+      ImagenologiaOutliers: Number(row.ImagenologiaOutliers),
+      EgresoHoras: Number(row.EgresoHoras),
+      EgresoMeta: Number(row.EgresoMeta),
+      EstadoTriaje: row.EstadoTriaje,
+      EstadoLaboratorio: row.EstadoLaboratorio,
+      EstadoImagenologia: row.EstadoImagenologia,
+      EstadoEgreso: row.EstadoEgreso
+    })).reverse();
     
     // Calcular promedios generales de los ultimos meses para los KPIs
     let totalCamas = 0, totalQuirofanos = 0, totalUrgencias = 0, totalHospitalizacion = 0;
@@ -1147,7 +1242,7 @@ router.get('/eficiencia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
 
     const kpis = {
       camasOcupadas: data.length ? Math.round(totalCamas / data.length) : 0,
-      quirofanosActivos: data.length ? Math.round(totalQuirofanos / data.length) : 0,
+      quirofanosactivos: data.length ? Math.round(totalQuirofanos / data.length) : 0,
       urgencias: totalUrgencias,
       hospitalizacion: totalHospitalizacion
     };
@@ -1161,59 +1256,49 @@ router.get('/eficiencia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
     });
   } catch (err) {
     console.error('Error consultando Eficiencia Operativa:', err);
-    res.status(500).json({ ok: false, error: 'Error de conexión con la base de datos remota.' });
+    res.status(500).json({ ok: false, error: 'Error al consultar indicadores de eficiencia.' });
   }
 });
 
-/**
- * GET /api/dashboard/censo-camas
- * Retorna el censo de camas en tiempo real cruzando V_MRPT y PC
- */
 router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
-    const pool = await connectRemoteDB();
-
-    // 1. Obtener listado maestro de camas reales (excluyendo virtuales)
-    const bedsResult = await pool.request().query(`
-      SELECT DISTINCT RoomCode, RoomName 
-      FROM V_MRPT 
-      WHERE (RoomName LIKE '%CAMA%' OR RoomCode LIKE 'CUBUTI%') 
-        AND RoomName IS NOT NULL
-        AND RoomName NOT LIKE '%VIRTUAL%'
-        AND RoomName NOT LIKE '%VIRT%'
-        AND RoomCode NOT LIKE '%VIRT%'
+    // 1. Obtener listado maestro de camas reales (excluyendo virtuales) de PostgreSQL (local)
+    const bedsResult = await pgPool.query(`
+      SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName" 
+      FROM dw_vertical_pt 
+      WHERE (roomname LIKE '%CAMA%' OR roomcode LIKE 'CUBUTI%') 
+        AND roomname IS NOT NULL
+        AND roomname NOT LIKE '%VIRTUAL%'
+        AND roomname NOT LIKE '%VIRT%'
+        AND roomcode NOT LIKE '%VIRT%'
     `);
-    const allBeds = bedsResult.recordset;
+    const allBeds = bedsResult.rows;
 
-    // 2. Obtener camas ocupadas actualmente (última cama asignada sin virtuales)
-    const occupiedResult = await pool.request().query(`
-      WITH CTE AS (
-        SELECT 
-          V.RoomCode, 
-          V.FullName AS Paciente, 
-          PR.FullName AS Medico,
-          ROW_NUMBER() OVER(PARTITION BY V.RoomCode ORDER BY PC.Date DESC) as rn
-        FROM PC
-        JOIN V_MRPT V ON PC.PCNum = V.ControllerKey AND V.ControllerName = 'PC' AND (V.RoomName LIKE '%CAMA%' OR V.RoomCode LIKE 'CUBUTI%')
-        LEFT JOIN PR ON PC.PRNum = PR.PRNum
-        WHERE PC.PC_ST = 'OP' 
-          AND PC.PCType IN ('IP', 'ER')
-          AND PC.MedicalDischargeDate IS NULL
-          AND V.RoomCode IS NOT NULL
-          AND V.RoomName NOT LIKE '%VIRTUAL%'
-          AND V.RoomName NOT LIKE '%VIRT%'
-          AND V.RoomCode NOT LIKE '%VIRT%'
-      )
-      SELECT RoomCode, Paciente, Medico
-      FROM CTE 
-      WHERE rn = 1
+    // 2. Obtener camas ocupadas actualmente (en vivo de SQL Server con join indexado rápido)
+    const mssqlPool = await connectRemoteDB();
+    const occupiedResult = await mssqlPool.request().query(`
+      SELECT 
+        v.RoomCode, 
+        pt.FullName AS Paciente, 
+        pr.FullName AS Medico
+      FROM PC pc
+      INNER JOIN PT pt ON pc.PTNum = pt.PTNum
+      LEFT JOIN V_MRPT v ON pt.PTNum = v.PTNum
+      LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
+      WHERE pc.PC_ST = 'OP' 
+        AND pc.PCType IN ('IP', 'ER')
+        AND pc.MedicalDischargeDate IS NULL
+        AND v.RoomCode IS NOT NULL
+        AND v.RoomName NOT LIKE '%VIRTUAL%'
+        AND v.RoomName NOT LIKE '%VIRT%'
+        AND v.RoomCode NOT LIKE '%VIRT%'
     `);
     const occupied = occupiedResult.recordset;
 
     // 3. Cruzar datos
     const bedsMap = {};
     allBeds.forEach(b => {
-      bedsMap[b.RoomCode] = { ...b, Estado: 'LIBRE', Paciente: null, Medico: null };
+      bedsMap[b.RoomCode] = { RoomCode: b.RoomCode, RoomName: b.RoomName, Estado: 'LIBRE', Paciente: null, Medico: null };
     });
 
     occupied.forEach(o => {
@@ -1222,7 +1307,7 @@ router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
         bedsMap[o.RoomCode].Paciente = o.Paciente;
         bedsMap[o.RoomCode].Medico = o.Medico;
       } else {
-        // En caso de que el paciente esté en una cama que no fue capturada por el filtro LIKE '%CAMA%'
+        // Cama encontrada pero no capturada por el filtro inicial
         bedsMap[o.RoomCode] = { 
           RoomCode: o.RoomCode, 
           RoomName: o.RoomCode, 
@@ -1266,67 +1351,79 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
     if (endDate === 'undefined' || endDate === 'null' || endDate === '') endDate = null;
     if (search === 'undefined' || search === 'null' || search === '') search = null;
 
-    const pool = await connectRemoteDB();
-    const request = pool.request();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const effectiveStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const effectiveEndDate = endDate || todayStr + ' 23:59:59';
 
-    let whereClauses = ["PC.PCType = 'ER'"];
+    const split = splitDateRange(effectiveStartDate, effectiveEndDate);
 
-    if (startDate) {
-      whereClauses.push("PC.Date >= @startDate");
-      request.input('startDate', startDate);
-    } else {
-      // Por defecto ultimo mes
-      whereClauses.push("PC.Date >= DATEADD(day, -30, GETDATE())");
+    // 1. Obtener ingresos de servicios (sapData)
+    let sapData = [];
+    if (split.pgStart && split.pgEnd) {
+      const pgRes = await pgPool.query(`
+        SELECT 
+          medico_solicitante as "Medico_Solicitante",
+          medico_tratante as "Medico_Tratante",
+          descripcion_del_articulo as "DESCRIPCION_DEL_ARTICULO",
+          total_cobrado as "TOTAL_COBRADO"
+        FROM dw_vertical_cuentas_servicios
+        WHERE unidad_de_servicio IN ('URG1', 'URG2')
+          AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+      
+      sapData = sapData.concat(pgRes.rows.map(row => ({
+        Medico_Solicitante: row.Medico_Solicitante,
+        Medico_Tratante: row.Medico_Tratante,
+        DESCRIPCION_DEL_ARTICULO: row.DESCRIPCION_DEL_ARTICULO,
+        TOTAL_COBRADO: Number(row.TOTAL_COBRADO)
+      })));
     }
-
-    if (endDate) {
-      whereClauses.push("PC.Date <= @endDate");
-      request.input('endDate', endDate);
-    } else {
-      whereClauses.push("PC.Date <= GETDATE()");
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const request = mssqlPool.request();
+      let whereSAP = ["UNIDAD_DE_SERVICIO IN ('URG1', 'URG2')", "FECHA_DE_CARGO >= @startDate", "FECHA_DE_CARGO <= @endDate"];
+      request.input('startDate', split.remoteStart);
+      request.input('endDate', split.remoteEnd || new Date());
+      
+      const mssqlRes = await request.query(`
+        SELECT Medico_Solicitante, Medico_Tratante, DESCRIPCION_DEL_ARTICULO, TOTAL_COBRADO
+        FROM UDR_CUENTAS_SERVICIOS
+        WHERE ${whereSAP.join(' AND ')}
+      `);
+      sapData = sapData.concat(mssqlRes.recordset);
     }
-
-    if (search) {
-      whereClauses.push("(PC.PCNum LIKE @search OR PC.PTNum IN (SELECT PTNum FROM PT WHERE FullName LIKE @search))");
-      request.input('search', `%${search}%`);
-    }
-
-    // SAP Revenue Query (VERTICAL / OPERATIVO)
-    let whereSAP = ["UNIDAD_DE_SERVICIO IN ('URG1', 'URG2')"];
-    if (startDate) whereSAP.push("FECHA_DE_CARGO >= @startDate");
-    if (endDate) whereSAP.push("FECHA_DE_CARGO <= @endDate");
-
-    const sapStr = `
-      SELECT 
-        Medico_Solicitante,
-        Medico_Tratante,
-        DESCRIPCION_DEL_ARTICULO,
-        TOTAL_COBRADO
-      FROM UDR_CUENTAS_SERVICIOS
-      WHERE ${whereSAP.join(' AND ')}
-    `;
-    const resSAP = await request.query(sapStr);
-    const sapData = resSAP.recordset;
 
     // Calcular KPIs Financieros (VERTICAL)
     const ingresosTotales = sapData.reduce((acc, curr) => acc + (curr.TOTAL_COBRADO || 0), 0);
     
     // Cruce con SAP Contabilidad Oficial
     let ingresosSAPTotales = 0;
-    try {
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const todayStr = now.toISOString().split('T')[0];
-      const sd = startDate ? new Date(startDate).toISOString().split('T')[0] : thirtyDaysAgo;
-      const ed = endDate ? new Date(endDate).toISOString().split('T')[0] : todayStr;
-      const sapSLRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sd}'&endDate='${ed}'`);
-      if (sapSLRes && sapSLRes.length > 0) {
-        ingresosSAPTotales = sapSLRes
-          .filter(row => row.ItmsGrpCod === 104) // 104 = AMBULANCIAS / URGENCIAS
-          .reduce((acc, row) => acc + (row.Total || 0), 0);
+    
+    // Histórico SAP de PostgreSQL
+    if (split.pgStart && split.pgEnd) {
+      const pgSapRes = await pgPool.query(`
+        SELECT SUM(total) as total
+        FROM dw_sap_ingresos_grupos
+        WHERE itmsgrpcod = 104 AND docdate >= $1 AND docdate <= $2
+      `, [split.pgStart, split.pgEnd]);
+      ingresosSAPTotales += Number(pgSapRes.rows[0].total || 0);
+    }
+    
+    // Hoy live de SAP
+    if (split.hasToday && split.remoteStart) {
+      try {
+        const sdStr = split.remoteStart.substring(0, 10);
+        const edStr = (split.remoteEnd || todayStr).substring(0, 10);
+        const sapSLRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sdStr}'&endDate='${edStr}'`);
+        if (sapSLRes && sapSLRes.length > 0) {
+          const todayTotal = sapSLRes
+            .filter(row => row.ItmsGrpCod === 104) // 104 = AMBULANCIAS / URGENCIAS
+            .reduce((acc, row) => acc + (row.Total || 0), 0);
+          ingresosSAPTotales += todayTotal;
+        }
+      } catch (e) {
+        console.error('[SAP] Error al consultar ingresos contabilizados para Urgencias hoy:', e.message);
       }
-    } catch (e) {
-      console.error('[SAP] Error al consultar ingresos contabilizados para Urgencias:', e.error || e);
     }
     
     // Top Médicos
@@ -1353,23 +1450,67 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       .sort((a, b) => b.ingresos - a.ingresos)
       .slice(0, 10);
 
-    // 1. Obtener datos detallados
-    const queryStr = `
-      SELECT TOP 500
-        PC.PCNum,
-        PC.Date as Ingreso,
-        PC.MedicalDischargeDate as Egreso,
-        PC.PC_ST as Estatus,
-        PT.FullName as Paciente,
-        DATEDIFF(minute, PC.Date, PC.MedicalDischargeDate) as MinutosEstancia
-      FROM PC
-      LEFT JOIN PT ON PC.PTNum = PT.PTNum
-      WHERE ${whereClauses.join(' AND ')}
-      ORDER BY PC.Date DESC
-    `;
+    // 2. Obtener datos detallados
+    let data = [];
+    if (split.pgStart && split.pgEnd) {
+      let pgWhere = ["pc.pctype = 'ER'", "pc.entrydate >= $1", "pc.entrydate <= $2"];
+      let params = [split.pgStart, split.pgEnd + ' 23:59:59'];
+      if (search) {
+        pgWhere.push("(pc.pcnum = $3 OR pt.fullname ILIKE $4)");
+        params.push(parseInt(search) || 0, `%${search}%`);
+      }
+      
+      const pgRes = await pgPool.query(`
+        SELECT 
+          pc.pcnum as "PCNum",
+          pc.entrydate as "Ingreso",
+          pc.medicaldischargedate as "Egreso",
+          pc.pc_st as "Estatus",
+          pt.fullname as "Paciente",
+          EXTRACT(EPOCH FROM (pc.medicaldischargedate - pc.entrydate))/60 as "MinutosEstancia"
+        FROM dw_vertical_pc pc
+        LEFT JOIN dw_vertical_pt pt ON pc.ptnum = pt.ptnum
+        WHERE ${pgWhere.join(' AND ')}
+        ORDER BY pc.entrydate DESC
+        LIMIT 500
+      `, params);
+      
+      data = data.concat(pgRes.rows.map(row => ({
+        PCNum: Number(row.PCNum),
+        Ingreso: row.Ingreso,
+        Egreso: row.Egreso,
+        Estatus: row.Estatus,
+        Paciente: row.Paciente,
+        MinutosEstancia: row.MinutosEstancia ? Math.round(Number(row.MinutosEstancia)) : null
+      })));
+    }
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const request = mssqlPool.request();
+      let whereClauses = ["PC.PCType = 'ER'", "PC.Date >= @startDate", "PC.Date <= @endDate"];
+      request.input('startDate', split.remoteStart);
+      request.input('endDate', split.remoteEnd || new Date());
+      
+      if (search) {
+        whereClauses.push("(PC.PCNum LIKE @search OR PC.PTNum IN (SELECT PTNum FROM PT WHERE FullName LIKE @search))");
+        request.input('search', `%${search}%`);
+      }
 
-    const result = await request.query(queryStr);
-    const data = result.recordset;
+      const mssqlRes = await request.query(`
+        SELECT TOP 500
+          PC.PCNum,
+          PC.Date as Ingreso,
+          PC.MedicalDischargeDate as Egreso,
+          PC.PC_ST as Estatus,
+          PT.FullName as Paciente,
+          DATEDIFF(minute, PC.Date, PC.MedicalDischargeDate) as MinutosEstancia
+        FROM PC
+        LEFT JOIN PT ON PC.PTNum = PT.PTNum
+        WHERE ${whereClauses.join(' AND ')}
+        ORDER BY PC.Date DESC
+      `);
+      data = data.concat(mssqlRes.recordset);
+    }
 
     // Calcular KPIs
     const atenciones = data.length;
@@ -1435,116 +1576,244 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
   }
 });
 
-/**
- * GET /api/dashboard/eficacia-nativo
- * Retorna datos de UDR_BI_PRODUCTIVIDAD_MEDICOS y V_UDR_CONSULTA_DIA
- */
 router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     let { startDate, endDate, search, especialidad } = req.query;
     if (endDate && endDate.length === 10) endDate += ' 23:59:59';
-    const pool = await connectRemoteDB();
-    const request = pool.request();
 
-    let whereProd = ["1=1"];
-    let whereCons = ["1=1"];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const effectiveStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const effectiveEndDate = endDate || todayStr + ' 23:59:59';
 
-    if (startDate) {
-      whereProd.push("Fecha >= @startDate");
-      whereCons.push("Fecha >= @startDate");
-      request.input('startDate', startDate);
+    const split = splitDateRange(effectiveStartDate, effectiveEndDate);
+
+    // --- 1. Obtener datos de Productividad Médica ---
+    let prodData = [];
+    
+    // Histórico de PostgreSQL
+    if (split.pgStart && split.pgEnd) {
+      let pgWhere = ["fecha >= $1", "fecha <= $2"];
+      let params = [split.pgStart, split.pgEnd];
+      let paramIndex = 3;
+      
+      if (search) {
+        pgWhere.push(`medico ILIKE $${paramIndex++}`);
+        params.push(`%${search}%`);
+      }
+      if (especialidad) {
+        pgWhere.push(`especialidad = $${paramIndex++}`);
+        params.push(especialidad);
+      }
+      
+      const pgRes = await pgPool.query(`
+        SELECT medico as "Medico", especialidad as "Especialidad", fecha as "Fecha", 
+               primeras as "Primeras", subsecuentes as "Subsecuentes", totalatenciones as "TotalAtenciones"
+        FROM dw_vertical_productividad_medicos
+        WHERE ${pgWhere.join(' AND ')}
+      `, params);
+      
+      prodData = prodData.concat(pgRes.rows.map(r => ({
+        Medico: r.Medico,
+        Especialidad: r.Especialidad,
+        Fecha: r.Fecha,
+        Primeras: Number(r.Primeras),
+        Subsecuentes: Number(r.Subsecuentes),
+        TotalAtenciones: Number(r.TotalAtenciones)
+      })));
     }
-    if (endDate) {
-      whereProd.push("Fecha <= @endDate");
-      whereCons.push("Fecha <= @endDate");
-      request.input('endDate', endDate);
+    
+    // Hoy live de SQL Server
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const request = mssqlPool.request();
+      let whereProd = ["Fecha >= @startDate", "Fecha <= @endDate"];
+      request.input('startDate', split.remoteStart);
+      request.input('endDate', split.remoteEnd || new Date());
+      
+      if (search) {
+        whereProd.push("Medico LIKE @search");
+        request.input('search', `%${search}%`);
+      }
+      if (especialidad) {
+        whereProd.push("Especialidad = @especialidad");
+        request.input('especialidad', especialidad);
+      }
+      
+      const mssqlRes = await request.query(`
+        SELECT Medico, Especialidad, Fecha, Primeras, Subsecuentes, TotalAtenciones
+        FROM UDR_BI_PRODUCTIVIDAD_MEDICOS
+        WHERE ${whereProd.join(' AND ')}
+      `);
+      prodData = prodData.concat(mssqlRes.recordset);
     }
-    if (search) {
-      whereProd.push("Medico LIKE @search");
-      whereCons.push("(Medico LIKE @search OR Paciente LIKE @search)");
-      request.input('search', `%${search}%`);
+
+    // --- 2. Obtener datos de Consultas del Día ---
+    let consData = [];
+    
+    // Histórico de PostgreSQL
+    if (split.pgStart && split.pgEnd) {
+      let pgWhere = ["fecha >= $1", "fecha <= $2"];
+      let params = [split.pgStart, split.pgEnd];
+      let paramIndex = 3;
+      
+      if (search) {
+        pgWhere.push(`(medico ILIKE $${paramIndex} OR paciente ILIKE $${paramIndex})`);
+        params.push(`%${search}%`);
+        paramIndex++;
+      }
+      if (especialidad) {
+        pgWhere.push(`msdescription_es = $${paramIndex++}`);
+        params.push(especialidad);
+      }
+      
+      const pgRes = await pgPool.query(`
+        SELECT numero_cita as "Numero_Cita", folio_medico as "Folio_Medico", medico as "Medico", 
+               msdescription_es as "Especialidad", fecha as "Fecha", hora as "Hora", 
+               numero_paciente as "Numero_Paciente", paciente as "Paciente", edad_anios as "Edad_Anios", 
+               telefono_1 as "Telefono_1", celular_2 as "Celular_2", estatus_orden_venta as "Estatus_Orden_Venta", 
+               articulo as "Articulo"
+        FROM dw_vertical_consulta_dia
+        WHERE ${pgWhere.join(' AND ')}
+      `, params);
+      
+      consData = consData.concat(pgRes.rows.map(r => ({
+        Numero_Cita: Number(r.Numero_Cita),
+        Folio_Medico: Number(r.Folio_Medico),
+        Medico: r.Medico,
+        Especialidad: r.Especialidad,
+        Fecha: r.Fecha,
+        Hora: r.Hora,
+        Numero_Paciente: Number(r.Numero_Paciente),
+        Paciente: r.Paciente,
+        Edad_Anios: r.Edad_Anios,
+        Telefono_1: r.Telefono_1,
+        Celular_2: r.Celular_2,
+        Estatus_Orden_Venta: r.Estatus_Orden_Venta,
+        Articulo: r.Articulo
+      })));
     }
-    if (especialidad) {
-      whereProd.push("Especialidad = @especialidad");
-      // For V_UDR_CONSULTA_DIA, the column is MSDescription_ES
-      whereCons.push("MSDescription_ES = @especialidad");
-      request.input('especialidad', especialidad);
+    
+    // Hoy live de SQL Server
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const request = mssqlPool.request();
+      let whereCons = ["Fecha >= @startDate", "Fecha <= @endDate"];
+      request.input('startDate', split.remoteStart);
+      request.input('endDate', split.remoteEnd || new Date());
+      
+      if (search) {
+        whereCons.push("(Medico LIKE @search OR Paciente LIKE @search)");
+        request.input('search', `%${search}%`);
+      }
+      if (especialidad) {
+        whereCons.push("MSDescription_ES = @especialidad");
+        request.input('especialidad', especialidad);
+      }
+      
+      const mssqlRes = await request.query(`
+        SELECT Numero_Cita, Folio_Medico, Medico, MSDescription_ES as Especialidad, 
+               Fecha, Hora, Numero_Paciente, Paciente, Edad_Anios, Telefono_1, Celular_2, 
+               Estatus_Orden_Venta, Articulo
+        FROM V_UDR_CONSULTA_DIA
+        WHERE ${whereCons.join(' AND ')}
+      `);
+      
+      // Convertir Hora date a String para mantener formato
+      const formattedMssql = mssqlRes.recordset.map(row => {
+        let horaStr = '';
+        if (row.Hora instanceof Date) {
+          horaStr = row.Hora.toTimeString().split(' ')[0];
+        } else if (row.Hora) {
+          horaStr = String(row.Hora);
+        }
+        
+        let fechaStr = '';
+        if (row.Fecha instanceof Date) {
+          fechaStr = row.Fecha.toISOString().split('T')[0];
+        } else {
+          fechaStr = row.Fecha;
+        }
+
+        return {
+          ...row,
+          Hora: horaStr,
+          Fecha: fechaStr
+        };
+      });
+      consData = consData.concat(formattedMssql);
     }
 
-    // 1. Tendencia Mensual (Consultas por mes)
-    const tendenciaMensual = await request.query(`
-      SELECT 
-        FORMAT(Fecha, 'yyyy-MM') AS monthStr,
-        SUM(TotalAtenciones) as Total,
-        SUM(Primeras) as Primeras,
-        SUM(Subsecuentes) as Subsecuentes
-      FROM UDR_BI_PRODUCTIVIDAD_MEDICOS
-      WHERE ${whereProd.join(' AND ')}
-      GROUP BY FORMAT(Fecha, 'yyyy-MM')
-      ORDER BY monthStr ASC
-    `);
+    // --- 3. Procesar Agregaciones en JS ---
+    
+    // A. Tendencia Mensual
+    const tendenciaAgrupada = {};
+    prodData.forEach(row => {
+      let d = new Date(row.Fecha);
+      let monthStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      if (!tendenciaAgrupada[monthStr]) {
+        tendenciaAgrupada[monthStr] = { monthStr, Total: 0, Primeras: 0, Subsecuentes: 0 };
+      }
+      tendenciaAgrupada[monthStr].Total += row.TotalAtenciones || 0;
+      tendenciaAgrupada[monthStr].Primeras += row.Primeras || 0;
+      tendenciaAgrupada[monthStr].Subsecuentes += row.Subsecuentes || 0;
+    });
+    const tendenciaMensual = Object.values(tendenciaAgrupada).sort((a,b) => a.monthStr.localeCompare(b.monthStr));
 
-    // 2. Top Especialidades
-    const topEspecialidades = await request.query(`
-      SELECT TOP 10
-        Especialidad,
-        SUM(TotalAtenciones) as Total
-      FROM UDR_BI_PRODUCTIVIDAD_MEDICOS
-      WHERE ${whereProd.join(' AND ')}
-      GROUP BY Especialidad
-      ORDER BY Total DESC
-    `);
+    // B. Top Especialidades
+    const especialidadesAgrupadas = {};
+    prodData.forEach(row => {
+      const esp = row.Especialidad || 'N/A';
+      especialidadesAgrupadas[esp] = (especialidadesAgrupadas[esp] || 0) + (row.TotalAtenciones || 0);
+    });
+    const topEspecialidades = Object.keys(especialidadesAgrupadas)
+      .map(k => ({ Especialidad: k, Total: especialidadesAgrupadas[k] }))
+      .sort((a,b) => b.Total - a.Total)
+      .slice(0, 10);
 
-    // 3. Top Médicos
-    const topMedicos = await request.query(`
-      SELECT TOP 10
-        Medico,
-        Especialidad,
-        SUM(TotalAtenciones) as Total
-      FROM UDR_BI_PRODUCTIVIDAD_MEDICOS
-      WHERE ${whereProd.join(' AND ')}
-      GROUP BY Medico, Especialidad
-      ORDER BY Total DESC
-    `);
+    // C. Top Médicos
+    const medicosAgrupados = {};
+    prodData.forEach(row => {
+      const key = `${row.Medico}||${row.Especialidad || 'N/A'}`;
+      medicosAgrupados[key] = (medicosAgrupados[key] || 0) + (row.TotalAtenciones || 0);
+    });
+    const topMedicos = Object.keys(medicosAgrupados)
+      .map(key => {
+        const [medico, especialidad] = key.split('||');
+        return { Medico: medico, Especialidad: especialidad, Total: medicosAgrupados[key] };
+      })
+      .sort((a,b) => b.Total - a.Total)
+      .slice(0, 10);
 
-    // 4. Estatus Consultas Día (Para gráfica de dona)
-    const estatusResult = await request.query(`
-      SELECT Estatus_Orden_Venta as nombre, COUNT(*) as valor
-      FROM V_UDR_CONSULTA_DIA
-      WHERE ${whereCons.join(' AND ')}
-      GROUP BY Estatus_Orden_Venta
-    `);
+    // D. Estatus Consultas Día (Gráfica Dona)
+    const estatusAgrupados = {};
+    consData.forEach(row => {
+      const est = row.Estatus_Orden_Venta || 'SIN ESTATUS';
+      estatusAgrupados[est] = (estatusAgrupados[est] || 0) + 1;
+    });
+    const estatusConsultas = Object.keys(estatusAgrupados).map(k => ({ nombre: k, valor: estatusAgrupados[k] }));
 
-    // 5. Agregados Totales para KPIs
-    const kpisResult = await request.query(`
-      SELECT 
-        SUM(TotalAtenciones) as TotalConsultas,
-        SUM(Primeras) as TotalPrimeras,
-        SUM(Subsecuentes) as TotalSubsecuentes
-      FROM UDR_BI_PRODUCTIVIDAD_MEDICOS
-      WHERE ${whereProd.join(' AND ')}
-    `);
+    // E. KPIs Totales
+    let totalConsultas = 0;
+    let totalPrimeras = 0;
+    let totalSubsecuentes = 0;
+    prodData.forEach(row => {
+      totalConsultas += row.TotalAtenciones || 0;
+      totalPrimeras += row.Primeras || 0;
+      totalSubsecuentes += row.Subsecuentes || 0;
+    });
 
-    // 6. Lista cruda para la tabla (Limitamos a 100 para no saturar)
-    const listaResult = await request.query(`
-      SELECT TOP 100
-        Numero_Cita,
-        Medico,
-        MSDescription_ES as Especialidad,
-        CONVERT(varchar, Fecha, 23) as Fecha,
-        CONVERT(varchar, Hora, 108) as Hora,
-        Paciente,
-        Edad_Anios,
-        Estatus_Orden_Venta,
-        Articulo
-      FROM V_UDR_CONSULTA_DIA
-      WHERE ${whereCons.join(' AND ')}
-      ORDER BY Fecha DESC, Hora DESC
-    `);
+    // F. Lista para la tabla (Últimas 100 consultas ordenadas por fecha/hora desc)
+    const listaConsultas = consData
+      .sort((a,b) => {
+        const dateA = new Date(`${a.Fecha}T${a.Hora || '00:00:00'}`);
+        const dateB = new Date(`${b.Fecha}T${b.Hora || '00:00:00'}`);
+        return dateB - dateA;
+      })
+      .slice(0, 100);
 
-    // 7. Detalle de Consultas para Drill-down (Agrupado por estatus)
+    // G. Detalle por estatus para drill-down
     const detalleConsultas = {};
-    listaResult.recordset.forEach(row => {
+    listaConsultas.forEach(row => {
       const e = row.Estatus_Orden_Venta;
       if (!detalleConsultas[e]) detalleConsultas[e] = [];
       if (detalleConsultas[e].length < 50) {
@@ -1552,22 +1821,21 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
       }
     });
 
-    const kpis = kpisResult.recordset[0];
-    const topEspecialidadText = topEspecialidades.recordset.length > 0 ? topEspecialidades.recordset[0].Especialidad : 'N/A';
+    const topEspecialidadText = topEspecialidades.length > 0 ? topEspecialidades[0].Especialidad : 'N/A';
 
     res.json({
       ok: true,
       data: {
-        tendenciaMensual: tendenciaMensual.recordset,
-        topEspecialidades: topEspecialidades.recordset,
-        topMedicos: topMedicos.recordset,
-        estatusConsultas: estatusResult.recordset,
-        listaConsultas: listaResult.recordset,
+        tendenciaMensual,
+        topEspecialidades,
+        topMedicos,
+        estatusConsultas,
+        listaConsultas,
         detalleConsultas,
         kpis: {
-          totalConsultas: kpis?.TotalConsultas || 0,
-          primeras: kpis?.TotalPrimeras || 0,
-          subsecuentes: kpis?.TotalSubsecuentes || 0,
+          totalConsultas,
+          primeras: totalPrimeras,
+          subsecuentes: totalSubsecuentes,
           topEspecialidad: topEspecialidadText
         }
       }
@@ -1575,37 +1843,31 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
 
   } catch (err) {
     console.error('Error consultando Eficacia Clínica:', err);
-    res.status(500).json({ ok: false, error: 'Error de conexión con la base de datos remota.' });
+    res.status(500).json({ ok: false, error: 'Error al consultar datos de eficacia clínica.' });
   }
 });
 
-/**
- * GET /api/dashboard/filtros-eficacia
- * Retorna las listas únicas de Médicos y Especialidades para los slicers
- */
 router.get('/filtros-eficacia', authenticate, async (req, res, next) => {
   try {
-    const pool = await connectRemoteDB();
-
-    const medicosResult = await pool.request().query(`
-      SELECT DISTINCT Medico
-      FROM UDR_BI_PRODUCTIVIDAD_MEDICOS
-      WHERE Medico IS NOT NULL AND Medico != ''
-      ORDER BY Medico
+    const medicosResult = await pgPool.query(`
+      SELECT DISTINCT medico as "Medico"
+      FROM dw_vertical_productividad_medicos
+      WHERE medico IS NOT NULL AND medico != ''
+      ORDER BY medico
     `);
 
-    const especialidadesResult = await pool.request().query(`
-      SELECT DISTINCT Especialidad
-      FROM UDR_BI_PRODUCTIVIDAD_MEDICOS
-      WHERE Especialidad IS NOT NULL AND Especialidad != ''
-      ORDER BY Especialidad
+    const especialidadesResult = await pgPool.query(`
+      SELECT DISTINCT especialidad as "Especialidad"
+      FROM dw_vertical_productividad_medicos
+      WHERE especialidad IS NOT NULL AND especialidad != ''
+      ORDER BY especialidad
     `);
 
     res.json({
       ok: true,
       data: {
-        medicos: medicosResult.recordset.map(m => m.Medico),
-        especialidades: especialidadesResult.recordset.map(e => e.Especialidad)
+        medicos: medicosResult.rows.map(m => m.Medico),
+        especialidades: especialidadesResult.rows.map(e => e.Especialidad)
       }
     });
 
@@ -1615,10 +1877,6 @@ router.get('/filtros-eficacia', authenticate, async (req, res, next) => {
   }
 });
 
-/**
- * GET /api/dashboard/quirofano-nativo
- * Dashboard nativo para Quirófanos basado en la vista UDR_USOQX
- */
 router.get('/quirofano-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     let { startDate, endDate, search } = req.query;
@@ -1627,151 +1885,191 @@ router.get('/quirofano-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
     if (endDate === 'undefined' || endDate === 'null' || endDate === '') endDate = null;
     if (search === 'undefined' || search === 'null' || search === '') search = null;
 
-    const pool = await connectRemoteDB();
-    const request = pool.request();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const effectiveStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const effectiveEndDate = endDate || todayStr + ' 23:59:59';
 
-    let whereClauses = ["UNIDAD_DE_SERVICIO = 'CQX'"];
+    const split = splitDateRange(effectiveStartDate, effectiveEndDate);
+    let rawList = [];
 
-    if (startDate) {
-      whereClauses.push("FECHA_DE_CARGO >= @startDate");
-      request.input('startDate', startDate);
-    }
-    if (endDate) {
-      whereClauses.push("FECHA_DE_CARGO <= @endDate");
-      request.input('endDate', endDate);
-    }
-    if (search) {
-      whereClauses.push("(NOMBRE_DEL_PACIENTE LIKE @search OR Medico_Tratante LIKE @search OR DESCRIPCION_DEL_ARTICULO LIKE @search)");
-      request.input('search', `%${search}%`);
-    }
+    // 1. Obtener histórico de PostgreSQL
+    if (split.pgStart && split.pgEnd) {
+      let pgWhere = ["fecha_de_cargo >= $1", "fecha_de_cargo <= $2"];
+      let params = [split.pgStart, split.pgEnd + ' 23:59:59'];
+      let paramIndex = 3;
+      let pgSearch = '';
 
-    const queryStr = `
-      WITH Agrupado AS (
+      if (search) {
+        pgSearch = `
+          WHERE (
+            A."Paciente" ILIKE $${paramIndex} 
+            OR A."Medicos" ILIKE $${paramIndex} 
+            OR U.medicos ILIKE $${paramIndex} 
+            OR A."Procedimientos" ILIKE $${paramIndex} 
+            OR U.procedimientos ILIKE $${paramIndex}
+            OR CAST(A."FOLIO_DE_ATENCION" AS VARCHAR) ILIKE $${paramIndex}
+          )
+        `;
+        params.push(`%${search}%`);
+      }
+
+      const pgQuery = `
+        WITH Agrupado AS (
+          SELECT 
+            folio_de_atencion as "FOLIO_DE_ATENCION",
+            MIN(fecha_de_cargo) as "FechaInicio",
+            MAX(fecha_de_cargo) as "FechaFin",
+            MAX(nombre_del_paciente) as "Paciente",
+            MAX(medico_tratante) as "Medicos",
+            STRING_AGG(descripcion_del_articulo, ', ') as "Procedimientos"
+          FROM dw_vertical_cuentas_servicios
+          WHERE unidad_de_servicio = 'CQX' AND ${pgWhere.join(' AND ')}
+          GROUP BY folio_de_atencion
+        )
         SELECT 
-          FOLIO_DE_ATENCION,
-          MIN(FECHA_DE_CARGO) as FechaInicio,
-          MAX(FECHA_DE_CARGO) as FechaFin,
-          MAX(NOMBRE_DEL_PACIENTE) as Paciente,
-          MAX(Medico_Tratante) as Medicos,
-          STRING_AGG(CAST(DESCRIPCION_DEL_ARTICULO AS NVARCHAR(MAX)), ', ') as Procedimientos
-        FROM UDR_CUENTAS_SERVICIOS
-        WHERE ${whereClauses.join(' AND ')}
-        GROUP BY FOLIO_DE_ATENCION
-      )
-      SELECT 
-        A.FOLIO_DE_ATENCION,
-        COALESCE(U.UDR_Inicio, A.FechaInicio) as FechaInicio,
-        COALESCE(U.UDR_Fin, A.FechaInicio) as FechaFin,
-        A.Paciente,
-        COALESCE(U.Quirofano, 'CQX') as Quirofano,
-        A.Medicos,
-        A.Procedimientos, U.Procedimientos as Procedimiento_Bitacora,
-        CASE WHEN U.PCFRNum IS NULL THEN 'Facturado sin registro en Quirófano (Consultorio/Omisión)' ELSE 'Cirugía Registrada' END as Notas
-      FROM Agrupado A
-      OUTER APPLY (
-        SELECT TOP 1 PCFRNum, FechaInicio as UDR_Inicio, FechaFin as UDR_Fin, Quirofano, Procedimientos
-        FROM UDR_USOQX 
-        WHERE Paciente = A.Paciente 
-          AND FechaInicio >= DATEADD(day, -3, A.FechaInicio)
-          AND FechaInicio <= DATEADD(day, 3, A.FechaInicio)
-      ) U
-      ORDER BY A.FechaInicio DESC
-    `;
+          A."FOLIO_DE_ATENCION",
+          COALESCE(U.fecha_inicio, A."FechaInicio") as "FechaInicio",
+          COALESCE(U.fecha_fin, A."FechaInicio") as "FechaFin",
+          A."Paciente",
+          COALESCE(U.quirofano, 'CQX') as "Quirofano",
+          COALESCE(U.medicos, A."Medicos") as "Medicos",
+          A."Procedimientos", U.procedimientos as "Procedimiento_Bitacora",
+          CASE WHEN U.pcfr_num IS NULL THEN 'Facturado sin registro en Quirófano (Consultorio/Omisión)' ELSE 'Cirugía Registrada' END as "Notas"
+        FROM Agrupado A
+        LEFT JOIN LATERAL (
+          SELECT pcfr_num, fecha_inicio, fecha_fin, quirofano, procedimientos, medicos
+          FROM dw_quirofano_eventos 
+          WHERE paciente = A."Paciente" 
+            AND fecha_inicio >= A."FechaInicio" - INTERVAL '3 days'
+            AND fecha_inicio <= A."FechaInicio" + INTERVAL '3 days'
+          ORDER BY fecha_inicio DESC
+          LIMIT 1
+        ) U ON TRUE
+        ${pgSearch}
+        ORDER BY A."FechaInicio" DESC
+      `;
+      
+      const pgRes = await pgPool.query(pgQuery, params);
+      rawList = rawList.concat(pgRes.rows.map(row => ({
+        FOLIO_DE_ATENCION: Number(row.FOLIO_DE_ATENCION),
+        FechaInicio: row.FechaInicio,
+        FechaFin: row.FechaFin,
+        Paciente: row.Paciente,
+        Quirofano: row.Quirofano,
+        Medicos: row.Medicos,
+        Procedimientos: row.Procedimientos,
+        Procedimiento_Bitacora: row.Procedimiento_Bitacora,
+        Notas: row.Notas
+      })));
+    }
 
-    const result = await request.query(queryStr);
+    // 2. Obtener lo de hoy (en vivo de SQL Server)
+    if (split.hasToday && split.remoteStart) {
+      const pool = await connectRemoteDB();
+      const request = pool.request();
+      let whereClauses = ["UNIDAD_DE_SERVICIO = 'CQX'", "FECHA_DE_CARGO >= @startDate", "FECHA_DE_CARGO <= @endDate"];
+      request.input('startDate', split.remoteStart);
+      request.input('endDate', split.remoteEnd || new Date());
+      
+      if (search) {
+        request.input('search', `%${search}%`);
+      }
 
-    // SAP Revenue queries
+      const mssqlQuery = `
+        WITH Agrupado AS (
+          SELECT 
+            FOLIO_DE_ATENCION,
+            MIN(FECHA_DE_CARGO) as FechaInicio,
+            MAX(FECHA_DE_CARGO) as FechaFin,
+            MAX(NOMBRE_DEL_PACIENTE) as Paciente,
+            MAX(Medico_Tratante) as Medicos,
+            STRING_AGG(CAST(DESCRIPCION_DEL_ARTICULO AS NVARCHAR(MAX)), ', ') as Procedimientos
+          FROM UDR_CUENTAS_SERVICIOS
+          WHERE ${whereClauses.join(' AND ')}
+          GROUP BY FOLIO_DE_ATENCION
+        )
+        SELECT 
+          A.FOLIO_DE_ATENCION,
+          COALESCE(U.UDR_Inicio, A.FechaInicio) as FechaInicio,
+          COALESCE(U.UDR_Fin, A.FechaInicio) as FechaFin,
+          A.Paciente,
+          COALESCE(U.Quirofano, 'CQX') as Quirofano,
+          COALESCE(U.Medicos, A.Medicos) as Medicos,
+          A.Procedimientos, U.Procedimientos as Procedimiento_Bitacora,
+          CASE WHEN U.PCFRNum IS NULL THEN 'Facturado sin registro en Quirófano (Consultorio/Omisión)' ELSE 'Cirugía Registrada' END as Notas
+        FROM Agrupado A
+        OUTER APPLY (
+          SELECT TOP 1 PCFRNum, FechaInicio as UDR_Inicio, FechaFin as UDR_Fin, Quirofano, Procedimientos, Medicos
+          FROM UDR_USOQX 
+          WHERE Paciente = A.Paciente 
+            AND FechaInicio >= DATEADD(day, -3, A.FechaInicio)
+            AND FechaInicio <= DATEADD(day, 3, A.FechaInicio)
+        ) U
+        ${search ? `WHERE (
+          A.Paciente LIKE @search 
+          OR A.Medicos LIKE @search 
+          OR U.Medicos LIKE @search 
+          OR A.Procedimientos LIKE @search 
+          OR U.Procedimientos LIKE @search
+          OR CAST(A.FOLIO_DE_ATENCION AS VARCHAR) LIKE @search
+        )` : ""}
+        ORDER BY A.FechaInicio DESC
+      `;
+      const mssqlRes = await request.query(mssqlQuery);
+      rawList = rawList.concat(mssqlRes.recordset);
+    }
+
+    // SAP Revenue queries - Consultar base local PostgreSQL (DW)
     let ingresosSAPTotales = 0;
     let topMedicosIngresos = [];
     let topServiciosIngresos = [];
-    let ingresosTotales = 0; // Para compatibilidad (Vertical)
+    let ingresosTotales = 0;
 
-    // Formatear fechas para SAP (últimos 30 días si no se especifican)
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const todayStr = now.toISOString().split('T')[0];
     const sd = startDate ? new Date(startDate).toISOString().split('T')[0] : thirtyDaysAgo;
     const ed = endDate ? new Date(endDate).toISOString().split('T')[0] : todayStr;
 
-    // Inicializar caché global para Quirófanos si no existe
-    if (!global.sapQuirofanoCache) {
-      global.sapQuirofanoCache = new Map();
-    }
-    const CACHE_TTL = 3 * 60 * 1000; // 3 minutos de caché para frescura de datos financieros
-    const cacheKey = `${sd}_${ed}`;
-    const cached = global.sapQuirofanoCache.get(cacheKey);
-
-    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-      ingresosSAPTotales = cached.ingresosSAPTotales;
-      topMedicosIngresos = cached.topMedicosIngresos;
-      topServiciosIngresos = cached.topServiciosIngresos;
+    try {
+      // 1. Obtener total ingresos
+      const totalRes = await pgPool.query(`
+        SELECT COALESCE(SUM(ingresos), 0) as total 
+        FROM dw_sap_quirofano_analiticas 
+        WHERE tipo = 'TOTAL' AND startdate >= $1 AND startdate <= $2
+      `, [sd, ed]);
+      ingresosSAPTotales = Number(totalRes.rows[0].total || 0);
       ingresosTotales = ingresosSAPTotales;
-    } else {
-      try {
-        await sapService._ensureSession();
 
-        // Ejecutar consultas HTTP de SAP de manera concurrente con Promise.all (GET simples sin paginación)
-        const [totalRes, medRes, srvRes] = await Promise.all([
-          sapService.get(`/SQLQueries('sq_quirofano_ingresos_totales')/List?startDate='${sd}'&endDate='${ed}'`).catch(err => {
-            console.error('[SAP] Error cargando sq_quirofano_ingresos_totales:', err.message);
-            return { data: { value: [] } };
-          }),
-          sapService.get(`/SQLQueries('sq_quirofano_top_medicos')/List?startDate='${sd}'&endDate='${ed}'`).catch(err => {
-            console.error('[SAP] Error cargando sq_quirofano_top_medicos:', err.message);
-            return { data: { value: [] } };
-          }),
-          sapService.get(`/SQLQueries('sq_quirofano_top_servicios')/List?startDate='${sd}'&endDate='${ed}'`).catch(err => {
-            console.error('[SAP] Error cargando sq_quirofano_top_servicios:', err.message);
-            return { data: { value: [] } };
-          })
-        ]);
+      // 2. Obtener top medicos
+      const medRes = await pgPool.query(`
+        SELECT nombre, SUM(ingresos) as ingresos 
+        FROM dw_sap_quirofano_analiticas 
+        WHERE tipo = 'MEDICO' AND startdate >= $1 AND startdate <= $2
+        GROUP BY nombre 
+        ORDER BY ingresos DESC 
+        LIMIT 10
+      `, [sd, ed]);
+      topMedicosIngresos = medRes.rows.map(row => ({ nombre: row.nombre, ingresos: Number(row.ingresos) }));
 
-        // 1. Obtener ingresos totales acumulados de Quirófano directamente del totalizador
-        if (totalRes.data && totalRes.data.value && totalRes.data.value.length > 0) {
-          ingresosSAPTotales = totalRes.data.value[0].ingresos || 0;
-        }
+      // 3. Obtener top servicios
+      const srvRes = await pgPool.query(`
+        SELECT nombre, SUM(ingresos) as ingresos 
+        FROM dw_sap_quirofano_analiticas 
+        WHERE tipo = 'SERVICIO' AND startdate >= $1 AND startdate <= $2
+        GROUP BY nombre 
+        ORDER BY ingresos DESC 
+        LIMIT 10
+      `, [sd, ed]);
+      topServiciosIngresos = srvRes.rows.map(row => ({ nombre: row.nombre, ingresos: Number(row.ingresos) }));
 
-        // 2. Obtener Top Médicos por Ingreso directamente de SAP
-        if (medRes.data && medRes.data.value) {
-          topMedicosIngresos = medRes.data.value
-            .map(row => ({
-              nombre: row.nombre || 'NO ESPECIFICADO',
-              ingresos: row.ingresos || 0
-            }))
-            .sort((a, b) => b.ingresos - a.ingresos)
-            .slice(0, 10);
-        }
-
-        // 3. Obtener Top Servicios Facturados directamente de SAP
-        if (srvRes.data && srvRes.data.value) {
-          topServiciosIngresos = srvRes.data.value
-            .map(row => ({
-              nombre: row.nombre || 'Desconocido',
-              ingresos: row.ingresos || 0
-            }))
-            .sort((a, b) => b.ingresos - a.ingresos)
-            .slice(0, 10);
-        }
-
-        ingresosTotales = ingresosSAPTotales;
-
-        // Guardar en el caché
-        global.sapQuirofanoCache.set(cacheKey, {
-          ingresosSAPTotales,
-          topMedicosIngresos,
-          topServiciosIngresos,
-          timestamp: Date.now()
-        });
-
-      } catch (e) {
-        console.error('[SAP] Error al procesar analíticas de Quirófano en paralelo:', e.message || e);
-      }
+    } catch (e) {
+      console.error('[PostgreSQL Error] Falló consulta de analíticas de Quirófano local:', e.message);
     }
 
     res.json({
       ok: true,
       data: {
-        lista: result.recordset,
+        lista: rawList,
         kpisFinancieros: { ingresosTotales, ingresosSAP: ingresosSAPTotales },
         topMedicosIngresos,
         topServiciosIngresos
@@ -1779,7 +2077,7 @@ router.get('/quirofano-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
     });
   } catch (err) {
     console.error('Error consultando Quirófano Nativo:', err);
-    res.status(500).json({ ok: false, error: 'Error de conexión con la base de datos remota.' });
+    res.status(500).json({ ok: false, error: 'Error al consultar quirófano nativo.' });
   }
 });
 
@@ -2017,12 +2315,7 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR']), asyn
   }
 });
 
-  /**
- * GET /api/dashboard/auxiliares-nativo/:tipo
- * Extrae volumen e ingresos operativos desde KH_HE (SQL Server) 
- * y los cruza con los Ingresos Contabilizados desde SAP.
- */
-router.get('/auxiliares-nativo/:tipo', authenticate, async (req, res, next) => {
+  router.get('/auxiliares-nativo/:tipo', authenticate, async (req, res, next) => {
   try {
     const { tipo } = req.params;
     let areaNombre = 'IMAGENOLOGIA';
@@ -2040,27 +2333,66 @@ router.get('/auxiliares-nativo/:tipo', authenticate, async (req, res, next) => {
     const now = new Date();
     const startOfYear = `${now.getFullYear()}-01-01`;
     const todayStr = now.toISOString().split('T')[0];
-    const sd = startDate ? new Date(startDate).toISOString().split('T')[0] : startOfYear;
-    const ed = endDate ? new Date(endDate).toISOString().split('T')[0] : todayStr;
+    const effectiveStartDate = startDate || startOfYear;
+    const effectiveEndDate = endDate || todayStr + ' 23:59:59';
 
-    const { connectRemoteDB } = require('../config/remote-db');
-    const pool = await connectRemoteDB();
-    const request = pool.request();
-    
-    let whereClauses = ["s.AreaNombre = @areaNombre", "s.Fecha IS NOT NULL"];
-    request.input('areaNombre', areaNombre);
+    const split = splitDateRange(effectiveStartDate, effectiveEndDate);
+    const trendMap = {}; // Clave: Yr-Mes
+    const estudiosMap = {}; // Clave: Estudio
 
-    if (startDate) {
-      whereClauses.push("s.Fecha >= @startDate");
-      request.input('startDate', startDate);
+    // Helper para agregar filas a la tendencia
+    const addTrendRow = (yr, mes, volumen, ingresos) => {
+      const key = `${yr}-${mes}`;
+      if (!trendMap[key]) {
+        trendMap[key] = { Yr: yr, Mes: mes, volumen: 0, ingresos: 0, ingresosSAP: 0 };
+      }
+      trendMap[key].volumen += volumen || 0;
+      trendMap[key].ingresos += ingresos || 0;
+    };
+
+    // Helper para agregar filas a los estudios
+    const addEstudioRow = (procedimiento, cantidad) => {
+      const p = procedimiento || 'Desconocido';
+      estudiosMap[p] = (estudiosMap[p] || 0) + (cantidad || 0);
+    };
+
+    // 1. Obtener histórico de PostgreSQL
+    if (split.pgStart && split.pgEnd) {
+      const pgTrendRes = await pgPool.query(`
+        SELECT 
+          EXTRACT(YEAR FROM s.fecha)::int as "Yr",
+          EXTRACT(MONTH FROM s.fecha)::int as "Mes",
+          SUM(s.cantidad)::int as volumen,
+          SUM(COALESCE(p.linetotal, 0))::float as ingresos
+        FROM dw_vertical_solicitudes_estudios s
+        LEFT JOIN dw_vertical_pay_ima p ON s.pcpritnum = p.pcitnum
+        WHERE s.areanombre = $1 AND s.fecha >= $2 AND s.fecha <= $3
+        GROUP BY EXTRACT(YEAR FROM s.fecha), EXTRACT(MONTH FROM s.fecha)
+      `, [areaNombre, split.pgStart, split.pgEnd + ' 23:59:59']);
+      
+      pgTrendRes.rows.forEach(r => addTrendRow(r.Yr, r.Mes, r.volumen, r.ingresos));
+
+      const pgTopRes = await pgPool.query(`
+        SELECT 
+          s.estudio as procedimiento,
+          SUM(s.cantidad)::int as cantidad
+        FROM dw_vertical_solicitudes_estudios s
+        WHERE s.areanombre = $1 AND s.fecha >= $2 AND s.fecha <= $3
+        GROUP BY s.estudio
+      `, [areaNombre, split.pgStart, split.pgEnd + ' 23:59:59']);
+      
+      pgTopRes.rows.forEach(r => addEstudioRow(r.procedimiento, r.cantidad));
     }
-    if (endDate) {
-      whereClauses.push("s.Fecha <= @endDate");
-      request.input('endDate', endDate);
-    }
-    
-    // 1. Obtener Tendencia Operativa (VERTICAL)
-    const tendenciaQuery = await request.query(`
+
+    // 2. Obtener lo de hoy de SQL Server
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const request = mssqlPool.request();
+      request.input('areaNombre', areaNombre);
+      request.input('startDate', split.remoteStart);
+      request.input('endDate', split.remoteEnd || new Date());
+
+      const mssqlTrendRes = await request.query(`
         SELECT 
           YEAR(s.Fecha) as Yr,
           MONTH(s.Fecha) as Mes,
@@ -2068,79 +2400,86 @@ router.get('/auxiliares-nativo/:tipo', authenticate, async (req, res, next) => {
           SUM(CAST(ISNULL(p.LineTotal, 0) AS FLOAT)) as ingresos
         FROM UDR_BI_SOLICITUDES_ESTUDIOS s
         LEFT JOIN UDR_PAY_IMA p ON s.PCPRITNum = p.PCITNum
-        WHERE ${whereClauses.join(' AND ')}
+        WHERE s.AreaNombre = @areaNombre AND s.Fecha IS NOT NULL
+          AND s.Fecha >= @startDate AND s.Fecha <= @endDate
         GROUP BY YEAR(s.Fecha), MONTH(s.Fecha)
-        ORDER BY Yr ASC, Mes ASC
       `);
+      mssqlTrendRes.recordset.forEach(r => addTrendRow(r.Yr, r.Mes, r.volumen, r.ingresos));
 
-    let tendenciaAnual = tendenciaQuery.recordset.map(row => ({
-      Yr: row.Yr,
-      Mes: row.Mes,
-      volumen: row.volumen,
-      ingresos: row.ingresos || 0,
-      ingresosSAP: 0 // Valor por defecto
-    }));
-
-    // 2. Obtener Ingresos Contabilizados (SAP)
-    try {
-      const sapRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sd}'&endDate='${ed}'`);
-      
-      if (sapRes && sapRes.length > 0) {
-        // Agrupar SAP por Año y Mes
-        const sapData = {}; // clave: "Yr-Mes"
-        sapRes.forEach(row => {
-          if (row.ItmsGrpCod === sapGroupCode && row.DocDate) {
-            const yr = parseInt(row.DocDate.substring(0, 4), 10);
-            const mes = parseInt(row.DocDate.substring(4, 6), 10);
-            const key = `${yr}-${mes}`;
-            if (!sapData[key]) sapData[key] = 0;
-            sapData[key] += row.Total || 0;
-          }
-        });
-
-        // Hacer el cruce (Join)
-        Object.keys(sapData).forEach(key => {
-          const [yrStr, mesStr] = key.split('-');
-          const yr = parseInt(yrStr, 10);
-          const mes = parseInt(mesStr, 10);
-          
-          let existing = tendenciaAnual.find(t => t.Yr === yr && t.Mes === mes);
-          if (existing) {
-            existing.ingresosSAP = sapData[key];
-          } else {
-            // Si SAP tiene ingresos en un mes que Vertical no tiene volumen, lo agregamos
-            tendenciaAnual.push({
-              Yr: yr,
-              Mes: mes,
-              volumen: 0,
-              ingresos: 0,
-              ingresosSAP: sapData[key]
-            });
-          }
-        });
-
-        // Re-ordenar cronológicamente después del merge
-        tendenciaAnual.sort((a, b) => (a.Yr - b.Yr) || (a.Mes - b.Mes));
-      }
-    } catch (sapError) {
-      console.error('[SAP] Error al cruzar ingresos en auxiliares:', sapError.error || sapError);
-    }
-
-    // Top Estudios
-    const topQuery = await request.query(`
-        SELECT TOP 10
+      const mssqlTopRes = await request.query(`
+        SELECT 
           s.Estudio as procedimiento,
           SUM(s.Cantidad) as cantidad
         FROM UDR_BI_SOLICITUDES_ESTUDIOS s
-        WHERE ${whereClauses.join(' AND ')}
+        WHERE s.AreaNombre = @areaNombre AND s.Fecha IS NOT NULL
+          AND s.Fecha >= @startDate AND s.Fecha <= @endDate
         GROUP BY s.Estudio
-        ORDER BY cantidad DESC
       `);
+      mssqlTopRes.recordset.forEach(r => addEstudioRow(r.procedimiento, r.cantidad));
+    }
+
+    // 3. Obtener Ingresos SAP (Cruce contabilidad)
+    const sapMap = {}; // Clave: Yr-Mes
+    const addSapAmount = (yr, mes, total) => {
+      const key = `${yr}-${mes}`;
+      sapMap[key] = (sapMap[key] || 0) + total;
+    };
+
+    // Histórico SAP de PostgreSQL
+    if (split.pgStart && split.pgEnd) {
+      const pgSapRes = await pgPool.query(`
+        SELECT 
+          EXTRACT(YEAR FROM docdate)::int as "Yr",
+          EXTRACT(MONTH FROM docdate)::int as "Mes",
+          SUM(total)::float as total
+        FROM dw_sap_ingresos_grupos
+        WHERE itmsgrpcod = $1 AND docdate >= $2 AND docdate <= $3
+        GROUP BY EXTRACT(YEAR FROM docdate), EXTRACT(MONTH FROM docdate)
+      `, [sapGroupCode, split.pgStart, split.pgEnd]);
+      pgSapRes.rows.forEach(r => addSapAmount(r.Yr, r.Mes, r.total));
+    }
+
+    // Hoy live de SAP Service Layer
+    if (split.hasToday && split.remoteStart) {
+      try {
+        const sdStr = split.remoteStart.substring(0, 10);
+        const edStr = (split.remoteEnd || todayStr).substring(0, 10);
+        const sapRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sdStr}'&endDate='${edStr}'`);
+        if (sapRes && sapRes.length > 0) {
+          sapRes.forEach(row => {
+            if (row.ItmsGrpCod === sapGroupCode && row.DocDate) {
+              const yr = parseInt(row.DocDate.substring(0, 4), 10);
+              const mes = parseInt(row.DocDate.substring(4, 6), 10);
+              addSapAmount(yr, mes, row.Total || 0);
+            }
+          });
+        }
+      } catch (sapError) {
+        console.error('[SAP live error in Auxiliares]', sapError.message);
+      }
+    }
+
+    // Unir ingresos SAP en la tendenciaAnual
+    Object.keys(sapMap).forEach(key => {
+      const [yrStr, mesStr] = key.split('-');
+      const yr = parseInt(yrStr, 10);
+      const mes = parseInt(mesStr, 10);
+      if (!trendMap[key]) {
+        trendMap[key] = { Yr: yr, Mes: mes, volumen: 0, ingresos: 0, ingresosSAP: 0 };
+      }
+      trendMap[key].ingresosSAP = sapMap[key];
+    });
+
+    const tendenciaAnual = Object.values(trendMap).sort((a, b) => (a.Yr - b.Yr) || (a.Mes - b.Mes));
+    const topEstudios = Object.keys(estudiosMap)
+      .map(k => ({ procedimiento: k, cantidad: estudiosMap[k] }))
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 10);
 
     res.json({
       success: true,
       tendenciaAnual,
-      topEstudios: topQuery.recordset
+      topEstudios
     });
   } catch (error) {
     console.error('Error en auxiliares-nativo:', error);
@@ -2148,144 +2487,264 @@ router.get('/auxiliares-nativo/:tipo', authenticate, async (req, res, next) => {
   }
 });
 
-/**
- * GET /api/dashboard/cuneros-nativo
- * Extrae datos de Neonatos (Cuneros) desde KH_HE
- */
 router.get('/cuneros-nativo', authenticate, async (req, res, next) => {
   try {
     let { startDate, endDate } = req.query;
 
-    // Default: año en curso si no se proporcionan fechas
-    if (!startDate && !endDate) {
-      const now = new Date();
-      startDate = `${now.getFullYear()}-01-01`;
-      endDate = now.toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const effectiveStartDate = startDate || `${new Date().getFullYear()}-01-01`;
+    const effectiveEndDate = endDate || todayStr + ' 23:59:59';
+
+    const split = splitDateRange(effectiveStartDate, effectiveEndDate);
+
+    // --- 1. Total de Recién Nacidos ---
+    let totalRN = 0;
+    
+    // PG Histórico
+    if (split.pgStart && split.pgEnd) {
+      const pgRNRes = await pgPool.query(`
+        SELECT COUNT(DISTINCT p.ptnum) AS total_rn
+        FROM dw_vertical_pc p
+        JOIN dw_vertical_pt pt ON p.ptnum = pt.ptnum
+        WHERE p.pc_st = 'CL'
+          AND (pt.roomname LIKE '%CUNERO%' OR pt.roomcode LIKE '%CUN%')
+          AND DATE(pt.birthdate) = DATE(p.entrydate)
+          AND p.entrydate >= $1 AND p.entrydate <= $2
+      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+      totalRN += Number(pgRNRes.rows[0].total_rn || 0);
+    }
+    // SQL Server Hoy
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const rnRequest = mssqlPool.request();
+      rnRequest.input('rnStart', split.remoteStart);
+      rnRequest.input('rnEnd', split.remoteEnd || new Date());
+      const rnQuery = await rnRequest.query(`
+        SELECT COUNT(DISTINCT p.PTNum) AS total_rn
+        FROM PC p
+        JOIN PT pt ON p.PTNum = pt.PTNum
+        JOIN V_MRPT v ON p.PTNum = v.PTNum
+        WHERE p.PC_ST = 'CL'
+          AND (v.RoomName LIKE '%CUNERO%' OR v.RoomCode LIKE '%CUN%')
+          AND DATEDIFF(day, pt.BirthDate, p.Date) = 0
+          AND p.Date >= @rnStart AND p.Date <= @rnEnd
+      `);
+      totalRN += Number(rnQuery.recordset[0].total_rn || 0);
     }
 
-    const pool = await connectRemoteDB();
-
-    // 1. Total de Recién Nacidos — misma lógica validada que /stats (PC+PT+V_MRPT con BirthDate=Date)
-    const rnRequest = pool.request();
-    let rnWhere = [
-      "p.PC_ST = 'CL'",
-      "(v.RoomName LIKE '%CUNERO%' OR v.RoomCode LIKE '%CUN%')",
-      "DATEDIFF(day, pt.BirthDate, p.Date) = 0"
-    ];
-    if (startDate) { rnWhere.push("CAST(p.Date AS DATE) >= @rnStart"); rnRequest.input('rnStart', startDate); }
-    if (endDate)   { rnWhere.push("CAST(p.Date AS DATE) <= @rnEnd");   rnRequest.input('rnEnd', endDate); }
-
-    const rnQuery = await rnRequest.query(`
-      SELECT COUNT(DISTINCT p.PTNum) AS total_rn
-      FROM PC p
-      JOIN PT pt ON p.PTNum = pt.PTNum
-      JOIN V_MRPT v ON p.PTNum = v.PTNum
-      WHERE ${rnWhere.join(' AND ')}
-    `);
-    const totalRN = rnQuery.recordset[0].total_rn || 0;
-
-    // 2. Ingresos SAP Contabilidad Oficial (Grupo 109 — CLINICA MUJER / CUNEROS) — FUENTE PRINCIPAL
+    // --- 2. Ingresos SAP Contabilidad Oficial (Grupo 109) ---
     let ingresosSAPTotales = 0;
-    try {
-      const now = new Date();
-      const startOfYear = `${now.getFullYear()}-01-01`;
-      const todayStr = now.toISOString().split('T')[0];
-      const sd = startDate ? new Date(startDate).toISOString().split('T')[0] : startOfYear;
-      const ed = endDate ? new Date(endDate).toISOString().split('T')[0] : todayStr;
-      const sapSLRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sd}'&endDate='${ed}'`);
-      if (sapSLRes && sapSLRes.length > 0) {
-        ingresosSAPTotales = sapSLRes
-          .filter(row => row.ItmsGrpCod === 109)
-          .reduce((acc, row) => acc + (row.Total || 0), 0);
+    
+    // PG Histórico SAP
+    if (split.pgStart && split.pgEnd) {
+      const pgSapRes = await pgPool.query(`
+        SELECT SUM(total) as total
+        FROM dw_sap_ingresos_grupos
+        WHERE itmsgrpcod = 109 AND docdate >= $1 AND docdate <= $2
+      `, [split.pgStart, split.pgEnd]);
+      ingresosSAPTotales += Number(pgSapRes.rows[0].total || 0);
+    }
+    // SAP Service Layer Hoy
+    if (split.hasToday && split.remoteStart) {
+      try {
+        const sd = split.remoteStart.substring(0, 10);
+        const ed = (split.remoteEnd || todayStr).substring(0, 10);
+        const sapSLRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sd}'&endDate='${ed}'`);
+        if (sapSLRes && sapSLRes.length > 0) {
+          ingresosSAPTotales += sapSLRes
+            .filter(row => row.ItmsGrpCod === 109)
+            .reduce((acc, row) => acc + (row.Total || 0), 0);
+        }
+      } catch (e) {
+        console.error('[SAP] Error al consultar ingresos contabilizados para Cuneros hoy:', e.message);
       }
-    } catch (e) {
-      console.error('[SAP] Error al consultar ingresos contabilizados para Cuneros:', e.error || e);
     }
 
-    // 3. Ingresos UCIN Vertical (complemento)
-    const ucRequest = pool.request();
-    let whereUCIN = ["UNIDAD_DE_SERVICIO = 'UCIN'"];
-    if (startDate) { whereUCIN.push("FECHA_DE_CARGO >= @ucStart"); ucRequest.input('ucStart', startDate); }
-    if (endDate)   { whereUCIN.push("FECHA_DE_CARGO <= @ucEnd");   ucRequest.input('ucEnd', endDate); }
-    const ingresosVertQuery = await ucRequest.query(`
-      SELECT SUM(TOTAL_COBRADO) as total_ingresos
-      FROM UDR_CUENTAS_SERVICIOS
-      WHERE ${whereUCIN.join(' AND ')}
-    `);
-    const totalIngresosVertical = ingresosVertQuery.recordset[0].total_ingresos || 0;
-
-    // 4. Fórmulas entregadas (Biberones)
-    const fRequest = pool.request();
-    let whereFormula = ["ima.FullName LIKE 'RN %'", "ima.ItemDescription LIKE '%FORMULA%'"];
-    let joinFormula = "";
-    if (startDate || endDate) {
-      joinFormula = "INNER JOIN PCIT ON ima.PCITNum = PCIT.PCITNum INNER JOIN PC ON PCIT.PCNum = PC.PCNum";
-      if (startDate) { whereFormula.push("CAST(PC.CreatedOn AS DATE) >= @fStart"); fRequest.input('fStart', startDate); }
-      if (endDate)   { whereFormula.push("CAST(PC.CreatedOn AS DATE) <= @fEnd");   fRequest.input('fEnd', endDate); }
+    // --- 3. Ingresos UCIN Vertical ---
+    let totalIngresosVertical = 0;
+    
+    // PG Histórico UCIN
+    if (split.pgStart && split.pgEnd) {
+      const pgUCINRes = await pgPool.query(`
+        SELECT SUM(total_cobrado) as total_ingresos
+        FROM dw_vertical_cuentas_servicios
+        WHERE unidad_de_servicio = 'UCIN'
+          AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+      totalIngresosVertical += Number(pgUCINRes.rows[0].total_ingresos || 0);
     }
-    const formulasQuery = await fRequest.query(`
-      SELECT SUM(ima.Quantity) as total_formulas 
-      FROM UDR_PAY_IMA ima ${joinFormula}
-      WHERE ${whereFormula.join(' AND ')}
-    `);
-    const totalFormulas = formulasQuery.recordset[0].total_formulas || 0;
-
-    // 5. Top Insumos y Medicamentos
-    const iRequest = pool.request();
-    let whereIns = ["ima.FullName LIKE 'RN %'"];
-    let joinIns = "";
-    if (startDate || endDate) {
-      joinIns = "INNER JOIN PCIT ON ima.PCITNum = PCIT.PCITNum INNER JOIN PC ON PCIT.PCNum = PC.PCNum";
-      if (startDate) { whereIns.push("CAST(PC.CreatedOn AS DATE) >= @iStart"); iRequest.input('iStart', startDate); }
-      if (endDate)   { whereIns.push("CAST(PC.CreatedOn AS DATE) <= @iEnd");   iRequest.input('iEnd', endDate); }
+    // SQL Server Hoy UCIN
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const ucRequest = mssqlPool.request();
+      ucRequest.input('ucStart', split.remoteStart);
+      ucRequest.input('ucEnd', split.remoteEnd || new Date());
+      const ingresosVertQuery = await ucRequest.query(`
+        SELECT SUM(TOTAL_COBRADO) as total_ingresos
+        FROM UDR_CUENTAS_SERVICIOS
+        WHERE UNIDAD_DE_SERVICIO = 'UCIN'
+          AND FECHA_DE_CARGO >= @ucStart AND FECHA_DE_CARGO <= @ucEnd
+      `);
+      totalIngresosVertical += Number(ingresosVertQuery.recordset[0].total_ingresos || 0);
     }
-    const insumosQuery = await iRequest.query(`
-      SELECT TOP 10 
-        ima.ItemDescription as item, 
-        SUM(ima.Quantity) as cantidad,
-        SUM(CAST(ISNULL(ima.LineTotal, 0) AS FLOAT)) as ingresos
-      FROM UDR_PAY_IMA ima ${joinIns}
-      WHERE ${whereIns.join(' AND ')}
-        AND ima.ItemDescription NOT LIKE '%FORMULA%'
-        AND ima.ItemDescription NOT LIKE '%USO DE OXIGENO%'
-        AND ima.ItemDescription NOT LIKE '%USO PUNTAS PARA OXIGENO%'
-        AND ima.ItemDescription NOT LIKE '%ESTANCIA%'
-        AND ima.ItemDescription NOT LIKE '%GRUPO SANGUINEO%'
-        AND ima.ItemDescription NOT LIKE '%TOMA DE GLUCOSA%'
-        AND ima.ItemDescription NOT LIKE '%Anticipo%'
-        AND ima.ItemDescription NOT LIKE '%CONSULTA%'
-      GROUP BY ima.ItemDescription
-      ORDER BY cantidad DESC
-    `);
-    const topInsumos = insumosQuery.recordset;
 
-    // 6. Distribución de Servicios
-    const sRequest = pool.request();
-    let whereServ = ["ima.FullName LIKE 'RN %'"];
-    let joinServ = "";
-    if (startDate || endDate) {
-      joinServ = "INNER JOIN PCIT ON ima.PCITNum = PCIT.PCITNum INNER JOIN PC ON PCIT.PCNum = PC.PCNum";
-      if (startDate) { whereServ.push("CAST(PC.CreatedOn AS DATE) >= @sStart"); sRequest.input('sStart', startDate); }
-      if (endDate)   { whereServ.push("CAST(PC.CreatedOn AS DATE) <= @sEnd");   sRequest.input('sEnd', endDate); }
+    // --- 4. Fórmulas entregadas (Biberones) ---
+    let totalFormulas = 0;
+    
+    // PG Histórico Fórmulas
+    if (split.pgStart && split.pgEnd) {
+      const pgFRes = await pgPool.query(`
+        SELECT SUM(ima.quantity) as total_formulas 
+        FROM dw_vertical_pay_ima ima 
+        INNER JOIN dw_vertical_pcit pcit ON pcit.pcitnum = ima.pcitnum
+        INNER JOIN dw_vertical_pc pc ON pc.pcnum = pcit.pcnum
+        WHERE ima.fullname LIKE 'RN %' AND ima.itemdescription LIKE '%FORMULA%'
+          AND pc.entrydate >= $1 AND pc.entrydate <= $2
+      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+      totalFormulas += Number(pgFRes.rows[0].total_formulas || 0);
     }
-    const serviciosQuery = await sRequest.query(`
-      SELECT 
-        ima.ItemDescription as servicio, 
-        SUM(ima.Quantity) as cantidad
-      FROM UDR_PAY_IMA ima ${joinServ}
-      WHERE ${whereServ.join(' AND ')}
-        AND (
-          ima.ItemDescription LIKE '%USO DE OXIGENO%' OR 
-          ima.ItemDescription LIKE '%USO PUNTAS PARA OXIGENO%' OR
-          ima.ItemDescription LIKE '%ESTANCIA DE CUNERO%' OR
-          ima.ItemDescription LIKE '%TOMA DE GLUCOSA%' OR
-          ima.ItemDescription LIKE '%GRUPO SANGUINEO%' OR
-          ima.ItemDescription LIKE '%TAMIZ%'
-        )
-      GROUP BY ima.ItemDescription
-      ORDER BY cantidad DESC
-    `);
-    const topServicios = serviciosQuery.recordset;
+    // SQL Server Hoy Fórmulas
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const fRequest = mssqlPool.request();
+      fRequest.input('fStart', split.remoteStart);
+      fRequest.input('fEnd', split.remoteEnd || new Date());
+      const formulasQuery = await fRequest.query(`
+        SELECT SUM(ima.Quantity) as total_formulas 
+        FROM UDR_PAY_IMA ima 
+        INNER JOIN PCIT ON ima.PCITNum = PCIT.PCITNum 
+        INNER JOIN PC ON PCIT.PCNum = PC.PCNum
+        WHERE ima.FullName LIKE 'RN %' AND ima.ItemDescription LIKE '%FORMULA%'
+          AND PC.CreatedOn >= @fStart AND PC.CreatedOn <= @fEnd
+      `);
+      totalFormulas += Number(formulasQuery.recordset[0].total_formulas || 0);
+    }
+
+    // --- 5. Top Insumos y Medicamentos ---
+    const insumosMap = {}; // Clave: item -> { cantidad, ingresos }
+    const addInsumo = (item, qty, amount) => {
+      if (!item) return;
+      if (!insumosMap[item]) insumosMap[item] = { item, cantidad: 0, ingresos: 0 };
+      insumosMap[item].cantidad += qty;
+      insumosMap[item].ingresos += amount;
+    };
+
+    // PG Histórico Insumos
+    if (split.pgStart && split.pgEnd) {
+      const pgIRes = await pgPool.query(`
+        SELECT 
+          ima.itemdescription as item, 
+          SUM(ima.quantity)::float as cantidad,
+          SUM(ima.linetotal)::float as ingresos
+        FROM dw_vertical_pay_ima ima 
+        INNER JOIN dw_vertical_pcit pcit ON pcit.pcitnum = ima.pcitnum
+        INNER JOIN dw_vertical_pc pc ON pc.pcnum = pcit.pcnum
+        WHERE ima.fullname LIKE 'RN %'
+          AND pc.entrydate >= $1 AND pc.entrydate <= $2
+          AND ima.itemdescription NOT LIKE '%FORMULA%'
+          AND ima.itemdescription NOT LIKE '%USO DE OXIGENO%'
+          AND ima.itemdescription NOT LIKE '%USO PUNTAS PARA OXIGENO%'
+          AND ima.itemdescription NOT LIKE '%ESTANCIA%'
+          AND ima.itemdescription NOT LIKE '%GRUPO SANGUINEO%'
+          AND ima.itemdescription NOT LIKE '%TOMA DE GLUCOSA%'
+          AND ima.itemdescription NOT LIKE '%Anticipo%'
+          AND ima.itemdescription NOT LIKE '%CONSULTA%'
+        GROUP BY ima.itemdescription
+      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+      pgIRes.rows.forEach(r => addInsumo(r.item, r.cantidad, r.ingresos));
+    }
+    // SQL Server Hoy Insumos
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const iRequest = mssqlPool.request();
+      iRequest.input('iStart', split.remoteStart);
+      iRequest.input('iEnd', split.remoteEnd || new Date());
+      const insumosQuery = await iRequest.query(`
+        SELECT 
+          ima.ItemDescription as item, 
+          SUM(ima.Quantity) as cantidad,
+          SUM(CAST(ISNULL(ima.LineTotal, 0) AS FLOAT)) as ingresos
+        FROM UDR_PAY_IMA ima 
+        INNER JOIN PCIT ON ima.PCITNum = PCIT.PCITNum 
+        INNER JOIN PC ON PCIT.PCNum = PC.PCNum
+        WHERE ima.FullName LIKE 'RN %'
+          AND PC.CreatedOn >= @iStart AND PC.CreatedOn <= @iEnd
+          AND ima.ItemDescription NOT LIKE '%FORMULA%'
+          AND ima.ItemDescription NOT LIKE '%USO DE OXIGENO%'
+          AND ima.ItemDescription NOT LIKE '%USO PUNTAS PARA OXIGENO%'
+          AND ima.ItemDescription NOT LIKE '%ESTANCIA%'
+          AND ima.ItemDescription NOT LIKE '%GRUPO SANGUINEO%'
+          AND ima.ItemDescription NOT LIKE '%TOMA DE GLUCOSA%'
+          AND ima.ItemDescription NOT LIKE '%Anticipo%'
+          AND ima.ItemDescription NOT LIKE '%CONSULTA%'
+        GROUP BY ima.ItemDescription
+      `);
+      insumosQuery.recordset.forEach(r => addInsumo(r.item, r.cantidad, r.ingresos));
+    }
+    const topInsumos = Object.values(insumosMap)
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 10);
+
+    // --- 6. Distribución de Servicios ---
+    const serviciosMap = {}; // Clave: servicio -> cantidad
+    const addServicio = (serv, qty) => {
+      if (!serv) return;
+      serviciosMap[serv] = (serviciosMap[serv] || 0) + qty;
+    };
+
+    // PG Histórico Servicios
+    if (split.pgStart && split.pgEnd) {
+      const pgSRes = await pgPool.query(`
+        SELECT 
+          ima.itemdescription as servicio, 
+          SUM(ima.quantity)::float as cantidad
+        FROM dw_vertical_pay_ima ima 
+        INNER JOIN dw_vertical_pcit pcit ON pcit.pcitnum = ima.pcitnum
+        INNER JOIN dw_vertical_pc pc ON pc.pcnum = pcit.pcnum
+        WHERE ima.fullname LIKE 'RN %'
+          AND pc.entrydate >= $1 AND pc.entrydate <= $2
+          AND (
+            ima.itemdescription LIKE '%USO DE OXIGENO%' OR 
+            ima.itemdescription LIKE '%USO PUNTAS PARA OXIGENO%' OR
+            ima.itemdescription LIKE '%ESTANCIA DE CUNERO%' OR
+            ima.itemdescription LIKE '%TOMA DE GLUCOSA%' OR
+            ima.itemdescription LIKE '%GRUPO SANGUINEO%' OR
+            ima.itemdescription LIKE '%TAMIZ%'
+          )
+        GROUP BY ima.itemdescription
+      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+      pgSRes.rows.forEach(r => addServicio(r.servicio, r.cantidad));
+    }
+    // SQL Server Hoy Servicios
+    if (split.hasToday && split.remoteStart) {
+      const mssqlPool = await connectRemoteDB();
+      const sRequest = mssqlPool.request();
+      sRequest.input('sStart', split.remoteStart);
+      sRequest.input('sEnd', split.remoteEnd || new Date());
+      const serviciosQuery = await sRequest.query(`
+        SELECT 
+          ima.ItemDescription as servicio, 
+          SUM(ima.Quantity) as cantidad
+        FROM UDR_PAY_IMA ima 
+        INNER JOIN PCIT ON ima.PCITNum = PCIT.PCITNum 
+        INNER JOIN PC ON PCIT.PCNum = PC.PCNum
+        WHERE ima.FullName LIKE 'RN %'
+          AND PC.CreatedOn >= @sStart AND PC.CreatedOn <= @sEnd
+          AND (
+            ima.ItemDescription LIKE '%USO DE OXIGENO%' OR 
+            ima.ItemDescription LIKE '%USO PUNTAS PARA OXIGENO%' OR
+            ima.ItemDescription LIKE '%ESTANCIA DE CUNERO%' OR
+            ima.ItemDescription LIKE '%TOMA DE GLUCOSA%' OR
+            ima.ItemDescription LIKE '%GRUPO SANGUINEO%' OR
+            ima.ItemDescription LIKE '%TAMIZ%'
+          )
+        GROUP BY ima.ItemDescription
+      `);
+      serviciosQuery.recordset.forEach(r => addServicio(r.servicio, r.cantidad));
+    }
+    const topServicios = Object.keys(serviciosMap)
+      .map(k => ({ servicio: k, cantidad: serviciosMap[k] }))
+      .sort((a, b) => b.cantidad - a.cantidad);
 
     res.json({
       success: true,
@@ -2304,39 +2763,25 @@ router.get('/cuneros-nativo', authenticate, async (req, res, next) => {
   }
 });
 
-
-/**
- * GET /api/dashboard/geografia
- * Datos geográficos para el dashboard demográfico
- */
 router.get('/geografia', authenticate, async (req, res) => {
   try {
-    const db = getDb();
-    
-    let estados = [];
-    let ciudades = [];
-
-    // Ahora traemos la demografía desde el sistema nuevo Verical (SQL Server)
-    const { connectRemoteDB } = require('../config/remote-db');
-    const pool = await connectRemoteDB();
-
-    const estadosQuery = await pool.request().query(`
-      SELECT StateCode as estado, COUNT(*) as cantidad 
-      FROM PT 
-      WHERE StateCode IS NOT NULL 
-      GROUP BY StateCode 
+    const estadosQuery = await pgPool.query(`
+      SELECT statecode as "estado", COUNT(*)::int as "cantidad" 
+      FROM dw_vertical_pt 
+      WHERE statecode IS NOT NULL 
+      GROUP BY statecode 
       ORDER BY cantidad DESC 
     `);
-    estados = estadosQuery.recordset;
+    const estados = estadosQuery.rows;
 
-    const ciudadesQuery = await pool.request().query(`
-      SELECT City as ciudad, COUNT(*) as cantidad 
-      FROM PT 
-      WHERE City IS NOT NULL 
-      GROUP BY City 
+    const ciudadesQuery = await pgPool.query(`
+      SELECT city as "ciudad", COUNT(*)::int as "cantidad" 
+      FROM dw_vertical_pt 
+      WHERE city IS NOT NULL 
+      GROUP BY city 
       ORDER BY cantidad DESC 
     `);
-    ciudades = ciudadesQuery.recordset;
+    const ciudades = ciudadesQuery.rows;
 
     res.json({
       ok: true,

@@ -133,6 +133,24 @@ export default function Navbar() {
   const [menuOpen, setMenu] = useState(false);
   const menuRef = useRef(null);
 
+  // Tema del sistema
+  const [theme, setTheme] = useState(() => {
+    return document.documentElement.getAttribute('data-theme') || 'light';
+  });
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('theme', nextTheme);
+    setTheme(nextTheme);
+  };
+
+  useEffect(() => {
+    // Sincronizar estado inicial por si acaso
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    setTheme(currentTheme);
+  }, []);
+
   // Cerrar menú al hacer click fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -163,10 +181,10 @@ export default function Navbar() {
       left:           'var(--sidebar-width)',
       right:           0,
       height:         'var(--navbar-height)',
-      background:     'rgba(255, 255, 255, 0.85)',
+      background:     'var(--navbar-bg)',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
-      borderBottom:   '1px solid rgba(0, 70, 135, 0.08)',
+      borderBottom:   '1px solid var(--navbar-border)',
       display:        'flex',
       alignItems:     'center',
       justifyContent: 'space-between',
@@ -219,6 +237,36 @@ export default function Navbar() {
       {/* Controles derechos */}
       <div style={{ display:'flex', alignItems:'center', gap:'1rem', position:'relative', zIndex:1 }}>
 
+        {/* Selector de Tema */}
+        <button
+          onClick={toggleTheme}
+          style={{
+            background: 'var(--surface-raised)',
+            border: '1px solid var(--navbar-border)',
+            borderRadius: '100px',
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all var(--transition-fast)',
+            fontSize: '1.05rem',
+            boxShadow: 'var(--shadow-xs)'
+          }}
+          onMouseOver={e => {
+            e.currentTarget.style.background = 'var(--surface-2)';
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseOut={e => {
+            e.currentTarget.style.background = 'var(--surface-raised)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+          title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        >
+          {theme === 'dark' ? '🌙' : '☀️'}
+        </button>
+
         {/* Rol badge con gradient */}
         <span style={{
           background:   currentRole.bg,
@@ -242,8 +290,8 @@ export default function Navbar() {
               display:       'flex',
               alignItems:    'center',
               gap:           '0.55rem',
-              background:    'rgba(255,255,255,0.5)',
-              border:        '1px solid rgba(0, 70, 135, 0.12)',
+              background:    'var(--surface-raised)',
+              border:        '1px solid var(--navbar-border)',
               borderRadius:  '100px',
               padding:       '0.25rem 0.8rem 0.25rem 0.3rem',
               cursor:        'pointer',
@@ -251,12 +299,12 @@ export default function Navbar() {
               boxShadow:     'var(--shadow-xs)',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = '#FFFFFF';
-              e.currentTarget.style.borderColor = 'rgba(0, 136, 201, 0.3)';
+              e.currentTarget.style.background = 'var(--surface-2)';
+              e.currentTarget.style.borderColor = 'var(--color-azul-claro)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.5)';
-              e.currentTarget.style.borderColor = 'rgba(0, 70, 135, 0.12)';
+              e.currentTarget.style.background = 'var(--surface-raised)';
+              e.currentTarget.style.borderColor = 'var(--navbar-border)';
             }}
           >
             <div style={{
@@ -295,11 +343,11 @@ export default function Navbar() {
               position:   'absolute',
               top:        'calc(100% + 8px)',
               right:       0,
-              background: 'rgba(255, 255, 255, 0.94)',
+              background: 'var(--color-bg-white)',
               backdropFilter: 'var(--glass-blur)',
               WebkitBackdropFilter: 'var(--glass-blur)',
               borderRadius: '14px',
-              border:     '1px solid rgba(0, 70, 135, 0.08)',
+              border:     '1px solid var(--navbar-border)',
               boxShadow:  'var(--shadow-lg)',
               minWidth:   190,
               overflow:   'hidden',
@@ -308,7 +356,7 @@ export default function Navbar() {
             }}>
               <style>{`@keyframes fadeDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}`}</style>
 
-              <div style={{ padding:'0.85rem 1.1rem', borderBottom:'1px solid rgba(0,70,135,0.05)' }}>
+              <div style={{ padding:'0.85rem 1.1rem', borderBottom:'1px solid var(--navbar-border)' }}>
                 <p style={{ fontSize:'0.82rem', fontWeight:700, color:'var(--text-primary)', margin:0, fontFamily: 'var(--font-body)' }}>{user?.nombre}</p>
                 <p style={{ fontSize:'0.72rem', color:'var(--text-muted)', margin:'0.15rem 0 0', fontFamily: 'var(--font-mono)' }}>{user?.email || user?.username}</p>
               </div>

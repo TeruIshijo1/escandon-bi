@@ -631,5 +631,35 @@ router.put('/kpi-config/:elementoId', (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/**
+ * POST /api/admin/sync-dw-full
+ * Fuerza la re-sincronización histórica completa de todos los tableros (Quirófano, Dashboards y Traslados SAP)
+ */
+router.post('/sync-dw-full', async (req, res, next) => {
+  try {
+    const { syncAllDashboards } = require('../services/dashboardSync.service');
+    const { syncQuirofanoData } = require('../services/quirofanoSync.service');
+    const { syncTraslados } = require('../services/sapTrasladosSync.service');
+
+    console.log('[API Admin] Iniciando re-sincronización completa de DW...');
+    
+    // Ejecutar secuencialmente para controlar carga
+    await syncQuirofanoData({ fullSync: true });
+    await syncAllDashboards({ fullSync: true });
+    const countT = await syncTraslados();
+
+    res.json({
+      ok: true,
+      message: 'Re-sincronización completa de DW finalizada con éxito.',
+      detalle: {
+        trasladosSincronizados: countT || 0
+      }
+    });
+  } catch (err) {
+    console.error('[API Admin] Error en sync-dw-full:', err.message);
+    next(err);
+  }
+});
+
 module.exports = router;
 

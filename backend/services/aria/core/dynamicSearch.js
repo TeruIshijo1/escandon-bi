@@ -6,8 +6,31 @@ const { hasIAPermission, buildAccessDeniedResponse } = require('./permissions');
 const { getSuggestionsForUser, IA_PERMISSION_CATALOG } = require('../config/intents');
 const queryResumenEjecutivoGeneral = require('../handlers/resumen.handler');
 
+const { queryCirugiasDelMomento, queryKitsQuirurgicos } = require('../handlers/quirofano.handler');
+const { queryTrasladosAlmacen, queryKardexAlmacen, queryInventarioAlmacenGeneral } = require('../handlers/almacen.handler');
+const { queryRecetasPendientes, queryLibroControlados } = require('../handlers/recetas.handler');
+
 async function searchDatabaseDynamically(userQuery, user = null) {
   try {
+    const normalized = normalizeText(userQuery);
+
+    // Redirección inteligente si la búsqueda en fallback contiene conceptos clave de los nuevos módulos
+    if (/cirug|quirofan|operac|procedim/.test(normalized)) {
+      return await queryCirugiasDelMomento();
+    }
+    if (/traslad|solicitud.*almacen|envio.*almacen/.test(normalized)) {
+      return await queryTrasladosAlmacen();
+    }
+    if (/kardex|trazabilidad/.test(normalized)) {
+      return await queryKardexAlmacen();
+    }
+    if (/receta|surtir|despacho/.test(normalized)) {
+      return await queryRecetasPendientes();
+    }
+    if (/controlado|psicotrop/.test(normalized)) {
+      return await queryLibroControlados();
+    }
+
     const pool = await getRemoteDb();
 
     // Palabras de relleno / ruido a ignorar en la extracción de términos
@@ -18,10 +41,9 @@ async function searchDatabaseDynamically(userQuery, user = null) {
       'medico', 'paciente', 'insumo', 'servicio', 'gastado', 'consumido', 'precio', 'costo',
       'hospital', 'cuenta', 'registros', 'datos', 'puedes', 'decirme', 'saber', 'ver', 'dime', 'nombre',
       'ultima', 'ultimo', 'reciente', 'recientes', 'consulta', 'consultas', 'atencion',
-      'devolucion', 'devoluciones', 'cargo', 'cargos', 'historial', 'expediente',
+      'devolucion', 'devoluciones', 'cargo', 'cargos', 'historial', 'expediente', 'momento'
     ]);
 
-    const normalized = normalizeText(userQuery);
     const rawTokens = normalized.split(/\s+/);
     const searchTerms = rawTokens.filter(w => w.length >= 3 && !FILLER_WORDS.has(w));
     const finalTerms = searchTerms.length > 0 ? searchTerms : rawTokens.filter(w => w.length >= 3);
@@ -36,7 +58,6 @@ async function searchDatabaseDynamically(userQuery, user = null) {
     const canSearchSupplies = hasIAPermission(user, 'ia-busqueda-insumos');
     const canSearchFinancial = hasIAPermission(user, 'ia-busqueda-financiera');
 
-    // Si el usuario no tiene ningún permiso de búsqueda, denegar
     if (!canSearchPatients && !canSearchDoctors && !canSearchSupplies && !canSearchFinancial) {
       return buildAccessDeniedResponse('ia-busqueda-pacientes', IA_PERMISSION_CATALOG);
     }
@@ -50,7 +71,6 @@ async function searchDatabaseDynamically(userQuery, user = null) {
       searchColumns.push('GRUPO_DE_ARTICULOS');
     }
     if (canSearchDoctors) searchColumns.push('Medico_Solicitante');
-    // UNIDAD_DE_SERVICIO es siempre visible (no es dato sensible)
     searchColumns.push('UNIDAD_DE_SERVICIO');
 
     const whereClauses = finalTerms.map((_, idx) => {
@@ -63,7 +83,6 @@ async function searchDatabaseDynamically(userQuery, user = null) {
       request.input(`kw${idx}`, `%${term}%`);
     });
 
-    // Seleccionar columnas según permisos financieros
     const montoExpression = canSearchFinancial
       ? 'ISNULL(TOTAL_COBRADO, ISNULL(TOTAL_SIN_DESC, 0))'
       : '0';
@@ -90,12 +109,11 @@ async function searchDatabaseDynamically(userQuery, user = null) {
     if (rows.length === 0) {
       return {
         topic: `Búsqueda: ${userQuery}`,
-        answer: `No encontré registros en la base de datos en vivo que coincidan con la búsqueda "**${userQuery}**". Prueba buscando por el apellido del paciente, nombre del médico o descripción del servicio.`,
+        answer: `No encontré registros en la base de datos en vivo que coincidan con la búsqueda "**${userQuery}**". Prueba buscando por el apellido del paciente, nombre del médico, descripción del servicio o usando las preguntas sugeridas de Quirófano, Almacén y Farmacia.`,
         suggestions: getSuggestionsForUser(user),
       };
     }
 
-    // Detectar intención de "Último / Reciente"
     const isUltimoIntent = /ultim|reciente/.test(normalizeText(userQuery));
 
     const totalMonto = canSearchFinancial
@@ -122,7 +140,6 @@ async function searchDatabaseDynamically(userQuery, user = null) {
       answerText = `Analicé la base de datos en tiempo real para "**${userQuery}**". Encontré **${rows.length} registros en vivo**${montoText} (${totalCantidad} unidades/atenciones).`;
     }
 
-    // KPIs
     const kpis = [
       { label: 'Registros Encontrados', value: rows.length },
     ];
@@ -131,7 +148,6 @@ async function searchDatabaseDynamically(userQuery, user = null) {
     }
     kpis.push({ label: 'Unidades/Servicios', value: totalCantidad, color: '#004687' });
 
-    // Tabla — filtrar columnas financieras según permiso
     const headers = ['Fecha', 'Paciente', 'Área', 'Insumo / Servicio', 'Médico'];
     if (canSearchFinancial) headers.push('Monto ($)');
 

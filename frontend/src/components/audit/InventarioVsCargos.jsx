@@ -81,20 +81,20 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
       {isOpen && (
         <div ref={dropdownRef} style={{
           position: 'absolute', top: '100%', left: align === 'right' ? 'auto' : 0, right: align === 'right' ? 0 : 'auto', marginTop: '4px',
-          background: 'white', border: '1px solid #E2E8F0', borderRadius: '8px',
+          background: 'var(--color-bg-white, white)', border: '1px solid var(--border-color, #E2E8F0)',
           boxShadow: '0 10px 25px rgba(0,0,0,0.15)', padding: '10px',
-          zIndex: 50, minWidth: '220px', fontWeight: 'normal', color: '#0F172A', textAlign: 'left', textTransform: 'none'
+          zIndex: 50, minWidth: '220px', fontWeight: 'normal', color: 'var(--text-primary, #0F172A)', textAlign: 'left', textTransform: 'none'
         }}>
           <input 
             type="text" 
             placeholder="Buscar..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', marginBottom: '8px', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-color, #CBD5E1)', background: 'var(--input-bg, white)', color: 'var(--text-primary)', marginBottom: '8px', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box' }}
             onClick={(e) => e.stopPropagation()}
           />
           <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '4px 0', borderBottom: '1px solid #E2E8F0', marginBottom: '4px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '4px 0', borderBottom: '1px solid var(--border-color, #E2E8F0)', marginBottom: '4px' }}>
               <input 
                 type="checkbox" 
                 checked={isAllSelected} 

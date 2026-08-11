@@ -93,3 +93,99 @@
 .print-only-logo {
   display: none;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   DARK MODE — Detalle de Solicitud / Receipt Modal
+   ───────────────────────────────────────────────────────────────── */
+[data-theme="dark"] .receipt-modal-overlay {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+}
+
+[data-theme="dark"] .receipt-modal-content {
+  background: #0F172A;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.6),
+    0 0 1px rgba(255, 255, 255, 0.1);
+  color: #F1F5F9;
+}
+
+/* Header row: "Detalle de Solicitud" */
+[data-theme="dark"] .receipt-modal-content > .no-print {
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+[data-theme="dark"] .receipt-modal-content > .no-print h2 {
+  color: #F1F5F9 !important;
+}
+
+/* Receipt body — typography */
+[data-theme="dark"] .receipt-body h2 {
+  color: #F1F5F9 !important;
+}
+[data-theme="dark"] .receipt-body h3 {
+  color: #CBD5E1 !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+[data-theme="dark"] .receipt-body strong {
+  color: #CBD5E1;
+}
+
+/* Info grid (Almacén Origen / Destino / Comentarios) */
+[data-theme="dark"] .receipt-body > div > div[style*="background: #f8fafc"],
+[data-theme="dark"] .receipt-body > div > div[style*="background:#f8fafc"] {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #CBD5E1 !important;
+}
+
+/* "Contenido" table header row */
+[data-theme="dark"] .receipt-body table thead tr {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+[data-theme="dark"] .receipt-body table th {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #94A3B8 !important;
+}
+
+/* Table body cells */
+[data-theme="dark"] .receipt-body table td {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+  color: #CBD5E1 !important;
+}
+[data-theme="dark"] .receipt-body table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+[data-theme="dark"] .receipt-body table tbody tr:hover {
+  background: rgba(0, 136, 201, 0.08);
+}
+
+/* Signature dividers */
+[data-theme="dark"] .print-signatures div[style*="border-bottom"] {
+  border-bottom-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ── Print: always force light backgrounds regardless of theme ── */
+@media print {
+  .receipt-modal-content {
+    background: white !important;
+    color: black !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .receipt-body h2,
+  .receipt-body h3,
+  .receipt-body strong,
+  .receipt-body table th,
+  .receipt-body table td {
+    color: black !important;
+  }
+  .receipt-body table th,
+  .receipt-body table td {
+    border-color: #cbd5e1 !important;
+  }
+  .receipt-body table thead tr {
+    background: #f1f5f9 !important;
+  }
+}

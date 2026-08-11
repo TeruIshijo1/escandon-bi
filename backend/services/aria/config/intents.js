@@ -8,9 +8,40 @@ const queryInsumosMasGastados = require('../handlers/insumos.handler');
 const queryPacientesMayorGasto = require('../handlers/gastos.handler');
 const queryDevolucionesFarmacia = require('../handlers/devoluciones.handler');
 const queryStockInsumo = require('../handlers/stock.handler');
+
+// NUEVOS HANDLERS
+const {
+  queryCirugiasDelMomento,
+  queryKitsQuirurgicos,
+  queryInventarioQuirofano
+} = require('../handlers/quirofano.handler');
+
+const {
+  queryInventarioAlmacenGeneral,
+  queryTrasladosAlmacen,
+  queryEntradasAlmacen,
+  queryKardexAlmacen
+} = require('../handlers/almacen.handler');
+
+const {
+  queryRecetasPendientes,
+  queryLibroControlados,
+  queryHistorialFarmacologico
+} = require('../handlers/recetas.handler');
+
 const { hasIAPermission } = require('../core/permissions');
 
 const IA_PERMISSION_CATALOG = [
+  {
+    id: 'ia-quirofano',
+    label: 'Quirófano y Cirugías',
+    icon: '🏥',
+    suggestions: [
+      '🏥 ¿Cuáles son las cirugías del momento?',
+      '🏥 ¿Qué materiales incluye el kit quirúrgico?',
+      '🏥 Dime el inventario de Quirófano QX/QXCR',
+    ],
+  },
   {
     id: 'ia-productividad-medica',
     label: 'Productividad Médica',
@@ -49,9 +80,9 @@ const IA_PERMISSION_CATALOG = [
   {
     id: 'ia-busqueda-pacientes',
     label: 'Búsqueda de Pacientes',
-    icon: '🏥',
+    icon: '👤',
     suggestions: [
-      '🏥 Buscar al paciente García',
+      '👤 Buscar al paciente García',
     ],
   },
   {
@@ -83,8 +114,10 @@ const IA_PERMISSION_CATALOG = [
     label: 'Farmacia e Inventarios',
     icon: '💊',
     suggestions: [
-      '💊 Dime el stock actual de paracetamol',
+      '💊 ¿Qué recetas están pendientes en Farmacia?',
+      '💊 Ver el libro de medicamentos controlados',
       '💊 ¿Cuáles son las devoluciones de farmacia hoy?',
+      '💊 Dime el stock actual de paracetamol',
     ],
   },
   {
@@ -92,13 +125,162 @@ const IA_PERMISSION_CATALOG = [
     label: 'Almacén General',
     icon: '📦',
     suggestions: [
-      '📦 Dime el stock de gasas en el almacén',
-      '📦 Buscar insumos generales',
+      '📦 Dime el stock del Almacén General',
+      '📦 ¿Cuáles son los traslados de almacén hoy?',
+      '📦 Ver entradas de mercancía de proveedores',
+      '📦 Consultar el Kardex de inventario',
     ],
   },
 ];
 
 const INTENT_REGISTRY = [
+  // ── QUIRÓFANO ────────────────────────────────────────────────
+  {
+    id: 'cirugias-momento',
+    patterns: [
+      /cirugias?\s+(del\s+momento|hoy|en\s+curso|recientes?|programadas?)/,
+      /agenda\s+quirurgica/,
+      /quirofano\s+(hoy|actual|evento)/,
+      /uso\s+de?\s*quirofano/,
+      /cirugias?\s+de?\s*hoy/,
+      /procedimientos?\s+quirurgicos?/,
+      /que\s+cirugias?\s+hay/,
+      /cirugias?\s+activas?/,
+    ],
+    iaPermission: 'ia-quirofano',
+    sectionPerm: null,
+    handler: queryCirugiasDelMomento,
+    priority: 25,
+  },
+  {
+    id: 'kits-quirurgicos',
+    patterns: [
+      /kit.*quirurgico/,
+      /materiales?.*cirugia/,
+      /insumos?.*cirugia/,
+      /receta.*quirofano/,
+      /plantilla.*cirugia/,
+    ],
+    iaPermission: 'ia-quirofano',
+    sectionPerm: null,
+    handler: queryKitsQuirurgicos,
+    priority: 22,
+  },
+  {
+    id: 'inventario-quirofano',
+    patterns: [
+      /stock.*quirofano/,
+      /inventario.*quirofano/,
+      /material.*quirofano/,
+      /quirofano.*stock/,
+      /quirofano.*inventario/,
+      /existencia.*quirofano/,
+    ],
+    iaPermission: 'ia-quirofano',
+    sectionPerm: null,
+    handler: queryInventarioQuirofano,
+    priority: 22,
+  },
+
+  // ── ALMACÉN GENERAL ──────────────────────────────────────────
+  {
+    id: 'almacen-inventario-general',
+    patterns: [
+      /stock.*almacen\s*general/,
+      /inventario.*almacen\s*general/,
+      /existencias?.*almacen\s*general/,
+      /almacen\s+general.*stock/,
+      /almacen\s+general.*inventario/,
+    ],
+    iaPermission: 'ia-almacen',
+    sectionPerm: null,
+    handler: queryInventarioAlmacenGeneral,
+    priority: 22,
+  },
+  {
+    id: 'almacen-traslados',
+    patterns: [
+      /traslados?.*almacen/,
+      /solicitud.*traslado/,
+      /envios?.*almacen/,
+      /movimientos?.*almacen/,
+      /traslados?\s+entre\s+almacenes/,
+    ],
+    iaPermission: 'ia-almacen',
+    sectionPerm: null,
+    handler: queryTrasladosAlmacen,
+    priority: 20,
+  },
+  {
+    id: 'almacen-entradas',
+    patterns: [
+      /entradas?.*almacen/,
+      /facturas?.*proveedor/,
+      /recepcion.*almacen/,
+      /compras?.*almacen/,
+      /ordenes?\s+de\s+compra/,
+    ],
+    iaPermission: 'ia-almacen',
+    sectionPerm: null,
+    handler: queryEntradasAlmacen,
+    priority: 20,
+  },
+  {
+    id: 'almacen-kardex',
+    patterns: [
+      /kardex/,
+      /trazabilidad.*insumo/,
+      /historial.*almacen/,
+      /movimientos.*kardex/,
+    ],
+    iaPermission: 'ia-almacen',
+    sectionPerm: null,
+    handler: queryKardexAlmacen,
+    priority: 20,
+  },
+
+  // ── FARMACIA AVANZADA ─────────────────────────────────────────
+  {
+    id: 'farmacia-recetas-pendientes',
+    patterns: [
+      /recetas?\s+pendientes?/,
+      /recetas?\s+por\s+surtir/,
+      /cola.*despacho/,
+      /pendientes?.*farmacia/,
+      /surtir.*receta/,
+    ],
+    iaPermission: 'ia-farmacia',
+    sectionPerm: null,
+    handler: queryRecetasPendientes,
+    priority: 20,
+  },
+  {
+    id: 'farmacia-controlados',
+    patterns: [
+      /medicamentos?\s+controlados?/,
+      /libro.*controlados/,
+      /controlados?.*farmacia/,
+      /registro.*controlados/,
+    ],
+    iaPermission: 'ia-farmacia',
+    sectionPerm: null,
+    handler: queryLibroControlados,
+    priority: 20,
+  },
+  {
+    id: 'farmacia-historial-paciente',
+    patterns: [
+      /historial\s+farmacologico/,
+      /medicamentos?\s+de?\s+paciente/,
+      /historial\s+de\s+recetas/,
+    ],
+    iaPermission: 'ia-farmacia',
+    sectionPerm: null,
+    handler: queryHistorialFarmacologico,
+    priority: 20,
+  },
+
+  // ── OTROS INTENTS EXISTENTES ─────────────────────────────────
   {
     id: 'productividad-medica',
     patterns: [
@@ -224,7 +406,7 @@ const INTENT_REGISTRY = [
     iaPermission: 'ia-farmacia',
     sectionPerm: 'farmacia-devoluciones',
     handler: queryDevolucionesFarmacia,
-    priority: 15, // Prioridad alta para evitar conflictos con la palabra genérica devolucion
+    priority: 15,
   },
   {
     id: 'farmacia-inventario',
@@ -269,14 +451,13 @@ function matchIntent(normalizedQuery) {
   for (const intent of INTENT_REGISTRY) {
     for (const pattern of intent.patterns) {
       if (pattern.test(normalizedQuery)) {
-        // Score = prioridad base + bonus si coincide con más patrones
         const matchCount = intent.patterns.filter(p => p.test(normalizedQuery)).length;
         const score = intent.priority + matchCount;
         if (score > bestScore) {
           bestScore = score;
           bestMatch = intent;
         }
-        break; // Ya encontramos un match en esta intención, pasar a la siguiente
+        break;
       }
     }
   }
@@ -298,7 +479,6 @@ function getSuggestionsForUser(user) {
     }
   }
 
-  // Si no hay sugerencias (usuario sin permisos IA), dar sugerencia genérica
   if (suggestions.length === 0) {
     suggestions.push('📊 Muéstrame un resumen general de mis áreas.');
   }
