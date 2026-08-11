@@ -124,7 +124,8 @@ export default function ReportesAlmacen() {
       lowerKey.includes('importe') || 
       lowerKey.includes('valor acumulado') || 
       lowerKey.includes('monto') || 
-      lowerKey.includes('precio')
+      lowerKey.includes('precio') ||
+      lowerKey.includes('total')
     ) {
       const num = Number(val);
       if (!isNaN(num)) {

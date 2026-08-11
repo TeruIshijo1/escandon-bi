@@ -339,11 +339,10 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
     let sqlText = '';
     let params = {};
     let queryCode = `sq_custom_${reportName.replace(/-/g, '_')}`;
-
     switch (reportName) {
       case 'cuentas-hospitalarias':
         sqlText = `
-          SELECT T0.[U_PCNum] AS [Folio de Atencion Medica], T0.[DocNum] AS [Numero de documento], T0.[DocStatus] AS [Status de documento], T0.[TaxDate] AS [Fecha de documento], T0.[DocDate] AS [Fecha de contabilizacion], T0.[DocDueDate] AS [Fecha de vencimiento], T0.[U_PT_Id] AS [ID Paciente], T0.[U_PCType] AS [Tipo de Atencion Medica], T0.[U_PTName] AS [Nombre de Paciente], T0.[U_PTNum] AS [Numero de Paciente], T0.[CardName] AS [Nombre de cliente/proveedor], T0.[DocTotal] AS [Total del documento], T0.[U_UserName] AS [Usuario] 
+          SELECT T0.[U_PCNum] AS [Folio de Atencion Medica (SAP)], T0.[DocNum] AS [Folio Orden Venta (SAP)], T0.[DocStatus] AS [Status de Documento (SAP)], T0.[TaxDate] AS [Fecha de Documento (SAP)], T0.[DocDate] AS [Fecha de Contabilizacion (SAP)], T0.[DocDueDate] AS [Fecha de Vencimiento (SAP)], T0.[U_PT_Id] AS [CURP (SAP)], T0.[U_PCType] AS [Tipo de Atencion Medica (SAP)], T0.[U_PTName] AS [Nombre de Paciente (SAP)], T0.[U_PTNum] AS [Numero de Paciente (SAP)], T0.[CardName] AS [Nombre de Cliente o Proveedor (SAP)], T0.[DocTotal] AS [Total del Documento (SAP)], T0.[U_UserName] AS [Usuario (SAP)] 
           FROM ORDR T0
           WHERE T0.[DocDate] >= :startDate AND T0.[DocDate] <= :endDate
           ORDER BY T0.[DocDate]
@@ -352,7 +351,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
         break;
       case 'atencion-medica-detalle':
         sqlText = `
-          SELECT T0.DocNum AS OrdenVenta, T0.DocDate AS FechaDocumento, T0.U_PCNum AS FolioAtencionMedica, T0.U_PTName AS NombrePaciente, T0.U_PRName AS NombreMedico, CASE WHEN T0.U_PCType = 'IP' THEN 'Hospitalizacion' WHEN T0.U_PCType = 'ER' THEN 'Urgencias' ELSE T0.U_PCType END AS TipoAtencion, T0.CardCode AS CodigoCliente, T0.CardName AS NombreCliente, T0.DocTotal AS TotalOrdenVenta, CASE WHEN T0.DocStatus = 'O' THEN 'Abierta' WHEN T0.DocStatus = 'C' THEN 'Cerrada' END AS EstatusDocumento 
+          SELECT T0.DocNum AS [Folio Orden Venta (SAP)], T0.DocDate AS [Fecha de Documento (SAP)], T0.U_PCNum AS [Folio de Atencion Medica (SAP)], T0.U_PTName AS [Nombre de Paciente (SAP)], T0.U_PRName AS [Nombre de Medico (SAP)], CASE WHEN T0.U_PCType = 'IP' THEN 'Hospitalizacion' WHEN T0.U_PCType = 'ER' THEN 'Urgencias' ELSE T0.U_PCType END AS [Tipo de Atencion (SAP)], T0.CardCode AS [Codigo de Cliente (SAP)], T0.CardName AS [Nombre de Cliente (SAP)], T0.DocTotal AS [Total Orden Venta (SAP)], CASE WHEN T0.DocStatus = 'O' THEN 'Abierta' WHEN T0.DocStatus = 'C' THEN 'Cerrada' END AS [Estatus de Documento (SAP)] 
           FROM ORDR T0
           WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND T0.CANCELED = 'N' AND ISNULL(T0.U_PCNum, '') <> '' AND T0.U_PCType IN ('IP', 'ER')
           ORDER BY T0.DocDate, T0.DocNum
@@ -361,7 +360,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
         break;
       case 'consultas-medicas':
         sqlText = `
-          SELECT T0.DocNum AS [Orden Venta], T0.DocDate AS [Fecha Documento], T0.DocDueDate AS [Fecha Entrega], T0.TaxDate AS [Fecha Contabilizacion], T0.CardCode AS [Cliente], T0.CardName AS [Nombre Cliente], T1.ItemCode AS [Codigo Articulo], T1.Dscription AS [Descripcion], T1.Quantity AS [Cantidad], T1.Price AS [Precio Unitario], T1.LineTotal AS [Total Linea], T0.DocTotal AS [Total Documento], T0.U_SONum AS [Folio Orden Venta], T0.U_PTNum AS [Numero Paciente], T0.U_PTName AS [Nombre Paciente], T0.U_PRName AS [Medico Responsable], T0.U_PRNum AS [Numero Medico], T0.U_PC_CL AS [Usuario Medical Suite], T0.U_UserName AS [Usuario], CASE T0.DocStatus WHEN 'O' THEN 'Abierto' WHEN 'C' THEN 'Cerrado' END AS [Estatus]
+          SELECT T0.DocNum AS [Folio Orden Venta (SAP)], T0.DocDate AS [Fecha de Documento (SAP)], T0.DocDueDate AS [Fecha de Entrega (SAP)], T0.TaxDate AS [Fecha de Contabilizacion (SAP)], T0.CardCode AS [Codigo Cliente (SAP)], T0.CardName AS [Nombre de Cliente (SAP)], T1.ItemCode AS [Codigo de Articulo (SAP)], T1.Dscription AS [Descripcion (SAP)], T1.Quantity AS [Cantidad (SAP)], T1.Price AS [Precio Unitario (SAP)], T1.LineTotal AS [Total Linea (SAP)], T0.DocTotal AS [Total Documento (SAP)], T0.U_SONum AS [Folio Orden Venta (SAP)], T0.U_PTNum AS [Numero Paciente (SAP)], T0.U_PTName AS [Nombre Paciente (SAP)], T0.U_PRName AS [Medico Responsable (SAP)], T0.U_PRNum AS [Numero Medico (SAP)], T0.U_PC_CL AS [Usuario Medical Suite (SAP)], T0.U_UserName AS [Usuario (SAP)], CASE T0.DocStatus WHEN 'O' THEN 'Abierto' WHEN 'C' THEN 'Cerrado' END AS [Estatus (SAP)]
           FROM ORDR T0
           INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
           WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND ISNULL(T0.U_SONum,'') <> ''
@@ -373,7 +372,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
         if (docNum && docNum !== 'undefined') {
           queryCode += '_by_doc';
           sqlText = `
-            SELECT T1.[DocNum] AS [Numero de documento], T1.[U_PTName] AS [Nombre de Paciente], T1.[U_PCNum] AS [Folio de Atencion Medica], T0.[ItemCode] AS [Numero de articulo], T0.[Dscription] AS [Descripcion articulo/serv.], T0.[Quantity] AS [Cantidad], T1.[DocDate] AS [Fecha de contabilizacion] 
+            SELECT T1.[DocNum] AS [Folio Orden Venta (SAP)], T1.[U_PTName] AS [Nombre de Paciente (SAP)], T1.[U_PCNum] AS [Folio de Atencion Medica (SAP)], T0.[ItemCode] AS [Codigo de Articulo (SAP)], T0.[Dscription] AS [Descripcion Articulo o Servicio (SAP)], T0.[Quantity] AS [Cantidad (SAP)], T1.[DocDate] AS [Fecha de Contabilizacion (SAP)] 
             FROM IGE1 T0 
             INNER JOIN OIGE T1 ON T1.[DocEntry] = T0.[DocEntry]
             WHERE T1.[DocNum] = :docNum
@@ -383,7 +382,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
         } else {
           queryCode += '_by_range';
           sqlText = `
-            SELECT T1.[DocNum] AS [Numero de documento], T1.[U_PTName] AS [Nombre de Paciente], T1.[U_PCNum] AS [Folio de Atencion Medica], T0.[ItemCode] AS [Numero de articulo], T0.[Dscription] AS [Descripcion articulo/serv.], T0.[Quantity] AS [Cantidad], T1.[DocDate] AS [Fecha de contabilizacion] 
+            SELECT T1.[DocNum] AS [Folio Orden Venta (SAP)], T1.[U_PTName] AS [Nombre de Paciente (SAP)], T1.[U_PCNum] AS [Folio de Atencion Medica (SAP)], T0.[ItemCode] AS [Codigo de Articulo (SAP)], T0.[Dscription] AS [Descripcion Articulo o Servicio (SAP)], T0.[Quantity] AS [Cantidad (SAP)], T1.[DocDate] AS [Fecha de Contabilizacion (SAP)] 
             FROM IGE1 T0 
             INNER JOIN OIGE T1 ON T1.[DocEntry] = T0.[DocEntry]
             WHERE T1.[DocDate] >= :startDate AND T1.[DocDate] <= :endDate
@@ -394,7 +393,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
         break;
       case 'precios-articulos':
         sqlText = `
-          SELECT T0.ItemCode, T0.ItemName, T1.ItmsGrpNam AS [Nombre Grupo], T2.Price AS [Precio Publico General], T3.Price AS [Precio Hospitalizacion], T4.Price AS [Precio 2025] 
+          SELECT T0.ItemCode AS [Codigo de Articulo (SAP)], T0.ItemName AS [Nombre de Articulo (SAP)], T1.ItmsGrpNam AS [Nombre de Grupo (SAP)], T2.Price AS [Precio Publico General (SAP)], T3.Price AS [Precio Hospitalizacion (SAP)], T4.Price AS [Precio 2025 (SAP)] 
           FROM OITM T0
           INNER JOIN OITB T1 ON T0.ItmsGrpCod = T1.ItmsGrpCod
           LEFT JOIN ITM1 T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 2
@@ -406,7 +405,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
         break;
       case 'interconsultas-jornadas':
         sqlText = `
-          SELECT T0.DocDate AS [Fecha Contable], T0.DocNum AS [Numero Factura], T0.CardCode AS [Codigo Cliente], T0.CardName AS [Cliente], T0.U_PCNum AS [Folio Atencion Medica], CASE WHEN T0.U_PCType = 'IP' THEN 'Hospitalizacion' WHEN T0.U_PCType = 'ER' THEN 'Urgencias' ELSE T0.U_PCType END AS [Tipo Atencion Medica], T0.U_PRNum AS [Codigo Medico], T0.U_PRName AS [Nombre Medico], T0.U_PTNum AS [Folio Paciente], T0.U_PTName AS [Nombre Paciente], T1.ItemCode AS [Codigo Servicio], T1.Dscription AS [Servicio], CASE WHEN T1.ItemCode IN ('SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716') THEN 'Jornada' WHEN T1.ItemCode IN ('SER1277', 'SER1423', 'SER0507', 'SER0525') THEN 'Interconsulta' END AS [Tipo Servicio], T1.Quantity AS [Cantidad], T1.Price AS [Precio Unitario], T1.DiscPrcnt AS [Porcentaje Descuento], T1.LineTotal AS [Total Linea], CASE WHEN T0.DocStatus = 'O' THEN 'Abierta' WHEN T0.DocStatus = 'C' THEN 'Cerrada' END AS [Estatus Factura]
+          SELECT T0.DocDate AS [Fecha Contable (SAP)], T0.DocNum AS [Folio Factura (SAP)], T0.CardCode AS [Codigo Cliente (SAP)], T0.CardName AS [Nombre de Cliente (SAP)], T0.U_PCNum AS [Folio de Atencion Medica (SAP)], CASE WHEN T0.U_PCType = 'IP' THEN 'Hospitalizacion' WHEN T0.U_PCType = 'ER' THEN 'Urgencias' ELSE T0.U_PCType END AS [Tipo de Atencion Medica (SAP)], T0.U_PRNum AS [Codigo Medico (SAP)], T0.U_PRName AS [Nombre Medico (SAP)], T0.U_PTNum AS [Folio Paciente (SAP)], T0.U_PTName AS [Nombre Paciente (SAP)], T1.ItemCode AS [Codigo Servicio (SAP)], T1.Dscription AS [Servicio (SAP)], CASE WHEN T1.ItemCode IN ('SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716') THEN 'Jornada' WHEN T1.ItemCode IN ('SER1277', 'SER1423', 'SER0507', 'SER0525') THEN 'Interconsulta' END AS [Tipo de Servicio (SAP)], T1.Quantity AS [Cantidad (SAP)], T1.Price AS [Precio Unitario (SAP)], T1.DiscPrcnt AS [Porcentaje Descuento (SAP)], T1.LineTotal AS [Total Linea (SAP)], CASE WHEN T0.DocStatus = 'O' THEN 'Abierta' WHEN T0.DocStatus = 'C' THEN 'Cerrada' END AS [Estatus Factura (SAP)]
           FROM OINV T0
           INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
           WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND T0.CANCELED = 'N' AND T0.U_PCNum IS NOT NULL AND T0.U_PCNum <> 0 AND T1.ItemCode IN ('SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716', 'SER1277', 'SER1423', 'SER0507', 'SER0525')
