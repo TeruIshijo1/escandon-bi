@@ -202,8 +202,8 @@ export default function InventarioFarmacia() {
     { id: 'inventory', label: '📦 Inventario (SAP)' },
     { id: 'pending', label: '🛎️ Recetas Pendientes' },
     { id: 'ledger', label: '📘 Controlados' },
-    { id: 'history', label: '🩺 Historial de Pacientes' },
-    { id: 'kits', label: '🔪 Kits Quirúrgicos' }
+    { id: 'history', label: '🩺 Historial de Pacientes' }
+    // { id: 'kits', label: '🔪 Kits Quirúrgicos' }
   ];
 
   return (
