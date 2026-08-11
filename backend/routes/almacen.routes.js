@@ -312,7 +312,8 @@ const executeSapQueryViaSL = async (queryName, sqlText, params) => {
     try {
       await sapService.patch(`/SQLQueries('${queryName}')`, { SqlName: queryName, SqlText: sqlText });
     } catch (err) {
-      console.warn(`[SAP SL Query Register/Patch Warning]:`, err.response?.data?.error?.message?.value || err.message);
+      const errMsg = err.error?.error?.message?.value || err.message || (typeof err === 'object' ? JSON.stringify(err) : err);
+      console.warn(`[SAP SL Query Register/Patch Warning]:`, errMsg);
     }
   }
 
@@ -344,7 +345,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
         sqlText = `
           SELECT T0.[U_PCNum] AS 'Folio de Atencion Medica', T0.[DocNum] AS 'Numero de documento', T0.[DocStatus] AS 'Status de documento', T0.[TaxDate] AS 'Fecha de documento', T0.[DocDate] AS 'Fecha de contabilizacion', T0.[DocDueDate] AS 'Fecha de vencimiento', T0.[U_PT_Id] AS 'ID Paciente', T0.[U_PCType] AS 'Tipo de Atencion Medica', T0.[U_PTName] AS 'Nombre de Paciente', T0.[U_PTNum] AS 'Numero de Paciente', T0.[CardName] AS 'Nombre de cliente/proveedor', T0.[DocTotal] AS 'Total del documento', T0.[U_UserName] AS 'Usuario' 
           FROM ORDR T0
-          WHERE T0.[DocDate] BETWEEN :startDate AND :endDate
+          WHERE T0.[DocDate] >= :startDate AND T0.[DocDate] <= :endDate
           ORDER BY T0.[DocDate]
         `;
         params = { startDate, endDate };
@@ -363,7 +364,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
           SELECT T0.DocNum AS 'Orden Venta', T0.DocDate AS 'Fecha Documento', T0.DocDueDate AS 'Fecha Entrega', T0.TaxDate AS 'Fecha Contabilizacion', T0.CardCode AS 'Cliente', T0.CardName AS 'Nombre Cliente', T1.ItemCode AS 'Codigo Articulo', T1.Dscription AS 'Descripcion', T1.Quantity AS 'Cantidad', T1.Price AS 'Precio Unitario', T1.LineTotal AS 'Total Linea', T0.DocTotal AS 'Total Documento', T0.U_SONum AS 'Folio Orden Venta', T0.U_PTNum AS 'Numero Paciente', T0.U_PTName AS 'Nombre Paciente', T0.U_PRName AS 'Medico Responsable', T0.U_PRNum AS 'Numero Medico', T0.U_PC_CL AS 'Usuario Medical Suite', T0.U_UserName AS 'Usuario', CASE T0.DocStatus WHEN 'O' THEN 'Abierto' WHEN 'C' THEN 'Cerrado' END AS 'Estatus'
           FROM ORDR T0
           INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
-          WHERE T0.DocDate BETWEEN :startDate AND :endDate AND ISNULL(T0.U_SONum,'') <> ''
+          WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND ISNULL(T0.U_SONum,'') <> ''
           ORDER BY T0.DocDate, T0.DocNum
         `;
         params = { startDate, endDate };
@@ -385,7 +386,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
             SELECT T1.[DocNum] AS 'Numero de documento', T1.[U_PTName] AS 'Nombre de Paciente', T1.[U_PCNum] AS 'Folio de Atencion Medica', T0.[ItemCode] AS 'Numero de articulo', T0.[Dscription] AS 'Descripcion articulo/serv.', T0.[Quantity] AS 'Cantidad', T1.[DocDate] AS 'Fecha de contabilizacion' 
             FROM IGE1 T0 
             INNER JOIN OIGE T1 ON T1.[DocEntry] = T0.[DocEntry]
-            WHERE T1.[DocDate] BETWEEN :startDate AND :endDate
+            WHERE T1.[DocDate] >= :startDate AND T1.[DocDate] <= :endDate
             ORDER BY T1.[DocNum], T0.[ItemCode]
           `;
           params = { startDate, endDate };
