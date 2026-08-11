@@ -3,12 +3,18 @@ import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
 
 export default function PuntoReordenAlmacen() {
-  const [activeTab, setActiveTab] = useState('reorden'); // 'reorden' | 'pedidos'
+  const [activeTab, setActiveTab] = useState('reorden'); // 'reorden' | 'pedidos' | 'ml_dataset'
   const [items, setItems] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingPedidos, setLoadingPedidos] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Dataset Analítico de ML
+  const [mlDataset, setMlDataset] = useState([]);
+  const [loadingML, setLoadingML] = useState(false);
+  const [syncingML, setSyncingML] = useState(false);
+  const [mlRiskFilter, setMlRiskFilter] = useState('ALL'); // ALL | CRITICO | ALTO | MEDIO | BAJO
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,6 +39,12 @@ export default function PuntoReordenAlmacen() {
     fetchReorderData();
     fetchPedidosData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'ml_dataset') {
+      fetchMLDataset();
+    }
+  }, [activeTab]);
 
   const fetchReorderData = async () => {
     try {
@@ -67,6 +79,80 @@ export default function PuntoReordenAlmacen() {
     } finally {
       setLoadingPedidos(false);
     }
+  };
+
+  const fetchMLDataset = async () => {
+    try {
+      setLoadingML(true);
+      const res = await fetch(`${API_BASE}/almacen/ml-dataset`, {
+        headers: authHeaders()
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        setMlDataset(json.data || []);
+      } else {
+        console.error('Error fetching ML dataset:', json.error);
+      }
+    } catch (err) {
+      console.error('Error loading ML dataset:', err);
+    } finally {
+      setLoadingML(false);
+    }
+  };
+
+  const handleSyncMLDataset = async () => {
+    try {
+      setSyncingML(true);
+      const res = await fetch(`${API_BASE}/almacen/ml-dataset/sync`, {
+        method: 'POST',
+        headers: authHeaders()
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        fetchMLDataset();
+      } else {
+        alert('Error al sincronizar: ' + (json.error || 'Desconocido'));
+      }
+    } catch (err) {
+      console.error('Error syncing ML dataset:', err);
+      alert('Error de red al sincronizar.');
+    } finally {
+      setSyncingML(false);
+    }
+  };
+
+  const exportToCSV = () => {
+    if (mlDataset.length === 0) return;
+    const headers = [
+      'itemcode', 'itemdescription', 'stock_actual', 'consumo_7d', 'consumo_15d', 
+      'consumo_30d', 'consumo_promedio_diario', 'variabilidad_consumo', 'minstock', 
+      'maxstock', 'pedidos_abiertos', 'fecha_ultimo_movimiento', 'dias_stock_restante', 
+      'riesgo_base', 'fecha_calculo'
+    ];
+    const csvRows = [headers.join(',')];
+    
+    mlDataset.forEach(row => {
+      const values = headers.map(header => {
+        let val = row[header];
+        if (val === null || val === undefined) val = '';
+        const stringVal = String(val).replace(/"/g, '""');
+        return stringVal.includes(',') || stringVal.includes('\n') || stringVal.includes('"') 
+          ? `"${stringVal}"` 
+          : stringVal;
+      });
+      csvRows.push(values.join(','));
+    });
+    
+    const csvContent = '\uFEFF' + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `ml_dataset_reorden_sku_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleOpenEdit = (item) => {
@@ -211,6 +297,21 @@ export default function PuntoReordenAlmacen() {
 
     return { reordenCount, criticoCount, pedidosCount, totalImporteSugerido };
   }, [items]);
+
+  // Filtrado de ML Dataset
+  const filteredMLDataset = useMemo(() => {
+    return mlDataset.filter(item => {
+      const matchesSearch = 
+        (item.itemcode && item.itemcode.toLowerCase().includes(searchTerm.toLowerCase().trim())) ||
+        (item.itemdescription && item.itemdescription.toLowerCase().includes(searchTerm.toLowerCase().trim()));
+      
+      const matchesRisk = 
+        mlRiskFilter === 'ALL' || 
+        item.riesgo_base === mlRiskFilter;
+        
+      return matchesSearch && matchesRisk;
+    });
+  }, [mlDataset, searchTerm, mlRiskFilter]);
 
   const exportToExcel = () => {
     const fechaReporte = new Date().toLocaleString('es-MX');
@@ -429,6 +530,12 @@ export default function PuntoReordenAlmacen() {
             className={`tab-btn ${activeTab === 'pedidos' ? 'active' : ''}`}
           >
             🚚 Pedidos SAP en Curso ({pedidos.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('ml_dataset')}
+            className={`tab-btn ${activeTab === 'ml_dataset' ? 'active' : ''}`}
+          >
+            📊 Dataset Analítico (ML Baseline)
           </button>
         </div>
       </header>
@@ -879,6 +986,176 @@ export default function PuntoReordenAlmacen() {
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* Pestaña 3: Dataset Analítico de Machine Learning */}
+      {activeTab === 'ml_dataset' && (
+        <div style={{ background: 'var(--color-bg-white, white)', borderRadius: '14px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid var(--border-color, #e2e8f0)', padding: '1.5rem' }}>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div>
+              <h2 style={{ margin: 0, color: 'var(--text-primary, #0f172a)', fontSize: '1.35rem', fontWeight: 'bold' }}>
+                📊 Dataset Analítico SKU (ML Baseline)
+              </h2>
+              <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary, #64748b)', fontSize: '0.9rem' }}>
+                Datos preparados para Machine Learning. Clasificación base de riesgo de desabasto según stock actual y promedio de consumo de los últimos 30 días.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleSyncMLDataset}
+                disabled={syncingML}
+                style={{ 
+                  padding: '0.65rem 1.25rem', 
+                  background: '#0f172a', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  fontWeight: 'bold', 
+                  cursor: syncingML ? 'not-allowed' : 'pointer',
+                  opacity: syncingML ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                {syncingML ? '⏳ Sincronizando...' : '↻ Sincronizar Dataset'}
+              </button>
+              <button
+                onClick={exportToCSV}
+                disabled={mlDataset.length === 0}
+                style={{ 
+                  padding: '0.65rem 1.25rem', 
+                  background: '#059669', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  fontWeight: 'bold', 
+                  cursor: mlDataset.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: mlDataset.length === 0 ? 0.6 : 1
+                }}
+              >
+                📥 Exportar Dataset (CSV)
+              </button>
+            </div>
+          </div>
+
+          {/* Barra de Filtros */}
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', background: 'var(--color-bg-base, #f8fafc)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+            <div style={{ flex: '1', minWidth: '250px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary, #475569)', marginBottom: '0.35rem' }}>Buscar por SKU o Descripción</label>
+              <input 
+                type="text"
+                placeholder="Ej. ALG0028 o CEFTRIAXONA..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '8px', outline: 'none', fontSize: '0.9rem', background: 'var(--color-bg-white, white)', color: 'var(--text-primary, #0f172a)' }}
+              />
+            </div>
+            <div style={{ width: '180px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary, #475569)', marginBottom: '0.35rem' }}>Filtrar por Riesgo</label>
+              <select
+                value={mlRiskFilter}
+                onChange={(e) => setMlRiskFilter(e.target.value)}
+                style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '8px', outline: 'none', fontSize: '0.9rem', background: 'var(--color-bg-white, white)', color: 'var(--text-primary, #0f172a)' }}
+              >
+                <option value="ALL">Todos los Riesgos</option>
+                <option value="CRITICO">🔴 CRITICO</option>
+                <option value="ALTO">🟠 ALTO</option>
+                <option value="MEDIO">🟡 MEDIO</option>
+                <option value="BAJO">🟢 BAJO</option>
+              </select>
+            </div>
+          </div>
+
+          {loadingML ? (
+            <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)' }}>
+              <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>⏳</div>
+              Cargando dataset analítico...
+            </div>
+          ) : filteredMLDataset.length === 0 ? (
+            <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)', background: 'var(--color-bg-base, #f8fafc)', borderRadius: '10px' }}>
+              No se encontraron registros para el filtro seleccionado.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '10px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-bg-base, #f1f5f9)', borderBottom: '2px solid var(--border-color, #cbd5e1)', color: 'var(--text-secondary, #475569)', fontWeight: 'bold' }}>
+                    <th style={{ padding: '0.75rem 1rem' }}>SKU</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Descripción</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Stock (SAP)</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Mín / Máx</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Tránsito</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo 7d / 15d / 30d</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Prom. Diario</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Variabilidad</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Días Restantes</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo Base</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredMLDataset.map((row, idx) => {
+                    const daysRemaining = Number(row.dias_stock_restante);
+                    const daysText = daysRemaining >= 9999 ? '∞' : Math.round(daysRemaining);
+                    const riskColor = 
+                      row.riesgo_base === 'CRITICO' ? { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' } :
+                      row.riesgo_base === 'ALTO' ? { bg: '#ffedd5', text: '#9a3412', border: '#fed7aa' } :
+                      row.riesgo_base === 'MEDIO' ? { bg: '#fef9c3', text: '#854d0e', border: '#fef08a' } :
+                      { bg: '#dcfce7', text: '#166534', border: '#bbf7d0' };
+
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-color, #e2e8f0)', background: idx % 2 === 0 ? 'var(--color-bg-white, white)' : 'var(--color-bg-base, #f8fafc)' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>{row.itemcode}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary, #334155)' }}>{row.itemdescription}</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: row.stock_actual === 0 ? '#ef4444' : 'var(--text-primary, #0f172a)' }}>
+                          {Math.round(row.stock_actual)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted, #64748b)' }}>
+                          {row.minstock} / {row.maxstock}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: row.pedidos_abiertos > 0 ? '#0284c7' : 'var(--text-muted, #94a3b8)', fontWeight: row.pedidos_abiertos > 0 ? 'bold' : 'normal' }}>
+                          {row.pedidos_abiertos > 0 ? `+${Math.round(row.pedidos_abiertos)}` : '-'}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-secondary, #334155)' }}>
+                          <span style={{ color: '#0284c7', fontWeight: '600' }}>{Math.round(row.consumo_7d)}</span>
+                          {' '}/{' '}
+                          <span style={{ color: '#0d9488', fontWeight: '600' }}>{Math.round(row.consumo_15d)}</span>
+                          {' '}/{' '}
+                          <span style={{ color: '#4f46e5', fontWeight: '600' }}>{Math.round(row.consumo_30d)}</span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
+                          {Number(row.consumo_promedio_diario).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted, #64748b)' }}>
+                          ±{Number(row.variabilidad_consumo).toFixed(2)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: daysRemaining <= 7 ? '#dc2626' : 'var(--text-primary, #0f172a)' }}>
+                          {daysText}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          <span style={{ 
+                            background: riskColor.bg, 
+                            color: riskColor.text, 
+                            border: `1px solid ${riskColor.border}`,
+                            padding: '0.2rem 0.5rem', 
+                            borderRadius: '6px', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 'bold',
+                            display: 'inline-block',
+                            minWidth: '80px'
+                          }}>
+                            {row.riesgo_base}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

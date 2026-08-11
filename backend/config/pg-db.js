@@ -424,6 +424,27 @@ async function initPostgresDW() {
       );
     `);
 
+    // 9. Tabla Analítica para Machine Learning (Paso 1 DataScience)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ml_dataset_reorden_sku (
+        itemcode VARCHAR(100) PRIMARY KEY,
+        itemdescription TEXT,
+        stock_actual DECIMAL(18,4) DEFAULT 0,
+        consumo_7d DECIMAL(18,4) DEFAULT 0,
+        consumo_15d DECIMAL(18,4) DEFAULT 0,
+        consumo_30d DECIMAL(18,4) DEFAULT 0,
+        consumo_promedio_diario DECIMAL(18,4) DEFAULT 0,
+        variabilidad_consumo DECIMAL(18,4) DEFAULT 0,
+        minstock INT DEFAULT 0,
+        maxstock INT DEFAULT 0,
+        pedidos_abiertos DECIMAL(18,4) DEFAULT 0,
+        fecha_ultimo_movimiento TIMESTAMP WITH TIME ZONE,
+        dias_stock_restante DECIMAL(18,4) DEFAULT 0,
+        riesgo_base VARCHAR(20),
+        fecha_calculo TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Índices para mejorar las consultas en las nuevas tablas
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_t_date ON dw_sap_traslados (docdate);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_c_cons_cuenta ON dw_cirrus_consumo (cuentahospitalaria);`);

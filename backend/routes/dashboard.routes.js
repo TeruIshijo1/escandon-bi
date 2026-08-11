@@ -552,6 +552,15 @@ const mapSectionToQuery = (section) => {
           AND PC_ST = 'CL' AND PCType = 'ER'
         GROUP BY MONTH(MedicalDischargeDate)
       `;
+    case '03_CUENTAS HOSPITALARIAS DE VA - SEGURO':
+      return `
+        SELECT MONTH(pc.MedicalDischargeDate) AS mes, COUNT(DISTINCT pc.PCNum) AS total
+        FROM PC pc
+        WHERE pc.MedicalDischargeDate >= '2026-04-01' AND pc.MedicalDischargeDate <= '2026-12-31'
+          AND pc.PC_ST = 'CL'
+          AND EXISTS (SELECT 1 FROM PCAG ag WHERE ag.PCNum = pc.PCNum)
+        GROUP BY MONTH(pc.MedicalDischargeDate)
+      `;
     case '04_ADMISIÓN CONTINUA (CONSULTAS DE URGENCIAS)':
       return `
         SELECT MONTH(Date) AS mes, COUNT(*) AS total

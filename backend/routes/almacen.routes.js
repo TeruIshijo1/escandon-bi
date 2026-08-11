@@ -696,4 +696,60 @@ router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
   }
 });
 
+/**
+ * GET /api/almacen/ml-dataset
+ * Retorna el dataset analítico completo ordenado por nivel de riesgo
+ */
+router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const pgRes = await pool.query(`
+      SELECT 
+        itemcode AS "itemcode",
+        itemdescription AS "itemdescription",
+        stock_actual AS "stock_actual",
+        consumo_7d AS "consumo_7d",
+        consumo_15d AS "consumo_15d",
+        consumo_30d AS "consumo_30d",
+        consumo_promedio_diario AS "consumo_promedio_diario",
+        variabilidad_consumo AS "variabilidad_consumo",
+        minstock AS "minstock",
+        maxstock AS "maxstock",
+        pedidos_abiertos AS "pedidos_abiertos",
+        fecha_ultimo_movimiento AS "fecha_ultimo_movimiento",
+        dias_stock_restante AS "dias_stock_restante",
+        riesgo_base AS "riesgo_base",
+        fecha_calculo AS "fecha_calculo"
+      FROM ml_dataset_reorden_sku
+      ORDER BY 
+        CASE riesgo_base 
+          WHEN 'CRITICO' THEN 1
+          WHEN 'ALTO' THEN 2
+          WHEN 'MEDIO' THEN 3
+          ELSE 4 
+        END, 
+        dias_stock_restante ASC,
+        itemcode ASC
+    `);
+    res.json({ ok: true, data: pgRes.rows });
+  } catch (err) {
+    console.error('[GET ML Dataset Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar el dataset analítico de ML' });
+  }
+});
+
+/**
+ * POST /api/almacen/ml-dataset/sync
+ * Fuerza la regeneración y cálculo del dataset analítico
+ */
+router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const { syncMLDataset } = require('../services/mlDataset.service');
+    const count = await syncMLDataset();
+    res.json({ ok: true, message: `Dataset analítico sincronizado con éxito. ${count} registros calculados.` });
+  } catch (err) {
+    console.error('[POST Sync ML Dataset Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al sincronizar el dataset analítico: ' + err.message });
+  }
+});
+
 module.exports = router;

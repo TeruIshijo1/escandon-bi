@@ -103,20 +103,21 @@ async function syncCenso() {
  */
 async function syncConsumo() {
   try {
-    console.log('[Sync] Extrayendo Consumos de Cirrus y cruzando con SAP (Últimos 15 días)...');
+    console.log('[Sync] Extrayendo Consumos de Cirrus y cruzando con SAP (Últimos 45 días)...');
     
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 15);
+    startDate.setDate(startDate.getDate() - 45);
     const endDate = new Date();
     
     const data = await etlService.getCargosFarmaciaSAP({ 
       fechaDesde: startDate.toISOString().split('T')[0], 
-      fechaHasta: endDate.toISOString().split('T')[0] 
+      fechaHasta: endDate.toISOString().split('T')[0],
+      limit: 100000
     });
 
     console.log(`[Sync] Cruzados ${data.length} registros de consumo. Guardando en PostgreSQL...`);
 
-    // Limpiamos los últimos 15 días para evitar duplicados y volvemos a insertar
+    // Limpiamos los últimos 45 días para evitar duplicados y volvemos a insertar
     await pool.query(`DELETE FROM dw_cirrus_consumo WHERE fechacargo >= $1`, [startDate]);
 
     for (const d of data) {
@@ -462,6 +463,14 @@ async function runAlmacenSync() {
   await syncEntradas();
   await syncKardex();
   await syncPedidosSAP();
+
+  try {
+    console.log('[Sync] Sincronizando Dataset Analítico para Machine Learning...');
+    const { syncMLDataset } = require('./mlDataset.service');
+    await syncMLDataset();
+  } catch (mlErr) {
+    console.error('[Sync] Error al sincronizar el Dataset Analítico de ML:', mlErr.message);
+  }
 }
 
 module.exports = {
