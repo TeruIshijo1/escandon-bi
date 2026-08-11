@@ -354,6 +354,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
       path:    '/auditoria/inventarios',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
+    /*
     {
       section: 'Auditoría',
       icon:    '📋',
@@ -361,6 +362,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
       path:    '/auditoria/cargos',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
+    */
     {
       section: 'Farmacia',
       icon:    '📦',
