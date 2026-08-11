@@ -11,6 +11,10 @@ export default function ReportesAlmacen() {
   const [endDate, setEndDate] = useState(today);
   const [itemCode, setItemCode] = useState('');
   
+  // Custom SAP reports state
+  const [customReport, setCustomReport] = useState('cuentas-hospitalarias');
+  const [docNum, setDocNum] = useState('');
+  
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -25,7 +29,8 @@ export default function ReportesAlmacen() {
     { id: 'kardex', label: '📦 Kardex de Artículo' },
     { id: 'censo', label: '🛏️ Censo de Pacientes' },
     { id: 'entradas', label: '📄 Entradas de Factura' },
-    { id: 'consumo', label: '📉 Historial de Consumo' }
+    { id: 'consumo', label: '📉 Historial de Consumo' },
+    { id: 'custom-sap', label: '📋 Reportes de Soporte SAP' }
   ];
 
   const fetchReport = async () => {
@@ -34,10 +39,24 @@ export default function ReportesAlmacen() {
     setData([]);
     
     try {
-      const query = new URLSearchParams({ startDate, endDate });
-      if (itemCode) query.append('itemCode', itemCode);
+      let endpoint = '';
+      if (activeTab === 'custom-sap') {
+        const query = new URLSearchParams({ reportName: customReport });
+        if (customReport !== 'precios-articulos') {
+          query.append('startDate', startDate);
+          query.append('endDate', endDate);
+        }
+        if (customReport === 'detalles-salida' && docNum) {
+          query.append('docNum', docNum);
+        }
+        endpoint = `${API_BASE}/almacen/reportes/custom-sap?${query.toString()}`;
+      } else {
+        const query = new URLSearchParams({ startDate, endDate });
+        if (itemCode) query.append('itemCode', itemCode);
+        endpoint = `${API_BASE}/almacen/reportes/${activeTab}?${query.toString()}`;
+      }
       
-      const response = await fetch(`${API_BASE}/almacen/reportes/${activeTab}?${query.toString()}`, {
+      const response = await fetch(endpoint, {
         headers: authHeaders()
       });
       
@@ -55,6 +74,13 @@ export default function ReportesAlmacen() {
   const handleRowClick = async (row) => {
     setSelectedRow(row);
     setModalOpen(true);
+    
+    if (activeTab === 'custom-sap') {
+      setModalLoading(false);
+      setModalData({ isCustom: true, row });
+      return;
+    }
+
     setModalLoading(true);
     setModalData(null);
 
@@ -236,26 +262,61 @@ export default function ReportesAlmacen() {
               />
             </div>
           )}
+
+          {activeTab === 'custom-sap' && (
+            <div style={{ flex: '1 1 300px' }}>
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Reporte de Soporte SAP</label>
+              <select 
+                value={customReport} 
+                onChange={e => { setCustomReport(e.target.value); setData([]); }}
+                style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', background: 'white' }}
+              >
+                <option value="cuentas-hospitalarias">Cuentas Hospitalarias (ORDR)</option>
+                <option value="atencion-medica-detalle">Detalle de Atenciones Médicas (Hospitalización/Urgencias)</option>
+                <option value="consultas-medicas">Consultas Médicas por Fecha (con Folio Orden Venta)</option>
+                <option value="detalles-salida">Detalle de Salidas de Almacén (IGE1/OIGE)</option>
+                <option value="precios-articulos">Lista de Precios de Artículos y Servicios (Lista 1, 2, 4)</option>
+                <option value="interconsultas-jornadas">Interconsultas y Jornadas Especiales (SER*)</option>
+              </select>
+            </div>
+          )}
+
+          {activeTab === 'custom-sap' && customReport === 'detalles-salida' && (
+            <div style={{ flex: '1 1 200px' }}>
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Número de documento (Opcional)</label>
+              <input 
+                type="number" 
+                value={docNum} 
+                onChange={e => setDocNum(e.target.value)} 
+                placeholder="Ej. 12345"
+                style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+              />
+            </div>
+          )}
           
-          <div style={{ flex: '1 1 200px' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Fecha Desde</label>
-            <input 
-              type="date" 
-              value={startDate} 
-              onChange={e => setStartDate(e.target.value)} 
-              style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
-            />
-          </div>
-          
-          <div style={{ flex: '1 1 200px' }}>
-            <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Fecha Hasta</label>
-            <input 
-              type="date" 
-              value={endDate} 
-              onChange={e => setEndDate(e.target.value)} 
-              style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
-            />
-          </div>
+          {(activeTab !== 'custom-sap' || customReport !== 'precios-articulos') && (
+            <>
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Fecha Desde</label>
+                <input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={e => setStartDate(e.target.value)} 
+                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+                />
+              </div>
+              
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Fecha Hasta</label>
+                <input 
+                  type="date" 
+                  value={endDate} 
+                  onChange={e => setEndDate(e.target.value)} 
+                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+                />
+              </div>
+            </>
+          )}
 
           <button 
             onClick={fetchReport} 
@@ -587,6 +648,27 @@ export default function ReportesAlmacen() {
                           📋 No hay partidas registradas para esta factura.
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* 4. Modal para Reportes de Soporte SAP (Custom) */}
+                  {modalData?.isCustom && (
+                    <div>
+                      <h4 style={{ margin: '0 0 1rem 0', color: '#0f172a', fontSize: '1.1rem' }}>
+                        📋 Detalle de Registro (Reporte SAP)
+                      </h4>
+                      <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0', maxHeight: '450px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <tbody>
+                            {Object.entries(modalData.row).map(([key, val], i) => (
+                              <tr key={i} style={{ borderBottom: i < Object.entries(modalData.row).length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+                                <td style={{ padding: '0.75rem 0', fontWeight: 'bold', color: '#475569', width: '35%', fontSize: '0.9rem', verticalAlign: 'top' }}>{key}</td>
+                                <td style={{ padding: '0.75rem 0', color: '#0f172a', fontSize: '0.95rem' }}>{formatCellValue(key, val)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
 
