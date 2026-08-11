@@ -302,87 +302,123 @@ router.get('/reportes/consumo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
   }
 });
 
+const executeSapQueryViaSL = async (queryName, sqlText, params) => {
+  const sapService = require('../services/sap.service');
+  await sapService._ensureSession();
+  
+  try {
+    await sapService.post('/SQLQueries', { SqlCode: queryName, SqlName: queryName, SqlText: sqlText });
+  } catch (e) {
+    try {
+      await sapService.patch(`/SQLQueries('${queryName}')`, { SqlName: queryName, SqlText: sqlText });
+    } catch (err) {
+      console.warn(`[SAP SL Query Register/Patch Warning]:`, err.response?.data?.error?.message?.value || err.message);
+    }
+  }
+
+  const qs = new URLSearchParams();
+  for (let key in params) {
+    if (params[key] !== undefined && params[key] !== null) {
+      qs.append(key, `'${params[key]}'`);
+    }
+  }
+
+  const response = await sapService.get(`/SQLQueries('${queryName}')/List?${qs.toString()}`);
+  return response.data?.value || [];
+};
+
 /**
  * GET /api/almacen/reportes/custom-sap
- * Ejecuta reportes personalizados provistos por soporte de SAP directamente de la base de datos remota
+ * Ejecuta reportes personalizados provistos por soporte de SAP directamente a través de SAP Service Layer
  */
 router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { reportName, startDate, endDate, docNum } = req.query;
-    const { getRemoteDb, sql } = require('../config/remote-db');
-    const pool = await getRemoteDb();
     
-    const sapDb = process.env.SAP_COMPANY_DB || 'SBO_HE2';
-    
-    let query = '';
-    const request = pool.request();
-    
-    if (startDate) request.input('startDate', sql.DateTime, startDate + ' 00:00:00');
-    if (endDate) request.input('endDate', sql.DateTime, endDate + ' 23:59:59');
-    if (docNum && docNum !== 'undefined') request.input('docNum', sql.Int, parseInt(docNum, 10));
+    let sqlText = '';
+    let params = {};
+    let queryCode = `sq_custom_${reportName.replace(/-/g, '_')}`;
 
     switch (reportName) {
       case 'cuentas-hospitalarias':
-        query = `
+        sqlText = `
           SELECT T0.[U_PCNum] AS 'Folio de Atencion Medica', T0.[DocNum] AS 'Numero de documento', T0.[DocStatus] AS 'Status de documento', T0.[TaxDate] AS 'Fecha de documento', T0.[DocDate] AS 'Fecha de contabilizacion', T0.[DocDueDate] AS 'Fecha de vencimiento', T0.[U_PT_Id] AS 'ID Paciente', T0.[U_PCType] AS 'Tipo de Atencion Medica', T0.[U_PTName] AS 'Nombre de Paciente', T0.[U_PTNum] AS 'Numero de Paciente', T0.[CardName] AS 'Nombre de cliente/proveedor', T0.[DocTotal] AS 'Total del documento', T0.[U_UserName] AS 'Usuario' 
-          FROM [${sapDb}].[dbo].[ORDR] T0
-          WHERE T0.[DocDate] BETWEEN @startDate AND @endDate
+          FROM ORDR T0
+          WHERE T0.[DocDate] BETWEEN :startDate AND :endDate
           ORDER BY T0.[DocDate]
         `;
+        params = { startDate, endDate };
         break;
       case 'atencion-medica-detalle':
-        query = `
+        sqlText = `
           SELECT T0.DocNum AS OrdenVenta, T0.DocDate AS FechaDocumento, T0.U_PCNum AS FolioAtencionMedica, T0.U_PTName AS NombrePaciente, T0.U_PRName AS NombreMedico, CASE WHEN T0.U_PCType = 'IP' THEN 'Hospitalizacion' WHEN T0.U_PCType = 'ER' THEN 'Urgencias' ELSE T0.U_PCType END AS TipoAtencion, T0.CardCode AS CodigoCliente, T0.CardName AS NombreCliente, T0.DocTotal AS TotalOrdenVenta, CASE WHEN T0.DocStatus = 'O' THEN 'Abierta' WHEN T0.DocStatus = 'C' THEN 'Cerrada' END AS EstatusDocumento 
-          FROM [${sapDb}].[dbo].[ORDR] T0
-          WHERE T0.DocDate >= @startDate AND T0.DocDate <= @endDate AND T0.CANCELED = 'N' AND ISNULL(T0.U_PCNum, '') <> '' AND T0.U_PCType IN ('IP', 'ER')
+          FROM ORDR T0
+          WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND T0.CANCELED = 'N' AND ISNULL(T0.U_PCNum, '') <> '' AND T0.U_PCType IN ('IP', 'ER')
           ORDER BY T0.DocDate, T0.DocNum
         `;
+        params = { startDate, endDate };
         break;
       case 'consultas-medicas':
-        query = `
+        sqlText = `
           SELECT T0.DocNum AS 'Orden Venta', T0.DocDate AS 'Fecha Documento', T0.DocDueDate AS 'Fecha Entrega', T0.TaxDate AS 'Fecha Contabilizacion', T0.CardCode AS 'Cliente', T0.CardName AS 'Nombre Cliente', T1.ItemCode AS 'Codigo Articulo', T1.Dscription AS 'Descripcion', T1.Quantity AS 'Cantidad', T1.Price AS 'Precio Unitario', T1.LineTotal AS 'Total Linea', T0.DocTotal AS 'Total Documento', T0.U_SONum AS 'Folio Orden Venta', T0.U_PTNum AS 'Numero Paciente', T0.U_PTName AS 'Nombre Paciente', T0.U_PRName AS 'Medico Responsable', T0.U_PRNum AS 'Numero Medico', T0.U_PC_CL AS 'Usuario Medical Suite', T0.U_UserName AS 'Usuario', CASE T0.DocStatus WHEN 'O' THEN 'Abierto' WHEN 'C' THEN 'Cerrado' END AS 'Estatus'
-          FROM [${sapDb}].[dbo].[ORDR] T0
-          INNER JOIN [${sapDb}].[dbo].[RDR1] T1 ON T0.DocEntry = T1.DocEntry
-          WHERE T0.DocDate BETWEEN @startDate AND @endDate AND ISNULL(T0.U_SONum,'') <> ''
+          FROM ORDR T0
+          INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
+          WHERE T0.DocDate BETWEEN :startDate AND :endDate AND ISNULL(T0.U_SONum,'') <> ''
           ORDER BY T0.DocDate, T0.DocNum
         `;
+        params = { startDate, endDate };
         break;
       case 'detalles-salida':
-        query = `
-          SELECT T1.[DocNum] AS 'Numero de documento', T1.[U_PTName] AS 'Nombre de Paciente', T1.[U_PCNum] AS 'Folio de Atencion Medica', T0.[ItemCode] AS 'Numero de articulo', T0.[Dscription] AS 'Descripcion articulo/serv.', T0.[Quantity] AS 'Cantidad', T1.[DocDate] AS 'Fecha de contabilizacion' 
-          FROM [${sapDb}].[dbo].[IGE1] T0 
-          INNER JOIN [${sapDb}].[dbo].[OIGE] T1 ON T1.[DocEntry] = T0.[DocEntry]
-          WHERE (@docNum IS NULL OR T1.[DocNum] = @docNum)
-            AND (T1.[DocDate] BETWEEN @startDate AND @endDate)
-          ORDER BY T1.[DocNum], T0.[ItemCode]
-        `;
+        if (docNum && docNum !== 'undefined') {
+          queryCode += '_by_doc';
+          sqlText = `
+            SELECT T1.[DocNum] AS 'Numero de documento', T1.[U_PTName] AS 'Nombre de Paciente', T1.[U_PCNum] AS 'Folio de Atencion Medica', T0.[ItemCode] AS 'Numero de articulo', T0.[Dscription] AS 'Descripcion articulo/serv.', T0.[Quantity] AS 'Cantidad', T1.[DocDate] AS 'Fecha de contabilizacion' 
+            FROM IGE1 T0 
+            INNER JOIN OIGE T1 ON T1.[DocEntry] = T0.[DocEntry]
+            WHERE T1.[DocNum] = :docNum
+            ORDER BY T1.[DocNum], T0.[ItemCode]
+          `;
+          params = { docNum };
+        } else {
+          queryCode += '_by_range';
+          sqlText = `
+            SELECT T1.[DocNum] AS 'Numero de documento', T1.[U_PTName] AS 'Nombre de Paciente', T1.[U_PCNum] AS 'Folio de Atencion Medica', T0.[ItemCode] AS 'Numero de articulo', T0.[Dscription] AS 'Descripcion articulo/serv.', T0.[Quantity] AS 'Cantidad', T1.[DocDate] AS 'Fecha de contabilizacion' 
+            FROM IGE1 T0 
+            INNER JOIN OIGE T1 ON T1.[DocEntry] = T0.[DocEntry]
+            WHERE T1.[DocDate] BETWEEN :startDate AND :endDate
+            ORDER BY T1.[DocNum], T0.[ItemCode]
+          `;
+          params = { startDate, endDate };
+        }
         break;
       case 'precios-articulos':
-        query = `
+        sqlText = `
           SELECT T0.ItemCode, T0.ItemName, T1.ItmsGrpNam AS 'Nombre Grupo', T2.Price AS 'Precio Publico General', T3.Price AS 'Precio Hospitalizacion', T4.Price AS 'Precio 2025' 
-          FROM [${sapDb}].[dbo].[OITM] T0
-          INNER JOIN [${sapDb}].[dbo].[OITB] T1 ON T0.ItmsGrpCod = T1.ItmsGrpCod
-          LEFT JOIN [${sapDb}].[dbo].[ITM1] T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 2
-          LEFT JOIN [${sapDb}].[dbo].[ITM1] T3 ON T0.ItemCode = T3.ItemCode AND T3.PriceList = 1
-          LEFT JOIN [${sapDb}].[dbo].[ITM1] T4 ON T0.ItemCode = T4.ItemCode AND T4.PriceList = 4
+          FROM OITM T0
+          INNER JOIN OITB T1 ON T0.ItmsGrpCod = T1.ItmsGrpCod
+          LEFT JOIN ITM1 T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 2
+          LEFT JOIN ITM1 T3 ON T0.ItemCode = T3.ItemCode AND T3.PriceList = 1
+          LEFT JOIN ITM1 T4 ON T0.ItemCode = T4.ItemCode AND T4.PriceList = 4
           ORDER BY T1.ItmsGrpNam, T0.ItemCode
         `;
+        params = {};
         break;
       case 'interconsultas-jornadas':
-        query = `
+        sqlText = `
           SELECT T0.DocDate AS 'Fecha Contable', T0.DocNum AS 'Numero Factura', T0.CardCode AS 'Codigo Cliente', T0.CardName AS 'Cliente', T0.U_PCNum AS 'Folio Atencion Medica', CASE WHEN T0.U_PCType = 'IP' THEN 'Hospitalizacion' WHEN T0.U_PCType = 'ER' THEN 'Urgencias' ELSE T0.U_PCType END AS 'Tipo Atencion Medica', T0.U_PRNum AS 'Codigo Medico', T0.U_PRName AS 'Nombre Medico', T0.U_PTNum AS 'Folio Paciente', T0.U_PTName AS 'Nombre Paciente', T1.ItemCode AS 'Codigo Servicio', T1.Dscription AS 'Servicio', CASE WHEN T1.ItemCode IN ('SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716') THEN 'Jornada' WHEN T1.ItemCode IN ('SER1277', 'SER1423', 'SER0507', 'SER0525') THEN 'Interconsulta' END AS 'Tipo Servicio', T1.Quantity AS 'Cantidad', T1.Price AS 'Precio Unitario', T1.DiscPrcnt AS 'Porcentaje Descuento', T1.LineTotal AS 'Total Linea', CASE WHEN T0.DocStatus = 'O' THEN 'Abierta' WHEN T0.DocStatus = 'C' THEN 'Cerrada' END AS 'Estatus Factura'
-          FROM [${sapDb}].[dbo].[OINV] T0
-          INNER JOIN [${sapDb}].[dbo].[INV1] T1 ON T0.DocEntry = T1.DocEntry
-          WHERE T0.DocDate >= @startDate AND T0.DocDate <= @endDate AND T0.CANCELED = 'N' AND T0.U_PCNum IS NOT NULL AND T0.U_PCNum <> 0 AND T1.ItemCode IN ('SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716', 'SER1277', 'SER1423', 'SER0507', 'SER0525')
+          FROM OINV T0
+          INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+          WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND T0.CANCELED = 'N' AND T0.U_PCNum IS NOT NULL AND T0.U_PCNum <> 0 AND T1.ItemCode IN ('SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716', 'SER1277', 'SER1423', 'SER0507', 'SER0525')
           ORDER BY T0.DocDate, T0.DocNum, T1.ItemCode
         `;
+        params = { startDate, endDate };
         break;
       default:
         return res.status(400).json({ ok: false, error: 'Reporte no válido o no especificado.' });
     }
 
-    const result = await request.query(query);
-    res.json({ ok: true, data: result.recordset });
+    const data = await executeSapQueryViaSL(queryCode, sqlText, params);
+    res.json({ ok: true, data });
   } catch (err) {
     console.error(`[Almacen] Error en reporte custom-sap:`, err);
     res.status(500).json({ ok: false, error: 'Error al consultar la base de datos remota de SAP' });
