@@ -342,7 +342,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
     switch (reportName) {
       case 'cuentas-hospitalarias':
         sqlText = `
-          SELECT T0.[U_PCNum] AS [Folio de Atencion Medica], T0.[DocNum] AS [Folio Orden Venta (SAP)], T0.[DocStatus] AS [Status de Documento (SAP)], T0.[TaxDate] AS [Fecha de Documento (SAP)], T0.[DocDate] AS [Fecha de Contabilizacion (SAP)], T0.[DocDueDate] AS [Fecha de Vencimiento (SAP)], T0.[U_PT_Id] AS [CURP], T0.[U_PCType] AS [Tipo de Atencion Medica], T0.[U_PTName] AS [Nombre de Paciente], T0.[U_PTNum] AS [Numero de Paciente], T0.[CardName] AS [Nombre de Cliente o Proveedor (SAP)], T0.[DocTotal] AS [Total del Documento (SAP)], T0.[U_UserName] AS [Usuario (SAP)] 
+          SELECT T0.[U_PCNum] AS [Folio de Atencion Medica], T0.[DocNum] AS [Folio Orden Venta (SAP)], T0.[DocStatus] AS [Status de Documento (SAP)], T0.[TaxDate] AS [Fecha de Documento (SAP)], T0.[DocDate] AS [Fecha de Contabilizacion (SAP)], T0.[DocDueDate] AS [Fecha de Vencimiento (SAP)], T0.[U_PT_Id] AS [CURP], T0.[U_PCType] AS [Tipo de Atencion Medica], T0.[U_PTName] AS [Nombre de Paciente], T0.[U_PTNum] AS [Numero de Paciente], T0.[CardName] AS [Nombre de Cliente o Proveedor (SAP)], T0.[DocTotal] AS [Total del Documento (SAP)], T0.[U_UserName] AS [Usuario] 
           FROM ORDR T0
           WHERE T0.[DocDate] >= :startDate AND T0.[DocDate] <= :endDate
           ORDER BY T0.[DocDate]
@@ -360,7 +360,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
         break;
       case 'consultas-medicas':
         sqlText = `
-          SELECT T0.DocNum AS [Folio Orden Venta (SAP)], T0.DocDate AS [Fecha de Documento (SAP)], T0.DocDueDate AS [Fecha de Entrega (SAP)], T0.TaxDate AS [Fecha de Contabilizacion (SAP)], T0.CardCode AS [Codigo Cliente (SAP)], T0.CardName AS [Nombre de Cliente (SAP)], T1.ItemCode AS [Codigo de Articulo (SAP)], T1.Dscription AS [Descripcion (SAP)], T1.Quantity AS [Cantidad (SAP)], T1.Price AS [Precio Unitario (SAP)], T1.LineTotal AS [Total Linea (SAP)], T0.DocTotal AS [Total Documento (SAP)], T0.U_SONum AS [Folio Orden Venta (SAP)], T0.U_PTNum AS [Numero Paciente], T0.U_PTName AS [Nombre Paciente], T0.U_PRName AS [Medico Responsable], T0.U_PRNum AS [Numero Medico], T0.U_PC_CL AS [Usuario Medical Suite], T0.U_UserName AS [Usuario (SAP)], CASE T0.DocStatus WHEN 'O' THEN 'Abierto' WHEN 'C' THEN 'Cerrado' END AS [Estatus (SAP)]
+          SELECT T0.DocNum AS [Folio Orden Venta (SAP)], T0.DocDate AS [Fecha de Documento (SAP)], T0.DocDueDate AS [Fecha de Entrega (SAP)], T0.TaxDate AS [Fecha de Contabilizacion (SAP)], T0.CardCode AS [Codigo Cliente (SAP)], T0.CardName AS [Nombre de Cliente (SAP)], T1.ItemCode AS [Codigo de Articulo (SAP)], T1.Dscription AS [Descripcion (SAP)], T1.Quantity AS [Cantidad (SAP)], T1.Price AS [Precio Unitario (SAP)], T1.LineTotal AS [Total Linea (SAP)], T0.DocTotal AS [Total Documento (SAP)], T0.U_SONum AS [Folio Orden Venta (SAP)], T0.U_PTNum AS [Numero Paciente], T0.U_PTName AS [Nombre Paciente], T0.U_PRName AS [Medico Responsable], T0.U_PRNum AS [Numero Medico], T0.U_PC_CL AS [Usuario Medical Suite], T0.U_UserName AS [Usuario], CASE T0.DocStatus WHEN 'O' THEN 'Abierto' WHEN 'C' THEN 'Cerrado' END AS [Estatus (SAP)]
           FROM ORDR T0
           INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
           WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND ISNULL(T0.U_SONum,'') <> ''
