@@ -23,23 +23,10 @@ if (Test-Path $DeployDir) {
         Write-Host "  -> .env de produccion respaldado en memoria" -ForegroundColor DarkGray
     }
 
-    # Respaldar bases de datos de producción
-    $DbFiles = @()
-    if (Test-Path "$DeployDir\database") {
-        $DbFiles = Get-ChildItem -Path "$DeployDir\database" -Filter "*.db*" -ErrorAction SilentlyContinue
-        if ($DbFiles.Count -gt 0) {
-            $DbBackupDir = "$DeployDir\_db_backup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-            New-Item -ItemType Directory -Path $DbBackupDir -Force | Out-Null
-            foreach ($dbf in $DbFiles) {
-                Copy-Item -Path $dbf.FullName -Destination $DbBackupDir -Force
-            }
-            Write-Host "  -> $($DbFiles.Count) archivos de BD respaldados en $DbBackupDir" -ForegroundColor DarkGray
-        }
-    }
-
-    # Limpiar frontend y backend (NO tocar database ni backups)
+    # Limpiar carpetas compiladas (frontend, backend y database)
     if (Test-Path "$DeployDir\frontend") { Remove-Item -Path "$DeployDir\frontend" -Recurse -Force }
     if (Test-Path "$DeployDir\backend")  { Remove-Item -Path "$DeployDir\backend" -Recurse -Force }
+    if (Test-Path "$DeployDir\database") { Remove-Item -Path "$DeployDir\database" -Recurse -Force }
 
 } else {
     New-Item -ItemType Directory -Path $DeployDir | Out-Null
@@ -174,12 +161,7 @@ Get-ChildItem -Path "$ProjectRoot\database" -File | Where-Object {
     $_.Extension -in @(".sql", ".js")
 } | Copy-Item -Destination "$DeployDir\database" -Force
 
-# Restaurar DBs desde backup si las respaldamos
-if ($DbFiles.Count -gt 0 -and (Test-Path $DbBackupDir)) {
-    Get-ChildItem -Path $DbBackupDir | Copy-Item -Destination "$DeployDir\database" -Force
-    Remove-Item -Path $DbBackupDir -Recurse -Force
-    Write-Host "  -> Bases de datos de produccion restauradas" -ForegroundColor Green
-}
+
 
 # ──────────────────────────────────────────────────────────
 # 5b. Exportar Data Warehouse PostgreSQL (pg_dump)
