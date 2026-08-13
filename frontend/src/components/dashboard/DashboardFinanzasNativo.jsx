@@ -22,7 +22,10 @@ const COLORS = ['#004687', '#0088C9', '#10B981', '#E8853D', '#8B5CF6'];
 
 export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }) {
   const [data, setData] = useState(null);
+  const [mlData, setMlData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMl, setLoadingMl] = useState(false);
+  const [activeTab, setActiveTab] = useState('HISTORIAL');
   const [error, setError] = useState(null);
   const [selectedPCNum, setSelectedPCNum] = useState(null);
   const [selectedFacturaDocNum, setSelectedFacturaDocNum] = useState(null);
@@ -31,6 +34,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
 
   useEffect(() => {
     fetchData();
+    fetchMlForecast();
   }, [globalFilters, globalTrigger]);
 
   const fetchData = async () => {
@@ -53,6 +57,31 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
       setError('Error de conexión con el servidor.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMlForecast = async () => {
+    setLoadingMl(true);
+    try {
+      const res = await fetch(`${API_BASE}/finanzas/ml-forecast`);
+      const json = await res.json();
+      if (json.ok) {
+        setMlData(json.data);
+      }
+    } catch (err) {
+      console.error('Error cargando predicciones ML:', err);
+    } finally {
+      setLoadingMl(false);
+    }
+  };
+
+  const runMlForecast = async () => {
+    try {
+      await fetch(`${API_BASE}/finanzas/ml-forecast/run`, { method: 'POST' });
+      alert('Entrenamiento/Predicción iniciada en segundo plano. Los resultados se actualizarán pronto.');
+      setTimeout(fetchMlForecast, 5000);
+    } catch (err) {
+      console.error('Error corriendo ML:', err);
     }
   };
 
@@ -160,6 +189,36 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
         <ExportButton id="export-pdf-btn" type="pdf" targetId="dashboard-finanzas-container" compact={true} />
         <button id="export-excel-btn" onClick={handleExportExcel}></button>
       </div>
+
+      {/* TABS */}
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+        <button
+          onClick={() => setActiveTab('HISTORIAL')}
+          style={{
+            background: 'none', border: 'none', padding: '0.5rem 1rem', fontSize: '1rem', fontWeight: 600, cursor: 'pointer',
+            color: activeTab === 'HISTORIAL' ? '#004687' : '#64748b',
+            borderBottom: activeTab === 'HISTORIAL' ? '3px solid #004687' : 'none',
+            marginBottom: '-0.6rem'
+          }}
+        >
+          Historial Transaccional
+        </button>
+        <button
+          onClick={() => setActiveTab('IA')}
+          style={{
+            background: 'none', border: 'none', padding: '0.5rem 1rem', fontSize: '1rem', fontWeight: 600, cursor: 'pointer',
+            color: activeTab === 'IA' ? '#8B5CF6' : '#64748b',
+            borderBottom: activeTab === 'IA' ? '3px solid #8B5CF6' : 'none',
+            marginBottom: '-0.6rem',
+            display: 'flex', alignItems: 'center', gap: '0.5rem'
+          }}
+        >
+          ✨ Proyecciones IA
+        </button>
+      </div>
+
+      {activeTab === 'HISTORIAL' ? (
+        <>
       {/* KPIs Section */}
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem'
@@ -403,6 +462,62 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
           docNum={selectedIngresoDocNum}
           onClose={() => setSelectedIngresoDocNum(null)}
         />
+      )}
+      </>
+      ) : (
+        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.1rem', fontWeight: 700 }}>Proyección de Ingresos (Próximo Mes)</h3>
+            <button 
+              onClick={runMlForecast}
+              style={{ background: '#8B5CF6', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 }}
+            >
+              🔄 Recalcular Proyecciones
+            </button>
+          </div>
+          
+          {loadingMl ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Cargando modelo predictivo...</div>
+          ) : mlData.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No hay proyecciones generadas. Haz clic en recalcular.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                    <th style={{ padding: '1rem' }}>Periodo Predicho</th>
+                    <th style={{ padding: '1rem' }}>Área / Servicio</th>
+                    <th style={{ padding: '1rem', textAlign: 'right' }}>Ingreso Estimado</th>
+                    <th style={{ padding: '1rem', textAlign: 'right' }}>Rango (Bajo - Alto)</th>
+                    <th style={{ padding: '1rem', textAlign: 'center' }}>Modelo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mlData.map((row, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '1rem', fontWeight: 600 }}>{row.periodo_predicho}</td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ fontWeight: 600, color: '#334155' }}>{row.area}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{row.servicio}</div>
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: 700, color: '#10B981', fontSize: '1.05rem' }}>
+                        {formatCurrency(row.ingreso_estimado)}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'right', color: '#64748b', fontSize: '0.85rem' }}>
+                        {formatCurrency(row.intervalo_bajo)} - {formatCurrency(row.intervalo_alto)}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <span style={{ background: '#F3E8FF', color: '#7E22CE', padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
+                          {row.modelo_version}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
