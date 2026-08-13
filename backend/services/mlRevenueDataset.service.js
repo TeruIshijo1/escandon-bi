@@ -57,10 +57,10 @@ async function syncRevenueDataset() {
         to_char(fecha_de_cargo, 'YYYY-MM') as periodo_mes,
         unidad_de_servicio as area,
         grupo_de_articulos as servicio,
-        SUM(total) as ingresos_total,
+        SUM(total * precio_unitario) as ingresos_total,
         COUNT(DISTINCT folio_de_atencion) as num_cuentas
       FROM dw_vertical_cuentas_servicios
-      WHERE total > 0
+      WHERE total > 0 AND precio_unitario > 0
       GROUP BY to_char(fecha_de_cargo, 'YYYY-MM'), unidad_de_servicio, grupo_de_articulos
       ORDER BY area, servicio, periodo_mes ASC
     `);
