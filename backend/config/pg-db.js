@@ -439,6 +439,7 @@ async function initPostgresDW() {
         maxstock INT DEFAULT 0,
         pedidos_abiertos DECIMAL(18,4) DEFAULT 0,
         fecha_ultimo_movimiento TIMESTAMP WITH TIME ZONE,
+        fecha_desabasto TIMESTAMP WITH TIME ZONE,
         dias_stock_restante DECIMAL(18,4) DEFAULT 0,
         riesgo_base VARCHAR(20),
         fecha_calculo TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -461,6 +462,7 @@ async function initPostgresDW() {
         maxstock INT DEFAULT 0,
         pedidos_abiertos DECIMAL(18,4) DEFAULT 0,
         fecha_ultimo_movimiento TIMESTAMP WITH TIME ZONE,
+        fecha_desabasto TIMESTAMP WITH TIME ZONE,
         dias_stock_restante DECIMAL(18,4) DEFAULT 0,
         riesgo_base VARCHAR(20),
         target_desabasto_7d INT DEFAULT NULL,
@@ -482,7 +484,62 @@ async function initPostgresDW() {
         prob_desabasto_7d DECIMAL(8,6),
         riesgo_ml VARCHAR(20),
         modelo_version VARCHAR(50),
+        fecha_ultimo_movimiento TIMESTAMP WITH TIME ZONE,
+        fecha_desabasto TIMESTAMP WITH TIME ZONE,
+        fecha_estimada_agotamiento TIMESTAMP WITH TIME ZONE,
         fecha_prediccion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 12. Historial de corridas de entrenamiento ML (Paso 8 DataScience)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ml_model_runs (
+        run_id SERIAL PRIMARY KEY,
+        modelo_version VARCHAR(100),
+        fecha_entrenamiento TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        train_rows INT DEFAULT 0,
+        test_rows INT DEFAULT 0,
+        precision DECIMAL(8,6),
+        recall DECIMAL(8,6),
+        f1 DECIMAL(8,6),
+        roc_auc DECIMAL(8,6),
+        baseline_f1 DECIMAL(8,6),
+        notas TEXT
+      );
+    `);
+
+    // 13. Dataset Histórico Mensual de Ingresos (Paso F1 DataScience)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ml_dataset_ingresos_mensual (
+        periodo_mes VARCHAR(7), -- Formato 'YYYY-MM'
+        area VARCHAR(100), -- 'GENERAL' o áreas específicas
+        servicio VARCHAR(100), -- 'TODOS' o servicios específicos
+        ingresos_total DECIMAL(18,4) DEFAULT 0,
+        num_cuentas INT DEFAULT 0,
+        num_pacientes INT DEFAULT 0,
+        ticket_promedio DECIMAL(18,4) DEFAULT 0,
+        ingresos_mes_anterior DECIMAL(18,4) DEFAULT 0,
+        crecimiento_mensual DECIMAL(8,4) DEFAULT 0,
+        dia_habil_count INT DEFAULT 0,
+        festivos_count INT DEFAULT 0,
+        fecha_calculo TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (periodo_mes, area, servicio)
+      );
+    `);
+
+    // 14. Predicciones/Forecast de Ingresos (Paso F3 DataScience)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ml_forecast_ingresos_mensual (
+        periodo_predicho VARCHAR(7), -- Formato 'YYYY-MM'
+        area VARCHAR(100),
+        servicio VARCHAR(100),
+        ingreso_estimado DECIMAL(18,4) DEFAULT 0,
+        intervalo_bajo DECIMAL(18,4) DEFAULT 0,
+        intervalo_alto DECIMAL(18,4) DEFAULT 0,
+        modelo_version VARCHAR(50),
+        metodo VARCHAR(50),
+        fecha_prediccion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (periodo_predicho, area, servicio)
       );
     `);
 
@@ -499,6 +556,12 @@ async function initPostgresDW() {
     await pool.query(`ALTER TABLE dw_sap_kardex ALTER COLUMN almacenorigen TYPE VARCHAR(255);`).catch(() => {});
     await pool.query(`ALTER TABLE dw_sap_kardex ALTER COLUMN almacendestino TYPE VARCHAR(255);`).catch(() => {});
     await pool.query(`ALTER TABLE dw_sap_entradas ALTER COLUMN almacenreceptor TYPE VARCHAR(255);`).catch(() => {});
+
+    // Migraciones: columna fecha_desabasto (fecha en la que el SKU se agotó) en tablas ML
+    await pool.query(`ALTER TABLE ml_dataset_reorden_sku ADD COLUMN IF NOT EXISTS fecha_desabasto TIMESTAMP WITH TIME ZONE;`).catch(() => {});
+    await pool.query(`ALTER TABLE ml_dataset_reorden_sku_history ADD COLUMN IF NOT EXISTS fecha_desabasto TIMESTAMP WITH TIME ZONE;`).catch(() => {});
+    await pool.query(`ALTER TABLE ml_predictions_reorden_sku ADD COLUMN IF NOT EXISTS fecha_desabasto TIMESTAMP WITH TIME ZONE;`).catch(() => {});
+    await pool.query(`ALTER TABLE ml_predictions_reorden_sku ADD COLUMN IF NOT EXISTS fecha_estimada_agotamiento TIMESTAMP WITH TIME ZONE;`).catch(() => {});
 
     // Nuevas migraciones a TEXT para evitar truncamientos y errores de inserción
     await pool.query(`ALTER TABLE dw_vertical_consulta_dia ALTER COLUMN medico TYPE TEXT;`).catch(() => {});

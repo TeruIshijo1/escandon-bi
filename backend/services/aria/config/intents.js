@@ -24,6 +24,10 @@ const {
 } = require('../handlers/almacen.handler');
 
 const {
+  queryForecastIngresos
+} = require('../handlers/finanzas.handler');
+
+const {
   queryRecetasPendientes,
   queryLibroControlados,
   queryHistorialFarmacologico
@@ -437,6 +441,22 @@ const INTENT_REGISTRY = [
     handler: queryStockInsumo,
     priority: 16,
   },
+  
+  // ── FINANZAS ────────────────────────────────────────────────
+  {
+    id: 'finanzas-forecast-ingresos',
+    patterns: [
+      /forecast.*ingresos/,
+      /prediccion.*ingresos/,
+      /proyeccion.*ingresos/,
+      /cuanto.*dinero.*ingresara/,
+      /ingresos.*siguiente.*mes/,
+    ],
+    iaPermission: 'ia-finanzas',
+    sectionPerm: null,
+    handler: queryForecastIngresos,
+    priority: 20,
+  }
 ];
 
 /**

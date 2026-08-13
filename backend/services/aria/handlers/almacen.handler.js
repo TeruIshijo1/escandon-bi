@@ -252,9 +252,193 @@ async function queryKardexAlmacen() {
   }
 }
 
+/**
+ * Handler 5: Predicciones ML de Riesgo de Desabasto (Paso 7 DataScience)
+ * Responde: qué insumos están en riesgo, cuáles comprar, por qué un SKU está en
+ * riesgo, top de críticos y qué cambió desde ayer.
+ */
+async function queryRiesgoDesabasto(normalizedQuery = '') {
+  try {
+    // 1. ¿Preguntan por un SKU específico? (ej. "por qué ALG0013 está en riesgo")
+    const skuMatch = normalizedQuery.match(/\b([A-Z]{2,6}\s?\d{3,8})\b/i);
+
+    if (skuMatch) {
+      return await explicarRiesgoSku(skuMatch[1].replace(/\s+/g, '').toUpperCase());
+    }
+
+    // 2. ¿Preguntan por cambios desde ayer?
+    if (/ayer|cambio|diferencia|nuevo|empeor/.test(normalizedQuery)) {
+      return await cambiosRiesgoDesdeAyer();
+    }
+
+    // 3. Resumen general de riesgo (default)
+    return await resumenRiesgoDesabasto();
+  } catch (err) {
+    console.error('Error en queryRiesgoDesabasto:', err);
+    return {
+      topic: 'Predicciones ML: Riesgo de Desabasto',
+      answer: 'Error al consultar las predicciones de desabasto: ' + err.message
+    };
+  }
+}
+
+/** Resumen general: KPIs + top 10 críticos */
+async function resumenRiesgoDesabasto() {
+  const pgRes = await pool.query(`
+    SELECT
+      COUNT(*) FILTER (WHERE riesgo_ml = 'YA EN DESABASTO') AS ya_desabasto,
+      COUNT(*) FILTER (WHERE riesgo_ml = 'CRITICO') AS criticos,
+      COUNT(*) FILTER (WHERE riesgo_ml = 'ALTO') AS alto,
+      COUNT(*) FILTER (WHERE riesgo_ml = 'MEDIO') AS medio,
+      ROUND(AVG(prob_desabasto_7d)::numeric, 4) AS prob_promedio,
+      MAX(fecha_prediccion) AS ultima_prediccion,
+      MAX(modelo_version) AS modelo_version
+    FROM ml_predictions_reorden_sku
+  `);
+  const stats = pgRes.rows[0];
+
+  const pgTop = await pool.query(`
+    SELECT itemcode, itemdescription, stock_actual, dias_stock_restante,
+           prob_desabasto_7d, riesgo_ml
+    FROM ml_predictions_reorden_sku
+    WHERE riesgo_ml IN ('YA EN DESABASTO', 'CRITICO', 'ALTO')
+    ORDER BY prob_desabasto_7d DESC, itemcode ASC
+    LIMIT 10
+  `);
+  const rows = pgTop.rows;
+
+  if (!rows || rows.length === 0) {
+    return {
+      topic: 'Predicciones ML: Riesgo de Desabasto',
+      answer: 'No hay insumos en riesgo de desabasto en las predicciones actuales del modelo.',
+      kpis: [
+        { label: 'Críticos + Sin Stock', value: 0, color: '#16A34A' },
+        { label: 'Probabilidad Promedio', value: '0%', color: '#16A34A' }
+      ]
+    };
+  }
+
+  const probPromedio = Number(stats.prob_promedio || 0);
+  const fechaPred = stats.ultima_prediccion ? new Date(stats.ultima_prediccion).toLocaleString('es-MX') : 'N/D';
+  const totalRiesgo = Number(stats.ya_desabasto || 0) + Number(stats.criticos || 0) + Number(stats.alto || 0);
+
+  const tableRows = rows.map(r => [
+    r.itemcode,
+    r.itemdescription || 'Insumo',
+    Math.round(Number(r.stock_actual || 0)).toLocaleString('es-MX'),
+    Number(r.dias_stock_restante) >= 9999 ? '∞' : Math.round(Number(r.dias_stock_restante)),
+    (Number(r.prob_desabasto_7d) * 100).toFixed(1) + '%',
+    r.riesgo_ml
+  ]);
+
+  return {
+    topic: 'Predicciones ML: Insumos en Riesgo de Desabasto (próximos 7 días)',
+    answer: `El modelo de riesgo detecta **${totalRiesgo} insumos en riesgo** (sin stock, críticos o alto riesgo). Los **10 más críticos** ordenados por probabilidad de desabasto son:`,
+    kpis: [
+      { label: 'Ya Sin Stock', value: Number(stats.ya_desabasto || 0), color: '#7F1D1D' },
+      { label: 'Críticos ML', value: Number(stats.criticos || 0), color: '#DC2626' },
+      { label: 'Alto Riesgo ML', value: Number(stats.alto || 0), color: '#EA580C' },
+      { label: 'Prob. Promedio', value: (probPromedio * 100).toFixed(1) + '%', color: '#004687' },
+      { label: 'Modelo', value: stats.modelo_version || 'N/D', color: '#64748B' },
+      { label: 'Última Predicción', value: fechaPred, color: '#64748B' }
+    ],
+    table: {
+      headers: ['Código', 'Descripción', 'Stock', 'Días Rest.', 'Prob. 7d', 'Riesgo ML'],
+      rows: tableRows
+    }
+  };
+}
+
+/** Explicación individual por SKU: por qué está en riesgo */
+async function explicarRiesgoSku(itemcode) {
+  const pgRes = await pool.query(`
+    SELECT itemcode, itemdescription, stock_actual, consumo_promedio_diario,
+           dias_stock_restante, riesgo_base, prob_desabasto_7d, riesgo_ml,
+           modelo_version, fecha_prediccion
+    FROM ml_predictions_reorden_sku
+    WHERE itemcode = $1
+  `, [itemcode]);
+  const row = pgRes.rows[0];
+
+  if (!row) {
+    return {
+      topic: `Predicciones ML: ${itemcode}`,
+      answer: `No encontré predicciones para el SKU **${itemcode}**. Verifica que el código exista en el catálogo de reorden o que ya se hayan generado predicciones (botón "Calcular Alertas de Desabasto").`
+    };
+  }
+
+  const stock = Number(row.stock_actual || 0);
+  const consumo = Number(row.consumo_promedio_diario || 0);
+  const dias = Number(row.dias_stock_restante);
+  const prob = Number(row.prob_desabasto_7d);
+
+  const razones = [];
+  if (stock <= 0) razones.push('el stock actual es 0 (ya está en desabasto)');
+  if (consumo > 0 && dias > 0 && dias <= 3) razones.push(`solo quedan ~${Math.round(dias)} días de stock al consumo promedio actual`);
+  if (consumo > 0 && dias > 3 && dias <= 7) razones.push(`quedan ~${Math.round(dias)} días de stock, dentro de la ventana de 7 días`);
+  if (consumo > 0 && dias === 0) razones.push('no hay stock suficiente para cubrir el consumo diario');
+  if (razones.length === 0) razones.push('el patrón histórico de este SKU presenta riesgo de agotamiento');
+
+  return {
+    topic: `Predicciones ML: ${row.itemcode} — ${(row.itemdescription || '').slice(0, 60)}`,
+    answer: `**${row.itemcode}** (${row.itemdescription || 'Insumo'}) tiene probabilidad de desabasto de **${(prob * 100).toFixed(1)}%** en los próximos 7 días → **${row.riesgo_ml}**. Las razones: ${razones.join('; ')}. La regla base por stock lo clasifica como **${row.riesgo_base}**.`,
+    kpis: [
+      { label: 'Stock Actual', value: Math.round(stock).toLocaleString('es-MX'), color: stock <= 0 ? '#DC2626' : '#004687' },
+      { label: 'Consumo Promedio/Día', value: consumo.toFixed(2), color: '#0088C9' },
+      { label: 'Días de Stock Restante', value: dias >= 9999 ? '∞' : Math.round(dias), color: dias <= 7 ? '#DC2626' : '#16A34A' },
+      { label: 'Prob. Desabasto 7d', value: (prob * 100).toFixed(1) + '%', color: '#EA580C' },
+      { label: 'Riesgo ML', value: row.riesgo_ml, color: '#7F1D1D' }
+    ]
+  };
+}
+
+/** Compara las predicciones de hoy contra el snapshot de ayer (historial) */
+async function cambiosRiesgoDesdeAyer() {
+  const pgFechas = await pool.query(`
+    SELECT DISTINCT snapshot_date
+    FROM ml_dataset_reorden_sku_history
+    ORDER BY snapshot_date DESC
+    LIMIT 3
+  `);
+  const fechas = pgFechas.rows.map(r => r.snapshot_date);
+  if (fechas.length < 2) {
+    return {
+      topic: 'Predicciones ML: Cambios',
+      answer: 'Aún no hay suficiente historial de snapshots para comparar el cambio desde ayer (se necesitan al menos 2 días de historial).'
+    };
+  }
+  const hoy = fechas[0];
+  const ayer = fechas[1];
+
+  const pgRes = await pool.query(`
+    SELECT
+      COUNT(*) FILTER (WHERE hoy.stock_actual <= 0 AND ayer.stock_actual > 0) AS nuevos_desabastos,
+      COUNT(*) FILTER (WHERE hoy.riesgo_base = 'CRITICO' AND ayer.riesgo_base NOT IN ('CRITICO')) AS nuevos_criticos,
+      COUNT(*) FILTER (WHERE hoy.stock_actual > 0 AND ayer.stock_actual <= 0) AS recuperados,
+      COUNT(*) FILTER (WHERE hoy.riesgo_base NOT IN ('CRITICO') AND ayer.riesgo_base = 'CRITICO') AS salieron_criticos
+    FROM ml_dataset_reorden_sku_history hoy
+    LEFT JOIN ml_dataset_reorden_sku_history ayer
+      ON ayer.itemcode = hoy.itemcode AND ayer.snapshot_date = $2
+    WHERE hoy.snapshot_date = $1
+  `, [hoy, ayer]);
+  const r = pgRes.rows[0];
+
+  return {
+    topic: 'Predicciones ML: Cambios vs Ayer',
+    answer: `Comparando el snapshot de hoy (${hoy.toLocaleDateString('es-MX')}) contra ayer (${ayer.toLocaleDateString('es-MX')}): **${r.nuevos_desabastos} insumos cayeron en desabasto**, **${r.nuevos_criticos} pasaron a crítico**, mientras que **${r.recuperados} se recuperaron** y **${r.salieron_criticos} salieron de crítico**.`,
+    kpis: [
+      { label: 'Nuevos en Desabasto', value: Number(r.nuevos_desabastos), color: '#DC2626' },
+      { label: 'Nuevos Críticos', value: Number(r.nuevos_criticos), color: '#EA580C' },
+      { label: 'Recuperados', value: Number(r.recuperados), color: '#16A34A' },
+      { label: 'Salieron de Crítico', value: Number(r.salieron_criticos), color: '#0088C9' }
+    ]
+  };
+}
+
 module.exports = {
   queryInventarioAlmacenGeneral,
   queryTrasladosAlmacen,
   queryEntradasAlmacen,
-  queryKardexAlmacen
+  queryKardexAlmacen,
+  queryRiesgoDesabasto
 };

@@ -71,6 +71,8 @@ $ExcludePatterns = @(
     "*.sqlite",             # DBs sueltas
     "analisis_*.md",        # Docs de análisis temporal
     "database.sqlite",
+    "__pycache__",          # Caché de Python (se regenera)
+    "*.pyc",
     "uploads"               # Carpeta uploads (se crea en instalación)
 )
 
@@ -88,6 +90,10 @@ Get-ChildItem -Path "$ProjectRoot\backend" | Where-Object {
 
 # Crear carpeta uploads vacía (necesaria para runtime)
 New-Item -ItemType Directory -Path "$DeployDir\backend\uploads" -Force | Out-Null
+
+# Limpiar cachés de Python anidadas (__pycache__ / *.pyc) dentro del backend copiado
+Get-ChildItem -Path "$DeployDir\backend" -Recurse -Directory -Filter "__pycache__" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+Get-ChildItem -Path "$DeployDir\backend" -Recurse -File -Filter "*.pyc" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
 
 # ──────────────────────────────────────────────────────────
 # 4. Generar .env.example actualizado

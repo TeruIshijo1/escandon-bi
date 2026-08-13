@@ -60,6 +60,25 @@ async function syncMLDataset() {
     lastMovementMap.set(row.codigo, row.max_fecha);
   });
 
+  // 4b. Obtener movimientos del Kardex para calcular la fecha exacta en la que cada
+  // SKU llegó a stock 0 (solo es relevante para los que ya están en desabasto)
+  const kardexMovementsMap = new Map();
+  const pgResKardexMov = await pool.query(`
+    SELECT codigo, fecha, movimiento
+    FROM dw_sap_kardex
+    WHERE movimiento <> 0
+    ORDER BY codigo, fecha ASC
+  `);
+  pgResKardexMov.rows.forEach(row => {
+    if (!kardexMovementsMap.has(row.codigo)) {
+      kardexMovementsMap.set(row.codigo, []);
+    }
+    kardexMovementsMap.get(row.codigo).push({
+      fecha: row.fecha,
+      movimiento: Number(row.movimiento || 0)
+    });
+  });
+
   // 5. Obtener consumo diario de los últimos 30 días
   // Agrupado por SKU y día para poder calcular consumo en ventanas y la desviación estándar
   const pgResConsumos = await pool.query(`
@@ -110,6 +129,24 @@ async function syncMLDataset() {
 
     // D. Último Movimiento
     const fechaUltimoMovimiento = lastMovementMap.get(itemCode) || null;
+
+    // D2. Fecha en la que el SKU se agotó (solo si ya está en desabasto):
+    // recorrer el kardex con balance acumulado (stock actual + movimientos futuros)
+    // hasta encontrar el movimiento que dejó el balance en 0
+    let fechaDesabasto = null;
+    if (stockActual <= 0) {
+      const movs = kardexMovementsMap.get(itemCode) || [];
+      if (movs.length > 0) {
+        let balance = stockActual - movs.reduce((sum, m) => sum + m.movimiento, 0);
+        for (const m of movs) {
+          balance += m.movimiento;
+          if (balance <= 0) {
+            fechaDesabasto = m.fecha;
+            break;
+          }
+        }
+      }
+    }
 
     // E. Ventanas de consumo
     const skuConsumptions = consumptionBySku.get(itemCode) || {};
@@ -169,6 +206,7 @@ async function syncMLDataset() {
       maxstock: maxStock,
       pedidos_abiertos: pedidosAbiertos,
       fecha_ultimo_movimiento: fechaUltimoMovimiento,
+      fecha_desabasto: fechaDesabasto,
       dias_stock_restante: diasStockRestante,
       riesgo_base: riesgoBase
     });
@@ -190,8 +228,8 @@ async function syncMLDataset() {
         INSERT INTO ml_dataset_reorden_sku (
           itemcode, itemdescription, stock_actual, consumo_7d, consumo_15d, consumo_30d, 
           consumo_promedio_diario, variabilidad_consumo, minstock, maxstock, 
-          pedidos_abiertos, fecha_ultimo_movimiento, dias_stock_restante, riesgo_base, fecha_calculo
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+          pedidos_abiertos, fecha_ultimo_movimiento, fecha_desabasto, dias_stock_restante, riesgo_base, fecha_calculo
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
       `, [
         item.itemcode,
         item.itemdescription,
@@ -205,6 +243,7 @@ async function syncMLDataset() {
         item.maxstock,
         item.pedidos_abiertos,
         item.fecha_ultimo_movimiento,
+        item.fecha_desabasto,
         item.dias_stock_restante,
         item.riesgo_base
       ]);
@@ -214,8 +253,8 @@ async function syncMLDataset() {
         INSERT INTO ml_dataset_reorden_sku_history (
           snapshot_date, itemcode, itemdescription, stock_actual, consumo_7d, consumo_15d, consumo_30d, 
           consumo_promedio_diario, variabilidad_consumo, minstock, maxstock, 
-          pedidos_abiertos, fecha_ultimo_movimiento, dias_stock_restante, riesgo_base, fecha_calculo
-        ) VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+          pedidos_abiertos, fecha_ultimo_movimiento, fecha_desabasto, dias_stock_restante, riesgo_base, fecha_calculo
+        ) VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
         ON CONFLICT (snapshot_date, itemcode) DO UPDATE SET
           itemdescription = EXCLUDED.itemdescription,
           stock_actual = EXCLUDED.stock_actual,
@@ -228,6 +267,7 @@ async function syncMLDataset() {
           maxstock = EXCLUDED.maxstock,
           pedidos_abiertos = EXCLUDED.pedidos_abiertos,
           fecha_ultimo_movimiento = EXCLUDED.fecha_ultimo_movimiento,
+          fecha_desabasto = EXCLUDED.fecha_desabasto,
           dias_stock_restante = EXCLUDED.dias_stock_restante,
           riesgo_base = EXCLUDED.riesgo_base,
           fecha_calculo = CURRENT_TIMESTAMP
@@ -244,6 +284,7 @@ async function syncMLDataset() {
         item.maxstock,
         item.pedidos_abiertos,
         item.fecha_ultimo_movimiento,
+        item.fecha_desabasto,
         item.dias_stock_restante,
         item.riesgo_base
       ]);

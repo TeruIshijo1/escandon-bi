@@ -132,6 +132,7 @@ const ariaRoutes = require('./routes/aria.routes');
 const pharmacyRoutes = require('./routes/pharmacy.routes');
 const sapRoutes = require('./routes/sap.routes');
 const almacenRoutes = require('./routes/almacen.routes');
+const finanzasRoutes = require('./routes/finanzas.routes');
 
 app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/dashboard',     dashboardRoutes);
@@ -146,6 +147,7 @@ app.use('/api/data-quality',  dataQualityRoutes);
 app.use('/api/pharmacy',      pharmacyRoutes);
 app.use('/api/almacen',       almacenRoutes);
 app.use('/api/sap',           sapRoutes);
+app.use('/api/finanzas',      finanzasRoutes);
 app.use('/api/files', authenticate, express.static(path.join(__dirname, 'uploads')));
 
 // Servir Frontend compilado en Producción
@@ -249,6 +251,15 @@ app.get('/health', (req, res) => {
 
       // Sincronizar todos los tableros en PostgreSQL DW (fullSync si alguna tabla clave está vacía)
       initDashboardCron();
+
+      // Re-entrenamiento automático del modelo ML (diario 04:30)
+      try {
+        const { initMLCron } = require('./services/mlPipeline.service');
+        initMLCron();
+      } catch (err) {
+        console.warn('⚠️ No se pudo inicializar el cron de ML Pipeline:', err.message);
+      }
+
       try {
         const countPC = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_pc');
         const countSrv = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_cuentas_servicios');

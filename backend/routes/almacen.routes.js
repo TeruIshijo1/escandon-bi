@@ -2,6 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const sapInventoryService = require('../services/sapInventory.service');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const { pool } = require('../config/pg-db');
@@ -811,6 +812,7 @@ router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
         maxstock AS "maxstock",
         pedidos_abiertos AS "pedidos_abiertos",
         fecha_ultimo_movimiento AS "fecha_ultimo_movimiento",
+        fecha_desabasto AS "fecha_desabasto",
         dias_stock_restante AS "dias_stock_restante",
         riesgo_base AS "riesgo_base",
         target_desabasto_7d AS "target_desabasto_7d",
@@ -836,7 +838,7 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
       SELECT 
         snapshot_date, itemcode, itemdescription, stock_actual, consumo_7d, consumo_15d, consumo_30d, 
         consumo_promedio_diario, variabilidad_consumo, minstock, maxstock, pedidos_abiertos, 
-        fecha_ultimo_movimiento, dias_stock_restante, riesgo_base, target_desabasto_7d, target_desabasto_15d, fecha_calculo
+        fecha_ultimo_movimiento, fecha_desabasto, dias_stock_restante, riesgo_base, target_desabasto_7d, target_desabasto_15d, fecha_calculo
       FROM ml_dataset_reorden_sku_history
       ORDER BY snapshot_date DESC, itemcode ASC
     `);
@@ -844,7 +846,7 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
     const headers = [
       'snapshot_date', 'itemcode', 'itemdescription', 'stock_actual', 'consumo_7d', 'consumo_15d', 
       'consumo_30d', 'consumo_promedio_diario', 'variabilidad_consumo', 'minstock', 'maxstock', 'pedidos_abiertos', 
-      'fecha_ultimo_movimiento', 'dias_stock_restante', 'riesgo_base', 'target_desabasto_7d', 'target_desabasto_15d', 'fecha_calculo'
+      'fecha_ultimo_movimiento', 'fecha_desabasto', 'dias_stock_restante', 'riesgo_base', 'target_desabasto_7d', 'target_desabasto_15d', 'fecha_calculo'
     ];
     
     let csv = '\uFEFF' + headers.join(',') + '\n';
@@ -881,6 +883,25 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
 });
 
 /**
+ * GET /api/almacen/ml-model-metrics
+ * Retorna las métricas del último entrenamiento del modelo (reorder_risk_metrics.json)
+ */
+router.get('/ml-model-metrics', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), (req, res) => {
+  try {
+    const fs = require('fs');
+    const metricsPath = path.join(__dirname, '..', 'ml', 'reports', 'reorder_risk_metrics.json');
+    if (!fs.existsSync(metricsPath)) {
+      return res.status(404).json({ ok: false, error: 'No hay métricas de modelo disponibles. Ejecuta el entrenamiento primero.' });
+    }
+    const metrics = JSON.parse(fs.readFileSync(metricsPath, 'utf-8'));
+    res.json({ ok: true, data: metrics });
+  } catch (err) {
+    console.error('[GET ML Model Metrics Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar métricas del modelo' });
+  }
+});
+
+/**
  * GET /api/almacen/ml-predictions
  * Retorna las predicciones de Machine Learning actuales
  */
@@ -897,6 +918,9 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
         prob_desabasto_7d AS "prob_desabasto_7d",
         riesgo_ml AS "riesgo_ml",
         modelo_version AS "modelo_version",
+        fecha_ultimo_movimiento AS "fecha_ultimo_movimiento",
+        fecha_desabasto AS "fecha_desabasto",
+        fecha_estimada_agotamiento AS "fecha_estimada_agotamiento",
         fecha_prediccion AS "fecha_prediccion"
       FROM ml_predictions_reorden_sku
       ORDER BY prob_desabasto_7d DESC, itemcode ASC
@@ -914,7 +938,6 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
  */
 router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), (req, res) => {
   const { exec } = require('child_process');
-  const path = require('path');
   const scriptPath = path.join(__dirname, '..', 'ml', 'predict_reorder_risk.py');
   
   console.log(`[ML Express] Ejecutando subproceso python en: ${scriptPath}`);

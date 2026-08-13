@@ -180,12 +180,27 @@ async function runBackfill() {
           const pastMovs = skuMovs.filter(m => new Date(m.fecha).toISOString().split('T')[0] <= dateStr);
           const fechaUltimoMovimiento = pastMovs.length > 0 ? pastMovs[pastMovs.length - 1].fecha : null;
 
+          // Determinar fecha de desabasto: si el stock del snapshot ya era 0,
+          // recorrer el kardex con balance acumulado hasta encontrar el movimiento
+          // que dejó el balance en 0 (la fecha en la que se acabó)
+          let fechaDesabasto = null;
+          if (stockActual <= 0 && pastMovs.length > 0) {
+            let balance = stockActual - pastMovs.reduce((s, m) => s + Number(m.movimiento || 0), 0);
+            for (const m of pastMovs) {
+              balance += Number(m.movimiento || 0);
+              if (balance <= 0) {
+                fechaDesabasto = m.fecha;
+                break;
+              }
+            }
+          }
+
           await client.query(`
             INSERT INTO ml_dataset_reorden_sku_history (
               snapshot_date, itemcode, itemdescription, stock_actual, consumo_7d, consumo_15d, consumo_30d, 
               consumo_promedio_diario, variabilidad_consumo, minstock, maxstock, 
-              pedidos_abiertos, fecha_ultimo_movimiento, dias_stock_restante, riesgo_base, fecha_calculo
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, $12, $13, $14, CURRENT_TIMESTAMP)
+              pedidos_abiertos, fecha_ultimo_movimiento, fecha_desabasto, dias_stock_restante, riesgo_base, fecha_calculo
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, $12, $13, $14, $15, CURRENT_TIMESTAMP)
             ON CONFLICT (snapshot_date, itemcode) DO NOTHING
           `, [
             dateStr,
@@ -200,6 +215,7 @@ async function runBackfill() {
             minStock,
             maxStock,
             fechaUltimoMovimiento,
+            fechaDesabasto,
             diasStockRestante,
             riesgoBase
           ]);

@@ -65,10 +65,10 @@ def main():
     
     print("[Train] Leyendo datos históricos desde PostgreSQL...")
     df = pd.read_sql(query, conn)
-    conn.close()
 
     if df.empty:
         print("❌ Error: No se encontraron registros maduros en ml_dataset_reorden_sku_history.")
+        conn.close()
         return
 
     print(f"[Train] Cargados {len(df)} registros para entrenamiento.")
@@ -125,6 +125,16 @@ def main():
         'LogisticRegression': LogisticRegression(class_weight='balanced', max_iter=2000, random_state=42),
         'RandomForestClassifier': RandomForestClassifier(class_weight='balanced', n_estimators=100, random_state=42)
     }
+
+    # 6b. Baseline de reglas de negocio (riesgo_base >= ALTO predice desabasto)
+    # Sirve para demostrar que el ML aporta valor sobre la regla actual
+    baseline_pred_test = (test_df['riesgo_base'].isin(['CRITICO', 'ALTO'])).astype(int)
+    baseline_acc = accuracy_score(y_test, baseline_pred_test)
+    baseline_prec = precision_score(y_test, baseline_pred_test, zero_division=0)
+    baseline_rec = recall_score(y_test, baseline_pred_test, zero_division=0)
+    baseline_f1 = f1_score(y_test, baseline_pred_test, zero_division=0)
+    baseline_cm = confusion_matrix(y_test, baseline_pred_test).tolist()
+    print(f"[BASELINE] Reglas (riesgo_base CRITICO/ALTO) | Acc: {baseline_acc:.4f} | Prec: {baseline_prec:.4f} | Recall: {baseline_rec:.4f} | F1: {baseline_f1:.4f}")
 
     best_model_name = None
     best_model = None
@@ -190,12 +200,49 @@ def main():
         'train_samples': len(train_df),
         'test_samples': len(test_df),
         'features': numeric_cols,
-        'performance': best_metrics
+        'performance': best_metrics,
+        'baseline': {
+            'name': 'Reglas de negocio (riesgo_base CRITICO/ALTO)',
+            'accuracy': baseline_acc,
+            'precision': baseline_prec,
+            'recall': baseline_rec,
+            'f1_score': baseline_f1,
+            'confusion_matrix': baseline_cm,
+            'mejora_f1_vs_baseline': round(best_metrics['f1_score'] - baseline_f1, 4)
+        }
     }
     report_path = os.path.join(reports_dir, 'reorder_risk_metrics.json')
     with open(report_path, 'w', encoding='utf-8') as f:
         json.dump(metrics_report, f, indent=2, ensure_ascii=False)
     print(f"[Train] Reporte de métricas guardado en {report_path}")
+
+    # 9. Registrar corrida en ml_model_runs (historial de desempeño del modelo)
+    try:
+        run_cursor = conn.cursor()
+        run_cursor.execute("""
+            INSERT INTO ml_model_runs (
+                modelo_version, fecha_entrenamiento, train_rows, test_rows,
+                precision, recall, f1, roc_auc, baseline_f1, notas
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            best_model_name + ' v' + model_data['model_version'],
+            pd.Timestamp.now(),
+            len(train_df),
+            len(test_df),
+            best_metrics['precision'],
+            best_metrics['recall'],
+            best_metrics['f1_score'],
+            best_metrics['roc_auc'],
+            baseline_f1,
+            'Entrenamiento automatico diario (04:30 cron)'
+        ))
+        conn.commit()
+        print(f"[Train] Corrida registrada en ml_model_runs (modelo: {best_model_name}, F1: {best_metrics['f1_score']:.4f})")
+    except Exception as e:
+        conn.rollback()
+        print("[Train] Advertencia: no se pudo registrar la corrida en ml_model_runs:", e)
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     main()

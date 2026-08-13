@@ -1,4 +1,6 @@
 import os
+import math
+from datetime import date, timedelta
 import psycopg2
 import pandas as pd
 import numpy as np
@@ -57,7 +59,9 @@ def main():
             maxstock,
             pedidos_abiertos,
             dias_stock_restante,
-            riesgo_base
+            riesgo_base,
+            fecha_ultimo_movimiento,
+            fecha_desabasto
         FROM ml_dataset_reorden_sku
     """
     
@@ -87,8 +91,15 @@ def main():
     probabilities = model.predict_proba(X)[:, 1]
     df['prob_desabasto_7d'] = probabilities
 
+    # Override: si el stock ya es 0, no hay nada que predecir — ya esta en desabasto
+    mask_ya_desabasto = df['stock_actual'] <= 0
+    df.loc[mask_ya_desabasto, 'prob_desabasto_7d'] = 1.0
+
     # Asignar riesgo_ml basado en los umbrales del negocio
-    def get_risk_ml(prob):
+    def get_risk_ml(row):
+        if row['stock_actual'] <= 0:
+            return 'YA EN DESABASTO'
+        prob = row['prob_desabasto_7d']
         if prob >= 0.80:
             return 'CRITICO'
         elif prob >= 0.60:
@@ -98,8 +109,20 @@ def main():
         else:
             return 'BAJO'
 
-    df['riesgo_ml'] = df['prob_desabasto_7d'].apply(get_risk_ml)
+    df['riesgo_ml'] = df.apply(get_risk_ml, axis=1)
     df['modelo_version'] = model_version
+
+    # 6b. Fecha estimada de agotamiento: hoy + días de stock restante
+    # (solo aplica si hay consumo; si el stock ya es 0 la fecha ya pasó)
+    def calc_fecha_agotamiento(row):
+        if float(row.get('stock_actual') or 0) <= 0:
+            return None
+        dias = float(row.get('dias_stock_restante') or 0)
+        if dias >= 9999:
+            return None
+        return date.today() + timedelta(days=math.ceil(dias))
+
+    df['fecha_estimada_agotamiento'] = df.apply(calc_fecha_agotamiento, axis=1)
 
     # 7. Persistir predicciones en PostgreSQL con transacción y limpieza
     print("[Predict] Guardando predicciones en PostgreSQL...")
@@ -112,12 +135,25 @@ def main():
             INSERT INTO ml_predictions_reorden_sku (
                 itemcode, itemdescription, stock_actual, consumo_promedio_diario, 
                 dias_stock_restante, riesgo_base, prob_desabasto_7d, riesgo_ml, 
-                modelo_version, fecha_prediccion
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                modelo_version, fecha_ultimo_movimiento, fecha_desabasto,
+                fecha_estimada_agotamiento, fecha_prediccion
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
         """
         
         records_to_insert = []
         for _, row in df.iterrows():
+            # fecha_ultimo_movimiento puede ser NaT/None
+            fecha_ult = row.get('fecha_ultimo_movimiento')
+            if pd.isna(fecha_ult):
+                fecha_ult = None
+            # fecha_desabasto puede ser NaT/None (solo existe si el SKU ya se agotó)
+            fecha_desab = row.get('fecha_desabasto')
+            if pd.isna(fecha_desab):
+                fecha_desab = None
+            # fecha_estimada_agotamiento puede ser None (sin consumo o ya agotado)
+            fecha_agot = row.get('fecha_estimada_agotamiento')
+            if pd.isna(fecha_agot):
+                fecha_agot = None
             records_to_insert.append((
                 row['itemcode'],
                 row['itemdescription'],
@@ -127,7 +163,10 @@ def main():
                 row['riesgo_base'],
                 float(row['prob_desabasto_7d']),
                 row['riesgo_ml'],
-                row['modelo_version']
+                row['modelo_version'],
+                fecha_ult,
+                fecha_desab,
+                fecha_agot
             ))
             
         cursor.executemany(insert_query, records_to_insert)

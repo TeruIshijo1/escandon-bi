@@ -198,7 +198,7 @@ export default function PuntoReordenAlmacen() {
     const headers = [
       'itemcode', 'itemdescription', 'stock_actual', 'consumo_promedio_diario', 
       'dias_stock_restante', 'riesgo_base', 'prob_desabasto_7d', 'riesgo_ml', 
-      'modelo_version', 'fecha_prediccion'
+      'modelo_version', 'fecha_estimada_agotamiento', 'fecha_desabasto', 'fecha_prediccion'
     ];
     const csvRows = [headers.join(',')];
     
@@ -1324,6 +1324,7 @@ export default function PuntoReordenAlmacen() {
                 style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '8px', outline: 'none', fontSize: '0.9rem', background: 'var(--color-bg-white, white)', color: 'var(--text-primary, #0f172a)' }}
               >
                 <option value="ALL">Todos los Riesgos</option>
+                <option value="YA EN DESABASTO">⚫ YA EN DESABASTO</option>
                 <option value="CRITICO">🔴 CRITICO</option>
                 <option value="ALTO">🟠 ALTO</option>
                 <option value="MEDIO">🟡 MEDIO</option>
@@ -1543,7 +1544,7 @@ export default function PuntoReordenAlmacen() {
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo Base por Stock</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Riesgo de Agotarse (Próximos 7 días)</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Diagnóstico Inteligente (IA)</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Fecha del Pronóstico</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Fecha</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1558,6 +1559,7 @@ export default function PuntoReordenAlmacen() {
                         { bg: '#dcfce7', text: '#166534', border: '#bbf7d0' };
 
                       const riskColorML = 
+                        row.riesgo_ml === 'YA EN DESABASTO' ? { bg: '#7f1d1d', text: '#ffffff', border: '#991b1b' } :
                         row.riesgo_ml === 'CRITICO' ? { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' } :
                         row.riesgo_ml === 'ALTO' ? { bg: '#ffedd5', text: '#9a3412', border: '#fed7aa' } :
                         row.riesgo_ml === 'MEDIO' ? { bg: '#fef9c3', text: '#854d0e', border: '#fef08a' } :
@@ -1565,7 +1567,19 @@ export default function PuntoReordenAlmacen() {
 
                       const probVal = Number(row.prob_desabasto_7d);
                       const probPercent = (probVal * 100).toFixed(1) + '%';
-                      const predDateStr = row.fecha_prediccion ? new Date(row.fecha_prediccion).toLocaleString('es-MX') : '-';
+                      const predDateStr = row.fecha_prediccion ? new Date(row.fecha_prediccion).toLocaleString('es-MX') : null;
+                      const lastMovDateStr = row.fecha_ultimo_movimiento ? new Date(row.fecha_ultimo_movimiento).toLocaleString('es-MX') : null;
+                      const outOfStockDateStr = row.fecha_desabasto ? new Date(row.fecha_desabasto).toLocaleString('es-MX') : null;
+                      const estAgotDateStr = row.fecha_estimada_agotamiento ? new Date(row.fecha_estimada_agotamiento).toLocaleDateString('es-MX') : null;
+
+                      // Para items YA EN DESABASTO, mostrar la fecha en la que se acabó (nunca un pronóstico);
+                      // para los demás, la fecha estimada en que se agotará el stock
+                      const isYaDesabasto = row.riesgo_ml === 'YA EN DESABASTO';
+                      const desabastoDate = outOfStockDateStr || lastMovDateStr;
+                      const daysRemainingNum = Number(row.dias_stock_restante);
+                      const sinConsumo = daysRemainingNum >= 9999;
+                      const displayDate = isYaDesabasto ? (desabastoDate || '-') : (sinConsumo ? '∞' : (estAgotDateStr || '-'));
+                      const dateLabel = isYaDesabasto ? 'Sin stock desde' : (sinConsumo ? 'Consumo nulo' : 'Se agota aprox.');
 
                       return (
                         <tr key={idx} style={{ borderBottom: '1px solid var(--border-color, #e2e8f0)', background: idx % 2 === 0 ? 'var(--color-bg-white, white)' : 'var(--color-bg-base, #f8fafc)' }}>
@@ -1613,8 +1627,9 @@ export default function PuntoReordenAlmacen() {
                               {row.riesgo_ml}
                             </span>
                           </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted, #64748b)' }}>
-                            {predDateStr}
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: isYaDesabasto ? '#dc2626' : 'var(--text-muted, #64748b)' }}>
+                            <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '600', marginBottom: '2px', color: isYaDesabasto ? '#991b1b' : '#94a3b8' }}>{dateLabel}</span>
+                            {displayDate}
                           </td>
                         </tr>
                       );
