@@ -1101,6 +1101,25 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       }
     }
 
+    // 3.5. Integrar Predicción de ML (IA) si existe
+    try {
+      const mlRes = await pgPool.query("SELECT periodo_predicho, ingreso_estimado FROM ml_forecast_ingresos_mensual WHERE area = 'GENERAL' AND servicio = 'TODOS'");
+      if (mlRes.rows.length > 0) {
+        mlRes.rows.forEach(mlRow => {
+          const mlMonth = mlRow.periodo_predicho;
+          const mlIngreso = Number(mlRow.ingreso_estimado);
+          
+          let existingPrediction = tendenciaMensual.find(m => m.month === mlMonth);
+          if (existingPrediction) {
+            existingPrediction.IngresosProyectados = mlIngreso;
+            existingPrediction.isML = true; // Flag for frontend if needed
+          }
+        });
+      }
+    } catch(err) {
+      console.error('[Dashboard] Error al mezclar ML forecast con dashboard financiero-nativo:', err);
+    }
+
     // KPIs Generales Acumulados
     let totalIng = 0, totalUt = 0, totalCuentas = 0, totalCostos = 0;
     Object.keys(dataByMonth).forEach(m => {

@@ -181,7 +181,7 @@ export default function DashboardFinancieroNativo({ globalFilters, globalTrigger
         
         {/* Gráfica de Barras: Ingresos vs Costos con Proyecciones */}
         <div style={{ flex: '1 1 500px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,70,135,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Ingresos vs Costos y Proyección (RLS)</h3>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Ingresos vs Costos y Proyección (ML/IA)</h3>
           <div style={{ width: '100%', height: 350 }}>
             <ResponsiveContainer>
               <BarChart data={tendenciaMensual} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
