@@ -1344,20 +1344,20 @@ export default function PuntoReordenAlmacen() {
                 No se encontraron registros en el inventario de hoy.
               </div>
             ) : (
-              <div style={{ overflowX: 'auto', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '10px' }}>
+              <div style={{ maxHeight: '65vh', overflow: 'auto', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '10px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'var(--color-bg-base, #f1f5f9)', borderBottom: '2px solid var(--border-color, #cbd5e1)', color: 'var(--text-secondary, #475569)', fontWeight: 'bold' }}>
-                      <th style={{ padding: '0.75rem 1rem' }}>Código</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Descripción</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Disponible</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Mín / Máx</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Pedido en Camino</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo (7d / 15d / 30d)</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Variación de Consumo</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock Restante</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo de Desabasto</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Código</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Descripción</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Disponible</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Mín / Máx</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Pedido en Camino</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo (7d / 15d / 30d)</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Variación de Consumo</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock Restante</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo de Desabasto</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1428,20 +1428,20 @@ export default function PuntoReordenAlmacen() {
                 No hay registros en el historial de consumo para el filtro seleccionado.
               </div>
             ) : (
-              <div style={{ overflowX: 'auto', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '10px' }}>
+              <div style={{ maxHeight: '65vh', overflow: 'auto', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '10px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'var(--color-bg-base, #f1f5f9)', borderBottom: '2px solid var(--border-color, #cbd5e1)', color: 'var(--text-secondary, #475569)', fontWeight: 'bold' }}>
-                      <th style={{ padding: '0.75rem 1rem' }}>Fecha de Registro</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Código</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Descripción</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Stock en la Fecha</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo 30 días</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo de Desabasto</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>¿Se agotó a los 7 días?</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>¿Se agotó a los 15 días?</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Fecha de Registro</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Código</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Descripción</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock en la Fecha</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo 30 días</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo de Desabasto</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>¿Se agotó a los 7 días?</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>¿Se agotó a los 15 días?</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1531,19 +1531,19 @@ export default function PuntoReordenAlmacen() {
                 No hay pronósticos disponibles. Haz clic en "Calcular Alertas de Desabasto (IA)" para generarlos.
               </div>
             ) : (
-              <div style={{ overflowX: 'auto', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '10px' }}>
+              <div style={{ maxHeight: '65vh', overflow: 'auto', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '10px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'var(--color-bg-base, #f1f5f9)', borderBottom: '2px solid var(--border-color, #cbd5e1)', color: 'var(--text-secondary, #475569)', fontWeight: 'bold' }}>
-                      <th style={{ padding: '0.75rem 1rem' }}>Código</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Descripción</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Disponible</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock Restante</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo Base por Stock</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Riesgo de Agotarse (Próximos 7 días)</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Diagnóstico Inteligente (IA)</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Fecha del Pronóstico</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Código</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Descripción</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Disponible</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock Restante</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo Base por Stock</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Riesgo de Agotarse (Próximos 7 días)</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Diagnóstico Inteligente (IA)</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Fecha del Pronóstico</th>
                     </tr>
                   </thead>
                   <tbody>
