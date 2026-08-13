@@ -3,6 +3,7 @@
 const cron = require('node-cron');
 const { exec } = require('child_process');
 const path = require('path');
+const { syncRevenueDataset } = require('./mlRevenueDataset.service');
 
 const isRunning = { train: false, predict: false };
 
@@ -44,6 +45,14 @@ async function runMLPipeline() {
     await runPythonScript('train_reorder_risk.py');
     console.log('[ML Pipeline] Modelo re-entrenado. Regenerando predicciones...');
     await runPythonScript('predict_reorder_risk.py');
+
+    console.log('[ML Pipeline] Generando dataset mensual de ingresos (Línea Financiera)...');
+    await syncRevenueDataset();
+    console.log('[ML Pipeline] Re-entrenando modelo de ingresos...');
+    await runPythonScript('train_revenue_forecast.py');
+    console.log('[ML Pipeline] Generando proyección de ingresos del siguiente mes...');
+    await runPythonScript('predict_revenue_forecast.py');
+
     const duration = ((Date.now() - startedAt) / 1000).toFixed(1);
     console.log(`✅ [ML Pipeline] Re-entrenamiento y predicción completados en ${duration}s.`);
     return { ok: true, duration };

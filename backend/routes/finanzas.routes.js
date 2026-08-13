@@ -3,10 +3,11 @@ const router = express.Router();
 const { pool } = require('../config/pg-db');
 const { exec } = require('child_process');
 const path = require('path');
+const { authenticate, authorize } = require('../middleware/auth.middleware');
 
 // GET /api/finanzas/ml-forecast
 // Retorna las proyecciones de ingresos para el siguiente mes
-router.get('/ml-forecast', async (req, res) => {
+router.get('/ml-forecast', authenticate, authorize(['ADMIN', 'DIRECTOR']), async (req, res) => {
   try {
     const query = `
       SELECT 
@@ -32,7 +33,7 @@ router.get('/ml-forecast', async (req, res) => {
 
 // POST /api/finanzas/ml-forecast/run
 // Ejecuta asíncronamente el script de predicción en Python
-router.post('/ml-forecast/run', (req, res) => {
+router.post('/ml-forecast/run', authenticate, authorize(['ADMIN', 'DIRECTOR']), (req, res) => {
   const scriptPath = path.join(__dirname, '..', 'ml', 'predict_revenue_forecast.py');
   
   exec(`python "${scriptPath}"`, (error, stdout, stderr) => {

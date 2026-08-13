@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 
-export default function DashboardUciNativo({ data }) {
+export default function DashboardHospitalizacionNativo({ data }) {
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -112,11 +112,11 @@ export default function DashboardUciNativo({ data }) {
   return (
     <div style={{ marginTop: '2rem', fontFamily: 'var(--font-body)' }}>
       <style>{`
-        .uci-card-glow {
+        .hos-card-glow {
           box-shadow: 0 4px 6px rgba(0,0,0,0.03);
           transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .uci-card-glow:hover {
+        .hos-card-glow:hover {
           transform: translateY(-3px);
           box-shadow: 0 10px 20px rgba(239, 68, 68, 0.08);
         }
@@ -169,9 +169,9 @@ export default function DashboardUciNativo({ data }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         
         {/* KPI: Facturación Total */}
-        <div className="uci-card-glow" style={{ background: 'linear-gradient(135deg, #1E293B, #0F172A)', color: 'white', padding: '1.5rem', borderRadius: '16px', position: 'relative', overflow: 'hidden' }}>
+        <div className="hos-card-glow" style={{ background: 'linear-gradient(135deg, #1E293B, #0F172A)', color: 'white', padding: '1.5rem', borderRadius: '16px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', opacity: 0.08, fontSize: '6rem' }}>💰</div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94A3B8' }}>Facturación UCI (Acumulada)</div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94A3B8' }}>Facturación Hospitalización (Acumulada)</div>
           <div style={{ fontSize: '1.85rem', fontWeight: 800, fontFamily: 'var(--font-mono)', margin: '0.5rem 0' }}>
             {formatCurrency(kpis.totalFacturado || 0)}
           </div>
@@ -181,9 +181,9 @@ export default function DashboardUciNativo({ data }) {
         </div>
 
         {/* KPI: Ocupación */}
-        <div className="uci-card-glow" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
+        <div className="hos-card-glow" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-10px', bottom: '-15px', opacity: 0.05, fontSize: '6rem' }}>🛏️</div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Ocupación de Camas UCI</div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Ocupación de Camas Hospitalización</div>
           <div style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: '#EF4444', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
             {kpis.ocupacionPct || 0}%
             <span style={{ fontSize: '0.9rem', color: '#64748B', fontWeight: 600 }}>({kpis.camasOcupadas}/{kpis.totalCamas} camas)</span>
@@ -195,26 +195,26 @@ export default function DashboardUciNativo({ data }) {
         </div>
 
         {/* KPI: Estancia Promedio */}
-        <div className="uci-card-glow" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
+        <div className="hos-card-glow" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-10px', bottom: '-15px', opacity: 0.05, fontSize: '6rem' }}>⏱️</div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Estancia Promedio UCI</div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Estancia Promedio Hospitalización</div>
           <div style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: '#0F172A' }}>
             {kpis.estanciaPromedio || 0} <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#64748B' }}>días</span>
           </div>
           <div style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <span>⏱️</span> <span>Promedio por paciente egresado de UCI</span>
+            <span>⏱️</span> <span>Promedio por paciente egresado de Hospitalización</span>
           </div>
         </div>
 
         {/* KPI: Mortalidad */}
-        <div className="uci-card-glow" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
+        <div className="hos-card-glow" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-10px', bottom: '-15px', opacity: 0.05, fontSize: '6rem' }}>🩺</div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Tasa de Mortalidad UCI</div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Tasa de Mortalidad Hospitalización</div>
           <div style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: '#0F172A' }}>
             {kpis.tasaMortalidad || 0}%
           </div>
           <div style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <span>⚠️</span> <span>Egresados fallecidos en Terapia Intensiva</span>
+            <span>⚠️</span> <span>Egresados fallecidos en Hospitalización</span>
           </div>
         </div>
 
@@ -224,9 +224,9 @@ export default function DashboardUciNativo({ data }) {
       <div style={{ background: '#FFFFFF', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontFamily: "var(--font-display)", color: '#0F172A', fontSize: '1.2rem', fontWeight: 800 }}>Censo Clínico en Vivo — Monitor de Terapia</h3>
+            <h3 style={{ margin: 0, fontFamily: "var(--font-display)", color: '#0F172A', fontSize: '1.2rem', fontWeight: 800 }}>Censo Clínico en Vivo — Monitor de Hospitalización</h3>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
-              Estado actual de los cubículos de Terapia Intensiva e Intermedia. Haz clic en una cama ocupada para ver el desglose detallado de su cuenta.
+              Estado actual de los cubículos de Hospitalización (Piso). Haz clic en una cama ocupada para ver el desglose detallado de su cuenta.
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.8rem', fontSize: '0.75rem', fontWeight: 700 }}>
@@ -240,13 +240,13 @@ export default function DashboardUciNativo({ data }) {
         </div>
 
         {/* Camas Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
           {censoCamas.map((bed, idx) => {
             const isOcupada = bed.Estado === 'OCUPADA';
             return (
               <div 
                 key={idx}
-                className={isOcupada ? "uci-card-glow bed-card-ocupada" : "uci-card-glow bed-card-libre"}
+                className={isOcupada ? "hos-card-glow bed-card-ocupada" : "hos-card-glow bed-card-libre"}
                 onClick={() => {
                   if (isOcupada) {
                     setSelectedPatientDetail({
@@ -333,7 +333,7 @@ export default function DashboardUciNativo({ data }) {
                       alignItems: 'center',
                       border: '1.5px dashed rgba(5, 150, 105, 0.2)'
                     }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cargos UCI</span>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cargos Hospitalización</span>
                       <span style={{ fontSize: '0.9rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
                         {formatCurrency(bed.totalCargos)}
                       </span>
@@ -377,7 +377,7 @@ export default function DashboardUciNativo({ data }) {
         
         {/* Gráfica 1: Distribución Financiera */}
         <div style={{ flex: '1 1 400px', background: 'white', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.1rem', fontWeight: 800 }}>Distribución de Cargos en UCI</h3>
+          <h3 style={{ margin: '0 0 1rem 0', fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.1rem', fontWeight: 800 }}>Distribución de Cargos</h3>
           <div style={{ width: '100%', height: 320, display: 'flex', flexDirection: 'column', justifycontent: 'center' }}>
             {ingresosPorGrupo && ingresosPorGrupo.length > 0 ? (
               <ResponsiveContainer width="100%" height={260}>
@@ -462,9 +462,9 @@ export default function DashboardUciNativo({ data }) {
       <div style={{ background: 'white', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
         <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.15rem', fontWeight: 800 }}>Historial Clínico y Facturación de Pacientes UCI</h3>
+            <h3 style={{ margin: 0, fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.15rem', fontWeight: 800 }}>Historial Clínico y Facturación de Pacientes</h3>
             <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: '#64748B' }}>
-              Muestra todas las cuentas de pacientes que recibieron atención en la UCI durante el periodo seleccionado. Haz clic en el monto de cargos para ver el desglose de su cuenta.
+              Muestra todas las cuentas de pacientes que recibieron atención en Hospitalización durante el periodo seleccionado. Haz clic en el monto de cargos para ver el desglose de su cuenta.
             </p>
           </div>
 
@@ -499,7 +499,7 @@ export default function DashboardUciNativo({ data }) {
               }}
             >
               <option value="">Todos los Estatus</option>
-              <option value="ACTIVO">Activos (En Terapia)</option>
+              <option value="ACTIVO">Activos (En Piso)</option>
               <option value="ALTA">Egresados (Alta)</option>
             </select>
 
@@ -539,7 +539,7 @@ export default function DashboardUciNativo({ data }) {
                   <th>Egreso / Alta</th>
                   <th>Días Estancia</th>
                   <th>Médico Tratante</th>
-                  <th style={{ textAlign: 'right' }}>Cargos UCI</th>
+                  <th style={{ textAlign: 'right' }}>Cargos Hospitalización</th>
                   <th>Estado</th>
                 </tr>
               </thead>
@@ -555,7 +555,7 @@ export default function DashboardUciNativo({ data }) {
                         {p.paciente}
                       </td>
                       <td style={{ fontSize: '0.8rem', color: '#64748B' }}>
-                        {p.room ? p.room.replace('TERAPIA INTENSIVA', 'Terap. Intensiva').replace('CUBICULO', 'Cubículo') : 'UCI / Terapia'}
+                        {p.room ? p.room.replace('TERAPIA INTENSIVA', 'Terap. Intensiva').replace('CUBICULO', 'Cubículo') : 'Hospitalización'}
                       </td>
                       <td style={{ fontSize: '0.8rem', color: '#64748B' }}>
                         {formatDateStr(p.entrydate)}
@@ -602,7 +602,7 @@ export default function DashboardUciNativo({ data }) {
                           textAlign: 'center',
                           minWidth: '70px'
                         }}>
-                          {isActivo ? 'En Terapia' : 'Egreso (Alta)'}
+                          {isActivo ? 'En Piso' : 'Egreso (Alta)'}
                         </span>
                       </td>
                     </tr>
@@ -658,7 +658,7 @@ export default function DashboardUciNativo({ data }) {
             }}>
               <div>
                 <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>
-                  Desglose de Cuenta Hospitalaria — {selectedPatientDetail.room ? selectedPatientDetail.room.replace('CUBICULO', 'Cubículo') : 'UCI / Terapia'}
+                  Desglose de Cuenta Hospitalaria — {selectedPatientDetail.room ? selectedPatientDetail.room.replace('CUBICULO', 'Cubículo') : 'Hospitalización'}
                 </span>
                 <h2 style={{ margin: '0.2rem 0 0 0', fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#0F172A' }}>
                   {selectedPatientDetail.paciente}

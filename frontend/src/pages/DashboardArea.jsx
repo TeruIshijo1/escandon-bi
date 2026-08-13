@@ -20,6 +20,7 @@ import DashboardCunerosNativo from '../components/dashboard/DashboardCunerosNati
 import DashboardConsultaExternaNativo from '../components/dashboard/DashboardConsultaExternaNativo';
 import DashboardAseguradorasNativo from '../components/dashboard/DashboardAseguradorasNativo';
 import DashboardUciNativo from '../components/dashboard/DashboardUciNativo';
+import DashboardHospitalizacionNativo from '../components/dashboard/DashboardHospitalizacionNativo';
 import { AREAS, AREAS_LABELS, AREA_TO_PERMISSION, can } from '../utils/rbac';
 import { useKPIConfig } from '../hooks/useKPIConfig';
 
@@ -230,6 +231,17 @@ export default function DashboardArea() {
         const json = await res.json();
         if (json.ok) {
           setAreaData({ kpis: [], rawUciData: json.data });
+        }
+      } else if (area === AREAS.HOSPITALIZACION) {
+        let url = `/api/dashboard/hospitalizacion-nativo?`;
+        if (globalFilters.startDate) url += `startDate=${globalFilters.startDate}&`;
+        if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
+        if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
+
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json();
+        if (json.ok) {
+          setAreaData({ kpis: [], rawHospitalizacionData: json.data });
         }
       } else if (area === AREAS.IMAGENOLOGIA || area === AREAS.LABORATORIO || area === AREAS.FARMACIA || area === AREAS.ASEGURADORAS) {
         // Para Imagenología, Laboratorio, Farmacia y Aseguradoras no usamos las tarjetas de hospitalización (camas, egresos)
@@ -618,6 +630,10 @@ export default function DashboardArea() {
               ) : area === AREAS.UCI ? (
                 <DashboardUciNativo 
                   data={areaData.rawUciData} 
+                />
+              ) : area === AREAS.HOSPITALIZACION ? (
+                <DashboardHospitalizacionNativo 
+                  data={areaData.rawHospitalizacionData} 
                 />
               ) : area === AREAS.CONSULTA_EXTERNA ? (
                 <DashboardConsultaExternaNativo 

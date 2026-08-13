@@ -155,7 +155,7 @@ const frontendPath = path.join(__dirname, '../frontend');
 if (fs.existsSync(path.join(frontendPath, 'index.html'))) {
   app.use(express.static(frontendPath));
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
     res.sendFile(path.join(frontendPath, 'index.html'));
   });
 }

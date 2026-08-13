@@ -10,11 +10,11 @@ from dateutil.relativedelta import relativedelta
 
 def get_db_connection():
     load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
-    db_user = os.getenv('DB_USER', 'postgres')
-    db_pass = os.getenv('DB_PASS', 'postgres')
-    db_host = os.getenv('DB_HOST', 'localhost')
-    db_port = os.getenv('DB_PORT', '5432')
-    db_name = os.getenv('DB_NAME', 'escandon_bi')
+    db_user = os.getenv('PGUSER', 'postgres')
+    db_pass = os.getenv('PGPASSWORD')
+    db_host = os.getenv('PGHOST', 'localhost')
+    db_port = os.getenv('PGPORT', '5432')
+    db_name = os.getenv('PGDATABASE', 'escandon_bi')
     return create_engine(f'postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}')
 
 def main():
@@ -128,7 +128,7 @@ def main():
         trans = conn.begin()
         try:
             # Borrar predicciones previas para ese mismo periodo si las hubiera
-            conn.execute(text(f"DELETE FROM ml_forecast_ingresos_mensual WHERE periodo_predicho = '{periodo_predicho}'"))
+            conn.execute(text("DELETE FROM ml_forecast_ingresos_mensual WHERE periodo_predicho = :periodo"), {"periodo": periodo_predicho})
             
             insert_query = text("""
                 INSERT INTO ml_forecast_ingresos_mensual (

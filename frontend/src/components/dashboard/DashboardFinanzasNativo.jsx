@@ -63,7 +63,8 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
   const fetchMlForecast = async () => {
     setLoadingMl(true);
     try {
-      const res = await fetch(`${API_BASE}/finanzas/ml-forecast`);
+      const token = sessionStorage.getItem('escandon_token');
+      const res = await fetch(`${API_BASE}/finanzas/ml-forecast`, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();
       if (json.ok) {
         setMlData(json.data);
@@ -77,7 +78,8 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
 
   const runMlForecast = async () => {
     try {
-      await fetch(`${API_BASE}/finanzas/ml-forecast/run`, { method: 'POST' });
+      const token = sessionStorage.getItem('escandon_token');
+      await fetch(`${API_BASE}/finanzas/ml-forecast/run`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       alert('Entrenamiento/Predicción iniciada en segundo plano. Los resultados se actualizarán pronto.');
       setTimeout(fetchMlForecast, 5000);
     } catch (err) {
