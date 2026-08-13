@@ -358,22 +358,6 @@ export default function SurgicalKits() {
                   fontSize: '0.85rem'
                 }}
               />
-              <button 
-                onClick={handleCopyKit}
-                style={{ 
-                  padding: '0.5rem 1rem', 
-                  background: copied ? '#10b981' : '#6366f1', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '8px', 
-                  fontWeight: 'bold', 
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {copied ? '✓ ¡Copiado!' : '📋 Copiar Lista'}
-              </button>
             </div>
             
             {/* Modal Items List */}
