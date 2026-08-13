@@ -790,4 +790,142 @@ router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
   }
 });
 
+/**
+ * GET /api/almacen/ml-history
+ * Retorna el historial completo del dataset analítico
+ */
+router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const pgRes = await pool.query(`
+      SELECT 
+        snapshot_date AS "snapshot_date",
+        itemcode AS "itemcode",
+        itemdescription AS "itemdescription",
+        stock_actual AS "stock_actual",
+        consumo_7d AS "consumo_7d",
+        consumo_15d AS "consumo_15d",
+        consumo_30d AS "consumo_30d",
+        consumo_promedio_diario AS "consumo_promedio_diario",
+        variabilidad_consumo AS "variabilidad_consumo",
+        minstock AS "minstock",
+        maxstock AS "maxstock",
+        pedidos_abiertos AS "pedidos_abiertos",
+        fecha_ultimo_movimiento AS "fecha_ultimo_movimiento",
+        dias_stock_restante AS "dias_stock_restante",
+        riesgo_base AS "riesgo_base",
+        target_desabasto_7d AS "target_desabasto_7d",
+        target_desabasto_15d AS "target_desabasto_15d",
+        fecha_calculo AS "fecha_calculo"
+      FROM ml_dataset_reorden_sku_history
+      ORDER BY snapshot_date DESC, itemcode ASC
+    `);
+    res.json({ ok: true, data: pgRes.rows });
+  } catch (err) {
+    console.error('[GET ML History Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar el historial analítico de ML' });
+  }
+});
+
+/**
+ * GET /api/almacen/ml-history/download
+ * Descarga el historial completo en formato CSV preparado para pandas/python
+ */
+router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const pgRes = await pool.query(`
+      SELECT 
+        snapshot_date, itemcode, itemdescription, stock_actual, consumo_7d, consumo_15d, consumo_30d, 
+        consumo_promedio_diario, variabilidad_consumo, minstock, maxstock, pedidos_abiertos, 
+        fecha_ultimo_movimiento, dias_stock_restante, riesgo_base, target_desabasto_7d, target_desabasto_15d, fecha_calculo
+      FROM ml_dataset_reorden_sku_history
+      ORDER BY snapshot_date DESC, itemcode ASC
+    `);
+    
+    const headers = [
+      'snapshot_date', 'itemcode', 'itemdescription', 'stock_actual', 'consumo_7d', 'consumo_15d', 
+      'consumo_30d', 'consumo_promedio_diario', 'variabilidad_consumo', 'minstock', 'maxstock', 'pedidos_abiertos', 
+      'fecha_ultimo_movimiento', 'dias_stock_restante', 'riesgo_base', 'target_desabasto_7d', 'target_desabasto_15d', 'fecha_calculo'
+    ];
+    
+    let csv = '\uFEFF' + headers.join(',') + '\n';
+    
+    pgRes.rows.forEach(row => {
+      const line = headers.map(h => {
+        let val = row[h];
+        if (val === null || val === undefined) {
+          val = '';
+        } else if (val instanceof Date) {
+          val = val.toISOString();
+        } else if (h === 'snapshot_date') {
+          // Format snapshot_date as YYYY-MM-DD
+          val = new Date(val).toISOString().split('T')[0];
+        } else {
+          val = String(val);
+        }
+        val = val.replace(/"/g, '""');
+        if (val.includes(',') || val.includes('\n') || val.includes('"')) {
+          return `"${val}"`;
+        }
+        return val;
+      });
+      csv += line.join(',') + '\n';
+    });
+    
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="ml_dataset_reorden_sku_history.csv"');
+    res.send(csv);
+  } catch (err) {
+    console.error('[GET Download ML History Error]', err);
+    res.status(500).send('Error al generar la descarga del historial analítico');
+  }
+});
+
+/**
+ * GET /api/almacen/ml-predictions
+ * Retorna las predicciones de Machine Learning actuales
+ */
+router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const pgRes = await pool.query(`
+      SELECT 
+        itemcode AS "itemcode",
+        itemdescription AS "itemdescription",
+        stock_actual AS "stock_actual",
+        consumo_promedio_diario AS "consumo_promedio_diario",
+        dias_stock_restante AS "dias_stock_restante",
+        riesgo_base AS "riesgo_base",
+        prob_desabasto_7d AS "prob_desabasto_7d",
+        riesgo_ml AS "riesgo_ml",
+        modelo_version AS "modelo_version",
+        fecha_prediccion AS "fecha_prediccion"
+      FROM ml_predictions_reorden_sku
+      ORDER BY prob_desabasto_7d DESC, itemcode ASC
+    `);
+    res.json({ ok: true, data: pgRes.rows });
+  } catch (err) {
+    console.error('[GET ML Predictions Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar predicciones de Machine Learning' });
+  }
+});
+
+/**
+ * POST /api/almacen/ml-predictions/run
+ * Ejecuta el script de predicción de Machine Learning asíncronamente
+ */
+router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), (req, res) => {
+  const { exec } = require('child_process');
+  const path = require('path');
+  const scriptPath = path.join(__dirname, '..', 'ml', 'predict_reorder_risk.py');
+  
+  console.log(`[ML Express] Ejecutando subproceso python en: ${scriptPath}`);
+  exec(`python "${scriptPath}"`, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`[POST Run ML Predictions Error]`, error);
+      return res.status(500).json({ ok: false, error: 'Error al ejecutar modelo predictivo: ' + error.message, stderr });
+    }
+    console.log(`[POST Run ML Predictions Output]`, stdout);
+    res.json({ ok: true, message: 'Predicciones de Machine Learning ejecutadas y guardadas correctamente.', stdout });
+  });
+});
+
 module.exports = router;

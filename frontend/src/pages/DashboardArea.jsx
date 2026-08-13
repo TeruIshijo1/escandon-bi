@@ -19,6 +19,7 @@ import DashboardAuxiliaresNativo from '../components/dashboard/DashboardAuxiliar
 import DashboardCunerosNativo from '../components/dashboard/DashboardCunerosNativo';
 import DashboardConsultaExternaNativo from '../components/dashboard/DashboardConsultaExternaNativo';
 import DashboardAseguradorasNativo from '../components/dashboard/DashboardAseguradorasNativo';
+import DashboardUciNativo from '../components/dashboard/DashboardUciNativo';
 import { AREAS, AREAS_LABELS, AREA_TO_PERMISSION, can } from '../utils/rbac';
 import { useKPIConfig } from '../hooks/useKPIConfig';
 
@@ -218,6 +219,17 @@ export default function DashboardArea() {
         const json = await res.json();
         if (json.ok) {
           setAreaData({ kpis: [], rawConsultaData: json.data });
+        }
+      } else if (area === AREAS.UCI) {
+        let url = `/api/dashboard/uci-nativo?`;
+        if (globalFilters.startDate) url += `startDate=${globalFilters.startDate}&`;
+        if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
+        if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
+
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json();
+        if (json.ok) {
+          setAreaData({ kpis: [], rawUciData: json.data });
         }
       } else if (area === AREAS.IMAGENOLOGIA || area === AREAS.LABORATORIO || area === AREAS.FARMACIA || area === AREAS.ASEGURADORAS) {
         // Para Imagenología, Laboratorio, Farmacia y Aseguradoras no usamos las tarjetas de hospitalización (camas, egresos)
@@ -509,7 +521,7 @@ export default function DashboardArea() {
             </div>
           ) : (
             <>
-              {area !== AREAS.QUIROFANO && area !== AREAS.CUNEROS && (
+              {area !== AREAS.QUIROFANO && area !== AREAS.CUNEROS && area !== AREAS.UCI && (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
                   {areaData.kpis.map((kpi, i) => {
                     const dbKey = KPI_DB_MAP[kpi.label] || kpi.label.replace(/\s+/g, '_').toLowerCase();
@@ -603,6 +615,10 @@ export default function DashboardArea() {
                 <div style={{ marginTop: '1rem' }}>
                   <DashboardCunerosNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
                 </div>
+              ) : area === AREAS.UCI ? (
+                <DashboardUciNativo 
+                  data={areaData.rawUciData} 
+                />
               ) : area === AREAS.CONSULTA_EXTERNA ? (
                 <DashboardConsultaExternaNativo 
                   data={areaData.rawConsultaData} 

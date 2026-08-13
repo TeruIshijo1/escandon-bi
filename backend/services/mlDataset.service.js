@@ -185,6 +185,7 @@ async function syncMLDataset() {
     console.log(`[ML Dataset] Guardando ${dataset.length} registros calculados en PostgreSQL...`);
 
     for (const item of dataset) {
+      // A. Guardar en la tabla de tiempo real (Dashboard)
       await client.query(`
         INSERT INTO ml_dataset_reorden_sku (
           itemcode, itemdescription, stock_actual, consumo_7d, consumo_15d, consumo_30d, 
@@ -207,10 +208,83 @@ async function syncMLDataset() {
         item.dias_stock_restante,
         item.riesgo_base
       ]);
+
+      // B. Guardar en la tabla histórica (Entrenamiento de ML) - Control de duplicados por día
+      await client.query(`
+        INSERT INTO ml_dataset_reorden_sku_history (
+          snapshot_date, itemcode, itemdescription, stock_actual, consumo_7d, consumo_15d, consumo_30d, 
+          consumo_promedio_diario, variabilidad_consumo, minstock, maxstock, 
+          pedidos_abiertos, fecha_ultimo_movimiento, dias_stock_restante, riesgo_base, fecha_calculo
+        ) VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+        ON CONFLICT (snapshot_date, itemcode) DO UPDATE SET
+          itemdescription = EXCLUDED.itemdescription,
+          stock_actual = EXCLUDED.stock_actual,
+          consumo_7d = EXCLUDED.consumo_7d,
+          consumo_15d = EXCLUDED.consumo_15d,
+          consumo_30d = EXCLUDED.consumo_30d,
+          consumo_promedio_diario = EXCLUDED.consumo_promedio_diario,
+          variabilidad_consumo = EXCLUDED.variabilidad_consumo,
+          minstock = EXCLUDED.minstock,
+          maxstock = EXCLUDED.maxstock,
+          pedidos_abiertos = EXCLUDED.pedidos_abiertos,
+          fecha_ultimo_movimiento = EXCLUDED.fecha_ultimo_movimiento,
+          dias_stock_restante = EXCLUDED.dias_stock_restante,
+          riesgo_base = EXCLUDED.riesgo_base,
+          fecha_calculo = CURRENT_TIMESTAMP
+      `, [
+        item.itemcode,
+        item.itemdescription,
+        item.stock_actual,
+        item.consumo_7d,
+        item.consumo_15d,
+        item.consumo_30d,
+        item.consumo_promedio_diario,
+        item.variabilidad_consumo,
+        item.minstock,
+        item.maxstock,
+        item.pedidos_abiertos,
+        item.fecha_ultimo_movimiento,
+        item.dias_stock_restante,
+        item.riesgo_base
+      ]);
     }
 
+    // 8. Retroetiquetado de desabastos pasados (Calcular targets de 7d y 15d retrospectivamente)
+    console.log('[ML Dataset] Recalculando targets de desabasto en el historial...');
+    await client.query(`
+      UPDATE ml_dataset_reorden_sku_history h
+      SET target_desabasto_7d = CASE 
+        WHEN EXISTS (
+          SELECT 1 
+          FROM ml_dataset_reorden_sku_history future
+          WHERE future.itemcode = h.itemcode
+            AND future.snapshot_date > h.snapshot_date
+            AND future.snapshot_date <= h.snapshot_date + INTERVAL '7 days'
+            AND future.stock_actual <= 0
+        ) THEN 1
+        ELSE 0
+      END
+      WHERE h.snapshot_date <= CURRENT_DATE - INTERVAL '7 days'
+    `);
+
+    await client.query(`
+      UPDATE ml_dataset_reorden_sku_history h
+      SET target_desabasto_15d = CASE 
+        WHEN EXISTS (
+          SELECT 1 
+          FROM ml_dataset_reorden_sku_history future
+          WHERE future.itemcode = h.itemcode
+            AND future.snapshot_date > h.snapshot_date
+            AND future.snapshot_date <= h.snapshot_date + INTERVAL '15 days'
+            AND future.stock_actual <= 0
+        ) THEN 1
+        ELSE 0
+      END
+      WHERE h.snapshot_date <= CURRENT_DATE - INTERVAL '15 days'
+    `);
+
     await client.query('COMMIT');
-    console.log('✅ [ML Dataset] Sincronización analítica completada exitosamente.');
+    console.log('✅ [ML Dataset] Sincronización analítica y cálculo de targets completado.');
     return dataset.length;
   } catch (err) {
     await client.query('ROLLBACK');

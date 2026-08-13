@@ -445,12 +445,55 @@ async function initPostgresDW() {
       );
     `);
 
+    // 10. Tabla Histórica para Entrenamiento de Machine Learning (Paso 2 DataScience)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ml_dataset_reorden_sku_history (
+        snapshot_date DATE NOT NULL,
+        itemcode VARCHAR(100) NOT NULL,
+        itemdescription TEXT,
+        stock_actual DECIMAL(18,4) DEFAULT 0,
+        consumo_7d DECIMAL(18,4) DEFAULT 0,
+        consumo_15d DECIMAL(18,4) DEFAULT 0,
+        consumo_30d DECIMAL(18,4) DEFAULT 0,
+        consumo_promedio_diario DECIMAL(18,4) DEFAULT 0,
+        variabilidad_consumo DECIMAL(18,4) DEFAULT 0,
+        minstock INT DEFAULT 0,
+        maxstock INT DEFAULT 0,
+        pedidos_abiertos DECIMAL(18,4) DEFAULT 0,
+        fecha_ultimo_movimiento TIMESTAMP WITH TIME ZONE,
+        dias_stock_restante DECIMAL(18,4) DEFAULT 0,
+        riesgo_base VARCHAR(20),
+        target_desabasto_7d INT DEFAULT NULL,
+        target_desabasto_15d INT DEFAULT NULL,
+        fecha_calculo TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (snapshot_date, itemcode)
+      );
+    `);
+
+    // 11. Tabla de Predicciones de Machine Learning (Paso 3 DataScience)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ml_predictions_reorden_sku (
+        itemcode VARCHAR(100) PRIMARY KEY,
+        itemdescription TEXT,
+        stock_actual DECIMAL(18,4),
+        consumo_promedio_diario DECIMAL(18,4),
+        dias_stock_restante DECIMAL(18,4),
+        riesgo_base VARCHAR(20),
+        prob_desabasto_7d DECIMAL(8,6),
+        riesgo_ml VARCHAR(20),
+        modelo_version VARCHAR(50),
+        fecha_prediccion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Índices para mejorar las consultas en las nuevas tablas
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_t_date ON dw_sap_traslados (docdate);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_c_cons_cuenta ON dw_cirrus_consumo (cuentahospitalaria);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_k_fecha ON dw_sap_kardex (fecha);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_k_code ON dw_sap_kardex (codigo);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_e_factura ON dw_sap_entradas (numerofactura);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_ml_hist_code ON ml_dataset_reorden_sku_history (itemcode);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_ml_hist_date ON ml_dataset_reorden_sku_history (snapshot_date);`);
 
     // Migraciones: ampliar columnas VARCHAR(50) a VARCHAR(255) en tablas existentes
     await pool.query(`ALTER TABLE dw_sap_kardex ALTER COLUMN almacenorigen TYPE VARCHAR(255);`).catch(() => {});
