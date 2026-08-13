@@ -899,26 +899,27 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
 
     // 1. Obtener histórico desde PostgreSQL local
     if (split.pgStart && split.pgEnd) {
-      let pgWhere = ["entrydate >= $1", "entrydate <= $2"];
+      let pgWhere = ["c.entrydate >= $1", "c.entrydate <= $2"];
       let params = [split.pgStart, split.pgEnd + ' 23:59:59'];
       
       if (search) {
-        pgWhere.push("(fullname ILIKE $3 OR CAST(pcnum AS VARCHAR) ILIKE $3)");
+        pgWhere.push("(p.fullname ILIKE $3 OR CAST(c.pcnum AS VARCHAR) ILIKE $3)");
         params.push(`%${search}%`);
       }
       
       const pgRes = await pgPool.query(`
         SELECT 
-          pcnum as "PCNum",
-          pc_st as "PC_ST",
-          medicaldischargedate as "MedicalDischargeDate",
-          entrydate as "EntryDate",
-          total as "Total",
-          profit as "Profit",
-          subtotalcost as "SubtotalCost",
-          balance as "Balance",
-          fullname as "FullName"
-        FROM dw_vertical_pc
+          c.pcnum as "PCNum",
+          c.pc_st as "PC_ST",
+          c.medicaldischargedate as "MedicalDischargeDate",
+          c.entrydate as "EntryDate",
+          c.total as "Total",
+          c.profit as "Profit",
+          c.subtotalcost as "SubtotalCost",
+          c.balance as "Balance",
+          p.fullname as "FullName"
+        FROM dw_vertical_pc c
+        LEFT JOIN dw_vertical_pt p ON c.ptnum = p.ptnum
         WHERE ${pgWhere.join(' AND ')}
       `, params);
       
