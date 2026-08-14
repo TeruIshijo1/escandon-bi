@@ -240,8 +240,14 @@ export default function DashboardHospitalizacionNativo({ data }) {
         </div>
 
         {/* Camas Grid */}
+        {occupiedBedsCount === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#64748B', background: '#F8FAFC', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>
+            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>🛏️</span>
+            No hay pacientes ingresados en este momento.
+          </div>
+        ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
-          {censoCamas.map((bed, idx) => {
+          {censoCamas.filter(bed => bed.Estado === 'OCUPADA').map((bed, idx) => {
             const isOcupada = bed.Estado === 'OCUPADA';
             return (
               <div 
@@ -370,6 +376,7 @@ export default function DashboardHospitalizacionNativo({ data }) {
             );
           })}
         </div>
+        )}
       </div>
 
       {/* ── SECCIÓN 3: GRAFICAS ANALÍTICAS ── */}
