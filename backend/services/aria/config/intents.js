@@ -537,7 +537,7 @@ const SYNONYM_ROOTS = {
   'farmacia-inventario': ['stock', 'existencia', 'inventario', 'disponible', 'suficiente'],
   'almacen-inventario': ['stock', 'existencia', 'inventario', 'almacen'],
   'cirugias-momento': ['cirug', 'quirofan', 'operac', 'procedim', 'agenda', 'programad'],
-  'kits-quirurgicos': ['kit', 'insumo', 'material', 'esteril'],
+  'kits-quirurgicos': ['kit'],
   'inventario-quirofano': ['inventario', 'stock', 'qx', 'qxcr'],
   'ocupacion-camas': ['cama', 'ocup', 'disponible', 'censo', 'disponibilidad'],
   'auditoria-inventarios': ['auditoria', 'discrepancia', 'faltante', 'conciliac', 'partida'],

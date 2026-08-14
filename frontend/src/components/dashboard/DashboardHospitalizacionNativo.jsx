@@ -574,7 +574,7 @@ export default function DashboardHospitalizacionNativo({ data }) {
                           folio: p.folio,
                           paciente: p.paciente,
                           room: p.room,
-                          total: p.total_cargos_uci,
+                          total: p.total_cargos,
                           entrydate: p.entrydate
                         })}
                         style={{ 
@@ -588,7 +588,7 @@ export default function DashboardHospitalizacionNativo({ data }) {
                         }}
                         title="Ver desglose de cuenta"
                       >
-                        {formatCurrency(p.total_cargos_uci)}
+                        {formatCurrency(p.total_cargos)}
                       </td>
                       <td>
                         <span style={{

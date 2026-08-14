@@ -39,6 +39,14 @@ const PHRASES = {
     /pronto\s+a\s+agotarse/,
     /cuando\s+se\s+acaba/,
     /cuando\s+se\s+agota/,
+    /mas\s+proximo\s+a\s+(termin|agot|acab|temrin)/,
+    /mas\s+cercano\s+a\s+(termin|agot|acab)/,
+    /proximo\s+a\s+(terminarse|agotarse|acabarse|temrinarse)/,
+    /se\s+va\s+a\s+(acabar|terminar|agotar)/,
+    /va\s+a\s+(acabar|terminarse|agotarse)/,
+    /a\s+punto\s+de\s+(acabarse|agotarse|terminarse)/,
+    /(cual|que)\s+(insumo|medicamento|material|producto)\s+(esta|este)\s+mas\s+proximo/,
+    /(insumo|inusmo|medicamento|material)\s+mas\s+proximo/,
   ],
 
   // ── FARMACIA: RECETAS PENDIENTES ──────────────────────────────
@@ -325,14 +333,14 @@ const PHRASES = {
  * y variantes que no están en los patrones regex).
  */
 const EXTRA_ROOTS = {
-  'almacen-riesgo-desabasto': ['escas', 'agot', 'acab', 'termin', 'falt', 'qued', 'repon', 'pedir', 'stock', 'comprar', 'reorden', 'desabast', 'critic'],
+  'almacen-riesgo-desabasto': ['escas', 'agot', 'acab', 'termin', 'falt', 'qued', 'repon', 'pedir', 'stock', 'comprar', 'reorden', 'desabast', 'critic', 'proxim', 'cercan', 'inusm'],
   'farmacia-recetas-pendientes': ['surtir', 'despach', 'receta', 'prescripcion', 'pendient', 'cola', 'surtid', 'medicin'],
   'farmacia-controlados': ['controlad', 'psicotrop', 'estupefacient', 'restringid', 'libro'],
   'farmacia-historial-paciente': ['historial', 'farmacolog', 'medicament', 'entregad', 'recet'],
   'devoluciones-farmacia': ['devolucion', 'devuelt', 'regresad', 'rechaz', 'sobrant', 'regres'],
   'ocupacion-camas': ['cama', 'ocupacion', 'ocupad', 'disponib', 'libr', 'vaci', 'internad', 'hospitalizad', 'hosped', 'censo', 'espacio', 'capacidad', 'llenad'],
   'cirugias-momento': ['cirug', 'quirofan', 'operacion', 'operand', 'procedim', 'salas', 'agenda', 'programad', 'curso'],
-  'kits-quirurgicos': ['kit', 'quirurgic', 'paquete', 'lista', 'material'],
+  'kits-quirurgicos': ['kit', 'quirurgic', 'paquete', 'lista'],
   'inventario-quirofano': ['quirofan', 'existencia', 'stock', 'qx'],
   'almacen-kardex': ['kardex', 'trazabilid', 'movimiento', 'historial', 'entrad', 'salida'],
   'almacen-traslados': ['traslad', 'transferencia', 'envio', 'pedido', 'solicitud', 'envia', 'enviar', 'mand'],
