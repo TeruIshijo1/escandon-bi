@@ -1593,6 +1593,10 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
         WHERE pc.PC_ST = 'OP' 
           AND pc.PCType = 'ER'
           AND pc.MedicalDischargeDate IS NULL
+          AND (v.RoomName LIKE '%URGENCIAS 1%' OR v.RoomName LIKE '%URGENCIAS 2%')
+          AND v.RoomName NOT LIKE '%VIRTUAL%'
+          AND v.RoomName NOT LIKE '%VIRT%'
+          AND v.RoomCode NOT LIKE '%VIRT%'
       `);
       let occupiedBeds = liveBedsRes.recordset || [];
       
@@ -1615,7 +1619,7 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       const masterBedsRes = await pgPool.query(`
         SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName"
         FROM dw_vertical_pt
-        WHERE (roomname LIKE '%URG%' OR roomcode LIKE '%URG%' OR roomname LIKE '%CHOQUE%')
+        WHERE (roomname LIKE '%URGENCIAS 1%' OR roomname LIKE '%URGENCIAS 2%')
           AND roomname NOT LIKE '%VIRTUAL%'
         ORDER BY roomcode ASC
       `);
@@ -2899,6 +2903,9 @@ router.get('/uci-nativo', authenticate, async (req, res, next) => {
           AND pc.PCType IN ('IP', 'ER')
           AND pc.MedicalDischargeDate IS NULL
           AND (v.RoomCode LIKE 'CUBUTI%' OR v.RoomCode = 'CUNUCIN01')
+          AND v.RoomName NOT LIKE '%VIRTUAL%'
+          AND v.RoomName NOT LIKE '%VIRT%'
+          AND v.RoomCode NOT LIKE '%VIRT%'
       `);
       occupiedBeds = liveBedsRes.recordset || [];
     } catch (e) {
@@ -3874,7 +3881,12 @@ router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
         WHERE pc.PC_ST = 'OP' 
           AND pc.PCType = 'IP'
           AND pc.MedicalDischargeDate IS NULL
+          AND (v.RoomName LIKE '%CAMA 1%' OR v.RoomName LIKE '%CAMA 2%')
+          AND v.RoomName NOT LIKE '%URGENCIAS%'
           AND (v.RoomCode NOT LIKE 'CUBUTI%' AND v.RoomCode != 'CUNUCIN01')
+          AND v.RoomName NOT LIKE '%VIRTUAL%'
+          AND v.RoomName NOT LIKE '%VIRT%'
+          AND v.RoomCode NOT LIKE '%VIRT%'
       `);
       occupiedBeds = liveBedsRes.recordset || [];
     } catch (e) {
@@ -3885,7 +3897,9 @@ router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
     const masterBedsRes = await pgPool.query(`
       SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName"
       FROM dw_vertical_pt
-      WHERE roomname LIKE '%CAMA%' AND roomcode NOT LIKE 'CUBUTI%'
+      WHERE (roomname LIKE '%CAMA 1%' OR roomname LIKE '%CAMA 2%')
+        AND roomname NOT LIKE '%URGENCIAS%'
+        AND roomcode NOT LIKE 'CUBUTI%'
         AND roomname NOT LIKE '%VIRTUAL%'
         AND roomname NOT LIKE '%VIRT%'
         AND roomcode NOT LIKE '%VIRT%'
