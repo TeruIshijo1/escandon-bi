@@ -353,17 +353,21 @@ router.get(
         return res.send(csvContent);
       }
 
-      // Verificar si el reporte tiene un JSON asignado (override)
-      const db = require('../config/db').getDb();
-      const configJson = await db.prepare('SELECT JsonApiUrl, JsonFilePath FROM ConfiguracionBI WHERE ReporteId = ? OR CAST(ConfigId AS TEXT) = ?').get(reportId, reportId);
-      if (configJson && (configJson.JsonApiUrl || configJson.JsonFilePath)) {
-        return await exportJsonToExcel(res, 'bi', reportId);
-      }
+      // Ignorar ConfigJSON para reportes que tienen lógica dedicada de exportación en resolveReportData
+      const customReports = ['consulta-externa', 'auditoria-inventarios', 'directivo-main', 'devoluciones-farmacia'];
+      if (!customReports.includes(reportId)) {
+        // Verificar si el reporte tiene un JSON asignado (override)
+        const db = require('../config/db').getDb();
+        const configJson = await db.prepare('SELECT JsonApiUrl, JsonFilePath FROM ConfiguracionBI WHERE ReporteId = ? OR CAST(ConfigId AS TEXT) = ?').get(reportId, reportId);
+        if (configJson && (configJson.JsonApiUrl || configJson.JsonFilePath)) {
+          return await exportJsonToExcel(res, 'bi', reportId);
+        }
 
-      // Verificar si el reporte corresponde a un KPI que tiene JSON asignado
-      const kpiJson = await db.prepare('SELECT JsonApiUrl, JsonFilePath FROM KPIConfig WHERE ElementoId = ? OR CAST(KPIId AS TEXT) = ?').get(reportId, reportId);
-      if (kpiJson && (kpiJson.JsonApiUrl || kpiJson.JsonFilePath)) {
-        return await exportJsonToExcel(res, 'kpi', reportId);
+        // Verificar si el reporte corresponde a un KPI que tiene JSON asignado
+        const kpiJson = await db.prepare('SELECT JsonApiUrl, JsonFilePath FROM KPIConfig WHERE ElementoId = ? OR CAST(KPIId AS TEXT) = ?').get(reportId, reportId);
+        if (kpiJson && (kpiJson.JsonApiUrl || kpiJson.JsonFilePath)) {
+          return await exportJsonToExcel(res, 'kpi', reportId);
+        }
       }
 
       // Obtener datos (fuente dinámica según reportId)
@@ -624,6 +628,88 @@ async function resolveReportData(reportId, filters) {
           { header: 'Total ($)', key: 'MontoCobrado', width: 15 },
           { header: 'Fecha Cargo', key: 'FechaCargo', width: 22 },
           { header: 'Médico', key: 'MedicoTratante', width: 25 },
+        ],
+        filas: data,
+      };
+    }
+    case 'consulta-externa': {
+      const { fechaDesde, fechaHasta, especialidad } = filters;
+      const { pool } = require('../config/pg-db');
+      const start = fechaDesde || new Date().toISOString().split('T')[0];
+      const end = (fechaHasta || start) + ' 23:59:59';
+      
+      let query = `
+        SELECT c.*, p.NombreCompleto as NombrePaciente, 
+               COALESCE(NULLIF(TRIM(c.Consultorio), ''), dw.articulo) as ConsultorioFinal,
+               COALESCE(NULLIF(TRIM(cons.Diagnostico), ''), dw.dx_description_es) as DiagnosticoFinal,
+               COALESCE(NULLIF(TRIM(c.Notas), ''), dw.comentarios) as NotasFinal,
+               COALESCE(NULLIF(TRIM(p.Telefonos), ''), CONCAT_WS(' ', NULLIF(TRIM(dw.telefono_1), ''), NULLIF(TRIM(dw.celular_2), ''))) as TelefonosFinal,
+               c.TipoConsulta,
+               dw.edad_anios,
+               dw.edad_mes,
+               dw.genero,
+               dw.consultas_previas,
+               dw.convenio
+        FROM cex_citas c
+        LEFT JOIN dw_vertical_consultas_prog dw ON c.CitaOrigenId = dw.no_cita::VARCHAR
+        LEFT JOIN cex_pacientes p ON c.NoExpediente = p.NoExpediente
+        LEFT JOIN cex_consultas cons ON c.CitaId = cons.CitaId
+        WHERE c.FechaHoraCita >= $1 AND c.FechaHoraCita <= $2
+      `;
+      const queryParams = [start, end];
+
+      if (especialidad && especialidad.trim() !== '') {
+        queryParams.push(especialidad);
+        query += ` AND c.Especialidad = $3`;
+      }
+      
+      query += ` ORDER BY c.FechaHoraCita ASC`;
+      
+      const result = await pool.query(query, queryParams);
+      const data = result.rows.map(r => ({
+        ...r,
+        consultorio: r.consultoriofinal || r.consultorio,
+        diagnostico: r.diagnosticofinal || r.diagnostico,
+        notas: r.notasfinal || r.notas,
+        telefonos: r.telefonosfinal || r.telefonos,
+        fechahoracita: new Date(r.fechahoracita).toLocaleString('es-MX', { hour12: false }),
+        edad_anios: r.edad_anios,
+        edad_mes: r.edad_mes,
+        genero: r.genero,
+        consultas_previas: r.consultas_previas,
+        convenio: r.convenio
+      }));
+      const isPagada = (c) => {
+        const text = ((c.notas || '') + ' ' + (c.diagnostico || '')).toLowerCase();
+        return text.includes('confirmad') || text.includes('pago procesado');
+      };
+
+      return {
+        titulo: 'Agenda de Consulta Externa',
+        resumen: {
+          'Total Citas': data.length,
+          'Asistencias': data.filter(c => c.estado === 'ASISTIDA').length,
+          'Pagadas': data.filter(isPagada).length,
+          'No Asistió': data.filter(c => c.estado === 'NO_ASISTIO').length,
+          'Canceladas': data.filter(c => c.estado === 'CANCELADA').length,
+        },
+        columnas: [
+          { header: 'Expediente', key: 'noexpediente', width: 14 },
+          { header: 'Paciente', key: 'nombrepaciente', width: 35 },
+          { header: 'Edad (Años)', key: 'edad_anios', width: 12 },
+          { header: 'Edad (Meses)', key: 'edad_mes', width: 12 },
+          { header: 'Género', key: 'genero', width: 10 },
+          { header: 'Convenio', key: 'convenio', width: 25 },
+          { header: 'Consultas Previas', key: 'consultas_previas', width: 15 },
+          { header: 'Fecha y Hora', key: 'fechahoracita', width: 22 },
+          { header: 'Estado', key: 'estado', width: 15 },
+          { header: 'S/P', key: 'tipoconsulta', width: 8 },
+          { header: 'Especialidad', key: 'especialidad', width: 22 },
+          { header: 'Médico', key: 'medico', width: 35 },
+          { header: 'Consultorio', key: 'consultorio', width: 14 },
+          { header: 'Diagnóstico', key: 'diagnostico', width: 40 },
+          { header: 'Notas / Observaciones', key: 'notas', width: 50 },
+          { header: 'Teléfonos', key: 'telefonos', width: 20 },
         ],
         filas: data,
       };

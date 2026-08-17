@@ -4,6 +4,7 @@
  * Rediseño premium con identidad de marca y micro-interacciones
  */
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth }     from '../context/AuthContext';
 import EmbeddedBI      from '../components/dashboard/EmbeddedBI';
 import ExportButton    from '../components/shared/ExportButton';
@@ -130,7 +131,9 @@ export default function DashboardArea() {
   // - Usuarios con múltiples permisos de área pueden elegir entre sus áreas permitidas
   const canSwitchArea = can(user?.role, 'verTodosTableros') || (!user?.area && allowedAreas.length > 1);
 
+  const navigate = useNavigate();
   const [area, setArea]  = useState(initialArea);
+  
   const [tab,  setTab]   = useState('kpis');
   const [urgenciasSearch, setUrgenciasSearch] = useState('');
 
@@ -166,6 +169,7 @@ export default function DashboardArea() {
 
   const fetchAreaData = async () => {
     setLoadingData(true);
+    setAreaData(prev => ({ ...prev, kpis: [] })); // Limpiar KPIs del área anterior para evitar "flasheos"
     try {
       const token = sessionStorage.getItem('escandon_token');
       
@@ -307,7 +311,7 @@ export default function DashboardArea() {
   const cfg = AREA_CONFIG[area] || AREA_CONFIG[DEFAULT_AREA];
 
   return (
-    <div id="dashboard-container" style={{ maxWidth:1200, margin:'0 auto' }}>
+    <div id="dashboard-container" style={{ maxWidth:'var(--content-max, 1200px)', margin:'0 auto' }}>
       <style>{`
         .area-kpi-card:hover {
           transform: translateY(-2px);

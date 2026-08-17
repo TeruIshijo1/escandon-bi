@@ -19,6 +19,7 @@ const sapService = require('./sap.service');
     try {
       const pool = await getRemoteDb();
       let querySQL = `
+        SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
         WITH STLG AS
         (
             SELECT
@@ -184,6 +185,7 @@ async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, li
   request.input('limit', sql.Int, limit);
 
   let querySQL = `
+    SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
     WITH SalidasFarmacia AS (
       SELECT PCPR.PCPRNum AS PCPRNum, PCPRIT.ItemCode AS ItemCode, ISNULL(SUM(PCPRIT.Quantity), 0) AS TotalSalidaFisica
       FROM dbo.PCIT PCIT
@@ -462,6 +464,7 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
   request.input('limit', sql.Int, limit);
 
   let querySQL = `
+    SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
     SELECT TOP (@limit)
         PCPR.PCPRNum AS OrdenId,
         PC.PCNum AS Cuenta,
@@ -613,6 +616,7 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
   // Por ahora, como no tenemos las tablas de POS y Traspasos confirmadas,
   // extraeremos los Cargos de Hospitalización y dejaremos la estructura preparada.
   const querySQL = `
+    SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
     SELECT TOP (@limit)
         'Hospitalización' AS TipoMovimiento,
         PCPR.PCPRNum AS Folio,
@@ -641,6 +645,7 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
   `;
 
   const querySQL_POS = `
+    SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
     SELECT TOP (@limit)
         'Punto de Venta (POS)' AS TipoMovimiento,
         T0.SONum AS Folio,

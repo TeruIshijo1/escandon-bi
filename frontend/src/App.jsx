@@ -48,6 +48,7 @@ const SinAcceso           = lazy(() => import('./pages/SinAcceso'));
 const DashboardSiti       = lazy(() => import('./components/dashboard/DashboardSiti'));
 const DashboardComparativo= lazy(() => import('./components/dashboard/DashboardComparativo'));
 const DataQualityDashboard= lazy(() => import('./pages/DataQualityDashboard'));
+const ConsultaExternaPage = lazy(() => import('./pages/ConsultaExternaPage'));
 
 /* ── Fallback de carga ───────────────────────────────────────── */
 function PageLoader() {
@@ -301,6 +302,16 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
                     <DataQualityDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Consulta Externa Operativa */}
+              <Route
+                path="consulta-externa"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.CONSULTA_EXTERNA]}>
+                    <ConsultaExternaPage />
                   </ProtectedRoute>
                 }
               />

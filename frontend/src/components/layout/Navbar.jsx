@@ -127,7 +127,7 @@ const EcgSVG = () => {
   );
 };
 
-export default function Navbar() {
+export default function Navbar({ onToggleSidebar, isSidebarCollapsed }) {
   const { user, logout }  = useAuth();
   const location           = useLocation();
   const [menuOpen, setMenu] = useState(false);
@@ -190,19 +190,43 @@ export default function Navbar() {
       justifyContent: 'space-between',
       padding:        '0 2rem',
       zIndex:          99,
+      transition:      'left 0.3s ease'
     }}>
 
       {/* Electrocardiograma decorativo de fondo */}
       <EcgSVG />
 
-      {/* Breadcrumb + Título de página */}
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          marginBottom: '0.15rem',
-        }}>
+      {/* Contenedor Izquierdo: Botón Toggle + Breadcrumb */}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <button
+          onClick={onToggleSidebar}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            padding: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '6px',
+          }}
+          title={isSidebarCollapsed ? "Mostrar Menú" : "Ocultar Menú"}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        
+        <div>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '0.15rem',
+          }}>
           <span style={{
             fontFamily: 'var(--font-mono)',
             fontSize: '0.6rem',
@@ -232,6 +256,7 @@ export default function Navbar() {
         }}>
           {title}
         </h2>
+        </div>
       </div>
 
       {/* Controles derechos */}

@@ -148,7 +148,7 @@ export default function DashboardDirectivo() {
   }
 
   return (
-    <div style={{ maxWidth: 1300, margin: '0 auto' }}>
+    <div style={{ maxWidth: 'var(--content-max, 1300px)', margin: '0 auto' }}>
       {/* <ExportApiModal isOpen={showExportApi} onClose={() => setShowExportApi(false)} /> */}
 
       {/* ── Header del dashboard ── */}

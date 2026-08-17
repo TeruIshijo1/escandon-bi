@@ -173,7 +173,7 @@ export default function HomePage() {
   const isAdmin = user?.role === 'ADMIN';
 
   return (
-    <div style={{ maxWidth:1200, margin:'0 auto' }}>
+    <div style={{ maxWidth:'var(--content-max, 1200px)', margin:'0 auto' }}>
       <style>{`
         @keyframes cardSlideIn {
           from { opacity: 0; transform: translateY(12px); }

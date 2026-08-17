@@ -427,9 +427,32 @@ async function syncConsultasProg(remotePool, startDateStr) {
   const res = await remotePool.request()
     .input('startDate', startDateStr)
     .query(`
-      SELECT No_Cita, No_Medico, Medico, Especialidad, NoPaciente, Paciente, DesdeFecha, HastaFecha, PCAP_ST_Descripcion 
-      FROM UDR_CONSULTAS_PROG 
-      WHERE DesdeFecha >= @startDate
+      SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+      SELECT 
+        c.Numero_Cita AS No_Cita, 
+        c.Folio_Medico AS No_Medico, 
+        c.Medico, 
+        c.MSDescription_ES AS Especialidad, 
+        c.Numero_Paciente AS NoPaciente, 
+        c.Paciente, 
+        CAST(CAST(c.Fecha AS DATE) AS DATETIME) + CAST(CAST(c.Hora AS TIME) AS DATETIME) AS DesdeFecha, 
+        DATEADD(minute, 30, CAST(CAST(c.Fecha AS DATE) AS DATETIME) + CAST(CAST(c.Hora AS TIME) AS DATETIME)) AS HastaFecha, 
+        COALESCE(prog.PCAP_ST_Descripcion, c.Estatus_Orden_Venta) AS PCAP_ST_Descripcion, 
+        c.PS, 
+        c.DXDescription_ES, 
+        c.Comentarios, 
+        c.Telefono_1, 
+        c.Celular_2, 
+        c.Articulo,
+        c.Edad_Anios,
+        c.Edad_Mes,
+        c.Genero,
+        c.ConsultasPreviasEjecutadas,
+        p.Convenio
+      FROM UDR_CD c
+      LEFT JOIN UDR_BI_PACIENTES p ON c.Numero_Paciente = p.NoPaciente
+      LEFT JOIN UDR_CONSULTAS_PROG prog ON c.Numero_Cita = prog.No_Cita
+      WHERE c.Fecha >= @startDate
     `);
 
   const records = res.recordset || [];
@@ -438,8 +461,8 @@ async function syncConsultasProg(remotePool, startDateStr) {
   for (const r of records) {
     await pool.query(`
       INSERT INTO dw_vertical_consultas_prog 
-        (no_cita, no_medico, medico, especialidad, nopaciente, paciente, desdefecha, hastafecha, pcap_st_descripcion, sync_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+        (no_cita, no_medico, medico, especialidad, nopaciente, paciente, desdefecha, hastafecha, pcap_st_descripcion, ps, dx_description_es, comentarios, telefono_1, celular_2, articulo, edad_anios, edad_mes, genero, consultas_previas, convenio, sync_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP)
       ON CONFLICT (no_cita) DO UPDATE SET
         no_medico = EXCLUDED.no_medico,
         medico = EXCLUDED.medico,
@@ -449,9 +472,20 @@ async function syncConsultasProg(remotePool, startDateStr) {
         desdefecha = EXCLUDED.desdefecha,
         hastafecha = EXCLUDED.hastafecha,
         pcap_st_descripcion = EXCLUDED.pcap_st_descripcion,
+        ps = EXCLUDED.ps,
+        dx_description_es = EXCLUDED.dx_description_es,
+        comentarios = EXCLUDED.comentarios,
+        telefono_1 = EXCLUDED.telefono_1,
+        celular_2 = EXCLUDED.celular_2,
+        articulo = EXCLUDED.articulo,
+        edad_anios = EXCLUDED.edad_anios,
+        edad_mes = EXCLUDED.edad_mes,
+        genero = EXCLUDED.genero,
+        consultas_previas = EXCLUDED.consultas_previas,
+        convenio = EXCLUDED.convenio,
         sync_date = CURRENT_TIMESTAMP;
     `, [
-      r.No_Cita, r.No_Medico, r.Medico, r.Especialidad, r.NoPaciente, r.Paciente, r.DesdeFecha, r.HastaFecha, r.PCAP_ST_Descripcion
+      r.No_Cita, r.No_Medico, r.Medico, r.Especialidad, r.NoPaciente, r.Paciente, r.DesdeFecha, r.HastaFecha, r.PCAP_ST_Descripcion, r.PS, r.DXDescription_ES, r.Comentarios, r.Telefono_1, r.Celular_2, r.Articulo, r.Edad_Anios, r.Edad_Mes, r.Genero, r.ConsultasPreviasEjecutadas, r.Convenio
     ]);
     count++;
   }
@@ -553,6 +587,16 @@ function initDashboardCron() {
     syncAllDashboards({ fullSync: false });
   });
   console.log('⏰ Cron Job de DW Dashboards inicializado (Ejecución cada 15 min).');
+
+  // Consulta Externa: agenda DW → cex_citas/cex_pacientes (15 min)
+  const { syncCexFromDW } = require('./cexSync.service');
+  const runCexSync = () => {
+    syncCexFromDW().catch(e => console.error('[CEX Cron] Error sincronizando agenda:', e.message));
+  };
+  cron.schedule('*/15 * * * *', runCexSync);
+  // Sync inicial al arrancar (después de que el DW cargue la ventana inicial)
+  setTimeout(runCexSync, 30 * 1000);
+  console.log('⏰ Cron Job de Consulta Externa inicializado (Ejecución cada 15 min).');
 }
 
 module.exports = {

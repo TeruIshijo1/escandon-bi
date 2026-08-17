@@ -183,7 +183,7 @@ export default function Estadisticas() {
   });
 
   return (
-    <div style={{ maxWidth:1200, margin:'0 auto' }}>
+    <div style={{ maxWidth:'var(--content-max, 1200px)', margin:'0 auto' }}>
       <style>{`
         .est-kpi-card:hover {
           transform: translateY(-2px);

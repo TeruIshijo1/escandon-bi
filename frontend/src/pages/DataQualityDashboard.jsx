@@ -129,7 +129,7 @@ export default function DataQualityDashboard() {
   };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1280px', margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ padding: '24px', maxWidth: 'var(--content-max, 1280px)', margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
       
       {/* Encabezado */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>

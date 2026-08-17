@@ -26,6 +26,7 @@ const sqlFiles = [
   '03_data_hub.sql',
   '04_kpi_config.sql',
   '05_quality_and_interop.sql',
+  '06_cex.sql',
 ];
 
 function splitStatements(sql) {

@@ -18,6 +18,9 @@ ON CONFLICT (NombreRol) DO NOTHING;
 INSERT INTO Roles (NombreRol, Descripcion, Nivel) VALUES
 ('ALMACEN_GENERAL', 'Acceso operativo a inventario general y traslados SAP.', 4)
 ON CONFLICT (NombreRol) DO NOTHING;
+INSERT INTO Roles (NombreRol, Descripcion, Nivel) VALUES
+('CONSULTA_EXTERNA', 'Gestión operativa de la agenda, pacientes y citas de Consulta Externa.', 4)
+ON CONFLICT (NombreRol) DO NOTHING;
 
 -- El administrador inicial se crea desde backend/config/init-db.js únicamente
 -- cuando SEED_ADMIN_PASSWORD está configurada en el archivo .env local.

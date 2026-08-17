@@ -252,6 +252,17 @@ async function initPostgresDW() {
         desdefecha TIMESTAMP WITH TIME ZONE,
         hastafecha TIMESTAMP WITH TIME ZONE,
         pcap_st_descripcion VARCHAR(100),
+        ps VARCHAR(50),
+        dx_description_es TEXT,
+        comentarios TEXT,
+        telefono_1 VARCHAR(100),
+        celular_2 VARCHAR(100),
+        articulo VARCHAR(255),
+        edad_anios VARCHAR(50),
+        edad_mes VARCHAR(50),
+        genero VARCHAR(10),
+        consultas_previas INT,
+        convenio VARCHAR(255),
         sync_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);

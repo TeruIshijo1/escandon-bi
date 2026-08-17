@@ -133,6 +133,7 @@ const pharmacyRoutes = require('./routes/pharmacy.routes');
 const sapRoutes = require('./routes/sap.routes');
 const almacenRoutes = require('./routes/almacen.routes');
 const finanzasRoutes = require('./routes/finanzas.routes');
+const cexRoutes = require('./routes/cex.routes');
 
 app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/dashboard',     dashboardRoutes);
@@ -148,6 +149,7 @@ app.use('/api/pharmacy',      pharmacyRoutes);
 app.use('/api/almacen',       almacenRoutes);
 app.use('/api/sap',           sapRoutes);
 app.use('/api/finanzas',      finanzasRoutes);
+app.use('/api/cex',           cexRoutes);
 app.use('/api/files', authenticate, express.static(path.join(__dirname, 'uploads')));
 
 // Servir Frontend compilado en Producción

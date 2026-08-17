@@ -71,7 +71,7 @@ export default function AdminAuditoriaLog() {
   );
 
   return (
-    <div style={{ maxWidth:1200, margin:'0 auto' }}>
+    <div style={{ maxWidth:'var(--content-max, 1200px)', margin:'0 auto' }}>
       <style>{`
         .search-input-field:focus {
           border-color: var(--color-azul-claro) !important;

@@ -304,7 +304,7 @@ export default function AdminConfiguracion() {
   };
 
   return (
-    <div style={{ maxWidth:'1200px', width:'100%', margin:'0 auto' }}>
+    <div style={{ maxWidth:'var(--content-max, 1200px)', width:'100%', margin:'0 auto' }}>
       <style>{`
         .config-card {
           background:#FFFFFF; 

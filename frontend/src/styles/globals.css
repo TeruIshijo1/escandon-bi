@@ -891,12 +891,12 @@ code, pre, .mono {
 .main-content {
   margin-left: var(--sidebar-width);
   margin-top: var(--navbar-height);
-  flex: 1;
+  width: calc(100% - var(--sidebar-width));
   padding: 1.75rem 2.5%;
   min-height: calc(100vh - var(--navbar-height));
   min-width: 0;
   background: var(--color-bg-base);
-  transition: margin-left var(--transition-base), padding var(--transition-base);
+  transition: margin-left 0.3s ease, width 0.3s ease;
   animation: fadeIn 0.4s var(--ease-out-expo);
 }
 

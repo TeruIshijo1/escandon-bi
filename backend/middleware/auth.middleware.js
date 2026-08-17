@@ -25,6 +25,7 @@ const VALID_ROLES = new Set([
   'JEFE_AREA',
   'USUARIO_OPERATIVO',
   'ALMACEN_GENERAL',
+  'CONSULTA_EXTERNA',
 ]);
 
 /* ── Áreas válidas del hospital ────────────────────────────── */
@@ -188,11 +189,12 @@ function authorizeArea(allowedRolesForAll = ['ADMIN', 'DIRECTOR']) {
 ══════════════════════════════════════════════════════════════ */
 function authorizeCapability(capability) {
   const ROLE_CAPABILITIES = {
-    ADMIN:            ['exportarPDF','exportarExcel','gestionarUsuarios','verAuditoria','verLogAuditoria','verMacropanelFinanciero','usarAsistenteIA'],
-    DIRECTOR:         ['exportarPDF','exportarExcel','verAuditoria','verMacropanelFinanciero','usarAsistenteIA'],
+    ADMIN:            ['exportarPDF','exportarExcel','gestionarUsuarios','verAuditoria','verLogAuditoria','verMacropanelFinanciero','usarAsistenteIA', 'verCEX', 'gestionCEX'],
+    DIRECTOR:         ['exportarPDF','exportarExcel','verAuditoria','verMacropanelFinanciero','usarAsistenteIA', 'verCEX'],
     JEFE_AREA:        ['exportarPDF','exportarExcel','usarAsistenteIA'],
     USUARIO_OPERATIVO:['exportarExcel'],
     ALMACEN_GENERAL:  ['exportarExcel'],
+    CONSULTA_EXTERNA: ['exportarExcel','verCEX','gestionCEX'],
   };
 
   return (req, res, next) => {

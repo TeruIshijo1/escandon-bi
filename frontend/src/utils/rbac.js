@@ -15,6 +15,7 @@ export const ROLES = {
   JEFE_AREA:        'JEFE_AREA',
   USUARIO_OPERATIVO:'USUARIO_OPERATIVO',
   ALMACEN_GENERAL:  'ALMACEN_GENERAL',
+  CONSULTA_EXTERNA: 'CONSULTA_EXTERNA',
 };
 
 export const AREAS = {
@@ -38,7 +39,7 @@ export const AREAS = {
  * Mapea cada ruta a los roles que pueden accederla.
  */
 export const ROUTE_PERMISSIONS = {
-  '/':                      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
+  '/':                      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL, ROLES.CONSULTA_EXTERNA],
   '/dashboard/directivo':   [ROLES.ADMIN, ROLES.DIRECTOR],
   '/dashboard/ocupacion':   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
   '/dashboard/area':        [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
@@ -59,6 +60,7 @@ export const ROUTE_PERMISSIONS = {
   '/almacen/reorden':       [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
   '/almacen/traslados':     [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
   '/almacen/reportes':      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
+  '/consulta-externa':      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.CONSULTA_EXTERNA],
   '/calidad-datos':         [ROLES.ADMIN, ROLES.DIRECTOR],
   '/estadisticas':          [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
   '/admin/usuarios':        [ROLES.ADMIN],
@@ -95,6 +97,7 @@ export const ROUTE_TO_PERMISSION = {
   '/almacen/reorden':       'almacen-reorden',
   '/almacen/traslados':     'almacen-traslados',
   '/almacen/reportes':      'almacen-reportes',
+  '/consulta-externa':      'consulta-externa',
   '/admin/usuarios':        'admin-usuarios',
   '/admin/auditoria-log':   'admin-auditoria-log',
   '/admin/configuracion':   'admin-configuracion',
@@ -178,6 +181,8 @@ export const CAPABILITIES = {
     verMacropanelFinanciero: true,
     editarConfiguracion: true,
     usarAsistenteIA:     true,
+    verCEX:              true,
+    gestionCEX:          true,
   },
   [ROLES.DIRECTOR]: {
     verTodosTableros:    true,
@@ -190,6 +195,8 @@ export const CAPABILITIES = {
     verMacropanelFinanciero: true,
     editarConfiguracion: false,
     usarAsistenteIA:     true,
+    verCEX:              true,
+    gestionCEX:          false,
   },
   [ROLES.JEFE_AREA]: {
     verTodosTableros:    false,
@@ -226,6 +233,20 @@ export const CAPABILITIES = {
     verMacropanelFinanciero: false,
     editarConfiguracion: false,
     usarAsistenteIA:     false,
+  },
+  [ROLES.CONSULTA_EXTERNA]: {
+    verTodosTableros:    false,
+    verDashboardDirectivo: false,
+    verAuditoria:        false,
+    exportarPDF:         false,
+    exportarExcel:       true,
+    gestionarUsuarios:   false,
+    verLogAuditoria:     false,
+    verMacropanelFinanciero: false,
+    editarConfiguracion: false,
+    usarAsistenteIA:     false,
+    verCEX:              true,
+    gestionCEX:          true,
   },
 };
 
@@ -299,7 +320,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
       icon:    '🏠',
       label:   'Inicio',
       path:    '/',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL],
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL, ROLES.CONSULTA_EXTERNA],
     },
     // Dirección
     {
@@ -446,6 +467,14 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
       label:   'Reportes (SAP)',
       path:    '/almacen/reportes',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
+    },
+    // Consulta Externa Operativa
+    {
+      section: 'Consulta Externa',
+      icon:    '🩺',
+      label:   'Agenda',
+      path:    '/consulta-externa',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.CONSULTA_EXTERNA],
     },
     {
       section: 'Auditoría',

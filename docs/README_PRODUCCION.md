@@ -30,6 +30,13 @@ Respecto al entorno de desarrollo local, se realizaron las siguientes adaptacion
   3. Requiere `better-sqlite3` instalado (sigue en `package.json` solo como herramienta de migración) y PostgreSQL alcanzable con las variables `PGUSER/PGHOST/PGPASSWORD/PGDATABASE/PGPORT`.
   4. `npm run db:init` crea/actualiza esquema y seeds (idempotente).
 
+### 1.4 Módulo Consulta Externa (CEX)
+- **Archivos**: `database/06_cex.sql`, `backend/routes/cex.routes.js`, `backend/services/cexSync.service.js`, `backend/scripts/migrate_cex.js`, `frontend/src/pages/ConsultaExternaPage.jsx`.
+- **Diseño**: VERTICAL (SQL Server KH_HE) sigue siendo **solo lectura**. La agenda se cachea en PostgreSQL (`dw_vertical_consultas_prog`) y un cron cada 15 min la replica a las tablas editables `cex_citas`/`cex_pacientes` (upsert por `CitaOrigenId`, respetando estados locales ya definidos: ASISTIDA/CANCELADA/NO_ASISTIO no se sobrescriben).
+- **Rol nuevo**: `CONSULTA_EXTERNA` con capabilities `verCEX` (lectura) y `gestionCEX` (crear/editar citas, registrar consultas). Admin puede crearlo desde Admin → Usuarios.
+- **Migración inicial en producción**: `node scripts/migrate_cex.js` desde `backend/` (puebla pacientes y citas desde la agenda ya sincronizada).
+- **Endpoints**: `GET /api/cex/agenda` (default hoy), `POST /api/cex/sync`, `POST /api/cex/citas`, `PATCH /api/cex/citas/:id/estado`, `POST /api/cex/consultas`, `GET /api/cex/pacientes`, `GET /api/cex/reportes`.
+
 ---
 
 ## 🤖 2. Instrucciones para la IA (Generación de `pase_a_produccion`)
