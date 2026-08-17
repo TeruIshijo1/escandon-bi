@@ -1,7 +1,7 @@
 /**
  * server.js — Entrada principal del Backend
- * Hospital Escandón BI Platform v1.0
- * Node.js + Express · SQLite · JWT
+ * Hospital Escandón BI Platform v2.0
+ * Node.js + Express · PostgreSQL · JWT
  */
 'use strict';
 
@@ -169,8 +169,8 @@ app.use((err, req, res, next) => {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
 
-  // Error de SQLite
-  if (err.code && err.code.startsWith('SQLITE')) {
+  // Error de base de datos (códigos SQLSTATE de PostgreSQL o legacy SQLite)
+  if (err.severity || (err.code && /^[0-9A-Z]{5}$/.test(err.code))) {
     return res.status(500).json({ error: 'Error de base de datos', code: err.code });
   }
 
@@ -194,7 +194,7 @@ app.get('/health', (req, res) => {
 });
 
 /* ── Arranque ───────────────────────────────────────────────── */
-(() => {
+(async () => {
   let localIp = 'localhost';
   try {
     const nets = os.networkInterfaces();
@@ -210,12 +210,12 @@ app.get('/health', (req, res) => {
 
   // El servidor arranca siempre, con o sin BD
   const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🏥  Hospital Escandón BI — Backend v1.0`);
+    console.log(`\n🏥  Hospital Escandón BI — Backend v2.0`);
     console.log(`🚀  Servidor corriendo en:`);
     console.log(`   ➜ Local:    http://localhost:${PORT}`);
     console.log(`   ➜ Intranet: http://${localIp}:${PORT} (Desde cualquier otra PC o Tablet en la red)`);
     console.log(`🛡️   Entorno: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔌  Intentando conectar a SQLite...\n`);
+    console.log(`🔌  Intentando conectar a PostgreSQL...\n`);
   });
 
   server.on('error', (err) => {
@@ -227,7 +227,7 @@ app.get('/health', (req, res) => {
   });
 
   try {
-    connectDB();
+    await connectDB();
     dbStatus = 'ok';
     
     // Inicializar conexión a SQL Server Remoto
@@ -291,7 +291,7 @@ app.get('/health', (req, res) => {
       }
     }).catch(e => console.warn('⚠️ Falló la inicialización de Postgres DW.'));
 
-    // Inicializar Sincronización de Data Warehouse Almacén/Cirrus a SQLite
+    // Inicializar Sincronización de Data Warehouse Almacén/Cirrus a PostgreSQL
     try {
       const { runAlmacenSync } = require('./services/almacenSync.service');
       runAlmacenSync().then(() => {
@@ -308,7 +308,7 @@ app.get('/health', (req, res) => {
 
   } catch (err) {
     dbStatus = 'sin_conexion';
-    console.warn('\n⚠️   SQLite no disponible:', err.message);
+    console.warn('\n⚠️   PostgreSQL no disponible:', err.message);
     console.warn('⚠️   El servidor sigue activo pero las rutas de datos fallarán.');
     console.warn('⚠️   Ejecute: node config/init-db.js para crear la BD.\n');
   }

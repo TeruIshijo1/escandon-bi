@@ -23,7 +23,7 @@ router.post('/login', async (req, res, next) => {
     }
 
     const db   = getDb();
-    const user = db.prepare(`
+    const user = await db.prepare(`
       SELECT
         u.UsuarioId,
         u.Username,
@@ -50,7 +50,7 @@ router.post('/login', async (req, res, next) => {
     }
 
     // Registrar último acceso
-    db.prepare(`UPDATE Usuarios SET UltimoAcceso = datetime('now','localtime'), UltimaIP = ? WHERE UsuarioId = ?`)
+    await db.prepare(`UPDATE Usuarios SET UltimoAcceso = CURRENT_TIMESTAMP, UltimaIP = ? WHERE UsuarioId = ?`)
       .run(req.ip, user.UsuarioId);
 
     const { accessToken, refreshToken } = generateTokens({
@@ -83,26 +83,30 @@ router.post('/login', async (req, res, next) => {
  * GET /api/auth/me
  * Devuelve datos del usuario autenticado (valida token)
  */
-router.get('/me', authenticate, async (req, res) => {
-  const db = getDb();
-  const u  = db.prepare(`
-    SELECT u.UsuarioId, u.Username, u.NombreCompleto, r.NombreRol AS Rol, u.AreaAsignada, u.ReportesPermitidos
-    FROM Usuarios u JOIN Roles r ON r.RolId = u.RolId
-    WHERE u.UsuarioId = ? AND u.Activo = 1
-  `).get(req.user.id);
+router.get('/me', authenticate, async (req, res, next) => {
+  try {
+    const db = getDb();
+    const u  = await db.prepare(`
+      SELECT u.UsuarioId, u.Username, u.NombreCompleto, r.NombreRol AS Rol, u.AreaAsignada, u.ReportesPermitidos
+      FROM Usuarios u JOIN Roles r ON r.RolId = u.RolId
+      WHERE u.UsuarioId = ? AND u.Activo = 1
+    `).get(req.user.id);
 
-  if (!u) return res.status(401).json({ error: 'Usuario no encontrado o inactivo' });
+    if (!u) return res.status(401).json({ error: 'Usuario no encontrado o inactivo' });
 
-  res.json({
-    user: {
-      id:       u.UsuarioId,
-      username: u.Username,
-      nombre:   u.NombreCompleto,
-      role:     u.Rol,
-      area:     u.AreaAsignada,
-      permisos: JSON.parse(u.ReportesPermitidos || '[]')
-    },
-  });
+    res.json({
+      user: {
+        id:       u.UsuarioId,
+        username: u.Username,
+        nombre:   u.NombreCompleto,
+        role:     u.Rol,
+        area:     u.AreaAsignada,
+        permisos: JSON.parse(u.ReportesPermitidos || '[]')
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 /**
@@ -112,7 +116,7 @@ router.get('/me', authenticate, async (req, res) => {
 router.post('/logout', authenticate, async (req, res) => {
   try {
     const db = getDb();
-    db.prepare(`UPDATE Usuarios SET RefreshToken = NULL WHERE UsuarioId = ?`).run(req.user.id);
+    await db.prepare(`UPDATE Usuarios SET RefreshToken = NULL WHERE UsuarioId = ?`).run(req.user.id);
     res.json({ ok: true, message: 'Sesión cerrada correctamente' });
   } catch (err) {
     res.json({ ok: true }); // Logout siempre exitoso para el cliente

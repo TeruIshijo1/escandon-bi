@@ -1,13 +1,11 @@
 -- ═══════════════════════════════════════════════════════════════════
--- 04_kpi_config.sql — Configuración de Indicadores KPI
+-- 04_kpi_config.sql — Configuración de Indicadores KPI (PostgreSQL)
 -- Hospital Escandón BI Platform v4.0
 -- Cada fila = un cuadro/indicador en la plataforma
 -- ═══════════════════════════════════════════════════════════════════
 
-DROP TABLE IF EXISTS KPIConfig;
-
 CREATE TABLE IF NOT EXISTS KPIConfig (
-  KPIId         INTEGER PRIMARY KEY AUTOINCREMENT,
+  KPIId         SERIAL PRIMARY KEY,
   ElementoId    TEXT    NOT NULL UNIQUE,   -- 'directivo.ocupacion'
   Seccion       TEXT    NOT NULL,          -- 'directivo' | 'mando' | 'area' | 'stats' | 'audit' | 'home'
   NombreDefault TEXT    NOT NULL,          -- Nombre original del sistema (no cambia)
@@ -17,10 +15,11 @@ CREATE TABLE IF NOT EXISTS KPIConfig (
   PBIUrl2       TEXT    NULL,              -- URL de la página 2 (opcional)
   PBIUrl3       TEXT    NULL,              -- URL de la página 3 (opcional)
   Activo        INTEGER NOT NULL DEFAULT 1,
-  FechaModif    TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
+  FechaModif    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  MultiPagina   INTEGER DEFAULT 0,
+  JsonApiUrl    TEXT    DEFAULT NULL,
+  JsonFilePath  TEXT    DEFAULT NULL
 );
-
-
 
 -- ── Seed: Estadísticas Demográficas (8) ──────────────────────────
 INSERT INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
@@ -31,7 +30,8 @@ INSERT INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
   ('stats.nacimientos',     'stats', 'Nacimientos',            '👶'),
   ('stats.estancia_global', 'stats', 'Estancia Promedio Global','📅'),
   ('stats.top_diagnosticos', 'stats', 'Top Diagnósticos del Período', '📊'),
-  ('stats.egresos_servicio', 'stats', 'Egresos por Servicio', '📊');
+  ('stats.egresos_servicio', 'stats', 'Egresos por Servicio', '📊')
+ON CONFLICT (ElementoId) DO NOTHING;
 
 -- ── Seed: Dashboard por Área (36 para las 9 áreas) ──────────────────
 INSERT INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
@@ -78,4 +78,5 @@ INSERT INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
   ('area.hospitalizacion.ocupacion', 'area', 'Ocupación - Hospitalización', '🏥'),
   ('area.hospitalizacion.egresos', 'area', 'Egresos Mes - Hospitalización', '🚪'),
   ('area.hospitalizacion.estancia', 'area', 'Estancia Promedio - Hospitalización', '📅'),
-  ('area.hospitalizacion.rotacion_camas', 'area', 'Rotación de Camas - Hospitalización', '🔄');
+  ('area.hospitalizacion.rotacion_camas', 'area', 'Rotación de Camas - Hospitalización', '🔄')
+ON CONFLICT (ElementoId) DO NOTHING;

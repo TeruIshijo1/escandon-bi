@@ -50,8 +50,8 @@ const INTENT_QUERIES = {
         SUM(CASE WHEN c.Estado = 'OCUPADA' THEN 1 ELSE 0 END)            AS CamasOcupadas,
         SUM(CASE WHEN c.Estado = 'DISPONIBLE' THEN 1 ELSE 0 END)         AS CamasLibres,
         ROUND(
-          CAST(SUM(CASE WHEN c.Estado = 'OCUPADA' THEN 1 ELSE 0 END) AS REAL)
-          * 100.0 / MAX(COUNT(*), 1)
+          CAST(SUM(CASE WHEN c.Estado = 'OCUPADA' THEN 1 ELSE 0 END) AS NUMERIC)
+          * 100.0 / GREATEST(COUNT(*), 1)
         , 1)                                                               AS PorcentajeOcupacion
       FROM Camas c
       WHERE c.Activo = 1
@@ -65,8 +65,8 @@ const INTENT_QUERIES = {
         SUM(CASE WHEN c.Estado = 'OCUPADA' THEN 1 ELSE 0 END)            AS CamasOcupadas,
         SUM(CASE WHEN c.Estado = 'DISPONIBLE' THEN 1 ELSE 0 END)         AS CamasLibres,
         ROUND(
-          CAST(SUM(CASE WHEN c.Estado = 'OCUPADA' THEN 1 ELSE 0 END) AS REAL)
-          * 100.0 / MAX(COUNT(*), 1)
+          CAST(SUM(CASE WHEN c.Estado = 'OCUPADA' THEN 1 ELSE 0 END) AS NUMERIC)
+          * 100.0 / GREATEST(COUNT(*), 1)
         , 1)                                                               AS PorcentajeOcupacion
       FROM Camas c
       WHERE c.Activo = 1 AND c.Area = ?
@@ -104,11 +104,11 @@ const INTENT_QUERIES = {
         COUNT(*)                                                           AS TotalEgresos,
         SUM(CASE WHEN e.TipoEgreso = 'DEFUNCION' THEN 1 ELSE 0 END)      AS Defunciones,
         ROUND(
-          CAST(SUM(CASE WHEN e.TipoEgreso = 'DEFUNCION' THEN 1 ELSE 0 END) AS REAL)
-          * 100.0 / MAX(COUNT(*), 1)
+          CAST(SUM(CASE WHEN e.TipoEgreso = 'DEFUNCION' THEN 1 ELSE 0 END) AS NUMERIC)
+          * 100.0 / GREATEST(COUNT(*), 1)
         , 2)                                                                AS TasaMortalidad
       FROM Egresos e
-      WHERE e.FechaEgreso >= datetime('now', '-1 month')
+      WHERE e.FechaEgreso >= CURRENT_TIMESTAMP - INTERVAL '1 month'
     `,
     params: [],
   },
@@ -123,7 +123,7 @@ const INTENT_QUERIES = {
         SUM(CASE WHEN qx.Estado = 'CANCELADA'   THEN 1 ELSE 0 END)        AS Canceladas,
         SUM(CASE WHEN qx.Estado = 'EN_CURSO'    THEN 1 ELSE 0 END)        AS EnCurso
       FROM ProgramacionQuirofano qx
-      WHERE date(qx.FechaCirugia) = date('now')
+      WHERE qx.FechaCirugia::date = CURRENT_DATE
     `,
     params: [],
   },
@@ -134,14 +134,14 @@ const INTENT_QUERIES = {
       SELECT
         e.AreaEgreso                                                AS Area,
         COUNT(*)                                                    AS Egresos,
-        AVG(CAST(julianday(e.FechaEgreso) - julianday(a.FechaIngreso) AS INTEGER)) AS EstanciaPromedioDias,
+        AVG((EXTRACT(EPOCH FROM e.FechaEgreso) - EXTRACT(EPOCH FROM a.FechaIngreso)) / 86400.0) AS EstanciaPromedioDias,
         ROUND(
-          CAST(COUNT(*) AS REAL) /
-          MAX((SELECT COUNT(*) FROM Camas WHERE Area = e.AreaEgreso), 1)
+          CAST(COUNT(*) AS NUMERIC) /
+          GREATEST((SELECT COUNT(*) FROM Camas WHERE Area = e.AreaEgreso), 1)
         , 2)                                                         AS RotacionCamas
       FROM Egresos e
       JOIN Admisiones a ON a.AdmisionId = e.AdmisionId
-      WHERE e.FechaEgreso >= datetime('now', '-1 month')
+      WHERE e.FechaEgreso >= CURRENT_TIMESTAMP - INTERVAL '1 month'
       GROUP BY e.AreaEgreso
       ORDER BY RotacionCamas DESC
       LIMIT 10
@@ -150,14 +150,14 @@ const INTENT_QUERIES = {
       SELECT
         e.AreaEgreso                                                AS Area,
         COUNT(*)                                                    AS Egresos,
-        AVG(CAST(julianday(e.FechaEgreso) - julianday(a.FechaIngreso) AS INTEGER)) AS EstanciaPromedioDias,
+        AVG((EXTRACT(EPOCH FROM e.FechaEgreso) - EXTRACT(EPOCH FROM a.FechaIngreso)) / 86400.0) AS EstanciaPromedioDias,
         ROUND(
-          CAST(COUNT(*) AS REAL) /
-          MAX((SELECT COUNT(*) FROM Camas WHERE Area = e.AreaEgreso), 1)
+          CAST(COUNT(*) AS NUMERIC) /
+          GREATEST((SELECT COUNT(*) FROM Camas WHERE Area = e.AreaEgreso), 1)
         , 2)                                                         AS RotacionCamas
       FROM Egresos e
       JOIN Admisiones a ON a.AdmisionId = e.AdmisionId
-      WHERE e.FechaEgreso >= datetime('now', '-1 month') AND e.AreaEgreso = ?
+      WHERE e.FechaEgreso >= CURRENT_TIMESTAMP - INTERVAL '1 month' AND e.AreaEgreso = ?
       GROUP BY e.AreaEgreso
     `,
     params: [],
@@ -170,15 +170,15 @@ const INTENT_QUERIES = {
         COUNT(DISTINCT r.PacienteId)                     AS ReadmisionesCount,
         COUNT(DISTINCT e.PacienteId)                     AS TotalEgresados,
         ROUND(
-          CAST(COUNT(DISTINCT r.PacienteId) AS REAL)
-          * 100.0 / MAX(COUNT(DISTINCT e.PacienteId), 1)
+          CAST(COUNT(DISTINCT r.PacienteId) AS NUMERIC)
+          * 100.0 / GREATEST(COUNT(DISTINCT e.PacienteId), 1)
         , 2)                                              AS TasaReadmision
       FROM Egresos e
       LEFT JOIN Admisiones r
         ON  r.PacienteId   = e.PacienteId
         AND r.FechaIngreso  > e.FechaEgreso
-        AND CAST(julianday(r.FechaIngreso) - julianday(e.FechaEgreso) AS INTEGER) <= 30
-      WHERE e.FechaEgreso >= datetime('now', '-1 month')
+        AND EXTRACT(EPOCH FROM (r.FechaIngreso - e.FechaEgreso)) / 86400.0 <= 30
+      WHERE e.FechaEgreso >= CURRENT_TIMESTAMP - INTERVAL '1 month'
     `,
     params: [],
   },
@@ -233,7 +233,7 @@ async function processRAGQuery({ question, userRole, userArea, userName, file, s
   let sources = [];
 
   if (hasPermission && INTENT_QUERIES[intent]?.sql) {
-    const result = fetchDataForIntent(intent, { userRole, userArea });
+    const result = await fetchDataForIntent(intent, { userRole, userArea });
     data = result.data;
     executedSQL = result.sql;
     sources = result.sources;
@@ -297,7 +297,7 @@ ${intentList}`,
 }
 
 /* ── Paso 2: Ejecutar query SQL con filtro RBAC ──────────── */
-function fetchDataForIntent(intent, { userRole, userArea }) {
+async function fetchDataForIntent(intent, { userRole, userArea }) {
   const queryConfig = INTENT_QUERIES[intent];
   if (!queryConfig || !queryConfig.sql) {
     return { data: [], sql: null, sources: [] };
@@ -317,12 +317,12 @@ function fetchDataForIntent(intent, { userRole, userArea }) {
       sqlToUse = queryConfig.sql;
     }
 
-    const data = db.prepare(sqlToUse).all(...params);
+    const data = await db.prepare(sqlToUse).all(...params);
 
     return {
       data,
       sql: sqlToUse,
-      sources: ['SQLite — Hospital Escandón', `Consulta: ${intent}`],
+      sources: ['PostgreSQL — Hospital Escandón', `Consulta: ${intent}`],
     };
   } catch (err) {
     console.error('[Mar-IA] Error al ejecutar query:', err.message);

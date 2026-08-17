@@ -54,10 +54,10 @@ router.post('/upload-json', upload.single('jsonFile'), (req, res, next) => {
  * GET /api/admin/usuarios
  * Lista todos los usuarios con su rol
  */
-router.get('/usuarios', (req, res, next) => {
+router.get('/usuarios', async (req, res, next) => {
   try {
     const db = getDb();
-    const usuarios = db.prepare(`
+    const usuarios = await db.prepare(`
       SELECT
         u.UsuarioId   AS id,
         u.Username    AS username,
@@ -89,10 +89,10 @@ router.get('/usuarios', (req, res, next) => {
  * GET /api/admin/usuarios/:id
  * Detalle de un usuario
  */
-router.get('/usuarios/:id', (req, res, next) => {
+router.get('/usuarios/:id', async (req, res, next) => {
   try {
     const db = getDb();
-    const u = db.prepare(`
+    const u = await db.prepare(`
       SELECT
         u.UsuarioId   AS id,
         u.Username    AS username,
@@ -121,12 +121,12 @@ router.get('/usuarios/:id', (req, res, next) => {
  * PUT /api/admin/usuarios/:id/permisos
  * Actualiza los reportes/tableros específicos a los que tiene acceso el usuario
  */
-router.put('/usuarios/:id/permisos', (req, res, next) => {
+router.put('/usuarios/:id/permisos', async (req, res, next) => {
   try {
     const { permisos } = req.body;
     const db = getDb();
 
-    db.prepare('UPDATE Usuarios SET ReportesPermitidos = ? WHERE UsuarioId = ?')
+    await db.prepare('UPDATE Usuarios SET ReportesPermitidos = ? WHERE UsuarioId = ?')
       .run(JSON.stringify(permisos || []), req.params.id);
 
     res.json({ ok: true, message: 'Permisos actualizados correctamente' });
@@ -157,19 +157,20 @@ router.post('/usuarios', async (req, res, next) => {
     const db = getDb();
 
     // Verificar que el rol existe
-    const rol = db.prepare('SELECT RolId, NombreRol FROM Roles WHERE RolId = ?').get(rolId);
+    const rol = await db.prepare('SELECT RolId, NombreRol FROM Roles WHERE RolId = ?').get(rolId);
     if (!rol) return res.status(400).json({ error: 'Rol no válido' });
 
     // Verificar duplicados
-    const existe = db.prepare('SELECT UsuarioId FROM Usuarios WHERE Username = ? OR Email = ?')
+    const existe = await db.prepare('SELECT UsuarioId FROM Usuarios WHERE Username = ? OR Email = ?')
       .get(username.toLowerCase(), email.toLowerCase());
     if (existe) return res.status(409).json({ error: 'El username o email ya existe' });
 
     const hash = await bcrypt.hash(password, 12);
 
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO Usuarios (Username, NombreCompleto, Email, PasswordHash, RolId, AreaAsignada, CreadoPor)
       VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING UsuarioId
     `).run(
       username.trim().toLowerCase(),
       nombre.trim(),
@@ -202,13 +203,13 @@ router.post('/usuarios', async (req, res, next) => {
  * Actualizar usuario (nombre, email, rol, área, activo)
  * Body: { nombre?, email?, rolId?, area?, activo? }
  */
-router.put('/usuarios/:id', (req, res, next) => {
+router.put('/usuarios/:id', async (req, res, next) => {
   try {
     const db = getDb();
     const id = req.params.id;
     const { nombre, email, rolId, area, activo, password } = req.body;
 
-    const user = db.prepare('SELECT UsuarioId FROM Usuarios WHERE UsuarioId = ?').get(id);
+    const user = await db.prepare('SELECT UsuarioId FROM Usuarios WHERE UsuarioId = ?').get(id);
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const updates = [];
@@ -217,7 +218,7 @@ router.put('/usuarios/:id', (req, res, next) => {
     if (nombre !== undefined) { updates.push('NombreCompleto = ?'); params.push(nombre.trim()); }
     if (email  !== undefined) { updates.push('Email = ?'); params.push(email.trim().toLowerCase()); }
     if (rolId  !== undefined) {
-      const rol = db.prepare('SELECT RolId FROM Roles WHERE RolId = ?').get(rolId);
+      const rol = await db.prepare('SELECT RolId FROM Roles WHERE RolId = ?').get(rolId);
       if (!rol) return res.status(400).json({ error: 'Rol no válido' });
       updates.push('RolId = ?'); params.push(rolId);
     }
@@ -238,10 +239,10 @@ router.put('/usuarios/:id', (req, res, next) => {
       return res.status(400).json({ error: 'No se proporcionaron campos para actualizar' });
     }
 
-    updates.push("FechaModificacion = datetime('now','localtime')");
+    updates.push("FechaModificacion = CURRENT_TIMESTAMP");
     params.push(id);
 
-    db.prepare(`UPDATE Usuarios SET ${updates.join(', ')} WHERE UsuarioId = ?`).run(...params);
+    await db.prepare(`UPDATE Usuarios SET ${updates.join(', ')} WHERE UsuarioId = ?`).run(...params);
 
     res.json({ ok: true, message: 'Usuario actualizado correctamente' });
   } catch (err) {
@@ -262,11 +263,11 @@ router.put('/usuarios/:id/password', async (req, res, next) => {
     }
 
     const db   = getDb();
-    const user = db.prepare('SELECT UsuarioId FROM Usuarios WHERE UsuarioId = ?').get(req.params.id);
+    const user = await db.prepare('SELECT UsuarioId FROM Usuarios WHERE UsuarioId = ?').get(req.params.id);
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const hash = await bcrypt.hash(password, 12);
-    db.prepare(`UPDATE Usuarios SET PasswordHash = ?, FechaModificacion = datetime('now','localtime') WHERE UsuarioId = ?`)
+    await db.prepare(`UPDATE Usuarios SET PasswordHash = ?, FechaModificacion = CURRENT_TIMESTAMP WHERE UsuarioId = ?`)
       .run(hash, req.params.id);
 
     res.json({ ok: true, message: 'Contraseña actualizada correctamente' });
@@ -279,7 +280,7 @@ router.put('/usuarios/:id/password', async (req, res, next) => {
  * DELETE /api/admin/usuarios/:id
  * Desactivar usuario (soft delete)
  */
-router.delete('/usuarios/:id', (req, res, next) => {
+router.delete('/usuarios/:id', async (req, res, next) => {
   try {
     const db = getDb();
     const id = req.params.id;
@@ -288,10 +289,10 @@ router.delete('/usuarios/:id', (req, res, next) => {
       return res.status(400).json({ error: 'No puede desactivar su propia cuenta' });
     }
 
-    const user = db.prepare('SELECT UsuarioId, Username FROM Usuarios WHERE UsuarioId = ?').get(id);
+    const user = await db.prepare('SELECT UsuarioId, Username FROM Usuarios WHERE UsuarioId = ?').get(id);
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    db.prepare(`UPDATE Usuarios SET Activo = 0, FechaModificacion = datetime('now','localtime') WHERE UsuarioId = ?`)
+    await db.prepare(`UPDATE Usuarios SET Activo = 0, FechaModificacion = CURRENT_TIMESTAMP WHERE UsuarioId = ?`)
       .run(id);
 
     res.json({ ok: true, message: `Usuario '${user.Username}' desactivado correctamente` });
@@ -304,10 +305,10 @@ router.delete('/usuarios/:id', (req, res, next) => {
  * GET /api/admin/roles
  * Lista todos los roles disponibles
  */
-router.get('/roles', (req, res, next) => {
+router.get('/roles', async (req, res, next) => {
   try {
     const db = getDb();
-    const roles = db.prepare('SELECT RolId AS id, NombreRol AS nombre FROM Roles ORDER BY Nivel').all();
+    const roles = await db.prepare('SELECT RolId AS id, NombreRol AS nombre FROM Roles ORDER BY Nivel').all();
     res.json({ ok: true, data: roles });
   } catch (err) {
     next(err);
@@ -318,7 +319,7 @@ router.get('/roles', (req, res, next) => {
  * GET /api/admin/audit-logs
  * Retorna logs de auditoría, filtrados por fecha
  */
-router.get('/audit-logs', (req, res, next) => {
+router.get('/audit-logs', async (req, res, next) => {
   try {
     const db = getDb();
     const { start, end } = req.query;
@@ -339,19 +340,19 @@ router.get('/audit-logs', (req, res, next) => {
     const params = [];
 
     if (start && end) {
-      query += ` WHERE date(FechaHora) BETWEEN ? AND ? `;
+      query += ` WHERE FechaHora::date BETWEEN ? AND ? `;
       params.push(start, end);
     } else if (start) {
-      query += ` WHERE date(FechaHora) >= ? `;
+      query += ` WHERE FechaHora::date >= ? `;
       params.push(start);
     } else if (end) {
-      query += ` WHERE date(FechaHora) <= ? `;
+      query += ` WHERE FechaHora::date <= ? `;
       params.push(end);
     }
 
     query += ` ORDER BY FechaHora DESC LIMIT 100000`;
 
-    const logs = db.prepare(query).all(...params);
+    const logs = await db.prepare(query).all(...params);
 
     res.json({ ok: true, data: logs });
   } catch (err) {
@@ -377,19 +378,19 @@ router.get('/audit-logs/excel', async (req, res, next) => {
     const params = [];
 
     if (start && end) {
-      query += ` WHERE date(FechaHora) BETWEEN ? AND ? `;
+      query += ` WHERE FechaHora::date BETWEEN ? AND ? `;
       params.push(start, end);
     } else if (start) {
-      query += ` WHERE date(FechaHora) >= ? `;
+      query += ` WHERE FechaHora::date >= ? `;
       params.push(start);
     } else if (end) {
-      query += ` WHERE date(FechaHora) <= ? `;
+      query += ` WHERE FechaHora::date <= ? `;
       params.push(end);
     }
 
     query += ` ORDER BY FechaHora DESC LIMIT 100000`;
 
-    const logs = db.prepare(query).all(...params);
+    const logs = await db.prepare(query).all(...params);
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Log Auditoria');
@@ -422,10 +423,10 @@ router.get('/audit-logs/excel', async (req, res, next) => {
  * GET /api/admin/config-bi
  * Lista todos los reportes configurados
  */
-router.get('/config-bi', (req, res, next) => {
+router.get('/config-bi', async (req, res, next) => {
   try {
     const db = getDb();
-    const config = db.prepare('SELECT ConfigId AS id, ReporteId AS reportId, Titulo AS name, PowerBIWorkspace AS workspaceId, PowerBIReportId AS pbiReportId, LookerDashboard AS lookerUrl, LookerDashboard2 AS lookerUrl2, LookerDashboard3 AS lookerUrl3, PbixPath AS pbixPath, ExcelPath AS excelPath, ThumbnailPath AS thumbnailPath, RolesPermitidos AS roles, AreaRequerida AS area, MultiPagina AS multiPagina, Activo AS active, JsonApiUrl AS jsonApiUrl, JsonFilePath AS jsonFilePath FROM ConfiguracionBI').all();
+    const config = await db.prepare('SELECT ConfigId AS id, ReporteId AS reportId, Titulo AS name, PowerBIWorkspace AS workspaceId, PowerBIReportId AS pbiReportId, LookerDashboard AS lookerUrl, LookerDashboard2 AS lookerUrl2, LookerDashboard3 AS lookerUrl3, PbixPath AS pbixPath, ExcelPath AS excelPath, ThumbnailPath AS thumbnailPath, RolesPermitidos AS roles, AreaRequerida AS area, MultiPagina AS multiPagina, Activo AS active, JsonApiUrl AS jsonApiUrl, JsonFilePath AS jsonFilePath FROM ConfiguracionBI').all();
     
     // Parsear roles JSON
     const data = config.map(c => ({
@@ -443,12 +444,12 @@ router.get('/config-bi', (req, res, next) => {
  * POST /api/admin/config-bi
  * Crear nueva configuración de reporte
  */
-router.post('/config-bi', (req, res, next) => {
+router.post('/config-bi', async (req, res, next) => {
   try {
     const { reportId, name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, roles, area, multiPagina, jsonApiUrl, jsonFilePath } = req.body;
     const db = getDb();
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ConfiguracionBI (ReporteId, Titulo, PowerBIWorkspace, PowerBIReportId, LookerDashboard, LookerDashboard2, LookerDashboard3, PbixPath, ExcelPath, ThumbnailPath, RolesPermitidos, AreaRequerida, MultiPagina, JsonApiUrl, JsonFilePath)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(reportId, name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, JSON.stringify(roles || []), area, multiPagina ? 1 : 0, jsonApiUrl || null, jsonFilePath || null);
@@ -463,12 +464,12 @@ router.post('/config-bi', (req, res, next) => {
  * PUT /api/admin/config-bi/:id
  * Actualizar configuración de reporte
  */
-router.put('/config-bi/:id', (req, res, next) => {
+router.put('/config-bi/:id', async (req, res, next) => {
   try {
     const { name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, roles, area, multiPagina, active, jsonApiUrl, jsonFilePath } = req.body;
     const db = getDb();
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE ConfiguracionBI
       SET Titulo = ?, PowerBIWorkspace = ?, PowerBIReportId = ?, LookerDashboard = ?, LookerDashboard2 = ?, LookerDashboard3 = ?, PbixPath = ?, ExcelPath = ?, ThumbnailPath = ?, RolesPermitidos = ?, AreaRequerida = ?, MultiPagina = ?, Activo = ?, JsonApiUrl = ?, JsonFilePath = ?
       WHERE ConfigId = ?
@@ -484,10 +485,10 @@ router.put('/config-bi/:id', (req, res, next) => {
  * DELETE /api/admin/config-bi/:id
  * Eliminar configuración de reporte
  */
-router.delete('/config-bi/:id', (req, res, next) => {
+router.delete('/config-bi/:id', async (req, res, next) => {
   try {
     const db = getDb();
-    db.prepare('DELETE FROM ConfiguracionBI WHERE ConfigId = ?').run(req.params.id);
+    await db.prepare('DELETE FROM ConfiguracionBI WHERE ConfigId = ?').run(req.params.id);
     res.json({ ok: true, message: 'Reporte eliminado del catálogo' });
   } catch (err) {
     next(err);
@@ -501,22 +502,23 @@ router.delete('/config-bi/:id', (req, res, next) => {
 const dataHubService = require('../services/datahub.service');
 
 // Listar conectores
-router.get('/connectors', (req, res, next) => {
+router.get('/connectors', async (req, res, next) => {
   try {
     const db = getDb();
-    const connectors = db.prepare('SELECT * FROM DataConnectors ORDER BY FechaCreacion DESC').all();
+    const connectors = await db.prepare('SELECT * FROM DataConnectors ORDER BY FechaCreacion DESC').all();
     res.json({ ok: true, data: connectors });
   } catch (err) { next(err); }
 });
 
 // Crear conector
-router.post('/connectors', (req, res, next) => {
+router.post('/connectors', async (req, res, next) => {
   try {
     const { nombre, tipo, configuracion } = req.body;
     const db = getDb();
-    const result = db.prepare(`
+    const result = await db.prepare(`
       INSERT INTO DataConnectors (Nombre, Tipo, Configuracion)
       VALUES (?, ?, ?)
+      RETURNING ConnectorId
     `).run(nombre, tipo, JSON.stringify(configuracion));
     res.json({ ok: true, id: result.lastInsertRowid });
   } catch (err) { next(err); }
@@ -531,19 +533,19 @@ router.get('/connectors/:id/entities', async (req, res, next) => {
 });
 
 // Listar todas las entidades registradas
-router.get('/entities', (req, res, next) => {
+router.get('/entities', async (req, res, next) => {
   try {
     const db = getDb();
-    const entities = db.prepare('SELECT * FROM DataEntities ORDER BY NombreEntidad').all();
+    const entities = await db.prepare('SELECT * FROM DataEntities ORDER BY NombreEntidad').all();
     res.json({ ok: true, data: entities });
   } catch (err) { next(err); }
 });
 
 // Listar mapeos de métricas
-router.get('/metric-mappings', (req, res, next) => {
+router.get('/metric-mappings', async (req, res, next) => {
   try {
     const db = getDb();
-    const mappings = db.prepare(`
+    const mappings = await db.prepare(`
       SELECT m.*, e.NombreEntidad, c.Nombre as ConectorNombre
       FROM MetricMappings m
       LEFT JOIN DataEntities e ON m.EntityId = e.EntityId
@@ -554,20 +556,20 @@ router.get('/metric-mappings', (req, res, next) => {
 });
 
 // Crear/Actualizar mapeo
-router.post('/metric-mappings', (req, res, next) => {
+router.post('/metric-mappings', async (req, res, next) => {
   try {
     const { seccionUI, entityId, campoValor, campoDelta, campoFiltro, metodoCalculo } = req.body;
     const db = getDb();
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO MetricMappings (SeccionUI, EntityId, CampoValor, CampoDelta, CampoFiltro, MetodoCalculo)
       VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(SeccionUI) DO UPDATE SET
-        EntityId = excluded.EntityId,
-        CampoValor = excluded.CampoValor,
-        CampoDelta = excluded.CampoDelta,
-        CampoFiltro = excluded.CampoFiltro,
-        MetodoCalculo = excluded.MetodoCalculo,
-        FechaActualizacion = datetime('now','localtime')
+        EntityId = EXCLUDED.EntityId,
+        CampoValor = EXCLUDED.CampoValor,
+        CampoDelta = EXCLUDED.CampoDelta,
+        CampoFiltro = EXCLUDED.CampoFiltro,
+        MetodoCalculo = EXCLUDED.MetodoCalculo,
+        FechaActualizacion = CURRENT_TIMESTAMP
     `).run(seccionUI, entityId, campoValor, campoDelta, campoFiltro || null, metodoCalculo);
     res.json({ ok: true });
   } catch (err) { next(err); }
@@ -583,10 +585,10 @@ router.post('/metric-mappings', (req, res, next) => {
  * GET /api/admin/kpi-config
  * Lista los 37 KPIs con su configuración actual
  */
-router.get('/kpi-config', (req, res, next) => {
+router.get('/kpi-config', async (req, res, next) => {
   try {
     const db   = getDb();
-    const kpis = db.prepare(`
+    const kpis = await db.prepare(`
       SELECT KPIId AS id, ElementoId, Seccion,
              NombreDefault, NombreCustom, Icono, PBIUrl, PBIUrl2, PBIUrl3, MultiPagina, Activo, JsonApiUrl, JsonFilePath
       FROM KPIConfig
@@ -601,12 +603,12 @@ router.get('/kpi-config', (req, res, next) => {
  * Actualiza nombre, ícono y URL PBI de un KPI específico
  * Body: { nombreCustom?, icono?, pbiUrl? }
  */
-router.put('/kpi-config/:elementoId', (req, res, next) => {
+router.put('/kpi-config/:elementoId', async (req, res, next) => {
   try {
     const { nombreCustom, icono, pbiUrl, pbiUrl2, pbiUrl3, multiPagina, jsonApiUrl, jsonFilePath } = req.body;
     const db = getDb();
 
-    const kpi = db.prepare('SELECT KPIId FROM KPIConfig WHERE ElementoId = ?').get(req.params.elementoId);
+    const kpi = await db.prepare('SELECT KPIId FROM KPIConfig WHERE ElementoId = ?').get(req.params.elementoId);
     if (!kpi) return res.status(404).json({ error: 'KPI no encontrado' });
 
     const updates = [];
@@ -623,10 +625,10 @@ router.put('/kpi-config/:elementoId', (req, res, next) => {
 
     if (updates.length === 0) return res.status(400).json({ error: 'Sin campos que actualizar' });
 
-    updates.push("FechaModif = datetime('now','localtime')");
+    updates.push("FechaModif = CURRENT_TIMESTAMP");
     params.push(req.params.elementoId);
 
-    db.prepare(`UPDATE KPIConfig SET ${updates.join(', ')} WHERE ElementoId = ?`).run(...params);
+    await db.prepare(`UPDATE KPIConfig SET ${updates.join(', ')} WHERE ElementoId = ?`).run(...params);
     res.json({ ok: true, message: 'KPI actualizado correctamente' });
   } catch (err) { next(err); }
 });

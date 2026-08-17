@@ -41,7 +41,7 @@ class DataHubService {
      */
     async scanFileSource(connectorId) {
         const db = getDb();
-        const connector = db.prepare('SELECT * FROM DataConnectors WHERE ConnectorId = ?').get(connectorId);
+        const connector = await db.prepare('SELECT * FROM DataConnectors WHERE ConnectorId = ?').get(connectorId);
         if (!connector) throw new Error('Conector no encontrado');
 
         const entities = [];
@@ -92,9 +92,11 @@ class DataHubService {
 
         // Guardar entidades en DB local
         for (const entity of entities) {
-            db.prepare(`
-                INSERT OR REPLACE INTO DataEntities (ConnectorId, NombreEntidad, Esquema)
+            await db.prepare(`
+                INSERT INTO DataEntities (ConnectorId, NombreEntidad, Esquema)
                 VALUES (?, ?, ?)
+                ON CONFLICT(ConnectorId, NombreEntidad) DO UPDATE SET
+                  Esquema = EXCLUDED.Esquema
             `).run(connectorId, entity.name, JSON.stringify(entity.schema));
         }
 
@@ -106,7 +108,7 @@ class DataHubService {
      */
     async getMetricValue(seccionUI) {
         const db = getDb();
-        const mapping = db.prepare(`
+        const mapping = await db.prepare(`
             SELECT m.*, e.NombreEntidad, c.Tipo, c.Configuracion, c.ConnectorId
             FROM MetricMappings m
             LEFT JOIN DataEntities e ON m.EntityId = e.EntityId
@@ -176,7 +178,7 @@ class DataHubService {
 
     async calculateFromSql(mapping) {
         const db = getDb();
-        const connector = db.prepare('SELECT * FROM DataConnectors WHERE ConnectorId = ?').get(mapping.ConnectorId);
+        const connector = await db.prepare('SELECT * FROM DataConnectors WHERE ConnectorId = ?').get(mapping.ConnectorId);
         const externalDb = await this.getExternalConnection(connector);
 
         try {

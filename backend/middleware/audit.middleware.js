@@ -62,11 +62,11 @@ async function logAction(entry) {
     const db = getDb();
     if (!db) return; // BD no disponible (tests)
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO AuditLog
         (UsuarioId, Username, Rol, Metodo, Ruta, EstadoHTTP, DuracionMs, IP, CuerpoRequest, FechaHora)
       VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).run(
       entry.userId,
       entry.username,

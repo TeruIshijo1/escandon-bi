@@ -228,9 +228,9 @@ async function exportJsonToExcel(res, type, id) {
     let config = null;
 
     if (type === 'kpi') {
-      config = db.prepare('SELECT COALESCE(NombreCustom, NombreDefault) AS nombre, JsonApiUrl, JsonFilePath FROM KPIConfig WHERE ElementoId = ? OR KPIId = ?').get(id, id);
+      config = await db.prepare('SELECT COALESCE(NombreCustom, NombreDefault) AS nombre, JsonApiUrl, JsonFilePath FROM KPIConfig WHERE ElementoId = ? OR CAST(KPIId AS TEXT) = ?').get(id, id);
     } else if (type === 'bi') {
-      config = db.prepare('SELECT Titulo AS nombre, JsonApiUrl, JsonFilePath FROM ConfiguracionBI WHERE ReporteId = ? OR ConfigId = ?').get(id, id);
+      config = await db.prepare('SELECT Titulo AS nombre, JsonApiUrl, JsonFilePath FROM ConfiguracionBI WHERE ReporteId = ? OR CAST(ConfigId AS TEXT) = ?').get(id, id);
     }
 
     if (!config || (!config.JsonApiUrl && !config.JsonFilePath)) {
@@ -355,13 +355,13 @@ router.get(
 
       // Verificar si el reporte tiene un JSON asignado (override)
       const db = require('../config/db').getDb();
-      const configJson = db.prepare('SELECT JsonApiUrl, JsonFilePath FROM ConfiguracionBI WHERE ReporteId = ? OR ConfigId = ?').get(reportId, reportId);
+      const configJson = await db.prepare('SELECT JsonApiUrl, JsonFilePath FROM ConfiguracionBI WHERE ReporteId = ? OR CAST(ConfigId AS TEXT) = ?').get(reportId, reportId);
       if (configJson && (configJson.JsonApiUrl || configJson.JsonFilePath)) {
         return await exportJsonToExcel(res, 'bi', reportId);
       }
 
       // Verificar si el reporte corresponde a un KPI que tiene JSON asignado
-      const kpiJson = db.prepare('SELECT JsonApiUrl, JsonFilePath FROM KPIConfig WHERE ElementoId = ? OR KPIId = ?').get(reportId, reportId);
+      const kpiJson = await db.prepare('SELECT JsonApiUrl, JsonFilePath FROM KPIConfig WHERE ElementoId = ? OR CAST(KPIId AS TEXT) = ?').get(reportId, reportId);
       if (kpiJson && (kpiJson.JsonApiUrl || kpiJson.JsonFilePath)) {
         return await exportJsonToExcel(res, 'kpi', reportId);
       }

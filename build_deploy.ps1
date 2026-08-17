@@ -108,21 +108,18 @@ $EnvExampleContent = @"
 PORT=5173
 NODE_ENV=production
 
-# SQLite (Base de datos local de la app)
-DB_PATH=../database/escandon_bi.db
+# PostgreSQL (Base de datos principal de la plataforma)
+PGUSER=postgres
+PGHOST=localhost
+PGPASSWORD=aqui_pon_la_contraseña_del_usuario_postgres
+PGDATABASE=escandon_bi
+PGPORT=5432
 
 # SQL Server (KH_HE - Sistema VERTICAL)
 SQL_SERVER_HOST=your_sql_server_ip
 SQL_SERVER_USER=sa
 SQL_SERVER_PASSWORD=your_sql_password
 SQL_SERVER_DB=KH_HE
-
-# PostgreSQL (Data Warehouse Local - Cache de dashboards)
-PGUSER=postgres
-PGHOST=localhost
-PGPASSWORD=aqui_pon_la_contraseña_del_usuario_postgres
-PGDATABASE=escandon_bi
-PGPORT=5432
 
 # SAP B1 Service Layer
 SAP_SL_BASE_URL=https://sl.hospesc.com:50000/b1s/v1

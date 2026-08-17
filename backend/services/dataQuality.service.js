@@ -52,27 +52,27 @@ async function runLiveQualityScan() {
 
       // Regla 1: Precio $0.00 en estudio o servicio cargado
       if (price === 0 && qty > 0) {
-        const exists = checkExistsStmt.get(code, patient, 'PRECIO_ZERO');
+        const exists = await checkExistsStmt.get(code, patient, 'PRECIO_ZERO');
         if (!exists || exists.count === 0) {
-          insertStmt.run('BASE_DATOS_VIVO', 'PRECIO_ZERO', 'ALTA', code, desc, patient, JSON.stringify(r));
+          await insertStmt.run('BASE_DATOS_VIVO', 'PRECIO_ZERO', 'ALTA', code, desc, patient, JSON.stringify(r));
           detected++;
         }
       }
 
       // Regla 2: Cantidad Atípica / Elevada
       if (qty >= 10) {
-        const exists = checkExistsStmt.get(code, patient, 'CANTIDAD_ANOMALA');
+        const exists = await checkExistsStmt.get(code, patient, 'CANTIDAD_ANOMALA');
         if (!exists || exists.count === 0) {
-          insertStmt.run('BASE_DATOS_VIVO', 'CANTIDAD_ANOMALA', 'MEDIA', code, desc, patient, JSON.stringify(r));
+          await insertStmt.run('BASE_DATOS_VIVO', 'CANTIDAD_ANOMALA', 'MEDIA', code, desc, patient, JSON.stringify(r));
           detected++;
         }
       }
 
       // Regla 3: Devoluciones no conciliadas
       if (r.Devuelto > 0) {
-        const exists = checkExistsStmt.get(code, patient, 'DEVOLUCION_PENDIENTE');
+        const exists = await checkExistsStmt.get(code, patient, 'DEVOLUCION_PENDIENTE');
         if (!exists || exists.count === 0) {
-          insertStmt.run('BASE_DATOS_VIVO', 'DEVOLUCION_PENDIENTE', 'MEDIA', code, desc, patient, JSON.stringify(r));
+          await insertStmt.run('BASE_DATOS_VIVO', 'DEVOLUCION_PENDIENTE', 'MEDIA', code, desc, patient, JSON.stringify(r));
           detected++;
         }
       }
@@ -88,7 +88,7 @@ async function runLiveQualityScan() {
 /**
  * Inspecciona un registro individual en busca de anomalías
  */
-function inspectRecord(record, source = 'CARGA_MANUAL') {
+async function inspectRecord(record, source = 'CARGA_MANUAL') {
   const db = getDb();
   const issuesFound = [];
 
@@ -120,7 +120,7 @@ function inspectRecord(record, source = 'CARGA_MANUAL') {
   `);
 
   for (const issue of issuesFound) {
-    insertStmt.run(
+    await insertStmt.run(
       source,
       issue.rule,
       issue.severity,
@@ -137,7 +137,7 @@ function inspectRecord(record, source = 'CARGA_MANUAL') {
 /**
  * Obtener lista de hallazgos de calidad con filtros
  */
-function getQualityIssues(filters = {}) {
+async function getQualityIssues(filters = {}) {
   const db = getDb();
   const { status, severity, limit = 100 } = filters;
 
@@ -156,7 +156,7 @@ function getQualityIssues(filters = {}) {
   sql += ` ORDER BY created_at DESC LIMIT ?`;
   params.push(parseInt(limit, 10));
 
-  const rows = db.prepare(sql).all(...params);
+  const rows = await db.prepare(sql).all(...params);
 
   return rows.map(row => ({
     ...row,
@@ -167,13 +167,13 @@ function getQualityIssues(filters = {}) {
 /**
  * Resolver o ignorar una anomalía de calidad
  */
-function resolveIssue(id, status, notes = '', resolvedBy = 'AUDITOR') {
+async function resolveIssue(id, status, notes = '', resolvedBy = 'AUDITOR') {
   const db = getDb();
   if (!['RESUELTO', 'IGNORADO'].includes(status)) {
     throw new Error("Estado inválido. Debe ser 'RESUELTO' o 'IGNORADO'.");
   }
 
-  const result = db.prepare(`
+  const result = await db.prepare(`
     UPDATE data_quality_issues
     SET status = ?, resolution_notes = ?, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
     WHERE id = ?
@@ -185,13 +185,13 @@ function resolveIssue(id, status, notes = '', resolvedBy = 'AUDITOR') {
 /**
  * Obtener estadísticas globales de calidad de datos
  */
-function getQualityStats() {
+async function getQualityStats() {
   const db = getDb();
 
-  const totalIssues = db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues`).get().count;
-  const pendingIssues = db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'PENDIENTE'`).get().count;
-  const resolvedIssues = db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'RESUELTO'`).get().count;
-  const highSeverity = db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'PENDIENTE' AND severity = 'ALTA'`).get().count;
+  const totalIssues = (await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues`).get()).count;
+  const pendingIssues = (await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'PENDIENTE'`).get()).count;
+  const resolvedIssues = (await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'RESUELTO'`).get()).count;
+  const highSeverity = (await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'PENDIENTE' AND severity = 'ALTA'`).get()).count;
 
   const baseScore = Math.max(0, 100 - (pendingIssues * 2.5));
 

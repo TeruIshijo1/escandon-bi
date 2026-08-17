@@ -21,6 +21,15 @@ Respecto al entorno de desarrollo local, se realizaron las siguientes adaptacion
 - **Archivo**: `backend/config/remote-db.js`
 - **Cambio**: Se añadieron sugerencias de diagnóstico automáticas para advertir al usuario en consola en caso de desconexión del túnel `bore` o cambios de puerto.
 
+### 1.3 Migración SQLite → PostgreSQL (Base de Datos Principal)
+- **Archivo**: `backend/migrate_to_pg.js`
+- **Cambio**: Toda la persistencia de la plataforma (usuarios/RBAC, auditoría, `ConfiguracionBI`, `KPIConfig`, `DataConnectors`, `MetricMappings`, `DataEntities`, calidad de datos, `interop_event_logs` y el legado clínico `Pacientes`/`AuditoriaInventarioCargos`) ahora vive en PostgreSQL (`escandon_bi`). SQLite se eliminó del runtime.
+- **Migración en producción (UNA sola vez)**:
+  1. Respaldo consistente: el script copia el archivo SQLite a `database/escandon_bi_backup_pre_pg.db` antes de migrar (conservar ese respaldo).
+  2. Ejecutar desde `backend/`: `node migrate_to_pg.js`
+  3. Requiere `better-sqlite3` instalado (sigue en `package.json` solo como herramienta de migración) y PostgreSQL alcanzable con las variables `PGUSER/PGHOST/PGPASSWORD/PGDATABASE/PGPORT`.
+  4. `npm run db:init` crea/actualiza esquema y seeds (idempotente).
+
 ---
 
 ## 🤖 2. Instrucciones para la IA (Generación de `pase_a_produccion`)
@@ -53,8 +62,8 @@ La IA o el script de empaquetado debe **EXCLUIR EXPLICITAMENTE**:
 ```text
 ❌ node_modules/                  (Se instalan en destino si fuera necesario)
 ❌ backend/.env                   (PRESERVAR SIEMPRE el .env del servidor productivo)
-❌ backend/database.sqlite        (Base de datos local de pruebas)
-❌ database/*.db                  (NO sobrescribir escandon_bi.db del servidor)
+❌ backend/database.sqlite        (Restos de pruebas SQLite)
+❌ database/*.db                  (SQLite eliminado; NO sobrescribir escandon_bi_backup_pre_pg.db)
 ❌ database/*.db-shm              (Archivos WAL/SHM temporales de SQLite)
 ❌ database/*.db-wal
 ❌ scratch/                       (Carpeta de pruebas sueltas)

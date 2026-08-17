@@ -1,34 +1,23 @@
 /**
- * init-db.js — Inicializa la base de datos SQLite
+ * init-db.js — Inicializa la base de datos PostgreSQL
  * Ejecuta el schema y los seeds automáticamente
- * Hospital Escandón BI Platform v1.0
+ * Hospital Escandón BI Platform v2.0
  *
- * Uso: node init-db.js
+ * Uso: node config/init-db.js
  */
 'use strict';
 
-const path     = require('path');
+const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const bcrypt   = require('bcryptjs');
-const Database = require('better-sqlite3');
-const fs       = require('fs');
+const bcrypt = require('bcryptjs');
+const fs     = require('fs');
 
-const DB_PATH     = process.env.DB_PATH || path.join(__dirname, '..', '..', 'database', 'escandon_bi.db');
-const DB_DIR      = path.dirname(DB_PATH);
-const SQL_DIR     = path.join(__dirname, '..', '..', 'database');
+const SQL_DIR = path.join(__dirname, '..', '..', 'database');
 
-// Crear directorio si no existe
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
-}
+console.log('🏥  Hospital Escandón BI — Inicialización de Base de Datos (PostgreSQL)');
 
-console.log('🏥  Hospital Escandón BI — Inicialización de Base de Datos');
-console.log(`📁  Ruta de BD: ${DB_PATH}\n`);
-
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const { pool } = require('./pg-db');
 
 const sqlFiles = [
   '01_schema.sql',
@@ -39,50 +28,72 @@ const sqlFiles = [
   '05_quality_and_interop.sql',
 ];
 
-for (const file of sqlFiles) {
-  const filePath = path.join(SQL_DIR, file);
-  if (!fs.existsSync(filePath)) {
-    console.warn(`⚠️  Archivo no encontrado: ${file}`);
-    continue;
-  }
+function splitStatements(sql) {
+  return sql
+    .split(';')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
 
-  console.log(`📄  Ejecutando ${file}...`);
-  const sql = fs.readFileSync(filePath, 'utf-8');
-
+(async () => {
   try {
-    db.exec(sql);
-    console.log(`   ✅  ${file} ejecutado correctamente.`);
+    for (const file of sqlFiles) {
+      const filePath = path.join(SQL_DIR, file);
+      if (!fs.existsSync(filePath)) {
+        console.warn(`⚠️  Archivo no encontrado: ${file}`);
+        continue;
+      }
+
+      console.log(`📄  Ejecutando ${file}...`);
+      const sql = fs.readFileSync(filePath, 'utf-8');
+
+      for (const stmt of splitStatements(sql)) {
+        try {
+          await pool.query(stmt);
+        } catch (err) {
+          // Saltar errores de "ya existe" en vistas/índices
+          if (err.code === '42P07' || err.code === '42710') {
+            console.log(`   ↪ ya existe: ${stmt.slice(0, 60)}...`);
+          } else {
+            console.error(`   ❌  Error en ${file}:`, err.message);
+          }
+        }
+      }
+      console.log(`   ✅  ${file} ejecutado correctamente.`);
+    }
+
+    const seedPassword = process.env.SEED_ADMIN_PASSWORD;
+    if (seedPassword) {
+      if (seedPassword.length < 12) {
+        throw new Error('SEED_ADMIN_PASSWORD debe tener al menos 12 caracteres.');
+      }
+
+      const seedAdmin = {
+        username: process.env.SEED_ADMIN_USERNAME || 'admin',
+        nombre:   process.env.SEED_ADMIN_NAME     || 'Administrador Inicial',
+        email:    process.env.SEED_ADMIN_EMAIL    || 'admin@example.invalid',
+      };
+
+      const passwordHash = bcrypt.hashSync(seedPassword, 12);
+      await pool.query(`
+        INSERT INTO Usuarios
+          (Username, NombreCompleto, Email, PasswordHash, RolId, AreaAsignada)
+        SELECT $1, $2, $3, $4, RolId, NULL
+        FROM Roles
+        WHERE NombreRol = 'ADMIN'
+        ON CONFLICT (Username) DO NOTHING
+      `, [seedAdmin.username, seedAdmin.nombre, seedAdmin.email, passwordHash]);
+
+      console.log(`👤  Administrador inicial verificado: ${seedAdmin.username}`);
+    } else {
+      console.warn('⚠️  No se creó un administrador inicial. Configure SEED_ADMIN_PASSWORD en backend/.env y vuelva a ejecutar db:init.');
+    }
+
+    console.log('\n✅  Base de datos inicializada correctamente.');
   } catch (err) {
-    console.error(`   ❌  Error en ${file}:`, err.message);
+    console.error('❌ Error en la inicialización:', err.message);
+    process.exitCode = 1;
+  } finally {
+    await pool.end();
   }
-}
-
-const seedPassword = process.env.SEED_ADMIN_PASSWORD;
-if (seedPassword) {
-  if (seedPassword.length < 12) {
-    db.close();
-    throw new Error('SEED_ADMIN_PASSWORD debe tener al menos 12 caracteres.');
-  }
-
-  const seedAdmin = {
-    username: process.env.SEED_ADMIN_USERNAME || 'admin',
-    nombre:   process.env.SEED_ADMIN_NAME     || 'Administrador Inicial',
-    email:    process.env.SEED_ADMIN_EMAIL    || 'admin@example.invalid',
-  };
-
-  const passwordHash = bcrypt.hashSync(seedPassword, 12);
-  db.prepare(`
-    INSERT OR IGNORE INTO Usuarios
-      (Username, NombreCompleto, Email, PasswordHash, RolId, AreaAsignada)
-    SELECT ?, ?, ?, ?, RolId, NULL
-    FROM Roles
-    WHERE NombreRol = 'ADMIN'
-  `).run(seedAdmin.username, seedAdmin.nombre, seedAdmin.email, passwordHash);
-
-  console.log(`👤  Administrador inicial verificado: ${seedAdmin.username}`);
-} else {
-  console.warn('⚠️  No se creó un administrador inicial. Configure SEED_ADMIN_PASSWORD en backend/.env y vuelva a ejecutar db:init.');
-}
-
-db.close();
-console.log('\n✅  Base de datos inicializada correctamente.');
+})();

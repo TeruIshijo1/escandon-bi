@@ -1,27 +1,25 @@
 -- ═══════════════════════════════════════════════════════════════════
--- 01_schema.sql — Esquema inicial de la Plataforma BI
+-- 01_schema.sql — Esquema de la Plataforma BI (PostgreSQL)
 -- Hospital Escandón v1.0
--- SQLite 3
+-- Ejecutado por backend/config/init-db.js (o por la migración SQLite→PG)
 -- ═══════════════════════════════════════════════════════════════════
-
-PRAGMA foreign_keys = ON;
 
 -- ───────────────────────────────────────────────────────────────────
 -- MÓDULO 1: RBAC — Roles y Usuarios
 -- ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS Roles (
-    RolId           INTEGER       PRIMARY KEY AUTOINCREMENT,
+    RolId           SERIAL        PRIMARY KEY,
     NombreRol       TEXT          NOT NULL UNIQUE,
     Descripcion     TEXT,
     Nivel           INTEGER       NOT NULL  -- 1=Admin, 2=Director, 3=JefeArea, 4=Operativo
         CHECK (Nivel BETWEEN 1 AND 4),
     Activo          INTEGER       NOT NULL DEFAULT 1,
-    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime'))
+    FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS Usuarios (
-    UsuarioId       INTEGER       PRIMARY KEY AUTOINCREMENT,
+    UsuarioId       SERIAL        PRIMARY KEY,
     Username        TEXT          NOT NULL UNIQUE,
     NombreCompleto  TEXT          NOT NULL,
     Email           TEXT          NOT NULL UNIQUE,
@@ -30,19 +28,12 @@ CREATE TABLE IF NOT EXISTS Usuarios (
     AreaAsignada    TEXT          NULL,  -- NULL para ADMIN y DIRECTOR
     Activo          INTEGER       NOT NULL DEFAULT 1,
     RefreshToken    TEXT          NULL,
-    UltimoAcceso    TEXT          NULL,
+    UltimoAcceso    TIMESTAMP     NULL,
     UltimaIP        TEXT          NULL,
-    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime')),
-    FechaModificacion TEXT        NULL,
+    FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FechaModificacion TIMESTAMP   NULL,
     CreadoPor       INTEGER       NULL REFERENCES Usuarios(UsuarioId),
-    CHECK (
-        AreaAsignada IS NULL OR AreaAsignada IN (
-            'QUIROFANO','IMAGENOLOGIA','URGENCIAS','CUNEROS',
-            'UCI','CONSULTA_EXTERNA','CARDIOLOGIA','LABORATORIO',
-            'HOSPITALIZACION','FARMACIA','FINANZAS','ASEGURADORAS',
-            'ALMACEN_GENERAL'
-        )
-    )
+    ReportesPermitidos TEXT       NULL
 );
 
 CREATE INDEX IF NOT EXISTS IX_Usuarios_RolId      ON Usuarios(RolId);
@@ -54,7 +45,7 @@ CREATE INDEX IF NOT EXISTS IX_Usuarios_Area       ON Usuarios(AreaAsignada);
 -- ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS AuditLog (
-    LogId           INTEGER       PRIMARY KEY AUTOINCREMENT,
+    LogId           SERIAL        PRIMARY KEY,
     UsuarioId       INTEGER       NULL REFERENCES Usuarios(UsuarioId),
     Username        TEXT          NOT NULL,
     Rol             TEXT,
@@ -64,7 +55,7 @@ CREATE TABLE IF NOT EXISTS AuditLog (
     DuracionMs      INTEGER,
     IP              TEXT,
     CuerpoRequest   TEXT          NULL,      -- JSON sanitizado
-    FechaHora       TEXT          NOT NULL DEFAULT (datetime('now','localtime'))
+    FechaHora       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS IX_AuditLog_UsuarioId ON AuditLog(UsuarioId);
@@ -76,31 +67,34 @@ CREATE INDEX IF NOT EXISTS IX_AuditLog_Ruta      ON AuditLog(Ruta);
 -- ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS Pacientes (
-    PacienteId      INTEGER       PRIMARY KEY AUTOINCREMENT,
-    NumeroExpediente TEXT          NOT NULL UNIQUE,
+    PacienteId      SERIAL        PRIMARY KEY,
+    NumeroExpediente TEXT         NOT NULL UNIQUE,
     NombreCompleto  TEXT          NOT NULL,
-    FechaNacimiento TEXT          NOT NULL,
+    FechaNacimiento TIMESTAMP     NOT NULL,
     Sexo            TEXT          NOT NULL CHECK (Sexo IN ('M','F')),
     CURP            TEXT          NULL UNIQUE,
     NSS             TEXT          NULL,
     Activo          INTEGER       NOT NULL DEFAULT 1,
-    FechaRegistro   TEXT          NOT NULL DEFAULT (datetime('now','localtime'))
+    FechaRegistro   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CodigoPostal    TEXT,
+    Estado          TEXT,
+    Municipio       TEXT
 );
 
 CREATE INDEX IF NOT EXISTS IX_Pacientes_Expediente ON Pacientes(NumeroExpediente);
 
 CREATE TABLE IF NOT EXISTS Admisiones (
-    AdmisionId      INTEGER       PRIMARY KEY AUTOINCREMENT,
+    AdmisionId      SERIAL        PRIMARY KEY,
     PacienteId      INTEGER       NOT NULL REFERENCES Pacientes(PacienteId),
     NumeroAdmision  TEXT          NOT NULL UNIQUE,
-    FechaIngreso    TEXT          NOT NULL,
+    FechaIngreso    TIMESTAMP     NOT NULL,
     AreaActual      TEXT          NOT NULL,
     CamaId          INTEGER       NULL,
     DiagnosticoIngreso TEXT,
     MedicoTratante  TEXT,
     Estado          TEXT          NOT NULL DEFAULT 'ACTIVA'
         CHECK (Estado IN ('ACTIVA','EGRESADA','TRANSFERIDA')),
-    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime'))
+    FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS IX_Admisiones_PacienteId ON Admisiones(PacienteId);
@@ -108,15 +102,15 @@ CREATE INDEX IF NOT EXISTS IX_Admisiones_Estado     ON Admisiones(Estado);
 CREATE INDEX IF NOT EXISTS IX_Admisiones_AreaActual ON Admisiones(AreaActual);
 
 CREATE TABLE IF NOT EXISTS Egresos (
-    EgresoId        INTEGER       PRIMARY KEY AUTOINCREMENT,
+    EgresoId        SERIAL        PRIMARY KEY,
     AdmisionId      INTEGER       NOT NULL REFERENCES Admisiones(AdmisionId),
     PacienteId      INTEGER       NOT NULL REFERENCES Pacientes(PacienteId),
-    FechaEgreso     TEXT          NOT NULL,
+    FechaEgreso     TIMESTAMP     NOT NULL,
     AreaEgreso      TEXT          NOT NULL,
     TipoEgreso      TEXT          NOT NULL
         CHECK (TipoEgreso IN ('ALTA_VOLUNTARIA','ALTA_MEDICA','TRANSFERENCIA','DEFUNCION','FUGA')),
     DiagnosticoEgreso TEXT,
-    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime'))
+    FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS IX_Egresos_PacienteId  ON Egresos(PacienteId);
@@ -128,7 +122,7 @@ CREATE INDEX IF NOT EXISTS IX_Egresos_TipoEgreso  ON Egresos(TipoEgreso);
 -- ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS Camas (
-    CamaId          INTEGER       PRIMARY KEY AUTOINCREMENT,
+    CamaId          SERIAL        PRIMARY KEY,
     NumeroCama      TEXT          NOT NULL,
     Area            TEXT          NOT NULL,
     Piso            TEXT,
@@ -147,12 +141,12 @@ CREATE       INDEX IF NOT EXISTS IX_Camas_Estado     ON Camas(Estado);
 -- ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS Insumos (
-    InsumoId        INTEGER       PRIMARY KEY AUTOINCREMENT,
+    InsumoId        SERIAL        PRIMARY KEY,
     Descripcion     TEXT          NOT NULL,
     CodigoBarras    TEXT          NULL UNIQUE,
     ClaveCBCBSS     TEXT          NULL,
     Categoria       TEXT,  -- MEDICAMENTO, MATERIAL, EQUIPO
-    PrecioUnitario  REAL          NOT NULL DEFAULT 0,
+    PrecioUnitario  DOUBLE PRECISION NOT NULL DEFAULT 0,
     UnidadMedida    TEXT          NOT NULL DEFAULT 'PZA',
     Activo          INTEGER       NOT NULL DEFAULT 1
 );
@@ -162,14 +156,14 @@ CREATE TABLE IF NOT EXISTS AlmacenOrdenes (
     PacienteId      INTEGER       NOT NULL REFERENCES Pacientes(PacienteId),
     AdmisionId      INTEGER       NOT NULL REFERENCES Admisiones(AdmisionId),
     InsumoId        INTEGER       NOT NULL REFERENCES Insumos(InsumoId),
-    AreaHospitalaria TEXT          NOT NULL,
+    AreaHospitalaria TEXT         NOT NULL,
     CantidadSurtida INTEGER       NOT NULL,
-    PrecioUnitario  REAL          NOT NULL,
+    PrecioUnitario  DOUBLE PRECISION NOT NULL,
     Estado          TEXT          NOT NULL DEFAULT 'PENDIENTE'
         CHECK (Estado IN ('PENDIENTE','SURTIDA','CANCELADA','PARCIAL')),
     EnfermeraReceptora TEXT       NULL,
-    FechaSurtido    TEXT          NOT NULL DEFAULT (datetime('now','localtime')),
-    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime'))
+    FechaSurtido    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS IX_AlmacenOrdenes_PacienteId ON AlmacenOrdenes(PacienteId);
@@ -178,14 +172,14 @@ CREATE INDEX IF NOT EXISTS IX_AlmacenOrdenes_Area       ON AlmacenOrdenes(AreaHo
 CREATE INDEX IF NOT EXISTS IX_AlmacenOrdenes_Estado     ON AlmacenOrdenes(Estado);
 
 CREATE TABLE IF NOT EXISTS CargosEnfermeria (
-    CargoId         INTEGER       PRIMARY KEY AUTOINCREMENT,
+    CargoId         SERIAL        PRIMARY KEY,
     OrdenAlmacenId  TEXT          NOT NULL REFERENCES AlmacenOrdenes(OrdenId),
     PacienteId      INTEGER       NOT NULL REFERENCES Pacientes(PacienteId),
     EnfermerId      INTEGER       NOT NULL REFERENCES Usuarios(UsuarioId),
     CantidadCargada INTEGER       NOT NULL,
-    FechaCargo      TEXT          NOT NULL DEFAULT (datetime('now','localtime')),
+    FechaCargo      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     Observaciones   TEXT          NULL,
-    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime'))
+    FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS IX_CargosEnfermeria_OrdenId    ON CargosEnfermeria(OrdenAlmacenId);
@@ -194,13 +188,13 @@ CREATE INDEX IF NOT EXISTS IX_CargosEnfermeria_Fecha      ON CargosEnfermeria(Fe
 
 -- Tabla de resultados de auditoría conciliada
 CREATE TABLE IF NOT EXISTS AuditoriaInventarioCargos (
-    AuditoriaId     INTEGER       PRIMARY KEY AUTOINCREMENT,
+    AuditoriaId     SERIAL        PRIMARY KEY,
     OrdenId         TEXT          NOT NULL,
     EstadoConciliacion TEXT       NOT NULL
         CHECK (EstadoConciliacion IN ('COINCIDE','DIFERENCIA','FALTANTE','EXCEDENTE')),
     Diferencia      INTEGER       NOT NULL DEFAULT 0,
-    MontoDisputa    REAL          NOT NULL DEFAULT 0,
-    FechaAuditoria  TEXT          NOT NULL DEFAULT (datetime('now','localtime')),
+    MontoDisputa    DOUBLE PRECISION NOT NULL DEFAULT 0,
+    FechaAuditoria  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     RevisadoPor     INTEGER       NULL REFERENCES Usuarios(UsuarioId),
     Comentario      TEXT          NULL
 );
@@ -214,10 +208,10 @@ CREATE INDEX IF NOT EXISTS IX_AuditoriaIC_Fecha     ON AuditoriaInventarioCargos
 -- ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS ProgramacionQuirofano (
-    CirugiaId       INTEGER       PRIMARY KEY AUTOINCREMENT,
+    CirugiaId       SERIAL        PRIMARY KEY,
     PacienteId      INTEGER       NOT NULL REFERENCES Pacientes(PacienteId),
     AdmisionId      INTEGER       NULL  REFERENCES Admisiones(AdmisionId),
-    FechaCirugia    TEXT          NOT NULL,
+    FechaCirugia    TIMESTAMP     NOT NULL,
     HoraInicio      TEXT          NULL,
     HoraFin         TEXT          NULL,
     QuirofanoNumero TEXT          NOT NULL,
@@ -226,7 +220,7 @@ CREATE TABLE IF NOT EXISTS ProgramacionQuirofano (
     Estado          TEXT          NOT NULL DEFAULT 'PROGRAMADA'
         CHECK (Estado IN ('PROGRAMADA','EN_CURSO','REALIZADA','CANCELADA','SUSPENDIDA')),
     Observaciones   TEXT          NULL,
-    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime'))
+    FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS IX_ProgramacionQX_Fecha     ON ProgramacionQuirofano(FechaCirugia);
@@ -237,7 +231,7 @@ CREATE INDEX IF NOT EXISTS IX_ProgramacionQX_PacienteId ON ProgramacionQuirofano
 -- ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS ConfiguracionBI (
-    ConfigId        INTEGER       PRIMARY KEY AUTOINCREMENT,
+    ConfigId        SERIAL        PRIMARY KEY,
     ReporteId       TEXT          NOT NULL UNIQUE,
     Titulo          TEXT          NOT NULL,
     PowerBIWorkspace TEXT         NULL,
@@ -248,8 +242,11 @@ CREATE TABLE IF NOT EXISTS ConfiguracionBI (
     RolesPermitidos TEXT          NOT NULL,  -- JSON array de roles
     AreaRequerida   TEXT          NULL,
     Activo          INTEGER       NOT NULL DEFAULT 1,
-    FechaCreacion   TEXT          NOT NULL DEFAULT (datetime('now','localtime')),
+    FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PbixPath        TEXT          NULL,
     ExcelPath       TEXT          NULL,
-    ThumbnailPath   TEXT          NULL
+    ThumbnailPath   TEXT          NULL,
+    MultiPagina     INTEGER       DEFAULT 0,
+    JsonApiUrl      TEXT          NULL,
+    JsonFilePath    TEXT          NULL
 );

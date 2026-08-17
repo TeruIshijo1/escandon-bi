@@ -117,55 +117,55 @@ router.get(
       const db = getDb();
 
       // 1. Ocupación global
-      const ocupacion = db.prepare(`
+      const ocupacion = await db.prepare(`
         SELECT
           COUNT(*)                                                           AS TotalCamas,
           SUM(CASE WHEN Estado = 'OCUPADA' THEN 1 ELSE 0 END)               AS Ocupadas,
           ROUND(
-            CAST(SUM(CASE WHEN Estado = 'OCUPADA' THEN 1 ELSE 0 END) AS REAL)
-            * 100.0 / MAX(COUNT(*), 1)
+            CAST(SUM(CASE WHEN Estado = 'OCUPADA' THEN 1 ELSE 0 END) AS NUMERIC)
+            * 100.0 / GREATEST(COUNT(*), 1)
           , 1)                                                               AS PctOcupacion
         FROM Camas WHERE Activo = 1
       `).get();
 
       // 2. KPIs de eficacia clínica
-      const eficacia = db.prepare(`
+      const eficacia = await db.prepare(`
         SELECT
           ROUND(
-            CAST(SUM(CASE WHEN TipoEgreso='DEFUNCION' THEN 1 ELSE 0 END) AS REAL)
-            * 100.0 / MAX(COUNT(*), 1)
+            CAST(SUM(CASE WHEN TipoEgreso='DEFUNCION' THEN 1 ELSE 0 END) AS NUMERIC)
+            * 100.0 / GREATEST(COUNT(*), 1)
           , 2) AS TasaMortalidad,
           COUNT(*) AS TotalEgresos,
-          ROUND(AVG(CAST(julianday(e.FechaEgreso) - julianday(a.FechaIngreso) AS REAL)), 1) AS EstanciaPromedio
+          ROUND(AVG((EXTRACT(EPOCH FROM e.FechaEgreso) - EXTRACT(EPOCH FROM a.FechaIngreso)) / 86400.0), 1) AS EstanciaPromedio
         FROM Egresos e
         JOIN Admisiones a ON a.AdmisionId = e.AdmisionId
-        WHERE e.FechaEgreso >= datetime('now', '-1 month')
+        WHERE e.FechaEgreso >= CURRENT_TIMESTAMP - INTERVAL '1 month'
       `).get();
 
       // 3. Producción quirúrgica
-      const produccion = db.prepare(`
+      const produccion = await db.prepare(`
         SELECT
           COUNT(*) AS CirugiasHoy,
           SUM(CASE WHEN Estado='REALIZADA'  THEN 1 ELSE 0 END) AS Realizadas,
           SUM(CASE WHEN Estado='CANCELADA'  THEN 1 ELSE 0 END) AS Canceladas,
           SUM(CASE WHEN Estado='EN_CURSO'   THEN 1 ELSE 0 END) AS EnCurso
         FROM ProgramacionQuirofano
-        WHERE date(FechaCirugia) = date('now')
+        WHERE FechaCirugia::date = CURRENT_DATE
       `).get();
 
       // 4. Macropanel Financiero (Simulado con datos de cargos si existen, o valores base reales)
       // En una implementación real, esto vendría de una tabla de Finanzas o Facturación.
       // Aquí usaremos los montos de AuditoriaInventarioCargos como referencia.
-      const financiero = db.prepare(`
+      const financiero = await db.prepare(`
         SELECT 
-          IFNULL(SUM(MontoDisputa), 0) AS MontoEnDisputa,
-          (SELECT IFNULL(SUM(PrecioUnitario * CantidadSurtida), 0) FROM AlmacenOrdenes WHERE FechaSurtido >= datetime('now', 'start of month')) AS CostoInsumosMes
+          COALESCE(SUM(MontoDisputa), 0) AS MontoEnDisputa,
+          (SELECT COALESCE(SUM(PrecioUnitario * CantidadSurtida), 0) FROM AlmacenOrdenes WHERE FechaSurtido >= DATE_TRUNC('month', CURRENT_TIMESTAMP)) AS CostoInsumosMes
         FROM AuditoriaInventarioCargos
-        WHERE FechaAuditoria >= datetime('now', 'start of month')
+        WHERE FechaAuditoria >= DATE_TRUNC('month', CURRENT_TIMESTAMP)
       `).get();
 
       // 5. Estado por Área (Censo)
-      const censo = db.prepare(`
+      const censo = await db.prepare(`
         SELECT Area, COUNT(*) as Ocupadas 
         FROM Camas 
         WHERE Estado = 'OCUPADA' 
@@ -235,29 +235,29 @@ router.get(
       const db   = getDb();
       const area = req.areaFilter || req.params.area;
 
-      const camas = db.prepare(`
+      const camas = await db.prepare(`
         SELECT
           COUNT(*) AS TotalCamas,
           SUM(CASE WHEN Estado='OCUPADA' THEN 1 ELSE 0 END) AS Ocupadas,
           ROUND(
-            CAST(SUM(CASE WHEN Estado='OCUPADA' THEN 1 ELSE 0 END) AS REAL)
-            * 100.0 / MAX(COUNT(*), 1)
+            CAST(SUM(CASE WHEN Estado='OCUPADA' THEN 1 ELSE 0 END) AS NUMERIC)
+            * 100.0 / GREATEST(COUNT(*), 1)
           , 1) AS PctOcupacion
         FROM Camas WHERE Area = ? AND Activo = 1
       `).get(area);
 
-      const egresos = db.prepare(`
+      const egresos = await db.prepare(`
         SELECT
           COUNT(*) AS EgresosMes,
-          AVG(CAST(julianday(e.FechaEgreso) - julianday(a.FechaIngreso) AS INTEGER)) AS EstanciaPromedio,
+          AVG((EXTRACT(EPOCH FROM e.FechaEgreso) - EXTRACT(EPOCH FROM a.FechaIngreso)) / 86400.0) AS EstanciaPromedio,
           ROUND(
-            CAST(COUNT(*) AS REAL) /
-            MAX((SELECT COUNT(*) FROM Camas WHERE Area = ?), 1)
+            CAST(COUNT(*) AS NUMERIC) /
+            GREATEST((SELECT COUNT(*) FROM Camas WHERE Area = ?), 1)
           , 2) AS RotacionCamas
         FROM Egresos e
         JOIN Admisiones a ON a.AdmisionId = e.AdmisionId
         WHERE e.AreaEgreso = ?
-          AND e.FechaEgreso >= datetime('now', '-1 month')
+          AND e.FechaEgreso >= CURRENT_TIMESTAMP - INTERVAL '1 month'
       `).get(area, area);
 
       res.json({
@@ -334,7 +334,6 @@ router.get(
   authenticate,
   async (req, res, next) => {
     try {
-      const db = getDb();
       const periodo = req.query.periodo || 'mes';
 
       // Calcular objetos Date
@@ -728,10 +727,10 @@ router.get(
  * Devuelve la configuración de todos los KPIs para los dashboards.
  * Cualquier usuario autenticado puede leer esto.
  */
-router.get('/kpi-config', authenticate, (req, res, next) => {
+router.get('/kpi-config', authenticate, async (req, res, next) => {
   try {
     const db   = getDb();
-    const kpis = db.prepare(`
+    const kpis = await db.prepare(`
       SELECT ElementoId, Seccion,
              COALESCE(NombreCustom, NombreDefault) AS Nombre,
              NombreDefault, NombreCustom, Icono, PBIUrl, PBIUrl2, PBIUrl3, MultiPagina, JsonApiUrl, JsonFilePath

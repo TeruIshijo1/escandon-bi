@@ -399,23 +399,23 @@ async function getKPIsProductividad({ area } = {}) {
   let sql = `
     SELECT
       COUNT(DISTINCT e.EgresoId)                                                      AS TotalEgresos,
-      AVG(CAST(julianday(e.FechaEgreso) - julianday(a.FechaIngreso) AS INTEGER))      AS EstanciaPromedioHospDias,
+      AVG((EXTRACT(EPOCH FROM e.FechaEgreso) - EXTRACT(EPOCH FROM a.FechaIngreso)) / 86400.0) AS EstanciaPromedioHospDias,
       ROUND(
-        CAST(COUNT(DISTINCT a.AdmisionId) AS REAL) * 100.0 /
-        MAX((SELECT COUNT(*) FROM Camas WHERE (? IS NULL OR Area = ?)), 1)
+        CAST(COUNT(DISTINCT a.AdmisionId) AS NUMERIC) * 100.0 /
+        GREATEST((SELECT COUNT(*) FROM Camas WHERE (? IS NULL OR Area = ?)), 1)
       , 1)                                                                             AS OcupacionPorcentaje,
       ROUND(
-        CAST(COUNT(DISTINCT e.EgresoId) AS REAL) /
-        MAX((SELECT COUNT(*) FROM Camas WHERE (? IS NULL OR Area = ?)), 1)
+        CAST(COUNT(DISTINCT e.EgresoId) AS NUMERIC) /
+        GREATEST((SELECT COUNT(*) FROM Camas WHERE (? IS NULL OR Area = ?)), 1)
       , 2)                                                                             AS RotacionCamas
     FROM Egresos e
     JOIN Admisiones a ON a.AdmisionId = e.AdmisionId
-    WHERE e.FechaEgreso >= datetime('now', '-1 month')
+    WHERE e.FechaEgreso >= CURRENT_TIMESTAMP - INTERVAL '1 month'
       AND (? IS NULL OR e.AreaEgreso = ?)
   `;
 
   const areaParam = area || null;
-  const row = db.prepare(sql).get(areaParam, areaParam, areaParam, areaParam, areaParam, areaParam);
+  const row = await db.prepare(sql).get(areaParam, areaParam, areaParam, areaParam, areaParam, areaParam);
 
   return {
     totalEgresos:     row?.TotalEgresos || 0,
@@ -430,16 +430,16 @@ async function getTasaMortalidad({ periodo = 'mes' } = {}) {
   const db = getDb();
   const dias = periodo === 'semana' ? 7 : periodo === 'año' ? 365 : 30;
 
-  const row = db.prepare(`
+  const row = await db.prepare(`
     SELECT
       COUNT(*) AS TotalEgresos,
       SUM(CASE WHEN e.TipoEgreso = 'DEFUNCION' THEN 1 ELSE 0 END) AS Defunciones,
       ROUND(
-        CAST(SUM(CASE WHEN e.TipoEgreso = 'DEFUNCION' THEN 1 ELSE 0 END) AS REAL)
-        * 100.0 / MAX(COUNT(*), 1)
+        CAST(SUM(CASE WHEN e.TipoEgreso = 'DEFUNCION' THEN 1 ELSE 0 END) AS NUMERIC)
+        * 100.0 / GREATEST(COUNT(*), 1)
       , 2) AS TasaMortalidad
     FROM Egresos e
-    WHERE e.FechaEgreso >= datetime('now', '-' || ? || ' days')
+    WHERE e.FechaEgreso >= CURRENT_TIMESTAMP - (? * INTERVAL '1 day')
   `).get(dias);
 
   return {

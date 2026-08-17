@@ -18,10 +18,10 @@ const { getDb } = require('../config/db');
  * GET /api/bi/available-reports
  * Retorna todos los reportes activos
  */
-router.get('/available-reports', authenticate, (req, res, next) => {
+router.get('/available-reports', authenticate, async (req, res, next) => {
   try {
     const db = getDb();
-    let reports = db.prepare('SELECT * FROM ConfiguracionBI WHERE Activo = 1').all();
+    let reports = await db.prepare('SELECT * FROM ConfiguracionBI WHERE Activo = 1').all();
     
     // Si no es ADMIN, filtrar por los permisos del usuario
     if (req.user.role !== 'ADMIN') {
@@ -49,7 +49,7 @@ router.get(
       const db = getDb();
       
       // Buscar en la BD primero
-      const config = db.prepare('SELECT * FROM ConfiguracionBI WHERE ReporteId = ? OR ConfigId = ?').get(reportId, reportId);
+      const config = await db.prepare('SELECT * FROM ConfiguracionBI WHERE ReporteId = ? OR CAST(ConfigId AS TEXT) = ?').get(reportId, reportId);
       
       let embedUrl, pbiReportId, workspaceId;
 
