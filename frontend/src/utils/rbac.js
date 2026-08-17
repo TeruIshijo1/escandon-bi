@@ -387,7 +387,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     {
       section: 'Farmacia',
       icon:    '📦',
-      label:   'Inventario (SAP)',
+      label:   'Inventario Farmacia (SAP)',
       path:    '/farmacia/inventario',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
     },
@@ -443,7 +443,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     {
       section: 'Almacén General',
       icon:    '📦',
-      label:   'Inventario General (SAP)',
+      label:   'Inventario Almacén (SAP)',
       path:    '/almacen/inventario',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
     },
@@ -457,14 +457,14 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     {
       section: 'Almacén General',
       icon:    '🚚',
-      label:   'Traslados (SAP)',
+      label:   'Traslados Almacén (SAP)',
       path:    '/almacen/traslados',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
     },
     {
       section: 'Almacén General',
       icon:    '📑',
-      label:   'Reportes (SAP)',
+      label:   'Reportes Almacén (SAP)',
       path:    '/almacen/reportes',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
     },
