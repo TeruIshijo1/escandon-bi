@@ -36,21 +36,6 @@ export default function AdminConfiguracion() {
   const [kpiEditForm,     setKPIEditForm]    = useState({ nombreCustom: '', icono: '', pbiUrl: '', jsonApiUrl: '', jsonFilePath: '', multiPagina: false });
   const [kpiSaving,       setKPISaving]      = useState(false);
 
-  const [connectors, setConnectors] = useState([]);
-  const [mappings, setMappings] = useState([]);
-  const [entities, setEntities] = useState([]);
-  const [selectedConnector, setSelectedConnector] = useState(null);
-  const [modalMappingOpen, setModalMappingOpen] = useState(false);
-  const [modalConnectorOpen, setModalConnectorOpen] = useState(false);
-
-  // Al abrir el modal de mapeo, refrescamos los datos para asegurar que lo último escaneado aparezca
-  useEffect(() => {
-    if (modalMappingOpen) fetchDataHub();
-  }, [modalMappingOpen]);
-
-  const [currentConnector, setCurrentConnector] = useState({ nombre: '', tipo: 'EXCEL', configuracion: { filePath: '' } });
-  const [currentMapping, setCurrentMapping] = useState({ seccionUI: '', entityId: '', campoValor: '', campoFiltro: '', metodoCalculo: 'SUM' });
-
   const ROL_DISPLAY = {
     ADMIN: 'Administrador',
     DIRECTOR: 'Directivo',
@@ -60,24 +45,8 @@ export default function AdminConfiguracion() {
 
   const AREAS_LIST = ['QUIROFANO', 'UCI', 'URGENCIAS', 'CUNEROS', 'IMAGENOLOGIA', 'LABORATORIO', 'CONSULTA_EXTERNA', 'HOSPITALIZACION'];
 
-  // Configuración de conexiones
-  const [sqlConfig, setSqlConfig] = useState({
-    host: 'sql-server.local',
-    port: '1433',
-    database: 'HOSPITAL_DB',
-    user: 'usuario_sql',
-    pass: '********'
-  });
-
-  const [pbiConfig, setPbiConfig] = useState({
-    tenantId: 'd7a4b1c2-e3f4-5678-90ab-cdef12345678',
-    clientId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    clientSecret: '••••••••••••••••'
-  });
-
   useEffect(() => {
     fetchReports();
-    fetchDataHub();
     fetchKPIConfig();
   }, []);
 
@@ -137,67 +106,7 @@ export default function AdminConfiguracion() {
     ? kpiList
     : kpiList.filter(k => k.Seccion === kpiFilter);
 
-  const fetchDataHub = async () => {
-    try {
-      const token = sessionStorage.getItem('escandon_token');
-      const resC = await fetch(`${API_BASE}/admin/connectors`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const jsonC = await resC.json();
-      if (jsonC.ok) setConnectors(jsonC.data);
 
-      const resM = await fetch(`${API_BASE}/admin/metric-mappings`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const jsonM = await resM.json();
-      if (jsonM.ok) setMappings(jsonM.data);
-
-      const resE = await fetch(`${API_BASE}/admin/entities`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const jsonE = await resE.json();
-      if (jsonE.ok) setEntities(jsonE.data);
-    } catch (err) { console.error('Error fetching data hub:', err); }
-  };
-
-  const handleScanEntities = async (id) => {
-    try {
-      setToast('Escaneando origen de datos...');
-      const token = sessionStorage.getItem('escandon_token');
-      const res = await fetch(`${API_BASE}/admin/connectors/${id}/entities`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const json = await res.json();
-      if (json.ok) {
-        setToast('Escaneo completado. Entidades registradas.');
-        fetchDataHub(); 
-      }
-    } catch (err) { alert('Error al escanear: ' + err.message); }
-  };
-
-  const handleSaveMapping = async () => {
-    try {
-      const token = sessionStorage.getItem('escandon_token');
-      const res = await fetch(`${API_BASE}/admin/metric-mappings`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentMapping)
-      });
-      if (res.ok) {
-        setToast('Mapeo de métrica guardado');
-        setModalMappingOpen(false);
-        fetchDataHub();
-      }
-    } catch (err) { alert(err.message); }
-  };
-
-  const handleSaveConnector = async () => {
-    try {
-      const token = sessionStorage.getItem('escandon_token');
-      const res = await fetch(`${API_BASE}/admin/connectors`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentConnector)
-      });
-      if (res.ok) {
-        setToast('Nuevo origen de datos registrado');
-        setModalConnectorOpen(false);
-        fetchDataHub();
-      }
-    } catch (err) { alert(err.message); }
-  };
 
   const fetchReports = async () => {
     try {
@@ -264,14 +173,7 @@ export default function AdminConfiguracion() {
     }
   };
 
-  const handleProbarConexion = () => {
-    setTesting(true);
-    setTimeout(() => {
-      setTesting(false);
-      setToast('✅ Conexión establecida con éxito (SQL Server & Azure)');
-      setTimeout(() => setToast(''), 4000);
-    }, 1500);
-  };
+
 
   const handleDeleteReport = async (id) => {
     if (!confirm('¿Está seguro de eliminar este reporte del catálogo?')) return;
@@ -464,102 +366,7 @@ export default function AdminConfiguracion() {
         </div>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(450px, 1fr))', gap:'1.5rem', marginBottom:'2rem' }}>
-        
-        {/* Conexión SQL */}
-        <div className="config-card">
-          <div className="config-watermark">🔌</div>
-          <h2 style={{ fontFamily:"var(--font-display)", fontSize:'1.05rem', fontWeight:800, color:'var(--color-azul-fuerte)', marginBottom:'1.25rem', paddingBottom:'0.65rem', borderBottom:'1px solid rgba(0,70,135,0.06)', display:'flex', alignItems:'center', gap:'0.6rem', letterSpacing: '-0.01em' }}>
-            Servidor de Base de Datos
-          </h2>
-          <div style={{ display:'flex', flexDirection:'column', gap:'0.875rem' }}>
-            <div style={{ display:'flex', gap:'0.875rem' }}>
-              <div style={{ flex:2 }}>
-                <label style={{ display:'block', fontSize:'0.65rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.35rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>HOST / IP</label>
-                <input value={sqlConfig.host} onChange={e => setSqlConfig({...sqlConfig, host:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:8, padding:'0.55rem', fontSize:'0.82rem', fontFamily: 'var(--font-mono)', background: '#F8FAFC', outline: 'none', transition: 'all var(--transition-fast)' }} />
-              </div>
-              <div style={{ flex:1 }}>
-                <label style={{ display:'block', fontSize:'0.65rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.35rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>PUERTO</label>
-                <input value={sqlConfig.port} onChange={e => setSqlConfig({...sqlConfig, port:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:8, padding:'0.55rem', fontSize:'0.82rem', fontFamily: 'var(--font-mono)', background: '#F8FAFC', outline: 'none', transition: 'all var(--transition-fast)' }} />
-              </div>
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:'0.65rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.35rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>BASE DE DATOS</label>
-              <input value={sqlConfig.database} onChange={e => setSqlConfig({...sqlConfig, database:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:8, padding:'0.55rem', fontSize:'0.82rem', fontFamily: 'var(--font-mono)', background: '#F8FAFC', outline: 'none', transition: 'all var(--transition-fast)' }} />
-            </div>
-            <div style={{ display:'flex', gap:'0.875rem' }}>
-              <div style={{ flex:1 }}>
-                <label style={{ display:'block', fontSize:'0.65rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.35rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>USUARIO</label>
-                <input value={sqlConfig.user} onChange={e => setSqlConfig({...sqlConfig, user:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:8, padding:'0.55rem', fontSize:'0.82rem', fontFamily: 'var(--font-mono)', background: '#F8FAFC', outline: 'none', transition: 'all var(--transition-fast)' }} />
-              </div>
-              <div style={{ flex:1 }}>
-                <label style={{ display:'block', fontSize:'0.65rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.35rem', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>CONTRASEÑA</label>
-                <input type="password" value={sqlConfig.pass} onChange={e => setSqlConfig({...sqlConfig, pass:e.target.value})} className="config-input-field" style={{ width:'100%', border:'1px solid #E2E8F0', borderRadius:8, padding:'0.55rem', fontSize:'0.82rem', background: '#F8FAFC', outline: 'none', transition: 'all var(--transition-fast)' }} />
-              </div>
-            </div>
-          </div>
-        </div>
 
-      </div>
-
-      {/* ── SECCIÓN DATA HUB ── */}
-      <div style={{ background:'#FFFFFF', borderRadius:16, padding:'1.75rem 1.5rem', marginBottom:'2rem', border:'1px solid rgba(0,70,135,0.05)', boxShadow:'var(--shadow-xs)' }}>
-        <h2 style={{ fontFamily:"var(--font-display)", fontSize:'1.05rem', fontWeight:800, color:'var(--color-azul-fuerte)', marginBottom:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', letterSpacing: '-0.01em' }}>
-          🧠 Data Hub: Centro de Inteligencia de Datos
-        </h2>
-        
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(320px, 1fr))', gap:'1.5rem' }}>
-          {/* Columna Conectores */}
-          <div style={{ borderRight:'1px solid rgba(0,70,135,0.06)', paddingRight:'1.5rem' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem' }}>
-              <span style={{ fontSize:'0.72rem', fontWeight:800, color:'var(--text-primary)', fontFamily: 'var(--font-display)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Orígenes Conectados</span>
-              <button onClick={() => setModalConnectorOpen(true)} style={{ fontSize:'0.72rem', fontWeight: 700, color:'var(--color-azul-claro)', background:'none', border:'none', cursor:'pointer', fontFamily: 'var(--font-display)' }}>+ Añadir</button>
-            </div>
-            {connectors.map(c => (
-              <div key={c.ConnectorId} style={{ padding:'1rem', border:'1px solid rgba(0,70,135,0.06)', borderRadius:12, marginBottom:'0.75rem', background: selectedConnector === c.ConnectorId ? 'rgba(0,136,201,0.04)' : '#FFFFFF', boxShadow: 'var(--shadow-xs)', position: 'relative' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span style={{ fontWeight:700, fontSize:'0.82rem', fontFamily: 'var(--font-body)', color: 'var(--text-primary)' }}>{c.Nombre}</span>
-                  <span style={{ fontSize:'0.65rem', padding:'0.15rem 0.45rem', background:'rgba(0,70,135,0.05)', color: 'var(--color-azul-fuerte)', borderRadius:6, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{c.Tipo}</span>
-                </div>
-                <div style={{ marginTop:'0.85rem', display:'flex', gap:'0.75rem' }}>
-                  <button onClick={() => handleScanEntities(c.ConnectorId)} style={{ fontSize:'0.72rem', fontWeight: 700, color:'var(--color-azul-fuerte)', background:'none', border:'none', cursor:'pointer', fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    Escanear Esquema
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Columna Mapeos */}
-          <div>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem' }}>
-              <span style={{ fontSize:'0.72rem', fontWeight:800, color:'var(--text-primary)', fontFamily: 'var(--font-display)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Mapeo de Métricas Clínicas</span>
-              <button onClick={() => setModalMappingOpen(true)} style={{ padding:'0.4rem 0.85rem', background:'var(--color-azul-fuerte)', color:'white', border:'none', borderRadius:8, fontSize:'0.7rem', fontWeight: 700, cursor:'pointer', fontFamily: 'var(--font-display)', boxShadow: '0 2px 8px rgba(0, 70, 135, 0.15)' }}>+ Mapear KPI</button>
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem' }}>
-              {mappings.map(m => {
-                const kpiInfo = kpiList.find(k => k.ElementoId === m.SeccionUI);
-                return (
-                <div key={m.MappingId} style={{ padding:'1rem', border:'1px solid rgba(0,70,135,0.06)', borderRadius:12, display:'flex', justifyContent:'space-between', alignItems:'center', background: '#FAFBFD', boxShadow: 'var(--shadow-xs)' }}>
-                  <div>
-                    <div style={{ fontSize:'0.82rem', fontWeight:700, color:'var(--text-primary)', display:'flex', alignItems:'center', gap:'0.4rem', fontFamily: 'var(--font-body)' }}>
-                      <span style={{ fontSize: '1rem' }}>{kpiInfo ? kpiInfo.Icono : '📊'}</span> 
-                      {kpiInfo ? (kpiInfo.NombreCustom || kpiInfo.NombreDefault) : m.SeccionUI}
-                      <span style={{ fontSize:'0.65rem', color:'var(--text-muted)', fontWeight:500, fontFamily: 'var(--font-mono)' }}>({m.SeccionUI})</span>
-                    </div>
-                    <div style={{ fontSize:'0.68rem', color:'var(--text-muted)', marginTop:'0.25rem', fontFamily: 'var(--font-body)', fontWeight: 500 }}>
-                      {m.ConectorNombre} → {m.NombreEntidad} · <span style={{ color:'var(--color-azul-fuerte)', fontWeight:700, fontFamily: 'var(--font-mono)' }}>{m.CampoValor}</span>
-                      {m.CampoFiltro && <span style={{ marginLeft: '0.5rem', background: 'rgba(232,133,61,0.08)', color: 'var(--color-accent-warm)', padding: '0.15rem 0.4rem', borderRadius: 4, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>Filtro: {m.CampoFiltro}</span>}
-                    </div>
-                  </div>
-                  <div style={{ fontSize:'0.74rem', fontWeight:800, color:'var(--color-verde-e)', fontFamily: 'var(--font-mono)' }}>{m.MetodoCalculo}</div>
-                </div>
-              )})}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* ── SECCIÓN KPI CONFIG ── */}
       <div style={{ background: '#FFFFFF', borderRadius: 16, padding: '1.75rem 1.5rem', marginBottom: '2rem', border: '1px solid rgba(0,70,135,0.05)', boxShadow: 'var(--shadow-xs)' }}>
@@ -744,9 +551,6 @@ export default function AdminConfiguracion() {
       </div>
 
       <div style={{ display:'flex', gap:'0.875rem', justifyContent:'flex-end', marginBottom: '2.5rem' }}>
-        <button onClick={handleProbarConexion} disabled={testing} style={{ padding:'0.65rem 1.35rem', border:'1.5px solid rgba(0,70,135,0.15)', borderRadius:10, background:'white', color:'var(--color-azul-fuerte)', fontFamily:"var(--font-display)", fontSize:'0.88rem', fontWeight:700, cursor: testing ? 'wait' : 'pointer', transition: 'all 150ms' }} onMouseEnter={e=>{if(!testing) e.currentTarget.style.background='#F8FAFC';}} onMouseLeave={e=>{if(!testing) e.currentTarget.style.background='white';}}>
-          {testing ? '⏳ Probando Conectores...' : 'Probar Conectores'}
-        </button>
         <button onClick={() => { setToast('Configuración del sistema guardada'); setTimeout(() => setToast(''), 3000); }} style={{ padding:'0.65rem 1.5rem', border:'none', borderRadius:10, background:'linear-gradient(135deg, var(--color-azul-claro), var(--color-azul-cruz))', color:'white', fontFamily:"var(--font-display)", fontSize:'0.88rem', fontWeight:700, cursor:'pointer', boxShadow:'0 4px 14px rgba(0,136,201,0.25)', transition: 'all 200ms' }} onMouseEnter={e=>e.currentTarget.style.transform='translateY(-1px)'} onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
           💾 Guardar Todo
         </button>

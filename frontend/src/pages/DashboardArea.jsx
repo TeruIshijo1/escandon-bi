@@ -199,6 +199,7 @@ export default function DashboardArea() {
         if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
         if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
 
+
         const res = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -215,6 +216,7 @@ export default function DashboardArea() {
         if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
         if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
 
+
         console.log('[DashboardArea] Fetching CEX data from:', url);
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         const json = await res.json();
@@ -227,6 +229,7 @@ export default function DashboardArea() {
         if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
         if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
 
+
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         const json = await res.json();
         if (json.ok) {
@@ -237,6 +240,7 @@ export default function DashboardArea() {
         if (globalFilters.startDate) url += `startDate=${globalFilters.startDate}&`;
         if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
         if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
+
 
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         const json = await res.json();

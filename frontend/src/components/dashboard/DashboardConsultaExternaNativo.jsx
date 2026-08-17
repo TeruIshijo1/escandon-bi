@@ -43,10 +43,6 @@ export default function DashboardConsultaExternaNativo({ data, searchFilter, set
           <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Tasa de Asistencia</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0D1B2A', marginTop: '0.2rem' }}>{data.kpis?.tasaAsistencia || 0}%</div>
         </div>
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: 12, borderLeft: '4px solid #F59E0B', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Ingresos Totales</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0D1B2A', marginTop: '0.2rem' }}>{formatCurrency(data.kpis?.ingresos)}</div>
-        </div>
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>

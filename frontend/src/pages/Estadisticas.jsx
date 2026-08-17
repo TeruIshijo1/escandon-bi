@@ -10,6 +10,7 @@ import EditableKPIWrapper from '../components/shared/EditableKPIWrapper';
 import PBIModal from '../components/shared/PBIModal';
 import { useKPIConfig } from '../hooks/useKPIConfig';
 import DashboardVidasSalvadas from '../components/dashboard/DashboardVidasSalvadas';
+import PremiumLoader from '../components/shared/PremiumLoader';
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -261,7 +262,13 @@ export default function Estadisticas() {
       </div>
 
       {/* KPIs demográficos */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:'1rem', marginBottom:'2rem', opacity: loading ? 0.55 : 1, transition: 'opacity 0.3s ease' }}>
+      {loading && data.stats.length === 0 ? (
+        <div style={{ padding: '4rem', display: 'flex', justifyContent: 'center' }}>
+          <PremiumLoader />
+        </div>
+      ) : (
+        <>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:'1rem', marginBottom:'2rem', opacity: loading ? 0.55 : 1, transition: 'opacity 0.3s ease' }}>
         {data.stats.map(s => {
           const kpiConfig = getKPI(s.id);
           const displayName = kpiConfig?.nombre || s.label;
@@ -299,10 +306,10 @@ export default function Estadisticas() {
             </div>
           );
         })}
-      </div>
+          </div>
 
-      {/* Diagnósticos top & Distribución */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(450px, 1fr))', gap:'1.5rem', opacity: loading ? 0.55 : 1, transition: 'opacity 0.3s ease', marginBottom: '2rem' }}>
+          {/* Diagnósticos top & Distribución */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(450px, 1fr))', gap:'1.5rem', opacity: loading ? 0.55 : 1, transition: 'opacity 0.3s ease', marginBottom: '2rem' }}>
         
         {/* Facturación por Área */}
         <EditableKPIWrapper elementoId="stats.top_diagnosticos" isAdmin={user?.role === 'ADMIN'} onKPIClick={handleKPIClick} accentColor="var(--color-azul-fuerte)">
@@ -332,7 +339,9 @@ export default function Estadisticas() {
                   }}/>
                 </div>
               </div>
-            )) : (
+            )) : loading ? (
+              <p style={{ textAlign:'center', color:'var(--text-muted)', fontSize:'0.85rem', padding:'2.5rem 0', fontFamily: 'var(--font-body)' }}>Cargando datos de facturación...</p>
+            ) : (
               <p style={{ textAlign:'center', color:'var(--text-muted)', fontSize:'0.85rem', padding:'2.5rem 0', fontFamily: 'var(--font-body)' }}>Sin datos de facturación en este periodo.</p>
             )}
           </div>
@@ -362,12 +371,16 @@ export default function Estadisticas() {
                   <div style={{ height:'100%', width:`${(a.n/data.maxArea)*100}%`, background:a.color, borderRadius:100, transition:'width 0.8s ease' }}/>
                 </div>
               </div>
-            )) : (
+            )) : loading ? (
+              <p style={{ textAlign:'center', color:'var(--text-muted)', fontSize:'0.85rem', padding:'2.5rem 0', fontFamily: 'var(--font-body)' }}>Cargando médicos...</p>
+            ) : (
               <p style={{ textAlign:'center', color:'var(--text-muted)', fontSize:'0.85rem', padding:'2.5rem 0', fontFamily: 'var(--font-body)' }}>Sin registros de médicos.</p>
             )}
           </div>
         </EditableKPIWrapper>
       </div>
+      </>
+      )}
 
       {/* Explorador de Estadísticas Históricas */}
       <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '2rem', border: '1px solid rgba(0,70,135,0.05)', boxShadow: 'var(--shadow-sm)', marginBottom: '2rem' }}>

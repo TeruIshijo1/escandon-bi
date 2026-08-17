@@ -1379,7 +1379,7 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
     if (startDate === 'undefined' || startDate === 'null' || startDate === '') startDate = null;
     if (endDate === 'undefined' || endDate === 'null' || endDate === '') endDate = null;
     if (search === 'undefined' || search === 'null' || search === '') search = null;
-
+    
     const todayStr = new Date().toISOString().split('T')[0];
     const effectiveStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const effectiveEndDate = endDate || todayStr + ' 23:59:59';
@@ -3242,27 +3242,7 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
     const progRes = await request.query(progStr);
     const programadasData = progRes.recordset || [];
 
-    // Ingresos CEX (UDR_CUENTAS_SERVICIOS)
-    let ingresosData = [];
-    try {
-      const ingStr = `
-        SELECT Medico_Tratante, TOTAL_COBRADO
-        FROM UDR_CUENTAS_SERVICIOS
-        WHERE UNIDAD_DE_SERVICIO = 'CEX' AND FECHA_DE_CARGO >= @startDate AND FECHA_DE_CARGO <= @endDate
-      `;
-      const ingRes = await request.query(ingStr);
-      ingresosData = ingRes.recordset || [];
-    } catch(err) {
-      console.warn("No se pudo cargar UDR_CUENTAS_SERVICIOS: ", err.message);
-    }
-    let ingresosTotales = 0;
-    const medicosIngresos = {};
-    
-    ingresosData.forEach(i => {
-      const amt = parseFloat(i.TOTAL_COBRADO) || 0;
-      ingresosTotales += amt;
-    });
-    
+
     // Top Médicos por cantidad de consultas programadas (finalProgData will be used after filtering, but we can compute it on the initial programadasData and overwrite later, or just wait. Ah, we need to compute it AFTER filtering. Let's do it after.)
     
     // Consultas completadas / facturadas (V_UDR_CONSULTA_DIA)
@@ -3380,8 +3360,7 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
           total: totalProgramadas,
           asistencias: asistencias,
           cancelaciones: cancelaciones,
-          tasaAsistencia: tasaAsistencia,
-          ingresos: ingresosTotales
+          tasaAsistencia: tasaAsistencia
         },
         tendencia,
         especialidades,
@@ -3955,7 +3934,7 @@ router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
         bedsMap[code] = {
           ...bedsMap[code],
           Estado: 'OCUPADA',
-          Paciente: o.Paciente,
+        Paciente: o.Paciente,
           Medico: o.Medico,
           FechaIngreso: o.FechaIngreso,
           PCNum: o.PCNum,
@@ -4005,17 +3984,31 @@ router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
     const totalCamas = censoCamas.length;
     const ocupacionPct = totalCamas > 0 ? parseFloat(((camasOcupadas * 100) / totalCamas).toFixed(1)) : 0;
 
-    // 5. Métricas Financieras (PostgreSQL DW)
+    // 5. Métricas Financieras (PostgreSQL DW + SAP)
     const finRes = await pgPool.query(`
       SELECT 
-        COALESCE(SUM(total_cobrado), 0)::float as total_facturado, 
         COUNT(DISTINCT folio_de_atencion)::int as total_pacientes
       FROM dw_vertical_cuentas_servicios
       WHERE (grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2'))
         AND folio_de_atencion IN (SELECT pcnum FROM dw_vertical_pc WHERE pctype = 'IP')
         AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
     `, [effectiveStartDate, effectiveEndDate]);
-    const { total_facturado: totalFacturado, total_pacientes: totalPacientes } = finRes.rows[0];
+    const { total_pacientes: totalPacientes } = finRes.rows[0];
+
+    // Ingresos SAP Facturados
+    let totalFacturado = 0;
+    try {
+      const sapRes = await pgPool.query(`
+        SELECT SUM(total) as total_facturado 
+        FROM dw_sap_ingresos_grupos
+        WHERE docdate >= $1 AND docdate <= $2
+          AND itmsgrpcod NOT IN (104, 111, 101, 115, 117, 109, 105, 103)
+      `, [effectiveStartDate.substring(0,10), effectiveEndDate.substring(0,10)]);
+      totalFacturado = parseFloat(sapRes.rows[0]?.total_facturado) || 0;
+    } catch (err) {
+      console.error('[SAP] Error al obtener facturación de Hospitalización:', err);
+    }
+
 
     // B. Desglose de ingresos por grupo de artículos
     const grupoRes = await pgPool.query(`

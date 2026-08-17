@@ -453,7 +453,7 @@ export default function DashboardQuirofanoNativo({ data }) {
 
       {/* Productividad por Especialidades (Estilo Excel) */}
       <div data-html2canvas-ignore="false" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', marginTop: '1.5rem' }}>
-        <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Productividad por Especialidades (Ref. Excel)</h3>
+        <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Productividad por Especialidades</h3>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>

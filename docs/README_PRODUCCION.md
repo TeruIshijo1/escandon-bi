@@ -13,9 +13,9 @@ Respecto al entorno de desarrollo local, se realizaron las siguientes adaptacion
 - **Cambio**: 
   ```env
   REMOTE_DB_SERVER=159.223.110.159
-  REMOTE_DB_PORT=37368
+  REMOTE_DB_PORT=50351
   ```
-- **Motivo Técnico**: En la red local del servidor productivo, la resolución DNS de Windows traducía el dominio `bore.pub` hacia la IP `1.1.1.1` (IP ficticia de filtrado DNS), haciendo fallar las conexiones TCP al puerto `37368`. Usar la IP directa `159.223.110.159` garantiza la conectividad inmediata sin depender de la resolución DNS del router/servidor.
+- **Motivo Técnico**: En la red local del servidor productivo, la resolución DNS de Windows traducía el dominio `bore.pub` hacia la IP `1.1.1.1` (IP ficticia de filtrado DNS), haciendo fallar las conexiones TCP al puerto `50351`. Usar la IP directa `159.223.110.159` garantiza la conectividad inmediata sin depender de la resolución DNS del router/servidor.
 
 ### 1.2 Mensajes de Diagnóstico en la Conexión Remota
 - **Archivo**: `backend/config/remote-db.js`

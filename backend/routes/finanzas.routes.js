@@ -32,22 +32,33 @@ router.get('/ml-forecast', authenticate, authorize(['ADMIN', 'DIRECTOR']), async
 });
 
 // POST /api/finanzas/ml-forecast/run
-// Ejecuta asíncronamente el script de predicción en Python
-router.post('/ml-forecast/run', authenticate, authorize(['ADMIN', 'DIRECTOR']), (req, res) => {
-  const scriptPath = path.join(__dirname, '..', 'ml', 'predict_revenue_forecast.py');
-  
-  exec(`python "${scriptPath}"`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`[Predict Revenue Error] ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`[Predict Revenue Stderr] ${stderr}`);
-    }
-    console.log(`[Predict Revenue Output] ${stdout}`);
-  });
+// Genera el dataset, entrena el modelo y ejecuta la predicción asíncronamente
+router.post('/ml-forecast/run', authenticate, authorize(['ADMIN', 'DIRECTOR']), async (req, res) => {
+  res.json({ ok: true, message: 'Proceso de IA de ingresos iniciado en segundo plano (Dataset -> Train -> Predict).' });
 
-  res.json({ ok: true, message: 'Predicción de ingresos iniciada en segundo plano.' });
+  try {
+    const { syncRevenueDataset } = require('../services/mlRevenueDataset.service');
+    console.log('[Predict Revenue] 1. Sincronizando dataset de ingresos...');
+    await syncRevenueDataset();
+
+    const trainScript = path.join(__dirname, '..', 'ml', 'train_revenue_forecast.py');
+    const predictScript = path.join(__dirname, '..', 'ml', 'predict_revenue_forecast.py');
+
+    console.log('[Predict Revenue] 2. Entrenando modelo...');
+    exec(`python "${trainScript}"`, (errTrain, stdoutTrain, stderrTrain) => {
+      if (errTrain) return console.error(`[Train Revenue Error] ${errTrain.message}`);
+      console.log(`[Train Revenue Output] ${stdoutTrain}`);
+
+      console.log('[Predict Revenue] 3. Ejecutando predicción...');
+      exec(`python "${predictScript}"`, (errPred, stdoutPred, stderrPred) => {
+        if (errPred) return console.error(`[Predict Revenue Error] ${errPred.message}`);
+        console.log(`[Predict Revenue Output] ${stdoutPred}`);
+      });
+    });
+
+  } catch (err) {
+    console.error('[Predict Revenue Pipeline Error]', err);
+  }
 });
 
 module.exports = router;
