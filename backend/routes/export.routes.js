@@ -640,7 +640,8 @@ async function resolveReportData(reportId, filters) {
       
       let query = `
         SELECT c.*, p.NombreCompleto as NombrePaciente, 
-               COALESCE(NULLIF(TRIM(c.Consultorio), ''), dw.articulo) as ConsultorioFinal,
+               c.Consultorio as ConsultorioFinal,
+               dw.articulo,
                COALESCE(NULLIF(TRIM(cons.Diagnostico), ''), dw.dx_description_es) as DiagnosticoFinal,
                COALESCE(NULLIF(TRIM(c.Notas), ''), dw.comentarios) as NotasFinal,
                COALESCE(NULLIF(TRIM(p.Telefonos), ''), CONCAT_WS(' ', NULLIF(TRIM(dw.telefono_1), ''), NULLIF(TRIM(dw.celular_2), ''))) as TelefonosFinal,
@@ -676,6 +677,7 @@ async function resolveReportData(reportId, filters) {
         edad_anios: r.edad_anios,
         edad_mes: r.edad_mes,
         genero: r.genero,
+        articulo: r.articulo,
         consultas_previas: r.consultas_previas,
         convenio: r.convenio
       }));
@@ -700,7 +702,8 @@ async function resolveReportData(reportId, filters) {
           { header: 'Edad (Meses)', key: 'edad_mes', width: 12 },
           { header: 'Género', key: 'genero', width: 10 },
           { header: 'Convenio', key: 'convenio', width: 25 },
-          { header: 'Consultas Previas', key: 'consultas_previas', width: 15 },
+          { header: 'Artículo', key: 'articulo', width: 35 },
+          { header: 'Consultas Previas Ejecutadas', key: 'consultas_previas', width: 20 },
           { header: 'Fecha y Hora', key: 'fechahoracita', width: 22 },
           { header: 'Estado', key: 'estado', width: 15 },
           { header: 'S/P', key: 'tipoconsulta', width: 8 },
