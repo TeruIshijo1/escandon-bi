@@ -101,7 +101,8 @@ const initSapQueries = async () => {
     console.error('[SAP] Error al inicializar queries de Quirófano:', err.message);
   }
 };
-setTimeout(initSapQueries, 5000);
+// No ejecutar en modo test (evita timers y conexiones SAP durante los tests)
+if (process.env.NODE_ENV !== 'test') setTimeout(initSapQueries, 5000);
 
 /**
  * GET /api/dashboard/directivo

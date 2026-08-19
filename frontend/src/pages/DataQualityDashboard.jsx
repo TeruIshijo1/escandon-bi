@@ -3,6 +3,7 @@
  * Hospital Escandón BI Platform
  */
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../api/client';
 
 export default function DataQualityDashboard() {
   const [stats, setStats] = useState({
@@ -22,23 +23,14 @@ export default function DataQualityDashboard() {
   const fetchStatsAndIssues = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('escandon_token');
-      const headers = { Authorization: `Bearer ${token}` };
-
       // Fetch stats
-      const statsRes = await fetch('/api/data-quality/stats', { headers });
-      const statsData = await statsRes.json();
+      const statsData = await apiFetch('/data-quality/stats');
       if (statsData.success) {
         setStats(statsData.data);
       }
 
       // Fetch issues
-      let url = `/api/data-quality/issues?limit=100`;
-      if (statusFilter) url += `&status=${statusFilter}`;
-      if (severityFilter) url += `&severity=${severityFilter}`;
-
-      const issuesRes = await fetch(url, { headers });
-      const issuesData = await issuesRes.json();
+      const issuesData = await apiFetch('/data-quality/issues', { params: { limit: 100, status: statusFilter, severity: severityFilter } });
       if (issuesData.success) {
         setIssues(issuesData.data || []);
       }
@@ -52,12 +44,7 @@ export default function DataQualityDashboard() {
   const handleScanLiveDB = async () => {
     setScanning(true);
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('escandon_token');
-      const res = await fetch('/api/data-quality/scan', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const data = await apiFetch('/data-quality/scan', { method: 'POST' });
       if (data.success) {
         alert(`🔍 Escaneo completado. Se detectaron ${data.detectedNewIssues || 0} nuevos hallazgos en la base de datos.`);
       }
@@ -75,20 +62,14 @@ export default function DataQualityDashboard() {
 
   const handleResolveIssue = async (id, status) => {
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('escandon_token');
-      const res = await fetch(`/api/data-quality/issues/${id}/resolve`, {
+      const data = await apiFetch(`/data-quality/issues/${id}/resolve`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+        body: {
           status,
           notes: actionNotes || 'Resuelto desde el panel de control.',
-        }),
+        },
       });
 
-      const data = await res.json();
       if (data.success) {
         setActionNotes('');
         fetchStatsAndIssues();

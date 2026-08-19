@@ -272,7 +272,7 @@ async function exportJsonToExcel(res, type, id) {
     workbook.creator = 'Hospital Escandón — Plataforma BI';
     workbook.created = new Date();
 
-    let sheetName = (config.nombre || 'Exportación').substring(0, 31).replace(/[/\\?*\[\]]/g, '');
+    let sheetName = (config.nombre || 'Exportación').substring(0, 31).replace(/[/\\?*[\]]/g, '');
     const sheet = workbook.addWorksheet(sheetName, {
       pageSetup: { paperSize: 9, orientation: 'landscape' },
     });
@@ -739,8 +739,24 @@ router.post(
       const { url } = req.body;
       if (!url) return res.status(400).json({ error: 'URL es requerida' });
 
-      // Hacer fetch de la API externa
-      const response = await fetch(url);
+      // Validar contra SSRF (solo URLs públicas http/https)
+      const { assertSafeFetchUrl } = require('../utils/urlSafety');
+      try {
+        await assertSafeFetchUrl(url);
+      } catch (err) {
+        const msg = err.message === 'SSRF_BLOCKED' ? 'La URL apunta a una red interna y no está permitida.' : err.message;
+        return res.status(400).json({ error: msg });
+      }
+
+      // Timeout de 15s y sin seguir redirecciones (evita SSRF por redirect)
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      let response;
+      try {
+        response = await fetch(url, { redirect: 'error', signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!response.ok) {
         throw new Error(`La API externa respondió con estado ${response.status}`);
       }

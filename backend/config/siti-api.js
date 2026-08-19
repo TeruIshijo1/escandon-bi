@@ -44,22 +44,18 @@ async function authenticateSiti() {
  */
 async function getSitiTables() {
   if (!sitiToken) await authenticateSiti();
-  
-  try {
-    let response = await fetch(`${SITI_API_URL}/api/tables`, {
+
+  let response = await fetch(`${SITI_API_URL}/api/tables`, {
+    headers: { 'token': sitiToken }
+  });
+
+  if (response.status === 401) {
+    await authenticateSiti();
+    response = await fetch(`${SITI_API_URL}/api/tables`, {
       headers: { 'token': sitiToken }
     });
-    
-    if (response.status === 401) {
-      await authenticateSiti();
-      response = await fetch(`${SITI_API_URL}/api/tables`, {
-        headers: { 'token': sitiToken }
-      });
-    }
-    return await response.json();
-  } catch (error) {
-    throw error;
   }
+  return await response.json();
 }
 
 /**
@@ -68,32 +64,28 @@ async function getSitiTables() {
  */
 async function querySiti(sqlQuery) {
   if (!sitiToken) await authenticateSiti();
-  
-  try {
-    let response = await fetch(`${SITI_API_URL}/api/query`, {
+
+  let response = await fetch(`${SITI_API_URL}/api/query`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'token': sitiToken
+    },
+    body: JSON.stringify({ query: sqlQuery })
+  });
+
+  if (response.status === 401) {
+    await authenticateSiti();
+    response = await fetch(`${SITI_API_URL}/api/query`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'token': sitiToken 
+        'token': sitiToken
       },
       body: JSON.stringify({ query: sqlQuery })
     });
-
-    if (response.status === 401) {
-      await authenticateSiti();
-      response = await fetch(`${SITI_API_URL}/api/query`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'token': sitiToken 
-        },
-        body: JSON.stringify({ query: sqlQuery })
-      });
-    }
-    return await response.json();
-  } catch (error) {
-    throw error;
   }
+  return await response.json();
 }
 
 module.exports = {

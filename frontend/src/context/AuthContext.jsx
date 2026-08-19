@@ -5,9 +5,22 @@
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { API_BASE } from '../api/config';
+import { getToken, setToken } from '../api/client';
 import { CAPABILITIES } from '../utils/rbac';
 
 const AuthContext = createContext(null);
+
+const TOKEN_KEY = 'escandon_token';
+const LEGACY_TOKEN_KEY = 'token';
+
+/* Migra el token legacy (localStorage) a sessionStorage una sola vez */
+function migrateLegacyToken() {
+  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
+  if (legacy && !sessionStorage.getItem(TOKEN_KEY)) {
+    sessionStorage.setItem(TOKEN_KEY, legacy);
+  }
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
+}
 
 
 export function AuthProvider({ children }) {
@@ -17,7 +30,8 @@ export function AuthProvider({ children }) {
 
   /* ── Inicialización: valida token guardado ───────────────── */
   useEffect(() => {
-    const token = sessionStorage.getItem('escandon_token');
+    migrateLegacyToken();
+    const token = getToken();
     if (!token) { setLoading(false); return; }
 
     (async () => {
@@ -29,7 +43,7 @@ export function AuthProvider({ children }) {
         const data = await res.json();
         setUser({ ...data.user, token });
       } catch {
-        sessionStorage.removeItem('escandon_token');
+        setToken(null);
       } finally {
         setLoading(false);
       }
@@ -53,8 +67,7 @@ export function AuthProvider({ children }) {
         return { ok: false, message: msg };
       }
 
-      sessionStorage.setItem('escandon_token', data.token);
-      localStorage.setItem('token', data.token);
+      setToken(data.token);
       setUser({ ...data.user, token: data.token });
       return { ok: true };
     } catch (err) {
@@ -66,8 +79,8 @@ export function AuthProvider({ children }) {
 
   /* ── Logout ──────────────────────────────────────────────── */
   const logout = useCallback(() => {
-    sessionStorage.removeItem('escandon_token');
-    localStorage.removeItem('token');
+    setToken(null);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
     setUser(null);
   }, []);
 

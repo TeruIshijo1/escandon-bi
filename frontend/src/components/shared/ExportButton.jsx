@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 import { API_BASE } from '../../api/config';
-import { authHeaders, getAuthToken } from '../../api/auth';
+import { authHeaders } from '../../api/auth';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 
@@ -64,14 +64,9 @@ export default function ExportButton({
 
   const buildQueryString = () => {
     // ... [existing logic inside buildQueryString] ...
-    const token = getAuthToken();
     const cleanParams = queryParams
       ? Object.fromEntries(Object.entries(queryParams).filter(([, v]) => v !== undefined && v !== null && v !== ''))
       : {};
-
-    if (token) {
-      cleanParams.token = token;
-    }
 
     const params = new URLSearchParams(cleanParams).toString();
     return params ? `?${params}` : '';
@@ -85,7 +80,6 @@ export default function ExportButton({
       return;
     }
 
-    const token = getAuthToken();
     const qStr = buildQueryString();
 
     if (type === 'pdf' && !useServerPdf) {

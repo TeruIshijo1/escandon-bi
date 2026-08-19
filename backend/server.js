@@ -196,7 +196,9 @@ app.get('/health', (req, res) => {
 });
 
 /* ── Arranque ───────────────────────────────────────────────── */
-(async () => {
+// En modo test se importa `app` para supertest sin arrancar servidor,
+// conexiones a BD ni cron jobs.
+if (process.env.NODE_ENV !== 'test') { (async () => {
   let localIp = 'localhost';
   try {
     const nets = os.networkInterfaces();
@@ -315,5 +317,6 @@ app.get('/health', (req, res) => {
     console.warn('⚠️   Ejecute: node config/init-db.js para crear la BD.\n');
   }
 })();
+}
 
 module.exports = app; // para tests

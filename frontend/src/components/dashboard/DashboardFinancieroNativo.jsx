@@ -105,61 +105,6 @@ export default function DashboardFinancieroNativo({ globalFilters, globalTrigger
     ? data.carteraCobranzaDetalle[selectedCartera.bucket]
     : (data.listaCuentas || []);
 
-  const handleApply = () => setApplyTrigger(prev => prev + 1);
-  const handleClear = () => {
-    setFilters({ search: '', startDate: '', endDate: '' });
-    setTimeout(() => setApplyTrigger(prev => prev + 1), 50);
-  };
-
-  const handleQuickDate = (type) => {
-    const today = new Date();
-    let start = new Date();
-    let end = new Date();
-
-    if (type === 'hoy') {
-      // both start and end are today
-    } else if (type === 'semana') {
-      const day = today.getDay(); 
-      const diff = today.getDate() - day + (day === 0 ? -6 : 1); 
-      start = new Date(today.setDate(diff));
-      end = new Date();
-    } else if (type === 'mes') {
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
-      end = new Date();
-    } else if (type === 'mes_pasado') {
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      end = new Date(today.getFullYear(), today.getMonth(), 0);
-    } else if (type === 'anio') {
-      start = new Date(today.getFullYear(), 0, 1);
-      end = new Date();
-    }
-
-    const formatDate = (d) => {
-      const offset = d.getTimezoneOffset() * 60000;
-      return new Date(d.getTime() - offset).toISOString().split('T')[0];
-    };
-    
-    setFilters(prev => ({
-      ...prev,
-      startDate: formatDate(start),
-      endDate: formatDate(end)
-    }));
-    
-    setTimeout(() => setApplyTrigger(prev => prev + 1), 50);
-  };
-
-  const quickBtnStyle = {
-    background: '#F1F5F9',
-    color: '#005FA9',
-    border: '1px solid #CBD5E1',
-    padding: '0.4rem 0.8rem',
-    borderRadius: 20,
-    fontSize: '0.75rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.2s'
-  };
-
   return (
     <div id="dashboard-financiero" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
 

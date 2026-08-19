@@ -134,9 +134,12 @@ async function syncInventoryCache() {
 }
 
 // Iniciar sincronización en background cada 15 minutos
-setInterval(syncInventoryCache, 15 * 60 * 1000);
-// Disparar la primera vez con un pequeño delay para dar tiempo a que el servidor arranque
-setTimeout(syncInventoryCache, 3000);
+// (no en modo test: evita timers y conexiones SAP durante los tests)
+if (process.env.NODE_ENV !== 'test') {
+  setInterval(syncInventoryCache, 15 * 60 * 1000);
+  // Disparar la primera vez con un pequeño delay para dar tiempo a que el servidor arranque
+  setTimeout(syncInventoryCache, 3000);
+}
 
 module.exports = {
   syncInventoryCache,

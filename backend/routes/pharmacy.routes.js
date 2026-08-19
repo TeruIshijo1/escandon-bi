@@ -63,8 +63,8 @@ router.get('/inventario', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
 });
 
 router.get('/lotes/:itemCode', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
+  const { itemCode } = req.params;
   try {
-    const { itemCode } = req.params;
     const warehouseCode = req.query.warehouse || 'FAR';
     
     if (!itemCode) return res.status(400).json({ ok: false, error: 'ItemCode requerido' });

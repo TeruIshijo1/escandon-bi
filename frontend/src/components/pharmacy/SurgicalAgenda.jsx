@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { API_BASE } from '../../api/config';
-import { authHeaders } from '../../api/auth';
+import { apiFetch } from '../../api/client';
 
 export default function SurgicalAgenda() {
   const [events, setEvents] = useState([]);
@@ -21,8 +20,8 @@ export default function SurgicalAgenda() {
     setError(null);
     
     Promise.all([
-      fetch(`${API_BASE}/pharmacy/surgical-events?days=${days}`, { headers: authHeaders() }).then(r => r.json()),
-      fetch(`${API_BASE}/pharmacy/surgical-kits?months=12`, { headers: authHeaders() }).then(r => r.json())
+      apiFetch(`/pharmacy/surgical-events`, { params: { days } }),
+      apiFetch(`/pharmacy/surgical-kits`, { params: { months: 12 } })
     ])
       .then(([eventsJson, kitsJson]) => {
         if (eventsJson.ok) setEvents(eventsJson.data || []);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ComposedChart, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { API_BASE } from '../../api/config';
+import { apiFetch } from '../../api/client';
 import PremiumLoader from '../shared/PremiumLoader';
 
 export default function DashboardComparativo() {
@@ -10,17 +10,11 @@ export default function DashboardComparativo() {
   useEffect(() => {
     async function fetchCombinedData() {
       try {
-        const token = sessionStorage.getItem('escandon_token');
-        const headers = { Authorization: `Bearer ${token}` };
-
         // Obtenemos SITI y Vertical
-        const [sitiResRaw, cirrusResRaw] = await Promise.all([
-          fetch(`${API_BASE}/siti/financiero`, { headers }),
-          fetch(`${API_BASE}/dashboard/financiero-nativo`, { headers })
+        const [sitiRes, cirrusRes] = await Promise.all([
+          apiFetch('/siti/financiero'),
+          apiFetch('/dashboard/financiero-nativo')
         ]);
-        
-        const sitiRes = await sitiResRaw.json();
-        const cirrusRes = await cirrusResRaw.json();
 
         let combined = [];
 

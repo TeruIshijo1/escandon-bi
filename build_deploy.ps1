@@ -73,7 +73,12 @@ $ExcludePatterns = @(
     "database.sqlite",
     "__pycache__",          # Caché de Python (se regenera)
     "*.pyc",
-    "uploads"               # Carpeta uploads (se crea en instalación)
+    "uploads",              # Carpeta uploads (se crea en instalación)
+    "tests",                # Suite de tests (solo desarrollo)
+    "coverage",             # Reportes de cobertura
+    "jest.config.js",       # Config de tests
+    "eslint.config.js",     # Config de lint
+    ".env.example"          # Se genera en el paso 4
 )
 
 Get-ChildItem -Path "$ProjectRoot\backend" | Where-Object { 
@@ -105,7 +110,7 @@ $EnvExampleContent = @"
 # ===================================================
 
 # Servidor
-PORT=5173
+PORT=4000
 NODE_ENV=production
 
 # PostgreSQL (Base de datos principal de la plataforma)
@@ -115,17 +120,24 @@ PGPASSWORD=aqui_pon_la_contraseña_del_usuario_postgres
 PGDATABASE=escandon_bi
 PGPORT=5432
 
-# SQL Server (KH_HE - Sistema VERTICAL)
-SQL_SERVER_HOST=your_sql_server_ip
-SQL_SERVER_USER=sa
-SQL_SERVER_PASSWORD=your_sql_password
-SQL_SERVER_DB=KH_HE
+# SQL Server Remoto (VERTICAL / KH_HE)
+REMOTE_DB_USER=
+REMOTE_DB_PASS=
+REMOTE_DB_SERVER=
+REMOTE_DB_NAME=KH_HE
+REMOTE_DB_PORT=1433
 
-# SAP B1 Service Layer
-SAP_SL_BASE_URL=https://sl.hospesc.com:50000/b1s/v1
-SAP_DB_NAME=SBO_HE2
-SAP_USER=manager
-SAP_PASSWORD=your_sap_password
+# API SITI (sistema legado)
+SITI_API_URL=http://192.168.254.21:9000
+SITI_USER=
+SITI_PASS=
+
+# SAP B1 Service Layer (sincronizacion de inventario)
+SAP_BASE_URL=https://sl.hospesc.com:50000/b1s/v2
+SAP_COMPANY_DB=SBO_HE2
+SAP_USERNAME=manager
+SAP_PASSWORD=
+SAP_REJECT_UNAUTHORIZED=true
 
 # Seguridad
 JWT_SECRET=your_jwt_secret_min_64_chars
@@ -133,14 +145,21 @@ JWT_REFRESH=your_refresh_secret
 JWT_EXPIRY=8h
 CORS_ORIGIN=http://localhost:8080
 
-# IA / Asistente ARIA
-OPENAI_API_KEY=your_openai_key
+# IA / Asistente ARIA (al menos una API key)
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.0-flash
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-chat
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o
+LLM_BASE_URL=
+# AZURE_OPENAI_ENDPOINT=https://TU-RECURSO.openai.azure.com/openai/deployments/gpt-4o
 
-# PowerBI Embedded (opcional)
-PBI_CLIENT_ID=
-PBI_CLIENT_SECRET=
-PBI_TENANT_ID=
-PBI_WORKSPACE_ID=
+# Administrador inicial (solo se usa en db:init)
+SEED_ADMIN_USERNAME=admin
+SEED_ADMIN_NAME=Administrador Inicial
+SEED_ADMIN_EMAIL=admin@example.invalid
+SEED_ADMIN_PASSWORD=
 "@
 Set-Content -Path "$DeployDir\backend\.env.example" -Value $EnvExampleContent
 

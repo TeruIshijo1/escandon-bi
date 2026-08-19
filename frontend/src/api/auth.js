@@ -1,8 +1,6 @@
-export const getAuthToken = () => (
-  sessionStorage.getItem('escandon_token') ||
-  localStorage.getItem('token') ||
-  ''
-);
+import { getToken } from './client';
+
+export const getAuthToken = () => getToken();
 
 export const authHeaders = (extraHeaders = {}) => {
   const token = getAuthToken();

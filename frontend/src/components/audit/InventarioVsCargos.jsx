@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import ExportButton from '../shared/ExportButton';
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
+import { getToken } from '../../api/client';
 
 const ESTADO_CONFIG = {
   'CONSUMO TOTAL':           { label:'Consumo Total',     class:'badge-ok'      },
@@ -145,7 +146,7 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
   const fetchData = async (isSilent = false) => {
     if (!isSilent) setLoad(true);
     try {
-      const rawToken = sessionStorage.getItem('escandon_token') || localStorage.getItem('token');
+      const rawToken = getToken();
       const token = (rawToken && rawToken !== 'null' && rawToken !== 'undefined') ? rawToken : '';
       const params = new URLSearchParams(
         Object.fromEntries(Object.entries(filters).filter(([, v]) => v))

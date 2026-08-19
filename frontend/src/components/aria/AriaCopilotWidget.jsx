@@ -3,7 +3,7 @@
  * Hospital Escandón BI Platform
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { API_BASE } from '../../api/config';
+import { apiFetch } from '../../api/client';
 
 function formatMarkdown(text) {
   if (!text) return '';
@@ -58,11 +58,7 @@ export default function AriaCopilotWidget() {
     if (isOpen && !suggestionsLoaded) {
       (async () => {
         try {
-          const token = sessionStorage.getItem('escandon_token') || localStorage.getItem('token');
-          const res = await fetch(`${API_BASE}/aria/suggestions`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await res.json();
+          const data = await apiFetch('/aria/suggestions');
           if (data.success && data.suggestions) {
             setMessages(prev => {
               const updated = [...prev];
@@ -105,17 +101,11 @@ export default function AriaCopilotWidget() {
     setLoading(true);
 
     try {
-      const token = sessionStorage.getItem('escandon_token') || localStorage.getItem('token');
-      const res = await fetch(`${API_BASE}/aria/query`, {
+      const data = await apiFetch('/aria/query', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ query: q }),
+        body: { query: q },
       });
 
-      const data = await res.json();
       if (data.success && data.data) {
         const botMsg = {
           sender: 'maria',

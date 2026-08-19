@@ -221,7 +221,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
           
           {/* Indicador PBI (solo si tiene URL) */}
-          {!!kpi.pbiUrl ? (
+          {kpi.pbiUrl ? (
             <div style={{
               fontFamily: 'var(--font-body)',
               fontSize: '0.62rem', fontWeight: 700,

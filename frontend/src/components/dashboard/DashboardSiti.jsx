@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { API_BASE } from '../../api/config';
+import { apiFetch } from '../../api/client';
 import PremiumLoader from '../shared/PremiumLoader';
 import DashboardSitiCirugias from './DashboardSitiCirugias';
 import DashboardSitiAuxiliares from './DashboardSitiAuxiliares';
@@ -18,17 +18,11 @@ export default function DashboardSiti() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const token = sessionStorage.getItem('escandon_token');
-        const headers = { Authorization: `Bearer ${token}` };
-
-        const [finResRaw, pacResRaw] = await Promise.all([
-          fetch(`${API_BASE}/siti/financiero`, { headers }),
-          fetch(`${API_BASE}/siti/pacientes`, { headers })
+        const [finData, pacData] = await Promise.all([
+          apiFetch('/siti/financiero'),
+          apiFetch('/siti/pacientes')
         ]);
         
-        const finData = await finResRaw.json();
-        const pacData = await pacResRaw.json();
-
         if (finData.success) {
           setData(finData.tendenciaMensual);
         }
