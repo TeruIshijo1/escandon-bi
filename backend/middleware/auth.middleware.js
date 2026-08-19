@@ -202,7 +202,13 @@ function authorizeCapability(capability) {
       return res.status(401).json({ error: 'No autenticado' });
     }
 
-    const caps = ROLE_CAPABILITIES[req.user.role] || [];
+    const caps = [...(ROLE_CAPABILITIES[req.user.role] || [])];
+    
+    // Inyectar capacidades específicas de área
+    if (req.user.area === 'CONSULTA_EXTERNA') {
+      caps.push('verCEX', 'gestionCEX');
+    }
+
     if (!caps.includes(capability)) {
       return res.status(403).json({
         error:       `No tiene permiso para: ${capability}`,
