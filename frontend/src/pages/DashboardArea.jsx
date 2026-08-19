@@ -22,7 +22,7 @@ import DashboardConsultaExternaNativo from '../components/dashboard/DashboardCon
 import DashboardAseguradorasNativo from '../components/dashboard/DashboardAseguradorasNativo';
 import DashboardUciNativo from '../components/dashboard/DashboardUciNativo';
 import DashboardHospitalizacionNativo from '../components/dashboard/DashboardHospitalizacionNativo';
-import { AREAS, AREAS_LABELS, AREA_TO_PERMISSION, can } from '../utils/rbac';
+import { AREAS, AREAS_LABELS, AREA_TO_PERMISSION, ROUTE_TO_PERMISSION, can } from '../utils/rbac';
 import { useKPIConfig } from '../hooks/useKPIConfig';
 
 const KPI_DB_MAP = {
@@ -565,6 +565,11 @@ export default function DashboardArea() {
                   {user?.role !== 'ADMIN' && user?.role !== 'DIRECTOR' && user?.permisos?.map((permId, i) => {
                     // No duplicar los KPIs que ya se muestran en el área actual
                     if (permId.startsWith(`area.${area.toLowerCase()}`)) return null;
+                    
+                    // Filtrar permisos estructurales (rutas, áreas, IA) para que no se dibujen como tarjetas sin sentido
+                    if (Object.values(ROUTE_TO_PERMISSION).includes(permId)) return null;
+                    if (Object.values(AREA_TO_PERMISSION).includes(permId)) return null;
+                    if (permId.startsWith('ia-')) return null;
                     
                     const kpiConfig = getKPI(permId);
                     if (!kpiConfig) return null;

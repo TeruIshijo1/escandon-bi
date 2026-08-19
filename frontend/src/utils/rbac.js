@@ -60,7 +60,7 @@ export const ROUTE_PERMISSIONS = {
   '/almacen/reorden':       [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
   '/almacen/traslados':     [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
   '/almacen/reportes':      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
-  '/consulta-externa':      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.CONSULTA_EXTERNA],
+  '/consulta-externa':      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.CONSULTA_EXTERNA],
   '/calidad-datos':         [ROLES.ADMIN, ROLES.DIRECTOR],
   '/estadisticas':          [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
   '/admin/usuarios':        [ROLES.ADMIN],
@@ -474,7 +474,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
       icon:    '🩺',
       label:   'Agenda',
       path:    '/consulta-externa',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.CONSULTA_EXTERNA],
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.CONSULTA_EXTERNA],
     },
     {
       section: 'Auditoría',
