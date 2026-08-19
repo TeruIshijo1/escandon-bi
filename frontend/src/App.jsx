@@ -310,7 +310,7 @@ export default function App() {
               <Route
                 path="consulta-externa"
                 element={
-                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.CONSULTA_EXTERNA]}>
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.CONSULTA_EXTERNA]}>
                     <ConsultaExternaPage />
                   </ProtectedRoute>
                 }
