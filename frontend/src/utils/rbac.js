@@ -533,7 +533,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
  * getPermissionSections()
  * Genera dinámicamente la lista de secciones asignables como permisos individuales por amendoza en AdminUsuarios.
  */
-export function getPermissionSections() {
+export function getPermissionSections(user) {
   const navItems = getNavItems({ username: 'amendoza', role: ROLES.ADMIN });
   const sections = [];
   const seen = new Set();
@@ -593,5 +593,9 @@ export function getPermissionSections() {
     });
   }
 
-  return sections;
+  if (user?.username?.toLowerCase() === 'amendoza') {
+    return sections;
+  }
+  const userPerms = user?.permisos || [];
+  return sections.filter(s => userPerms.includes(s.id));
 }

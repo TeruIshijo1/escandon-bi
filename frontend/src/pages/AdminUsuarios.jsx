@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import { getPermissionSections } from '../utils/rbac';
+import { useAuth } from '../context/AuthContext';
 
 const API_BASE = '/api';
 
@@ -32,8 +33,9 @@ const ROL_DISPLAY = {
 const AREAS_LIST = ['QUIROFANO', 'UCI', 'URGENCIAS', 'CUNEROS', 'IMAGENOLOGIA', 'LABORATORIO', 'CONSULTA_EXTERNA', 'HOSPITALIZACION'];
 
 export default function AdminUsuarios() {
-  // Genera dinámicamente la lista de secciones desde rbac.js
-  const PLATFORM_SECTIONS = useMemo(() => getPermissionSections(), []);
+  const { user } = useAuth();
+  // Genera dinámicamente la lista de secciones desde rbac.js (filtrada por lo que tiene el propio admin)
+  const PLATFORM_SECTIONS = useMemo(() => getPermissionSections(user), [user]);
   // Extraer las categorías únicas, en orden de aparición
   const categories = useMemo(() => {
     const cats = [];

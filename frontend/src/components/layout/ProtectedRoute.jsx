@@ -5,7 +5,7 @@
  */
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { canAccessRoute, hasPermission } from '../../utils/rbac';
+import { canAccessRoute, hasPermission, ROUTE_TO_PERMISSION } from '../../utils/rbac';
 
 /**
  * @param {string[]} allowedRoles  - Roles permitidos para la ruta
@@ -30,22 +30,28 @@ export default function ProtectedRoute({ allowedRoles, requiredArea, requiredUse
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Verificar rol
-  const allowed = allowedRoles
-    ? allowedRoles.includes(user.role)
-    : canAccessRoute(user.role, location.pathname, user.area, requiredArea);
+  // 1. Verificar permisos individuales del usuario como MÁXIMA AUTORIDAD
+  const hasPerm = hasPermission(user, location.pathname);
 
-  if (!allowed) {
+  // Si el rbac dictamina que no tiene permiso explícito (y la ruta exigía uno), rebotar
+  if (!hasPerm) {
     return <Navigate to="/sin-acceso" replace />;
   }
 
-  // Verificar username estricto (ej. Superadmin)
+  const permId = ROUTE_TO_PERMISSION[location.pathname];
+
+  // 2. Si la ruta NO tiene un ID de permiso mapeado, caemos en la validación clásica de roles
+  if (!permId) {
+    const allowed = allowedRoles
+      ? allowedRoles.includes(user.role)
+      : canAccessRoute(user.role, location.pathname, user.area, requiredArea);
+      
+    if (!allowed) {
+      return <Navigate to="/sin-acceso" replace />;
+    }
+  }
+
   if (requiredUsername && user.username !== requiredUsername) {
-    return <Navigate to="/sin-acceso" replace />;
-  }
-
-  // Verificar permisos individuales del usuario
-  if (!hasPermission(user, location.pathname)) {
     return <Navigate to="/sin-acceso" replace />;
   }
 
