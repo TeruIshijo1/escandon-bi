@@ -204,8 +204,12 @@ function authorizeCapability(capability) {
 
     const caps = [...(ROLE_CAPABILITIES[req.user.role] || [])];
     
-    // Inyectar capacidades específicas de área
-    if (req.user.area === 'CONSULTA_EXTERNA') {
+    // Inyectar capacidades específicas de área o permisos asignados manualmente
+    if (
+      req.user.area === 'CONSULTA_EXTERNA' || 
+      req.user.permisos.includes('consulta-externa') || 
+      req.user.permisos.includes('area-consulta-externa')
+    ) {
       caps.push('verCEX', 'gestionCEX');
     }
 
