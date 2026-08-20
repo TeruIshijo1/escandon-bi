@@ -76,11 +76,15 @@ export default function AlmacenQuirofano() {
   // Filtered Movements List
   const filteredMovements = useMemo(() => {
     return movements.filter(m => {
-      const matchSearch = (m.Codigo || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      const matchSearch = !searchQuery ||
+                          (m.Codigo || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (m.Medicamento || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (m.Paciente || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (m.Procedimiento || '').toLowerCase().includes(searchQuery.toLowerCase());
-      const matchWhs = warehouseFilter === 'ALL' || m.Almacen === warehouseFilter;
+                          (m.Procedimiento || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (m.Medicos || '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchWhs = warehouseFilter === 'ALL' || 
+                       m.Almacen === warehouseFilter || 
+                       (warehouseFilter === 'QX' && (m.Almacen === 'CQX' || m.Almacen === 'QX'));
       return matchSearch && matchWhs;
     });
   }, [movements, searchQuery, warehouseFilter]);
@@ -268,7 +272,7 @@ export default function AlmacenQuirofano() {
             transition: 'all 0.2s ease'
           }}
         >
-          📤 Salidas a Pacientes
+          📤 Salidas a Pacientes {subTab === 'salidas' && !loadingMovements ? `(${filteredMovements.length})` : ''}
         </button>
 
         <button
@@ -286,7 +290,7 @@ export default function AlmacenQuirofano() {
             transition: 'all 0.2s ease'
           }}
         >
-          🔄 Devoluciones y Retornos QX
+          🔄 Devoluciones y Retornos QX {subTab === 'devoluciones' && !loadingMovements ? `(${filteredMovements.length})` : ''}
         </button>
       </div>
 
@@ -295,7 +299,7 @@ export default function AlmacenQuirofano() {
         <div style={{ flex: 1, minWidth: '240px' }}>
           <input
             type="text"
-            placeholder="🔍 Buscar por código, medicamento, paciente o procedimiento..."
+            placeholder="🔍 Buscar por código, medicamento, paciente, médico o procedimiento..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -357,6 +361,7 @@ export default function AlmacenQuirofano() {
               <option value={7}>📅 Últimos 7 días</option>
               <option value={30}>📅 Últimos 30 días</option>
               <option value={90}>📅 Últimos 90 días</option>
+              <option value={180}>📅 Últimos 180 días</option>
             </select>
           </div>
         )}

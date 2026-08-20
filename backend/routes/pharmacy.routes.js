@@ -555,49 +555,92 @@ router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR',
     const clampedDays = Math.min(Math.max(days, 1), 180);
 
     const pool = await connectRemoteDB();
-    
-    let quantityCondition = '';
-    if (type === 'salidas') {
-      quantityCondition = 'AND b.Quantity > 0';
-    } else if (type === 'devoluciones') {
-      quantityCondition = 'AND b.Quantity < 0';
+    const sapMap = sapInventoryService.getInventoryMap();
+    let movements = [];
+
+    // 1. Obtener Salidas a Cirugías/Pacientes si aplica ('salidas' o 'all')
+    if (type === 'salidas' || type === 'all') {
+      const salRes = await pool.request().query(`
+        SELECT TOP 500
+          p.PCNum,
+          p.PCFRNum,
+          COALESCE(NULLIF(LTRIM(RTRIM(q.Paciente)), ''), NULLIF(LTRIM(RTRIM(pt.FullName)), ''), 'PACIENTE QUIRURGICO') AS Paciente,
+          COALESCE(NULLIF(LTRIM(RTRIM(q.Quirofano)), ''), 'QUIROFANO') AS Quirofano,
+          COALESCE(NULLIF(LTRIM(RTRIM(q.Medicos)), ''), NULLIF(LTRIM(RTRIM(pr.FullName)), ''), NULLIF(LTRIM(RTRIM(pr.Name)) + ' ' + LTRIM(RTRIM(pr.LastName)), ''), 'CIRUJANO TRATANTE') AS Medicos,
+          COALESCE(NULLIF(LTRIM(RTRIM(q.Procedimientos)), ''), 'CIRUGIA / PROCEDIMIENTO QX') AS Procedimiento,
+          p.CreatedOn AS Fecha,
+          i.ItemCode AS Codigo,
+          COALESCE(NULLIF(LTRIM(RTRIM(i.ItemDescription)), ''), 'Material Quirúrgico') AS Medicamento,
+          b.Quantity AS Cantidad,
+          COALESCE(i.WarehouseCode, 'QX') AS Almacen,
+          'SALIDA_CARGO' AS TipoMovimiento
+        FROM PCPR p
+        INNER JOIN PCPRIT i ON p.PCPRNum = i.PCPRNum
+        INNER JOIN PCPRBT b ON i.PCPRITNum = b.PCPRITNum
+        INNER JOIN PC c ON p.PCNum = c.PCNum
+        INNER JOIN PT pt ON c.PTNum = pt.PTNum
+        LEFT JOIN PR pr ON p.PR_PC_ID = pr.PRID
+        LEFT JOIN UDR_USOQX q ON p.PCFRNum = q.PCFRNum
+        WHERE (i.WarehouseCode IN ('QX', 'QXCR') OR p.SUCode = 'CQX' OR p.SUCodeReq = 'CQX')
+          AND p.CreatedOn >= DATEADD(day, -${clampedDays}, GETDATE())
+        ORDER BY p.CreatedOn DESC
+      `);
+      movements.push(...salRes.recordset);
     }
 
-    const dbRes = await pool.request().query(`
-      SELECT TOP 500
-        p.PCNum,
-        fr.PCFRNum,
-        ISNULL(NULLIF(TRIM(q.Paciente), ''), 'PACIENTE N/A') AS Paciente,
-        ISNULL(NULLIF(TRIM(q.Quirofano), ''), 'QUIROFANO') AS Quirofano,
-        ISNULL(NULLIF(TRIM(q.Medicos), ''), 'MEDICO N/A') AS Medicos,
-        ISNULL(NULLIF(TRIM(q.Procedimientos), ''), 'PROCEDIMIENTO N/A') AS Procedimiento,
-        p.CreatedOn AS Fecha,
-        i.ItemCode AS Codigo,
-        ISNULL(i.ItemDescription, 'Material/Medicamento') AS Medicamento,
-        b.Quantity AS Cantidad,
-        i.WarehouseCode AS Almacen,
-        CASE WHEN b.Quantity < 0 THEN 'DEVOLUCION' ELSE 'SALIDA_CARGO' END AS TipoMovimiento
-      FROM PCPR p
-      INNER JOIN PCPRIT i ON p.PCPRNum = i.PCPRNum
-      INNER JOIN PCPRBT b ON i.PCPRITNum = b.PCPRITNum
-      LEFT JOIN PC c ON p.PCNum = c.PCNum
-      LEFT JOIN PCFR fr ON c.PCNum = fr.PCNum
-      LEFT JOIN UDR_USOQX q ON fr.PCFRNum = q.PCFRNum
-      WHERE i.WarehouseCode IN ('QX', 'QXCR')
-      AND p.CreatedOn >= DATEADD(day, -${clampedDays}, GETDATE())
-      ${quantityCondition}
-      ORDER BY p.CreatedOn DESC
-    `);
+    // 2. Obtener Devoluciones y Retornos si aplica ('devoluciones' o 'all')
+    if (type === 'devoluciones' || type === 'all') {
+      const devRes = await pool.request().query(`
+        SELECT TOP 500
+          h.PCDLNum AS PCNum,
+          h.PCFRNum,
+          COALESCE(NULLIF(LTRIM(RTRIM(q.Paciente)), ''), NULLIF(LTRIM(RTRIM(pt.FullName)), ''), 'PACIENTE HOSPITAL') AS Paciente,
+          COALESCE(NULLIF(LTRIM(RTRIM(q.Quirofano)), ''), 'QUIROFANO') AS Quirofano,
+          COALESCE(NULLIF(LTRIM(RTRIM(q.Medicos)), ''), NULLIF(LTRIM(RTRIM(h.CreatedBy)), ''), 'EQUIPO QX') AS Medicos,
+          COALESCE(NULLIF(LTRIM(RTRIM(q.Procedimientos)), ''), NULLIF(LTRIM(RTRIM(h.Notes)), ''), 'DEVOLUCION DE MATERIAL / RETORNO QX') AS Procedimiento,
+          l.CreatedOn AS Fecha,
+          l.ItemCode AS Codigo,
+          COALESCE(NULLIF(LTRIM(RTRIM(l.ItemDescription)), ''), 'Material Quirúrgico') AS Medicamento,
+          -ABS(l.Quantity) AS Cantidad,
+          COALESCE(l.WarehouseCode, 'QX') AS Almacen,
+          'DEVOLUCION' AS TipoMovimiento
+        FROM PCDLBL l
+        INNER JOIN PCDL h ON l.PCDLNum = h.PCDLNum
+        LEFT JOIN PC c ON h.PCNum = c.PCNum
+        LEFT JOIN PT pt ON c.PTNum = pt.PTNum
+        LEFT JOIN UDR_USOQX q ON h.PCFRNum = q.PCFRNum
+        WHERE (
+          l.WarehouseCode IN ('QX', 'QXCR') 
+          OR l.U_SUCode = 'CQX' 
+          OR l.ItemCode LIKE 'QUI%' 
+          OR l.U_FRCode LIKE '%QX%'
+          OR l.U_FRCode LIKE '%QUIRO%'
+        )
+        AND l.CreatedOn >= DATEADD(day, -${clampedDays}, GETDATE())
+        ORDER BY l.CreatedOn DESC
+      `);
+      movements.push(...devRes.recordset);
+    }
 
-    const movements = dbRes.recordset || [];
-    
-    // Contadores
+    // Ordenar por Fecha descendente
+    movements.sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+
+    // Enriquecer con nombres de SAP si el nombre es genérico
+    const enrichedMovements = movements.map(m => {
+      const sapItem = sapMap.get(m.Codigo);
+      const name = (sapItem && sapItem.ItemName && sapItem.ItemName !== 'Material/Medicamento') 
+        ? sapItem.ItemName 
+        : m.Medicamento;
+      return { ...m, Medicamento: name };
+    });
+
+    // Contadores estadísticos
     let totalSalidas = 0;
     let totalDevoluciones = 0;
     let piezasSalidas = 0;
     let piezasDevueltas = 0;
 
-    movements.forEach(m => {
+    enrichedMovements.forEach(m => {
       if (m.Cantidad < 0) {
         totalDevoluciones++;
         piezasDevueltas += Math.abs(m.Cantidad);
@@ -609,9 +652,9 @@ router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR',
 
     res.json({
       ok: true,
-      data: movements,
+      data: enrichedMovements,
       stats: {
-        totalMovimientos: movements.length,
+        totalMovimientos: enrichedMovements.length,
         totalSalidas,
         totalDevoluciones,
         piezasSalidas,
