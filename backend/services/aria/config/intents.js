@@ -121,7 +121,7 @@ const IA_PERMISSION_CATALOG = [
     icon: '💊',
     suggestions: [
       '💊 ¿Qué recetas están pendientes en Farmacia?',
-      '💊 Ver el libro de medicamentos controlados',
+      '📤 Ver salidas y dispensaciones de Farmacia',
       '💊 ¿Cuáles son las devoluciones de farmacia hoy?',
       '💊 Dime el stock actual de paracetamol',
     ],
@@ -279,10 +279,15 @@ const INTENT_REGISTRY = [
   {
     id: 'farmacia-controlados',
     patterns: [
+      /salidas?\s+(de\s+)?farmacia/,
+      /dispensacion(es)?\s+(de\s+)?farmacia/,
+      /salidas?\s+con\s+lote/,
+      /entregas?\s+con\s+lote/,
       /medicamentos?\s+controlados?/,
       /libro.*controlados/,
       /controlados?.*farmacia/,
       /registro.*controlados/,
+      /registro.*salidas/,
     ],
     iaPermission: 'ia-farmacia',
     sectionPerm: null,

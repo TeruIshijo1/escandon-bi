@@ -27,7 +27,7 @@ async function searchDatabaseDynamically(userQuery, user = null) {
     if (/receta|surtir|despacho/.test(normalized)) {
       return await queryRecetasPendientes();
     }
-    if (/controlado|psicotrop/.test(normalized)) {
+    if (/controlado|psicotrop|salida.*farmacia|dispensacion/.test(normalized)) {
       return await queryLibroControlados();
     }
 

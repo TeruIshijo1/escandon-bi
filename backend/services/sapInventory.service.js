@@ -6,6 +6,7 @@ const sapService = require('./sap.service');
 let globalInventoryCache = [];
 let globalInventoryMap = new Map();
 let globalBatchesCache = []; // Cache para lotes
+let globalMedicalClassificationMap = new Map(); // Mapa de clasificaciones médicas (CON, ANTI, REFRI, etc.)
 let globalItemGroups = {};
 let globalManufacturers = {};
 let syncPromise = null;
@@ -46,11 +47,13 @@ async function syncInventoryCache() {
     await sapService._ensureSession();
     
     // 1. Preparar consultas SQL Nativas (para todos los almacenes con stock)
-    const sqlInv = `SELECT T0.ItemCode, T0.ItemName, T0.ItmsGrpCod, T0.FirmCode, T1.WhsCode, T1.OnHand AS QuantityOnStock, T1.AvgPrice AS PurchaseCost, T2.Price AS SalesPrice FROM OITM T0 INNER JOIN OITW T1 ON T0.ItemCode = T1.ItemCode LEFT JOIN ITM1 T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 1 WHERE T0.InvntItem = 'Y' AND T1.OnHand > 0`;
+    const sqlInv = `SELECT T0.ItemCode, T0.ItemName, T0.ItmsGrpCod, T0.FirmCode, T0.U_CLASI_MED_1 AS MedicalClassification, T0.U_CLASI_MED_2 AS SecondaryClassification, T1.WhsCode, T1.OnHand AS QuantityOnStock, T1.AvgPrice AS PurchaseCost, T2.Price AS SalesPrice FROM OITM T0 INNER JOIN OITW T1 ON T0.ItemCode = T1.ItemCode LEFT JOIN ITM1 T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 1 WHERE T0.InvntItem = 'Y' AND T1.OnHand > 0`;
     const sqlBat = `SELECT T0.ItemCode, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber WHERE T1.Quantity > 0`;
+    const sqlClasi = `SELECT ItemCode, ItemName, U_CLASI_MED_1, U_CLASI_MED_2 FROM OITM WHERE U_CLASI_MED_1 IS NOT NULL OR U_CLASI_MED_2 IS NOT NULL`;
     
     await ensureSqlQuery('sq_inv_all', sqlInv);
     await ensureSqlQuery('sq_bat_all', sqlBat);
+    await ensureSqlQuery('sq_clasi_all', sqlClasi);
     
     // 1.5 Obtener metadatos (Grupos y Fabricantes)
     if (Object.keys(globalItemGroups).length === 0) {
@@ -99,15 +102,42 @@ async function syncInventoryCache() {
       }
     }
     
+    // 3.5 Obtener Clasificaciones Médicas Generales
+    try {
+      let clasiResponse = await sapService.get(`/SQLQueries('sq_clasi_all')/List`, pageHeaders);
+      let clasiItems = clasiResponse.data?.value || [];
+      globalMedicalClassificationMap.clear();
+      clasiItems.forEach(c => {
+        const c1 = c.U_CLASI_MED_1 ? String(c.U_CLASI_MED_1).trim().toUpperCase() : null;
+        const c2 = c.U_CLASI_MED_2 ? String(c.U_CLASI_MED_2).trim().toUpperCase() : null;
+        globalMedicalClassificationMap.set(c.ItemCode, {
+          ItemCode: c.ItemCode,
+          ItemName: c.ItemName,
+          MedicalClassification: c1,
+          SecondaryClassification: c2,
+          isControlled: c1 === 'CON' || c2 === 'CON',
+          isAntibiotic: c1 === 'ANTI' || c2 === 'ANTI',
+          isColdChain: c1 === 'REFRI' || c2 === 'REFRI',
+          isHighRisk: c1 === 'AR' || c2 === 'AR',
+          isLasa: c1 === 'LASA' || c2 === 'LASA'
+        });
+      });
+    } catch (clasiErr) {
+      console.warn(`[SAP Cache SQL] Error al cargar clasificaciones médicas:`, clasiErr.message);
+    }
+    
     // 4. Formatear y guardar en memoria
     if (invItems.length > 0) {
       globalInventoryCache = invItems.map(item => {
         const cost = item.PurchaseCost || 0;
         const price = item.SalesPrice || 0;
         const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
+        const medClass = globalMedicalClassificationMap.get(item.ItemCode);
         
         return {
           ...item,
+          MedicalClassification: medClass?.MedicalClassification || item.MedicalClassification || null,
+          SecondaryClassification: medClass?.SecondaryClassification || item.SecondaryClassification || null,
           ItemGroupName: globalItemGroups[item.ItmsGrpCod] || 'General',
           ManufacturerName: globalManufacturers[item.FirmCode] && globalManufacturers[item.FirmCode] !== '- Ningún fabricante -' ? globalManufacturers[item.FirmCode] : 'Genérico',
           ProfitMargin: margin,
@@ -122,7 +152,7 @@ async function syncInventoryCache() {
         ExpirationDate: formatSapDate(b.ExpirationDate)
       }));
       lastSyncTime = new Date();
-      console.log(`[SAP Cache SQL] Sincronización exitosa: ${globalInventoryCache.length} artículos y ${globalBatchesCache.length} lotes en memoria.`);
+      console.log(`[SAP Cache SQL] Sincronización exitosa: ${globalInventoryCache.length} artículos, ${globalBatchesCache.length} lotes y ${globalMedicalClassificationMap.size} clasificaciones médicas en memoria.`);
     }
     } catch (error) {
       console.error(`[SAP Cache SQL] Error al sincronizar inventario:`, error.message || error);
@@ -145,5 +175,6 @@ module.exports = {
   syncInventoryCache,
   getInventoryCache: () => globalInventoryCache,
   getBatchesCache: () => globalBatchesCache,
-  getInventoryMap: () => globalInventoryMap
+  getInventoryMap: () => globalInventoryMap,
+  getMedicalClassificationMap: () => globalMedicalClassificationMap
 };

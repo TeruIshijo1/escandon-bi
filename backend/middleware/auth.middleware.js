@@ -110,24 +110,33 @@ function authorize(allowedRoles = []) {
       return res.status(401).json({ error: 'No autenticado', code: 'NOT_AUTHENTICATED' });
     }
 
-    const { role, id, username } = req.user;
+    const { role, id, username, permisos } = req.user;
 
     // REGLA MAESTRA: amendoza pasa incondicionalmente
     if (username && username.toLowerCase() === 'amendoza') {
       return next();
     }
 
-    if (!allowedRoles.includes(role)) {
-      // Log del intento denegado
-      console.warn(`[RBAC] Acceso denegado — Usuario: ${username} (${id}), Rol: ${role}, Ruta: ${req.method} ${req.path}, Roles requeridos: ${allowedRoles.join(',')}`);
-
-      return res.status(403).json({
-        error: `Acceso no autorizado. Se requiere autorización explícita de amendoza.`,
-        code:  'INSUFFICIENT_ROLE',
-      });
+    // Permitir acceso si el rol está en la lista de permitidos
+    if (allowedRoles.includes(role)) {
+      return next();
     }
 
-    next();
+    // NUEVA REGLA (Quitar tipo de perfil para permisos explícitos):
+    // Si el usuario no tiene el rol adecuado, pero se le asignaron permisos manualmente (ej. 'consulta-externa'),
+    // permitimos el acceso a los endpoints de dashboard. El frontend también realiza el bloqueo visual.
+    // Esto evita el error de "0s" cuando un USUARIO_OPERATIVO entra a un área fuera de su rol.
+    if (permisos && permisos.length > 0) {
+      return next();
+    }
+
+    // Log del intento denegado
+    console.warn(`[RBAC] Acceso denegado — Usuario: ${username} (${id}), Rol: ${role}, Ruta: ${req.method} ${req.path}, Roles requeridos: ${allowedRoles.join(',')}`);
+
+    return res.status(403).json({
+      error: `Acceso no autorizado. Se requiere autorización explícita de amendoza.`,
+      code:  'INSUFFICIENT_ROLE',
+    });
   };
 }
 

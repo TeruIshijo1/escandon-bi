@@ -90,12 +90,10 @@ export default function AlmacenQuirofano() {
       
       {/* Banner de bienvenida e indicador del Almacén Quirófano */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(30,41,59,0.8), rgba(15,23,42,0.9))',
-        border: '1px solid rgba(255,255,255,0.1)',
+        background: 'linear-gradient(135deg, #004687 0%, #0077B6 100%)',
         borderRadius: '16px',
-        padding: '1.5rem',
-        backdropFilter: 'blur(10px)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        padding: '1.5rem 1.75rem',
+        boxShadow: '0 8px 24px rgba(0, 70, 135, 0.15)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -103,10 +101,10 @@ export default function AlmacenQuirofano() {
         gap: '1rem'
       }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700, color: 'white', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span>🏥</span> Almacén Quirófano (QX / QXCR)
+          <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span>🏥</span> Almacén Quirófano (QX / QXCR — Carro Rojo)
           </h2>
-          <p style={{ margin: '0.35rem 0 0 0', color: '#94a3b8', fontSize: '0.9rem' }}>
+          <p style={{ margin: '0.4rem 0 0 0', color: '#E0F2FE', fontSize: '0.95rem', fontWeight: 500 }}>
             Gestión en tiempo real de insumos en stock, cargos a cirugías y registro de devoluciones/retornos.
           </p>
         </div>
@@ -116,18 +114,23 @@ export default function AlmacenQuirofano() {
           <button
             onClick={() => subTab === 'inventory' ? fetchStock() : fetchMovements()}
             style={{
-              padding: '0.6rem 1rem',
-              background: '#2563eb',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 600,
+              padding: '0.65rem 1.25rem',
+              background: 'rgba(255, 255, 255, 0.18)',
+              color: '#FFFFFF',
+              border: '1px solid rgba(255, 255, 255, 0.35)',
+              borderRadius: '10px',
+              fontWeight: 700,
               cursor: 'pointer',
-              fontSize: '0.85rem',
+              fontSize: '0.9rem',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.4rem'
+              gap: '0.5rem',
+              backdropFilter: 'blur(8px)',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.28)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)'; }}
           >
             🔄 Actualizar Datos
           </button>
@@ -136,52 +139,114 @@ export default function AlmacenQuirofano() {
 
       {/* Tarjetas resumen de estadísticas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '1.25rem' }}>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Artículos en Stock</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#38bdf8', marginTop: '0.25rem' }}>
+        <div 
+          onClick={() => {
+            setWarehouseFilter('ALL');
+            setSubTab('inventory');
+          }}
+          style={{ 
+            background: warehouseFilter === 'ALL' && subTab === 'inventory' ? '#F0F9FF' : '#FFFFFF', 
+            border: warehouseFilter === 'ALL' && subTab === 'inventory' ? '2px solid #0077B6' : '1px solid #E2E8F0', 
+            borderRadius: '14px', 
+            padding: '1.25rem', 
+            boxShadow: '0 2px 8px rgba(0, 70, 135, 0.05)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            position: 'relative'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 119, 182, 0.12)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 70, 135, 0.05)'; }}
+          title="Clic para ver todos los artículos de Quirófano (QX y QXCR)"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ fontSize: '0.78rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Artículos en Stock</div>
+            {warehouseFilter === 'ALL' && subTab === 'inventory' && (
+              <span style={{ fontSize: '0.7rem', background: '#0077B6', color: '#FFFFFF', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontWeight: 700 }}>TODOS</span>
+            )}
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#0077B6', marginTop: '0.25rem' }}>
             {stockStats.totalItems || 0}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>Con existencia disponible en QX/QXCR</div>
+          <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>Con existencia disponible en QX/QXCR</div>
         </div>
 
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '1.25rem' }}>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Piezas Físicas</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#4ade80', marginTop: '0.25rem' }}>
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0, 70, 135, 0.05)' }}>
+          <div style={{ fontSize: '0.78rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Total Piezas Físicas</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#059669', marginTop: '0.25rem' }}>
             {(stockStats.totalStock || 0).toLocaleString()}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>Insumos físicos en anaqueles</div>
+          <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>Insumos físicos en anaqueles</div>
         </div>
 
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '1.25rem' }}>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valor Estimado Stock</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#facc15', marginTop: '0.25rem' }}>
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0, 70, 135, 0.05)' }}>
+          <div style={{ fontSize: '0.78rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Valor Total Stock</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#D97706', marginTop: '0.25rem' }}>
             ${(stockStats.totalValue || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>Valuación a precio de catálogo</div>
+          <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>Valuación de inventario en anaqueles</div>
         </div>
 
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '1.25rem' }}>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Quirófano Controlados</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#f43f5e', marginTop: '0.25rem' }}>
+        <div 
+          onClick={() => {
+            if (warehouseFilter === 'QXCR' && subTab === 'inventory') {
+              setWarehouseFilter('ALL');
+            } else {
+              setWarehouseFilter('QXCR');
+              setSubTab('inventory');
+            }
+          }}
+          style={{ 
+            background: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#FEF2F2' : '#FFFFFF', 
+            border: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '2px solid #DC2626' : '1px solid #E2E8F0', 
+            borderRadius: '14px', 
+            padding: '1.25rem', 
+            boxShadow: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '0 4px 14px rgba(220, 38, 38, 0.15)' : '0 2px 8px rgba(0, 70, 135, 0.05)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            position: 'relative'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(220, 38, 38, 0.18)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = warehouseFilter === 'QXCR' && subTab === 'inventory' ? '0 4px 14px rgba(220, 38, 38, 0.15)' : '0 2px 8px rgba(0, 70, 135, 0.05)'; }}
+          title="Clic para filtrar y ver los artículos de Quirófano Carro Rojo (QXCR)"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ fontSize: '0.78rem', color: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#991B1B' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
+              Quirófano Carro Rojo
+            </div>
+            <span style={{ 
+              fontSize: '0.7rem', 
+              background: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#DC2626' : '#FEE2E2', 
+              color: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#FFFFFF' : '#DC2626', 
+              padding: '0.2rem 0.55rem', 
+              borderRadius: '9999px', 
+              fontWeight: 700 
+            }}>
+              {warehouseFilter === 'QXCR' && subTab === 'inventory' ? '✓ FILTRADO' : '🔍 VER LISTA'}
+            </span>
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#DC2626', marginTop: '0.25rem' }}>
             {stockStats.qxcrCount || 0} artículos
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>Almacén QXCR (Medicamentos controlados)</div>
+          <div style={{ fontSize: '0.8rem', color: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#B91C1C' : '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>
+            {warehouseFilter === 'QXCR' && subTab === 'inventory' ? 'Mostrando insumos QXCR en tabla ↓' : 'Almacén QXCR (Insumos Carro de Paro)'}
+          </div>
         </div>
       </div>
 
       {/* Pestañas secundarias de navegación interna de Almacén QX */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', background: '#F1F5F9', padding: '0.35rem', borderRadius: '12px', width: 'fit-content', flexWrap: 'wrap' }}>
         <button
           onClick={() => setSubTab('inventory')}
           style={{
-            padding: '0.6rem 1.2rem',
-            background: subTab === 'inventory' ? '#3b82f6' : 'rgba(30,41,59,0.5)',
-            color: 'white',
+            padding: '0.6rem 1.25rem',
+            background: subTab === 'inventory' ? '#FFFFFF' : 'transparent',
+            color: subTab === 'inventory' ? '#004687' : '#64748B',
             border: 'none',
-            borderRadius: '8px',
-            fontWeight: subTab === 'inventory' ? 'bold' : 'normal',
+            borderRadius: '9px',
+            fontWeight: subTab === 'inventory' ? 800 : 600,
             cursor: 'pointer',
             fontSize: '0.9rem',
+            boxShadow: subTab === 'inventory' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
             transition: 'all 0.2s ease'
           }}
         >
@@ -191,14 +256,15 @@ export default function AlmacenQuirofano() {
         <button
           onClick={() => setSubTab('salidas')}
           style={{
-            padding: '0.6rem 1.2rem',
-            background: subTab === 'salidas' ? '#10b981' : 'rgba(30,41,59,0.5)',
-            color: 'white',
+            padding: '0.6rem 1.25rem',
+            background: subTab === 'salidas' ? '#FFFFFF' : 'transparent',
+            color: subTab === 'salidas' ? '#059669' : '#64748B',
             border: 'none',
-            borderRadius: '8px',
-            fontWeight: subTab === 'salidas' ? 'bold' : 'normal',
+            borderRadius: '9px',
+            fontWeight: subTab === 'salidas' ? 800 : 600,
             cursor: 'pointer',
             fontSize: '0.9rem',
+            boxShadow: subTab === 'salidas' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
             transition: 'all 0.2s ease'
           }}
         >
@@ -208,14 +274,15 @@ export default function AlmacenQuirofano() {
         <button
           onClick={() => setSubTab('devoluciones')}
           style={{
-            padding: '0.6rem 1.2rem',
-            background: subTab === 'devoluciones' ? '#f43f5e' : 'rgba(30,41,59,0.5)',
-            color: 'white',
+            padding: '0.6rem 1.25rem',
+            background: subTab === 'devoluciones' ? '#FFFFFF' : 'transparent',
+            color: subTab === 'devoluciones' ? '#DC2626' : '#64748B',
             border: 'none',
-            borderRadius: '8px',
-            fontWeight: subTab === 'devoluciones' ? 'bold' : 'normal',
+            borderRadius: '9px',
+            fontWeight: subTab === 'devoluciones' ? 800 : 600,
             cursor: 'pointer',
             fontSize: '0.9rem',
+            boxShadow: subTab === 'devoluciones' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
             transition: 'all 0.2s ease'
           }}
         >
@@ -224,7 +291,7 @@ export default function AlmacenQuirofano() {
       </div>
 
       {/* Barra de Filtros y Búsqueda */}
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(15, 23, 42, 0.4)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', background: '#FFFFFF', padding: '1rem 1.25rem', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
         <div style={{ flex: 1, minWidth: '240px' }}>
           <input
             type="text"
@@ -234,13 +301,17 @@ export default function AlmacenQuirofano() {
             style={{
               width: '100%',
               padding: '0.65rem 1rem',
-              background: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              background: '#F8FAFC',
+              border: '1px solid #CBD5E1',
               borderRadius: '8px',
-              color: 'white',
+              color: '#0F172A',
+              fontWeight: 500,
               fontSize: '0.9rem',
-              outline: 'none'
+              outline: 'none',
+              transition: 'border-color 0.2s ease'
             }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#0088C9'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; }}
           />
         </div>
 
@@ -250,17 +321,19 @@ export default function AlmacenQuirofano() {
             onChange={(e) => setWarehouseFilter(e.target.value)}
             style={{
               padding: '0.65rem 1rem',
-              background: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              background: '#F8FAFC',
+              border: '1px solid #CBD5E1',
               borderRadius: '8px',
-              color: 'white',
+              color: '#0F172A',
+              fontWeight: 600,
               fontSize: '0.9rem',
-              outline: 'none'
+              outline: 'none',
+              cursor: 'pointer'
             }}
           >
             <option value="ALL">🏢 Todos los almacenes QX</option>
             <option value="QX">QX — Quirófano General</option>
-            <option value="QXCR">QXCR — Quirófano Controlados</option>
+            <option value="QXCR">QXCR — Quirófano Carro Rojo</option>
           </select>
         </div>
 
@@ -271,12 +344,14 @@ export default function AlmacenQuirofano() {
               onChange={(e) => setDaysFilter(Number(e.target.value))}
               style={{
                 padding: '0.65rem 1rem',
-                background: 'rgba(30, 41, 59, 0.8)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
+                background: '#F8FAFC',
+                border: '1px solid #CBD5E1',
                 borderRadius: '8px',
-                color: 'white',
+                color: '#0F172A',
+                fontWeight: 600,
                 fontSize: '0.9rem',
-                outline: 'none'
+                outline: 'none',
+                cursor: 'pointer'
               }}
             >
               <option value={7}>📅 Últimos 7 días</option>
@@ -289,52 +364,65 @@ export default function AlmacenQuirofano() {
 
       {/* VISTA 1: STOCK ACTUAL */}
       {subTab === 'inventory' && (
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)' }}>
           {loadingStock ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Cargando existencias en Almacén Quirófano…</div>
+            <div style={{ padding: '3.5rem', textAlign: 'center', color: '#64748B', fontWeight: 600, fontSize: '1rem' }}>⏳ Cargando existencias en Almacén Quirófano…</div>
           ) : filteredStock.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>No se encontraron artículos con el filtro seleccionado.</div>
+            <div style={{ padding: '3.5rem', textAlign: 'center', color: '#64748B', fontWeight: 600, fontSize: '1rem' }}>⚠️ No se encontraron artículos con el filtro seleccionado.</div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', fontSize: '0.9rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ background: 'rgba(30, 41, 59, 0.8)', textAlign: 'left', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <th style={{ padding: '0.85rem 1rem' }}>Código</th>
-                    <th style={{ padding: '0.85rem 1rem' }}>Descripción / Insumo</th>
-                    <th style={{ padding: '0.85rem 1rem' }}>Almacén</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Stock Físico</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Precio Unit.</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Valor Total ($)</th>
-                    <th style={{ padding: '0.85rem 1rem' }}>Grupo SAP</th>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Código</th>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Descripción / Insumo</th>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Almacén</th>
+                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Stock Físico</th>
+                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Precio Unit.</th>
+                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Valor Total ($)</th>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Grupo SAP</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStock.map((item, idx) => (
-                    <tr key={`${item.ItemCode}-${item.WhsCode}-${idx}`} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', background: idx % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.02)' }}>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#38bdf8' }}>{item.ItemCode}</td>
-                      <td style={{ padding: '0.75rem 1rem' }}>{item.ItemName}</td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
+                    <tr
+                      key={`${item.ItemCode}-${item.WhsCode}-${idx}`}
+                      style={{
+                        borderBottom: '1px solid #F1F5F9',
+                        background: idx % 2 === 0 ? '#FFFFFF' : '#FBFDFF',
+                        transition: 'background 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#F0F7FF'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#FBFDFF'; }}
+                    >
+                      <td style={{ padding: '0.85rem 1.25rem', fontWeight: 700, color: '#005FA9' }}>{item.ItemCode}</td>
+                      <td style={{ padding: '0.85rem 1.25rem', fontWeight: 600, color: '#0F172A' }}>{item.ItemName}</td>
+                      <td style={{ padding: '0.85rem 1.25rem' }}>
                         <span style={{
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold',
-                          background: item.WhsCode === 'QXCR' ? 'rgba(244, 63, 94, 0.2)' : 'rgba(59, 130, 246, 0.2)',
-                          color: item.WhsCode === 'QXCR' ? '#f43f5e' : '#60a5fa'
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '0.3rem 0.75rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                          background: item.WhsCode === 'QXCR' ? '#FEE2E2' : '#EFF6FF',
+                          color: item.WhsCode === 'QXCR' ? '#DC2626' : '#1D4ED8',
+                          border: item.WhsCode === 'QXCR' ? '1px solid #FECACA' : '1px solid #BFDBFE'
                         }}>
-                          {item.WhsCode === 'QXCR' ? 'QXCR (Controlados)' : 'QX (General)'}
+                          {item.WhsCode === 'QXCR' ? '🚨 QXCR (Carro Rojo)' : '🏥 QX (General)'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: item.QuantityOnStock > 5 ? '#4ade80' : '#facc15' }}>
+                      <td style={{ padding: '0.85rem 1.25rem', textAlign: 'right', fontWeight: 800, fontSize: '1rem', color: item.QuantityOnStock > 5 ? '#15803D' : '#D97706' }}>
                         {item.QuantityOnStock}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                      <td style={{ padding: '0.85rem 1.25rem', textAlign: 'right', fontWeight: 600, color: '#334155' }}>
                         ${(item.SalesPrice || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold' }}>
+                      <td style={{ padding: '0.85rem 1.25rem', textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
                         ${((item.QuantityOnStock || 0) * (item.SalesPrice || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#94a3b8', fontSize: '0.8rem' }}>
+                      <td style={{ padding: '0.85rem 1.25rem', color: '#64748B', fontSize: '0.85rem', fontWeight: 500 }}>
                         {item.ItemGroupName || 'General'}
                       </td>
                     </tr>
@@ -348,54 +436,83 @@ export default function AlmacenQuirofano() {
 
       {/* VISTA 2 y 3: SALIDAS Y DEVOLUCIONES */}
       {(subTab === 'salidas' || subTab === 'devoluciones') && (
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)' }}>
           {loadingMovements ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Cargando historial de movimientos de Quirófano…</div>
+            <div style={{ padding: '3.5rem', textAlign: 'center', color: '#64748B', fontWeight: 600, fontSize: '1rem' }}>⏳ Cargando historial de movimientos de Quirófano…</div>
           ) : filteredMovements.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>No hay registros de movimientos en el periodo seleccionado.</div>
+            <div style={{ padding: '3.5rem', textAlign: 'center', color: '#64748B', fontWeight: 600, fontSize: '1rem' }}>⚠️ No hay registros de movimientos en el periodo seleccionado.</div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white', fontSize: '0.85rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ background: 'rgba(30, 41, 59, 0.8)', textAlign: 'left', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <th style={{ padding: '0.85rem 1rem' }}>Fecha</th>
-                    <th style={{ padding: '0.85rem 1rem' }}>Folio Quirófano</th>
-                    <th style={{ padding: '0.85rem 1rem' }}>Paciente</th>
-                    <th style={{ padding: '0.85rem 1rem' }}>Procedimiento</th>
-                    <th style={{ padding: '0.85rem 1rem' }}>Médico / Equipo</th>
-                    <th style={{ padding: '0.85rem 1rem' }}>Insumo</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Tipo</th>
-                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Cantidad</th>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fecha</th>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Folio Quirófano</th>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Paciente</th>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Procedimiento</th>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Médico / Equipo</th>
+                    <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Insumo</th>
+                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Tipo</th>
+                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cantidad</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredMovements.map((m, idx) => (
-                    <tr key={`${m.PCNum}-${m.Codigo}-${idx}`} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', background: idx % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.02)' }}>
-                      <td style={{ padding: '0.75rem 1rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                    <tr
+                      key={`${m.PCNum}-${m.Codigo}-${idx}`}
+                      style={{
+                        borderBottom: '1px solid #F1F5F9',
+                        background: idx % 2 === 0 ? '#FFFFFF' : '#FBFDFF',
+                        transition: 'background 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#F0F7FF'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#FBFDFF'; }}
+                    >
+                      <td style={{ padding: '0.85rem 1.25rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         {new Date(m.Fecha).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#38bdf8' }}>
+                      <td style={{ padding: '0.85rem 1.25rem', fontWeight: 700, color: '#005FA9' }}>
                         Folio #{m.PCFRNum || m.PCNum}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{m.Paciente}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#e2e8f0' }}>{m.Procedimiento}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#94a3b8', fontSize: '0.8rem' }}>{m.Medicos}</td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <span style={{ fontWeight: 600 }}>{m.Codigo}</span> — {m.Medicamento}
+                      <td style={{ padding: '0.85rem 1.25rem', fontWeight: 700, color: '#0F172A' }}>
+                        {m.Paciente}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.85rem 1.25rem', color: '#334155', fontWeight: 500 }}>
+                        {m.Procedimiento}
+                      </td>
+                      <td style={{ padding: '0.85rem 1.25rem', color: '#64748B', fontWeight: 500, fontSize: '0.85rem' }}>
+                        {m.Medicos}
+                      </td>
+                      <td style={{ padding: '0.85rem 1.25rem' }}>
+                        <span style={{ fontWeight: 700, color: '#005FA9' }}>{m.Codigo}</span>
+                        <span style={{ color: '#94A3B8', margin: '0 0.35rem' }}>—</span>
+                        <span style={{ fontWeight: 600, color: '#0F172A' }}>{m.Medicamento}</span>
+                      </td>
+                      <td style={{ padding: '0.85rem 1.25rem', textAlign: 'center' }}>
                         <span style={{
-                          padding: '0.25rem 0.6rem',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold',
-                          background: m.Cantidad < 0 ? 'rgba(244, 63, 94, 0.25)' : 'rgba(16, 185, 129, 0.25)',
-                          color: m.Cantidad < 0 ? '#f43f5e' : '#34d399'
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          padding: '0.35rem 0.8rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                          background: m.Cantidad < 0 ? '#FEE2E2' : '#DCFCE7',
+                          color: m.Cantidad < 0 ? '#DC2626' : '#15803D',
+                          border: m.Cantidad < 0 ? '1px solid #FECACA' : '1px solid #BBF7D0'
                         }}>
-                          {m.Cantidad < 0 ? '🔄 DEVOLUCIÓN' : '📤 SALIDA CARGO'}
+                          <span>{m.Cantidad < 0 ? '🔄' : '📤'}</span>
+                          <span>{m.Cantidad < 0 ? 'DEVOLUCIÓN' : 'SALIDA CARGO'}</span>
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, fontSize: '1rem', color: m.Cantidad < 0 ? '#f43f5e' : '#34d399' }}>
+                      <td style={{
+                        padding: '0.85rem 1.25rem',
+                        textAlign: 'right',
+                        fontWeight: 800,
+                        fontSize: '1.05rem',
+                        color: m.Cantidad < 0 ? '#DC2626' : '#16A34A'
+                      }}>
                         {m.Cantidad > 0 ? `+${m.Cantidad}` : m.Cantidad}
                       </td>
                     </tr>

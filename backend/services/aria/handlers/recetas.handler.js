@@ -113,7 +113,7 @@ async function queryRecetasPendientes() {
 }
 
 /**
- * Handler 2: Libro Electrónico de Medicamentos Controlados
+ * Handler 2: Registro de Salidas de Farmacia con Lote
  */
 async function queryLibroControlados() {
   try {
@@ -148,8 +148,8 @@ async function queryLibroControlados() {
 
     if (rows.length === 0) {
       return {
-        topic: 'Farmacia: Libro de Controlados',
-        answer: 'No se encontraron movimientos registrados en el Libro de Controlados.',
+        topic: 'Farmacia: Salidas de Farmacia',
+        answer: 'No se encontraron movimientos de salidas registrados en Farmacia.',
       };
     }
 
@@ -173,22 +173,22 @@ async function queryLibroControlados() {
     });
 
     return {
-      topic: 'Farmacia: Libro Electrónico de Controlados',
-      answer: `El Libro Electrónico de Controlados registra **${rows.length} dispensaciones auditadas** con lote y médico responsable:`,
+      topic: 'Farmacia: Salidas de Farmacia con Lote',
+      answer: `El registro de **Salidas de Farmacia** contiene **${rows.length} dispensaciones con lote** realizadas a pacientes:`,
       kpis: [
-        { label: 'Registros Auditados', value: rows.length, color: '#004687' },
+        { label: 'Salidas Registradas', value: rows.length, color: '#004687' },
         { label: 'Unidades Dispensadas', value: totalPiezas.toLocaleString('es-MX'), color: '#0088C9' }
       ],
       table: {
-        headers: ['Fecha', 'Paciente', 'Médico Autoriza', 'Medicamento Controlado', 'Lote', 'Cantidad'],
+        headers: ['Fecha', 'Paciente', 'Médico Autoriza', 'Artículo / Insumo', 'Lote', 'Cantidad'],
         rows: tableRows
       }
     };
   } catch (err) {
     console.error('Error en queryLibroControlados:', err);
     return {
-      topic: 'Farmacia: Libro de Controlados',
-      answer: 'No se pudo consultar el Libro de Controlados: ' + err.message
+      topic: 'Farmacia: Salidas de Farmacia',
+      answer: 'No se pudo consultar el registro de salidas de Farmacia: ' + err.message
     };
   }
 }
@@ -274,5 +274,6 @@ async function queryHistorialFarmacologico(normalizedQuery) {
 module.exports = {
   queryRecetasPendientes,
   queryLibroControlados,
+  querySalidasFarmacia: queryLibroControlados,
   queryHistorialFarmacologico
 };

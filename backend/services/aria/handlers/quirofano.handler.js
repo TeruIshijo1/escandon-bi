@@ -208,18 +208,18 @@ async function queryInventarioQuirofano() {
     const tableRows = sortedItems.slice(0, 10).map(i => [
       i.ItemCode || '',
       i.ItemName || 'Insumo Médico',
-      i.WhsCode === 'QXCR' ? 'Quirófano Controlados (QXCR)' : 'Almacén Quirófano (QX)',
+      i.WhsCode === 'QXCR' ? 'Quirófano Carro Rojo (QXCR)' : 'Almacén Quirófano (QX)',
       Number(i.QuantityOnStock || 0).toLocaleString('es-MX'),
       `$${Number(i.SalesPrice || 0).toLocaleString('es-MX')}`
     ]);
 
     return {
-      topic: 'Inventario de Quirófano (QX / QXCR)',
-      answer: `El inventario actual del **Almacén Quirófano (QX)** y **Controlados (QXCR)** cuenta con **${qxItems.length} tipos de artículos en stock** sumando **${totalStock.toLocaleString('es-MX')} piezas en existencia**.`,
+      topic: 'Inventario de Quirófano (QX / QXCR — Carro Rojo)',
+      answer: `El inventario actual del **Almacén Quirófano (QX)** y **Carro Rojo (QXCR)** cuenta con **${qxItems.length} tipos de artículos en stock** sumando **${totalStock.toLocaleString('es-MX')} piezas en existencia**.`,
       kpis: [
         { label: 'Tipos de Insumos', value: qxItems.length, color: '#004687' },
         { label: 'Piezas Totales QX', value: totalStock.toLocaleString('es-MX'), color: '#0088C9' },
-        { label: 'Artículos Controlados (QXCR)', value: controladosCount, color: '#DC2626' },
+        { label: 'Insumos Carro Rojo (QXCR)', value: controladosCount, color: '#DC2626' },
       ],
       table: {
         headers: ['Código', 'Descripción', 'Almacén', 'Stock Actual', 'Precio Unitario'],

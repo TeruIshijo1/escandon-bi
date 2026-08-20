@@ -62,8 +62,14 @@ const PHRASES = {
     /faltan\s+por\s+surtir/,
   ],
 
-  // ── FARMACIA: CONTROLADOS ─────────────────────────────────────
+  // ── FARMACIA: SALIDAS Y CONTROLADOS ───────────────────────────
   'farmacia-controlados': [
+    /salidas?\s+de\s+farmacia/,
+    /salidas?\s+con\s+lote/,
+    /dispensaciones?\s+de\s+farmacia/,
+    /dispensaciones?\s+con\s+lote/,
+    /entregas?\s+con\s+lote/,
+    /registro\s+de\s+salidas?/,
     /sustancias?\s+controladas?/,
     /medicamentos?\s+restringidos?/,
     /estupefacientes?/,

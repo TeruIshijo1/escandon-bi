@@ -14,7 +14,7 @@ const SUGGESTED_QUESTIONS = [
   '💊 ¿Qué recetas están pendientes en Farmacia?',
   '🛏️ ¿Cuál es la ocupación de camas hoy?',
   '🩺 ¿Qué materiales incluye el kit quirúrgico?',
-  '📋 Ver el libro de medicamentos controlados',
+  '📤 Ver salidas de Farmacia con lote',
 ];
 
 function formatMarkdown(text) {

@@ -155,14 +155,15 @@ router.get('/ubicaciones/:itemCode', authenticate, authorize(['ADMIN', 'DIRECTOR
 // ==========================================
 
 /**
- * GET /api/pharmacy/controlled-ledger
- * Libro Electrónico de Controlados
+ * GET /api/pharmacy/salidas-farmacia (alias: /api/pharmacy/controlled-ledger)
+ * Registro de Salidas y Dispensaciones de Farmacia con Lote
  */
-router.get('/controlled-ledger', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
+const handleSalidasFarmacia = async (req, res) => {
   try {
+    const filterClass = (req.query.classification || req.query.type || 'ALL').toUpperCase();
     const pool = await connectRemoteDB();
     const dbRes = await pool.request().query(`
-      SELECT TOP 200
+      SELECT TOP 500
         b.CreatedOn AS Fecha,
         t.FullName AS Paciente,
         COALESCE(NULLIF(LTRIM(RTRIM(pr.FullName)), ''), NULLIF(LTRIM(RTRIM(pr.Name)) + ' ' + LTRIM(RTRIM(pr.LastName)), ''), 'NO ESPECIFICADO') AS Medico,
@@ -180,17 +181,77 @@ router.get('/controlled-ledger', authenticate, authorize(['ADMIN', 'DIRECTOR', '
       ORDER BY b.CreatedOn DESC
     `);
     
-    const enrichedData = dbRes.recordset.map(row => {
-      const sapItem = sapInventoryService.getInventoryMap().get(row.Codigo);
-      return { ...row, Medicamento: sapItem ? sapItem.ItemName : row.Medicamento };
+    const invMap = sapInventoryService.getInventoryMap();
+    const clasiMap = sapInventoryService.getMedicalClassificationMap();
+
+    let totalSalidas = 0;
+    let totalControlados = 0;
+    let totalAntibioticos = 0;
+    let totalRedFria = 0;
+    let totalAltoRiesgo = 0;
+
+    const allData = dbRes.recordset.map(row => {
+      const sapItem = invMap.get(row.Codigo);
+      const clasi = clasiMap.get(row.Codigo);
+      const medClass = clasi?.MedicalClassification || sapItem?.MedicalClassification || null;
+      const secClass = clasi?.SecondaryClassification || sapItem?.SecondaryClassification || null;
+
+      const isControlled = medClass === 'CON' || secClass === 'CON';
+      const isAntibiotic = medClass === 'ANTI' || secClass === 'ANTI';
+      const isColdChain = medClass === 'REFRI' || secClass === 'REFRI';
+      const isHighRisk = medClass === 'AR' || secClass === 'AR';
+      const isLasa = medClass === 'LASA' || secClass === 'LASA';
+
+      totalSalidas++;
+      if (isControlled) totalControlados++;
+      if (isAntibiotic) totalAntibioticos++;
+      if (isColdChain) totalRedFria++;
+      if (isHighRisk) totalAltoRiesgo++;
+
+      return {
+        ...row,
+        Medicamento: sapItem ? sapItem.ItemName : (clasi?.ItemName || row.Medicamento),
+        Clasificacion: medClass || 'GENERAL',
+        ClasificacionSecundaria: secClass,
+        EsControlado: isControlled,
+        EsAntibiotico: isAntibiotic,
+        EsRedFria: isColdChain,
+        EsAltoRiesgo: isHighRisk,
+        EsLasa: isLasa
+      };
     });
+
+    let filteredData = allData;
+    if (filterClass === 'CON' || filterClass === 'CONTROLADOS') {
+      filteredData = allData.filter(d => d.EsControlado);
+    } else if (filterClass === 'ANTI' || filterClass === 'ANTIBIOTICOS') {
+      filteredData = allData.filter(d => d.EsAntibiotico);
+    } else if (filterClass === 'REFRI' || filterClass === 'REDFRIA') {
+      filteredData = allData.filter(d => d.EsRedFria);
+    } else if (filterClass === 'AR' || filterClass === 'ALTORIESGO') {
+      filteredData = allData.filter(d => d.EsAltoRiesgo);
+    }
     
-    res.json({ ok: true, data: enrichedData });
+    res.json({
+      ok: true,
+      data: filteredData,
+      stats: {
+        totalSalidas,
+        totalControlados,
+        totalAntibioticos,
+        totalRedFria,
+        totalAltoRiesgo,
+        articulosControladosCatalogo: Array.from(clasiMap.values()).filter(c => c.isControlled).length
+      }
+    });
   } catch (err) {
-    console.error('Error en controlled-ledger:', err);
+    console.error('Error en salidas-farmacia:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
   }
-});
+};
+
+router.get('/salidas-farmacia', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), handleSalidasFarmacia);
+router.get('/controlled-ledger', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), handleSalidasFarmacia);
 
 /**
  * GET /api/pharmacy/pending-prescriptions
