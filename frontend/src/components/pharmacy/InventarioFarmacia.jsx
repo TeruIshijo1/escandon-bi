@@ -381,27 +381,26 @@ export default function InventarioFarmacia() {
         </div>
 
         {/* Table */}
-        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 350px)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 350px)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1080px' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
-              <tr style={{ background: '#f1f5f9', color: '#334155', fontSize: '0.875rem', letterSpacing: '0.025em', textTransform: 'uppercase' }}>
-                <th style={{ padding: '1rem 1.25rem', borderBottom: '2px solid #e2e8f0' }}>ItemCode</th>
-                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem' }}>Descripción SAP</th>
-                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem' }}>Grupo / Laboratorio</th>
-                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'center' }}>Clasificación SAP</th>
-                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Stock Actual</th>
-                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Costo Compra</th>
-                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Precio Venta</th>
-                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Margen / Utilidad</th>
-                <th style={{ padding: '1rem 1.25rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center' }}>Estatus</th>
-                <th style={{ padding: '1rem 1.25rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center' }}>Acciones</th>
-                <th style={{ padding: 0, minWidth: '2rem', borderBottom: '2px solid #e2e8f0' }}></th>
+              <tr style={{ background: '#f1f5f9', color: '#334155', fontSize: '0.8rem', letterSpacing: '0.025em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                <th style={{ padding: '0.85rem 0.75rem', borderBottom: '2px solid #e2e8f0', width: '100px' }}>ItemCode</th>
+                <th style={{ padding: '0.85rem 0.75rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', minWidth: '200px' }}>Descripción SAP</th>
+                <th style={{ padding: '0.85rem 0.65rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700' }}>Grupo / Lab</th>
+                <th style={{ padding: '0.85rem 0.65rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'center' }}>Clasificación SAP</th>
+                <th style={{ padding: '0.85rem 0.65rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'right' }}>Stock</th>
+                <th style={{ padding: '0.85rem 0.65rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'right' }}>Costo</th>
+                <th style={{ padding: '0.85rem 0.65rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'right' }}>Precio</th>
+                <th style={{ padding: '0.85rem 0.65rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'right' }}>Margen / Utilidad</th>
+                <th style={{ padding: '0.85rem 0.65rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center' }}>Estatus</th>
+                <th style={{ padding: '0.85rem 0.75rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center', minWidth: '145px' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="11" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                  <td colSpan="10" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                       <div className="spinner" style={{ border: '4px solid #f3f3f3', borderTop: '4px solid #3b82f6', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }}></div>
                       Conectando con SAP Service Layer...
@@ -410,7 +409,7 @@ export default function InventarioFarmacia() {
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan="11" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                  <td colSpan="10" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                     No se encontraron artículos que coincidan con la búsqueda.
                   </td>
                 </tr>
@@ -425,19 +424,19 @@ export default function InventarioFarmacia() {
 
                   return (
                     <tr key={item.ItemCode || idx} style={{ borderBottom: '1px solid #e2e8f0', transition: 'background 0.2s' }}>
-                      <td style={{ padding: '1rem 1.25rem', color: '#0f172a', fontWeight: '500' }}>{item.ItemCode}</td>
-                      <td style={{ padding: '1rem', color: '#475569', fontSize: '0.9rem' }}>{item.ItemName}</td>
-                      <td style={{ padding: '1rem', color: '#475569', fontSize: '0.85rem' }}>
-                        <div style={{ fontWeight: '500', color: '#334155' }}>{item.ItemGroupName}</div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{item.ManufacturerName}</div>
+                      <td style={{ padding: '0.75rem 0.75rem', color: '#0f172a', fontWeight: '600', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{item.ItemCode}</td>
+                      <td style={{ padding: '0.75rem 0.75rem', color: '#475569', fontSize: '0.875rem', fontWeight: '500' }}>{item.ItemName}</td>
+                      <td style={{ padding: '0.75rem 0.65rem', color: '#475569', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: '600', color: '#334155' }}>{item.ItemGroupName}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.72rem' }}>{item.ManufacturerName}</div>
                       </td>
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 0.65rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <span style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          padding: '0.3rem 0.75rem',
+                          padding: '0.25rem 0.65rem',
                           borderRadius: '9999px',
-                          fontSize: '0.75rem',
+                          fontSize: '0.72rem',
                           fontWeight: 800,
                           whiteSpace: 'nowrap',
                           background: medBadge.bg,
@@ -447,52 +446,51 @@ export default function InventarioFarmacia() {
                           {medBadge.text}
                         </span>
                       </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500', color: '#0f172a' }}>{stock.toLocaleString()}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#b45309' }}>{formatCurrency(purchase)}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#10b981' }}>{formatCurrency(sales)}</td>
-                      <td style={{ padding: '1rem', textAlign: 'right' }}>
-                        <div style={{ fontWeight: '600', color: (item.ProfitMargin || 0) > 0 ? '#0ea5e9' : '#64748b' }}>
+                      <td style={{ padding: '0.75rem 0.65rem', textAlign: 'right', fontWeight: '700', color: '#0f172a', whiteSpace: 'nowrap' }}>{stock.toLocaleString()}</td>
+                      <td style={{ padding: '0.75rem 0.65rem', textAlign: 'right', fontWeight: '600', color: '#b45309', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{formatCurrency(purchase)}</td>
+                      <td style={{ padding: '0.75rem 0.65rem', textAlign: 'right', fontWeight: '600', color: '#10b981', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{formatCurrency(sales)}</td>
+                      <td style={{ padding: '0.75rem 0.65rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.85rem', color: (item.ProfitMargin || 0) > 0 ? '#0ea5e9' : '#64748b' }}>
                           {(item.ProfitMargin || 0).toFixed(1) + '%'}
                         </div>
-                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                        <div style={{ color: '#64748b', fontSize: '0.72rem' }}>
                           {formatCurrency(item.ExpectedUtility)}
                         </div>
                       </td>
-                      <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 0.65rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         {isLow ? (
-                          <span style={{ padding: '0.25rem 0.75rem', background: '#fef2f2', color: '#dc2626', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold' }}>BAJO</span>
+                          <span style={{ padding: '0.2rem 0.6rem', background: '#fef2f2', color: '#dc2626', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 'bold' }}>BAJO</span>
                         ) : (
-                          <span style={{ padding: '0.25rem 0.75rem', background: '#ecfdf5', color: '#059669', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 'bold' }}>OK</span>
+                          <span style={{ padding: '0.2rem 0.6rem', background: '#ecfdf5', color: '#059669', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 'bold' }}>OK</span>
                         )}
                       </td>
-                      <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                      <td style={{ padding: '0.75rem 0.75rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'center' }}>
                           <button 
                             onClick={() => fetchBatches(item)}
                             title="Ver Lotes"
-                            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '0.4rem 0.6rem', borderRadius: '6px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: '500', color: '#334155' }}
+                            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '0.35rem 0.55rem', borderRadius: '6px', fontSize: '0.82rem', cursor: 'pointer', fontWeight: '600', color: '#334155' }}
                           >
                             Lotes
                           </button>
                           <button 
                             onClick={() => fetchLocations(item)}
                             title="Localizar en Hospital"
-                            style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', padding: '0.4rem', borderRadius: '6px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: '500', color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px' }}
+                            style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', padding: '0.35rem', borderRadius: '6px', fontSize: '0.95rem', cursor: 'pointer', fontWeight: '500', color: '#0369a1', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px' }}
                           >
                             📍
                           </button>
                           <button 
                             onClick={() => fetchHistory(item)}
                             title="Historial de Salidas"
-                            style={{ background: '#fef3c7', border: '1px solid #fde68a', padding: '0.4rem', borderRadius: '6px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: '500', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px' }}
+                            style={{ background: '#fef3c7', border: '1px solid #fde68a', padding: '0.35rem', borderRadius: '6px', fontSize: '0.95rem', cursor: 'pointer', fontWeight: '500', color: '#b45309', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px' }}
                           >
                             🕒
                           </button>
                         </div>
                       </td>
-                      <td style={{ padding: 0, minWidth: '2rem' }}></td>
                     </tr>
-                  )
+                  );
                 })
               )}
             </tbody>
