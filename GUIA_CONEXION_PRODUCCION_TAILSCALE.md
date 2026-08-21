@@ -4,11 +4,9 @@ Esta guía detalla la arquitectura de red y los pasos exactos para configurar y 
 
 ---
 
-## 📌 1. Arquitectura de Red (Reemplazo de Bore)
+## 📌 1. Arquitectura de Red Segura
 
-Anteriormente se utilizaba **Bore** (`bore.pub`), el cual presentaba riesgos de seguridad (relay público), caídas de túnel y puertos dinámicos que cambiaban en cada reinicio.
-
-El sistema ahora opera mediante una **Red Mesh Privada Cifrada con Tailscale (WireGuard)**:
+El sistema opera mediante una **Red Mesh Privada Cifrada con Tailscale (WireGuard)** para garantizar máxima seguridad y estabilidad en las conexiones:
 
 ```mermaid
 graph LR

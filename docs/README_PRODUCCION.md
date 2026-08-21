@@ -15,11 +15,11 @@ Respecto al entorno de desarrollo local, se realizaron las siguientes adaptacion
   REMOTE_DB_SERVER=100.121.115.8
   REMOTE_DB_PORT=1433
   ```
-- **Motivo Técnico**: Se migró de Bore a **Tailscale Mesh VPN**. La conexión hacia SQL Server (`KH_HE`) se realiza de forma directa y cifrada extremo a extremo a través de la IP privada fija `100.121.115.8` en el puerto estándar `1433`. Consulta `GUIA_CONEXION_PRODUCCION_TAILSCALE.md` para más información.
+- **Motivo Técnico**: La arquitectura utiliza **Tailscale Mesh VPN**. La conexión hacia SQL Server (`KH_HE`) se realiza de forma directa y cifrada extremo a extremo a través de la IP privada fija `100.121.115.8` en el puerto estándar `1433`. Consulta `GUIA_CONEXION_PRODUCCION_TAILSCALE.md` para más información.
 
 ### 1.2 Mensajes de Diagnóstico en la Conexión Remota
 - **Archivo**: `backend/config/remote-db.js`
-- **Cambio**: Se añadieron sugerencias de diagnóstico automáticas para advertir al usuario en consola en caso de desconexión del túnel `bore` o cambios de puerto.
+- **Cambio**: Se añadieron sugerencias de diagnóstico automáticas para advertir al usuario en consola en caso de desconexión del túnel o errores de red.
 
 ### 1.3 Migración SQLite → PostgreSQL (Base de Datos Principal)
 - **Archivo**: `backend/migrate_to_pg.js`

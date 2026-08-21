@@ -15,7 +15,7 @@ El servidor de producción opera mediante un proceso Node.js integrado que entre
   REMOTE_DB_SERVER=100.121.115.8
   REMOTE_DB_PORT=1433
   ```
-- **Nota Técnica**: Se migró completamente de Bore a **Tailscale Mesh VPN (WireGuard)**. La conexión hacia SQL Server (`KH_HE`) se realiza de forma directa y cifrada extremo a extremo a través de la IP privada fija `100.121.115.8` en el puerto estándar `1433`, eliminando dependencias de relays públicos, cambios dinámicos de puerto y problemas de resolución DNS. Consulta `GUIA_CONEXION_PRODUCCION_TAILSCALE.md` para más detalles.
+- **Nota Técnica**: La arquitectura de red utiliza **Tailscale Mesh VPN (WireGuard)**. La conexión hacia SQL Server (`KH_HE`) se realiza de forma directa y cifrada extremo a extremo a través de la IP privada fija `100.121.115.8` en el puerto estándar `1433`, eliminando dependencias externas y problemas de resolución DNS. Consulta `GUIA_CONEXION_PRODUCCION_TAILSCALE.md` para más detalles.
 
 ### 1.2 Arranque en Producción
 - **Script**: `iniciar_produccion.bat`
