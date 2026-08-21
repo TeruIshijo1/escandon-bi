@@ -395,10 +395,7 @@ export default function DashboardArea() {
             display:'flex',
             alignItems:'center',
             gap:'0.75rem',
-            letterSpacing: '-0.01em',
-            background: 'linear-gradient(to right, #FFFFFF, #CBD5E1)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
+            letterSpacing: '-0.01em'
           }}>
             <span style={{ fontSize:'2.2rem', WebkitTextFillColor: 'initial' }}>{cfg.icon}</span>
             {AREAS_LABELS[area]}

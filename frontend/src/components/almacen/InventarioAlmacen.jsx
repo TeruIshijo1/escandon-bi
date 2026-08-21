@@ -172,7 +172,7 @@ export default function InventarioAlmacen() {
   };
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ padding: '2rem', maxWidth: 'var(--content-max, 1400px)', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
       
       <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
         <div>

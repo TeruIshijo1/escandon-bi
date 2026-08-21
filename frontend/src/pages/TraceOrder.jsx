@@ -201,8 +201,8 @@ const TraceOrder = () => {
           disabled={loading || !docNum}
           style={{
             padding: '0.65rem 1.5rem',
-            background: '#2563EB',
-            color: 'white',
+            background: 'var(--color-azul-claro)',
+            color: 'var(--color-bg-white)',
             border: 'none',
             borderRadius: 'var(--radius-sm)',
             fontFamily: 'var(--font-display)',
@@ -254,7 +254,7 @@ const TraceOrder = () => {
                   fontSize: '0.75rem',
                   fontWeight: 700,
                   fontFamily: 'var(--font-mono)',
-                  background: data.OrderInfo.DocumentStatus === 'bost_Open' ? 'rgba(232,133,61,0.15)' : 'rgba(0,151,74,0.15)',
+                  background: data.OrderInfo.DocumentStatus === 'bost_Open' ? 'rgba(var(--color-accent-warm-rgb), 0.15)' : 'rgba(var(--color-verde-e-rgb), 0.15)',
                   color: data.OrderInfo.DocumentStatus === 'bost_Open' ? 'var(--color-accent-warm)' : 'var(--color-verde-e)',
                 }}>
                   {data.OrderInfo.DocumentStatus === 'bost_Open' ? 'Abierta' : 'Cerrada'}
@@ -284,8 +284,8 @@ const TraceOrder = () => {
                   fontSize: '0.75rem',
                   fontWeight: 700,
                   fontFamily: 'var(--font-mono)',
-                  background: 'rgba(37,99,235,0.12)',
-                  color: '#3B82F6',
+                  background: 'rgba(var(--color-azul-claro-rgb), 0.12)',
+                  color: 'var(--color-azul-claro)',
                 }}>
                   Solicitado: {item.RequestedQuantity} en {item.TargetWarehouse}
                 </span>

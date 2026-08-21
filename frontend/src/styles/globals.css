@@ -8,13 +8,16 @@
 /* ── Tokens de Color ─────────────────────────────────────────── */
 :root {
   /* Paleta institucional (intacta) */
-  --color-azul-fuerte:  #004687;
-  --color-azul-claro:   #0088C9;
-  --color-azul-cruz:    #005FA9;
-  --color-verde-e:      #00974A;
+  --color-azul-fuerte:      #004687;
+  --color-azul-claro:       #0088C9;
+  --color-azul-claro-rgb:   0, 136, 201;
+  --color-azul-cruz:        #005FA9;
+  --color-verde-e:          #00974A;
+  --color-verde-e-rgb:      0, 151, 74;
 
   /* Acento cálido (nuevo) */
-  --color-accent-warm:  #E8853D;
+  --color-accent-warm:      #E8853D;
+  --color-accent-warm-rgb:  232, 133, 61;
   --color-accent-warm-soft: rgba(232, 133, 61, 0.12);
 
   /* Fondos estructurales — con tint azul sutil */

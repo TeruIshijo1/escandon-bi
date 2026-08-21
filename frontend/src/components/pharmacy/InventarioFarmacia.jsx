@@ -237,7 +237,7 @@ export default function InventarioFarmacia() {
   ];
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ padding: '2rem', maxWidth: 'var(--content-max, 1400px)', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
       
       {/* Tabs de Navegación */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', overflowX: 'auto' }}>

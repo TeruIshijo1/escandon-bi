@@ -208,10 +208,7 @@ export default function DashboardDirectivo() {
               fontWeight:800, 
               color:'white', 
               margin:0, 
-              lineHeight:1.1,
-              background: 'linear-gradient(to right, #FFFFFF, #CBD5E1)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
+              lineHeight:1.1
             }}>
               {TAB_DETAILS[activeTab]?.title || 'Resumen Ejecutivo'}
             </h1>
