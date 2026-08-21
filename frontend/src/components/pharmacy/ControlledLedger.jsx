@@ -39,28 +39,43 @@ export default function ControlledLedger() {
     }
   };
 
-  // Filtrado local en base al tab de clasificación y búsqueda
-  const filteredData = useMemo(() => {
+  // 1. Filtrado base por término de búsqueda (Paciente, Médico, Medicamento, Código, Lote)
+  const searchFilteredData = useMemo(() => {
+    const term = searchQuery.toLowerCase().trim();
+    if (!term) return data;
     return data.filter(item => {
-      // Filtro de clasificación médica
-      let matchClass = true;
-      if (activeFilter === 'CON') matchClass = item.EsControlado;
-      else if (activeFilter === 'ANTI') matchClass = item.EsAntibiotico;
-      else if (activeFilter === 'REFRI') matchClass = item.EsRedFria;
-      else if (activeFilter === 'AR') matchClass = item.EsAltoRiesgo;
-
-      // Filtro de búsqueda de texto
-      const term = searchQuery.toLowerCase().trim();
-      const matchText = !term ||
-        (item.Paciente || '').toLowerCase().includes(term) ||
-        (item.Medico || '').toLowerCase().includes(term) ||
-        (item.Medicamento || '').toLowerCase().includes(term) ||
-        (item.Codigo || '').toLowerCase().includes(term) ||
-        (item.Lote || '').toLowerCase().includes(term);
-
-      return matchClass && matchText;
+      return (item.Paciente || '').toLowerCase().includes(term) ||
+             (item.Medico || '').toLowerCase().includes(term) ||
+             (item.Medicamento || '').toLowerCase().includes(term) ||
+             (item.Codigo || '').toLowerCase().includes(term) ||
+             (item.Lote || '').toLowerCase().includes(term);
     });
-  }, [data, activeFilter, searchQuery]);
+  }, [data, searchQuery]);
+
+  // 2. KPIs dinámicos calculados directamente con base en la información filtrada
+  const kpis = useMemo(() => {
+    const totalSalidas = searchFilteredData.length;
+    const totalControlados = searchFilteredData.filter(d => d.EsControlado).length;
+    const totalAntibioticos = searchFilteredData.filter(d => d.EsAntibiotico).length;
+    const totalRedFria = searchFilteredData.filter(d => d.EsRedFria).length;
+    const totalAltoRiesgo = searchFilteredData.filter(d => d.EsAltoRiesgo).length;
+    return {
+      totalSalidas,
+      totalControlados,
+      totalAntibioticos,
+      totalRedFria,
+      totalAltoRiesgo
+    };
+  }, [searchFilteredData]);
+
+  // 3. Filtrado final por categoría médica para la tabla
+  const filteredData = useMemo(() => {
+    if (activeFilter === 'CON') return searchFilteredData.filter(d => d.EsControlado);
+    if (activeFilter === 'ANTI') return searchFilteredData.filter(d => d.EsAntibiotico);
+    if (activeFilter === 'REFRI') return searchFilteredData.filter(d => d.EsRedFria);
+    if (activeFilter === 'AR') return searchFilteredData.filter(d => d.EsAltoRiesgo);
+    return searchFilteredData;
+  }, [searchFilteredData, activeFilter]);
 
   const exportToExcel = () => {
     if (filteredData.length === 0) return;
@@ -117,7 +132,210 @@ export default function ControlledLedger() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="controlled-ledger-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      
+      <style>{`
+        /* ── Base Cards ── */
+        .cl-card {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 14px;
+          padding: 1.25rem;
+          box-shadow: 0 2px 8px rgba(0, 70, 135, 0.05);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .cl-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        }
+        .cl-card-title {
+          font-size: 0.78rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #64748B;
+        }
+        .cl-card-subtitle {
+          font-size: 0.8rem;
+          font-weight: 500;
+          color: #94A3B8;
+          margin-top: 0.25rem;
+        }
+
+        /* ── Active Cards (Light Mode) ── */
+        .cl-card-all.active {
+          background: #F0F9FF;
+          border: 2px solid #0077B6;
+          box-shadow: 0 4px 14px rgba(0, 119, 182, 0.15);
+        }
+        .cl-card-con.active {
+          background: #FEF2F2;
+          border: 2px solid #DC2626;
+          box-shadow: 0 4px 14px rgba(220, 38, 38, 0.15);
+        }
+        .cl-card-anti.active {
+          background: #EFF6FF;
+          border: 2px solid #2563EB;
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.15);
+        }
+        .cl-card-refri.active {
+          background: #F0FDF4;
+          border: 2px solid #059669;
+          box-shadow: 0 4px 14px rgba(5, 150, 105, 0.15);
+        }
+
+        /* ── KPI Numbers (Light Mode) ── */
+        .cl-num-all { color: #0077B6; }
+        .cl-num-con { color: #DC2626; }
+        .cl-num-anti { color: #2563EB; }
+        .cl-num-refri { color: #059669; }
+
+        /* ── Badges in Cards (Light Mode) ── */
+        .cl-card-badge {
+          font-size: 0.7rem;
+          padding: 0.2rem 0.55rem;
+          border-radius: 9999px;
+          font-weight: 700;
+        }
+        .cl-badge-all { background: #0077B6; color: #FFFFFF; }
+        .cl-badge-con { background: #FEE2E2; color: #DC2626; }
+        .cl-badge-con.active { background: #DC2626; color: #FFFFFF; }
+        .cl-badge-anti { background: #DBEAFE; color: #1D4ED8; }
+        .cl-badge-anti.active { background: #2563EB; color: #FFFFFF; }
+        .cl-badge-refri { background: #D1FAE5; color: #047857; }
+        .cl-badge-refri.active { background: #059669; color: #FFFFFF; }
+
+        /* ══════════════════════════════════════════════════════════════════
+           DARK MODE STYLES
+           ══════════════════════════════════════════════════════════════════ */
+        [data-theme="dark"] .cl-card {
+          background: #0F172A !important;
+          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+        }
+        [data-theme="dark"] .cl-card-title {
+          color: #E2E8F0 !important;
+        }
+        [data-theme="dark"] .cl-card-subtitle {
+          color: #94A3B8 !important;
+        }
+
+        /* Active Glows in Dark Mode */
+        [data-theme="dark"] .cl-card-all.active {
+          background: rgba(0, 119, 182, 0.25) !important;
+          border: 2px solid #38BDF8 !important;
+          box-shadow: 0 0 20px rgba(56, 189, 248, 0.3) !important;
+        }
+        [data-theme="dark"] .cl-card-con.active {
+          background: rgba(220, 38, 38, 0.25) !important;
+          border: 2px solid #F87171 !important;
+          box-shadow: 0 0 20px rgba(248, 113, 113, 0.3) !important;
+        }
+        [data-theme="dark"] .cl-card-anti.active {
+          background: rgba(37, 99, 235, 0.25) !important;
+          border: 2px solid #60A5FA !important;
+          box-shadow: 0 0 20px rgba(96, 165, 250, 0.3) !important;
+        }
+        [data-theme="dark"] .cl-card-refri.active {
+          background: rgba(5, 150, 105, 0.25) !important;
+          border: 2px solid #34D399 !important;
+          box-shadow: 0 0 20px rgba(52, 211, 153, 0.3) !important;
+        }
+
+        /* Numbers in Dark Mode */
+        [data-theme="dark"] .cl-num-all { color: #38BDF8 !important; }
+        [data-theme="dark"] .cl-num-con { color: #F87171 !important; }
+        [data-theme="dark"] .cl-num-anti { color: #60A5FA !important; }
+        [data-theme="dark"] .cl-num-refri { color: #34D399 !important; }
+
+        /* Badges in Dark Mode */
+        [data-theme="dark"] .cl-badge-all {
+          background: #0284C7 !important;
+          color: #FFFFFF !important;
+        }
+        [data-theme="dark"] .cl-badge-con {
+          background: rgba(220, 38, 38, 0.25) !important;
+          color: #FCA5A5 !important;
+          border: 1px solid rgba(248, 113, 113, 0.4) !important;
+        }
+        [data-theme="dark"] .cl-badge-con.active {
+          background: #DC2626 !important;
+          color: #FFFFFF !important;
+          border: none !important;
+        }
+        [data-theme="dark"] .cl-badge-anti {
+          background: rgba(37, 99, 235, 0.25) !important;
+          color: #93C5FD !important;
+          border: 1px solid rgba(96, 165, 250, 0.4) !important;
+        }
+        [data-theme="dark"] .cl-badge-anti.active {
+          background: #2563EB !important;
+          color: #FFFFFF !important;
+          border: none !important;
+        }
+        [data-theme="dark"] .cl-badge-refri {
+          background: rgba(5, 150, 105, 0.25) !important;
+          color: #6EE7B7 !important;
+          border: 1px solid rgba(52, 211, 153, 0.4) !important;
+        }
+        [data-theme="dark"] .cl-badge-refri.active {
+          background: #059669 !important;
+          color: #FFFFFF !important;
+          border: none !important;
+        }
+
+        /* Search bar in Dark Mode */
+        [data-theme="dark"] .cl-search-box {
+          background: #0F172A !important;
+          border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .cl-search-input {
+          background: #1E293B !important;
+          border-color: rgba(255, 255, 255, 0.15) !important;
+          color: #F8FAFC !important;
+        }
+        [data-theme="dark"] .cl-search-input::placeholder {
+          color: #94A3B8 !important;
+        }
+        [data-theme="dark"] .cl-table-container {
+          background: #0F172A !important;
+          border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .cl-thead {
+          background: #1E293B !important;
+          border-bottom: 2px solid rgba(255, 255, 255, 0.15) !important;
+        }
+        [data-theme="dark"] .cl-th {
+          color: #CBD5E1 !important;
+        }
+        [data-theme="dark"] .cl-row-even {
+          background: #0F172A !important;
+        }
+        [data-theme="dark"] .cl-row-odd {
+          background: rgba(255, 255, 255, 0.02) !important;
+        }
+        [data-theme="dark"] .cl-row-con {
+          background: rgba(220, 38, 38, 0.08) !important;
+        }
+        [data-theme="dark"] .cl-row-hover:hover {
+          background: rgba(255, 255, 255, 0.05) !important;
+        }
+        [data-theme="dark"] .cl-text-primary {
+          color: #F8FAFC !important;
+        }
+        [data-theme="dark"] .cl-text-secondary {
+          color: #CBD5E1 !important;
+        }
+        [data-theme="dark"] .cl-text-code {
+          color: #38BDF8 !important;
+        }
+        [data-theme="dark"] .cl-lote-box {
+          background: #1E293B !important;
+          color: #E2E8F0 !important;
+          border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+      `}</style>
       
       {/* Banner Superior */}
       <div style={{
@@ -184,250 +402,191 @@ export default function ControlledLedger() {
         </div>
       </div>
 
-      {/* Tarjetas KPI Interactivas */}
+      {/* Tarjetas KPI Interactivas (Filtros Principales con soporte Dark Mode) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
         
         {/* Card 1: Total Salidas */}
         <div 
           onClick={() => setActiveFilter('ALL')}
-          style={{ 
-            background: activeFilter === 'ALL' ? '#F0F9FF' : '#FFFFFF', 
-            border: activeFilter === 'ALL' ? '2px solid #0077B6' : '1px solid #E2E8F0', 
-            borderRadius: '14px', 
-            padding: '1.25rem', 
-            boxShadow: '0 2px 8px rgba(0, 70, 135, 0.05)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+          className={`cl-card cl-card-all ${activeFilter === 'ALL' ? 'active' : ''}`}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ fontSize: '0.78rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Total Salidas (Lotes)</div>
+            <div className="cl-card-title">Total Salidas (Lotes)</div>
             {activeFilter === 'ALL' && (
-              <span style={{ fontSize: '0.7rem', background: '#0077B6', color: '#FFFFFF', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontWeight: 700 }}>VER TODO</span>
+              <span className="cl-card-badge cl-badge-all">✓ ACTIVO</span>
             )}
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#0077B6', marginTop: '0.25rem' }}>
-            {stats.totalSalidas || data.length}
+          <div className="cl-num-all" style={{ fontSize: '2.1rem', fontWeight: 800, marginTop: '0.25rem' }}>
+            {kpis.totalSalidas}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>Dispensaciones con lote registradas</div>
+          <div className="cl-card-subtitle">
+            {searchQuery ? `Salidas para "${searchQuery}"` : 'Dispensaciones con lote registradas'}
+          </div>
         </div>
 
         {/* Card 2: Controlados (CON) */}
         <div 
           onClick={() => setActiveFilter(activeFilter === 'CON' ? 'ALL' : 'CON')}
-          style={{ 
-            background: activeFilter === 'CON' ? '#FEF2F2' : '#FFFFFF', 
-            border: activeFilter === 'CON' ? '2px solid #DC2626' : '1px solid #E2E8F0', 
-            borderRadius: '14px', 
-            padding: '1.25rem', 
-            boxShadow: activeFilter === 'CON' ? '0 4px 14px rgba(220, 38, 38, 0.15)' : '0 2px 8px rgba(0, 70, 135, 0.05)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+          className={`cl-card cl-card-con ${activeFilter === 'CON' ? 'active' : ''}`}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ fontSize: '0.78rem', color: activeFilter === 'CON' ? '#991B1B' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-              Medicamentos Controlados
-            </div>
-            <span style={{ 
-              fontSize: '0.7rem', 
-              background: activeFilter === 'CON' ? '#DC2626' : '#FEE2E2', 
-              color: activeFilter === 'CON' ? '#FFFFFF' : '#DC2626', 
-              padding: '0.2rem 0.55rem', 
-              borderRadius: '9999px', 
-              fontWeight: 700 
-            }}>
+            <div className="cl-card-title">Medicamentos Controlados</div>
+            <span className={`cl-card-badge cl-badge-con ${activeFilter === 'CON' ? 'active' : ''}`}>
               {activeFilter === 'CON' ? '✓ FILTRADO' : '💊 SOLO CONTROLADOS'}
             </span>
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#DC2626', marginTop: '0.25rem' }}>
-            {stats.totalControlados || data.filter(d => d.EsControlado).length}
+          <div className="cl-num-con" style={{ fontSize: '2.1rem', fontWeight: 800, marginTop: '0.25rem' }}>
+            {kpis.totalControlados}
           </div>
-          <div style={{ fontSize: '0.8rem', color: activeFilter === 'CON' ? '#B91C1C' : '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>
-            {stats.articulosControladosCatalogo || 20} psicotrópicos catalogados en SAP
+          <div className="cl-card-subtitle">
+            {searchQuery ? `Controlados para el filtro actual` : `${stats.articulosControladosCatalogo || 20} psicotrópicos catalogados en SAP`}
           </div>
         </div>
 
         {/* Card 3: Antibióticos (ANTI) */}
         <div 
           onClick={() => setActiveFilter(activeFilter === 'ANTI' ? 'ALL' : 'ANTI')}
-          style={{ 
-            background: activeFilter === 'ANTI' ? '#EFF6FF' : '#FFFFFF', 
-            border: activeFilter === 'ANTI' ? '2px solid #2563EB' : '1px solid #E2E8F0', 
-            borderRadius: '14px', 
-            padding: '1.25rem', 
-            boxShadow: activeFilter === 'ANTI' ? '0 4px 14px rgba(37, 99, 235, 0.15)' : '0 2px 8px rgba(0, 70, 135, 0.05)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+          className={`cl-card cl-card-anti ${activeFilter === 'ANTI' ? 'active' : ''}`}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ fontSize: '0.78rem', color: activeFilter === 'ANTI' ? '#1E40AF' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-              Antibióticos
-            </div>
-            <span style={{ 
-              fontSize: '0.7rem', 
-              background: activeFilter === 'ANTI' ? '#2563EB' : '#DBEAFE', 
-              color: activeFilter === 'ANTI' ? '#FFFFFF' : '#1D4ED8', 
-              padding: '0.2rem 0.55rem', 
-              borderRadius: '9999px', 
-              fontWeight: 700 
-            }}>
+            <div className="cl-card-title">Antibióticos</div>
+            <span className={`cl-card-badge cl-badge-anti ${activeFilter === 'ANTI' ? 'active' : ''}`}>
               {activeFilter === 'ANTI' ? '✓ FILTRADO' : '💉 VER ANTI'}
             </span>
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#2563EB', marginTop: '0.25rem' }}>
-            {stats.totalAntibioticos || data.filter(d => d.EsAntibiotico).length}
+          <div className="cl-num-anti" style={{ fontSize: '2.1rem', fontWeight: 800, marginTop: '0.25rem' }}>
+            {kpis.totalAntibioticos}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>Clasificación ANTI en SAP</div>
+          <div className="cl-card-subtitle">
+            {searchQuery ? `Antibióticos para el filtro actual` : 'Clasificación ANTI en SAP'}
+          </div>
         </div>
 
         {/* Card 4: Red Fría (REFRI) */}
         <div 
           onClick={() => setActiveFilter(activeFilter === 'REFRI' ? 'ALL' : 'REFRI')}
-          style={{ 
-            background: activeFilter === 'REFRI' ? '#F0FDF4' : '#FFFFFF', 
-            border: activeFilter === 'REFRI' ? '2px solid #059669' : '1px solid #E2E8F0', 
-            borderRadius: '14px', 
-            padding: '1.25rem', 
-            boxShadow: activeFilter === 'REFRI' ? '0 4px 14px rgba(5, 150, 105, 0.15)' : '0 2px 8px rgba(0, 70, 135, 0.05)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
+          className={`cl-card cl-card-refri ${activeFilter === 'REFRI' ? 'active' : ''}`}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ fontSize: '0.78rem', color: activeFilter === 'REFRI' ? '#065F46' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-              Red Fría / Refrigerados
-            </div>
-            <span style={{ 
-              fontSize: '0.7rem', 
-              background: activeFilter === 'REFRI' ? '#059669' : '#D1FAE5', 
-              color: activeFilter === 'REFRI' ? '#FFFFFF' : '#047857', 
-              padding: '0.2rem 0.55rem', 
-              borderRadius: '9999px', 
-              fontWeight: 700 
-            }}>
+            <div className="cl-card-title">Red Fría / Refrigerados</div>
+            <span className={`cl-card-badge cl-badge-refri ${activeFilter === 'REFRI' ? 'active' : ''}`}>
               {activeFilter === 'REFRI' ? '✓ FILTRADO' : '❄️ VER REFRI'}
             </span>
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#059669', marginTop: '0.25rem' }}>
-            {stats.totalRedFria || data.filter(d => d.EsRedFria).length}
+          <div className="cl-num-refri" style={{ fontSize: '2.1rem', fontWeight: 800, marginTop: '0.25rem' }}>
+            {kpis.totalRedFria}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>Control de temperatura 2°C - 8°C</div>
+          <div className="cl-card-subtitle">
+            {searchQuery ? `Refrigerados para el filtro actual` : 'Control de temperatura 2°C - 8°C'}
+          </div>
         </div>
 
       </div>
 
-      {/* Barra de Filtros y Búsqueda */}
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', background: '#FFFFFF', padding: '1rem 1.25rem', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+      {/* Barra de Búsqueda y Estado de Filtro */}
+      <div className="cl-search-box" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', background: '#FFFFFF', padding: '1rem 1.25rem', borderRadius: '14px', border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
         
-        {/* Botones de filtro rápido */}
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setActiveFilter('ALL')}
-            style={{
-              padding: '0.55rem 1rem',
-              borderRadius: '8px',
-              border: activeFilter === 'ALL' ? '2px solid #004687' : '1px solid #CBD5E1',
-              background: activeFilter === 'ALL' ? '#004687' : '#FFFFFF',
-              color: activeFilter === 'ALL' ? '#FFFFFF' : '#334155',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            📋 Todos ({data.length})
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('CON')}
-            style={{
-              padding: '0.55rem 1rem',
-              borderRadius: '8px',
-              border: activeFilter === 'CON' ? '2px solid #DC2626' : '1px solid #FECACA',
-              background: activeFilter === 'CON' ? '#DC2626' : '#FEF2F2',
-              color: activeFilter === 'CON' ? '#FFFFFF' : '#DC2626',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            💊 Solo Controlados ({data.filter(d => d.EsControlado).length})
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('ANTI')}
-            style={{
-              padding: '0.55rem 1rem',
-              borderRadius: '8px',
-              border: activeFilter === 'ANTI' ? '2px solid #2563EB' : '1px solid #BFDBFE',
-              background: activeFilter === 'ANTI' ? '#2563EB' : '#EFF6FF',
-              color: activeFilter === 'ANTI' ? '#FFFFFF' : '#2563EB',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            💉 Antibióticos ({data.filter(d => d.EsAntibiotico).length})
-          </button>
-
-          <button
-            onClick={() => setActiveFilter('REFRI')}
-            style={{
-              padding: '0.55rem 1rem',
-              borderRadius: '8px',
-              border: activeFilter === 'REFRI' ? '2px solid #059669' : '1px solid #A7F3D0',
-              background: activeFilter === 'REFRI' ? '#059669' : '#ECFDF5',
-              color: activeFilter === 'REFRI' ? '#FFFFFF' : '#059669',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            ❄️ Red Fría ({data.filter(d => d.EsRedFria).length})
-          </button>
-        </div>
-
-        {/* Campo de búsqueda */}
-        <div style={{ flex: 1, minWidth: '240px' }}>
+        {/* Campo de búsqueda grande y limpio */}
+        <div style={{ flex: 1, minWidth: '280px', position: 'relative' }}>
           <input
             type="text"
+            className="cl-search-input"
             placeholder="🔍 Buscar por Paciente, Médico, Medicamento, Código o Lote..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               width: '100%',
-              padding: '0.65rem 1rem',
+              padding: '0.75rem 2.5rem 0.75rem 1rem',
               background: '#F8FAFC',
               border: '1px solid #CBD5E1',
-              borderRadius: '8px',
+              borderRadius: '10px',
               color: '#0F172A',
               fontWeight: 500,
-              fontSize: '0.9rem',
+              fontSize: '0.95rem',
               outline: 'none',
-              transition: 'border-color 0.2s ease'
+              transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
             }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = '#0088C9'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#0088C9'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0, 136, 201, 0.15)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = 'none'; }}
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: '#E2E8F0',
+                border: 'none',
+                borderRadius: '50%',
+                width: '22px',
+                height: '22px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748B',
+                fontSize: '0.75rem',
+                fontWeight: 'bold'
+              }}
+              title="Limpiar búsqueda"
+            >
+              ✕
+            </button>
+          )}
         </div>
+
+        {/* Indicador de estado activo si hay filtro */}
+        {(searchQuery || activeFilter !== 'ALL') && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span className="cl-text-secondary" style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>
+              Mostrando <strong className="cl-text-primary" style={{ color: '#0F172A' }}>{filteredData.length}</strong> resultados
+            </span>
+            {activeFilter !== 'ALL' && (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.3rem 0.65rem',
+                background: '#EFF6FF',
+                color: '#1D4ED8',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                border: '1px solid #BFDBFE'
+              }}>
+                Filtro: {activeFilter === 'CON' ? '💊 Controlados' : activeFilter === 'ANTI' ? '💉 Antibióticos' : activeFilter === 'REFRI' ? '❄️ Red Fría' : activeFilter}
+                <button
+                  onClick={() => setActiveFilter('ALL')}
+                  style={{ background: 'none', border: 'none', color: '#1D4ED8', cursor: 'pointer', fontWeight: 'bold', padding: 0, marginLeft: '4px' }}
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            <button
+              onClick={() => { setSearchQuery(''); setActiveFilter('ALL'); }}
+              style={{
+                padding: '0.4rem 0.75rem',
+                background: '#F1F5F9',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                color: '#475569',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Restablecer todo
+            </button>
+          </div>
+        )}
 
       </div>
 
       {/* Tabla Principal */}
-      <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)' }}>
+      <div className="cl-table-container" style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)' }}>
         {loading ? (
           <div style={{ padding: '3.5rem', textAlign: 'center', color: '#64748B', fontWeight: 600, fontSize: '1rem' }}>⏳ Cargando registro de salidas y trazabilidad de lotes…</div>
         ) : error ? (
@@ -440,14 +599,14 @@ export default function ControlledLedger() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
-                <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
-                  <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fecha y Hora</th>
-                  <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Médico Autoriza</th>
-                  <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Paciente</th>
-                  <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Insumo / Medicamento</th>
-                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Clasificación SAP</th>
-                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'center', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lote</th>
-                  <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cant.</th>
+                <tr className="cl-thead" style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
+                  <th className="cl-th" style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fecha y Hora</th>
+                  <th className="cl-th" style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Médico Autoriza</th>
+                  <th className="cl-th" style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Paciente</th>
+                  <th className="cl-th" style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Insumo / Medicamento</th>
+                  <th className="cl-th" style={{ padding: '0.9rem 1.25rem', textAlign: 'center', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Clasificación SAP</th>
+                  <th className="cl-th" style={{ padding: '0.9rem 1.25rem', textAlign: 'center', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lote</th>
+                  <th className="cl-th" style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cant.</th>
                 </tr>
               </thead>
               <tbody>
@@ -465,9 +624,12 @@ export default function ControlledLedger() {
                     badge = { text: '🏷️ LASA', bg: '#F5F3FF', color: '#7C3AED', border: '#DDD6FE' };
                   }
 
+                  const rowClass = row.EsControlado ? 'cl-row-con' : idx % 2 === 0 ? 'cl-row-even' : 'cl-row-odd';
+
                   return (
                     <tr 
                       key={idx} 
+                      className={`cl-row-hover ${rowClass}`}
                       style={{ 
                         borderBottom: '1px solid #F1F5F9',
                         background: row.EsControlado ? '#FFFDFD' : idx % 2 === 0 ? '#FFFFFF' : '#FBFDFF',
@@ -476,18 +638,18 @@ export default function ControlledLedger() {
                       onMouseEnter={(e) => { e.currentTarget.style.background = row.EsControlado ? '#FEF2F2' : '#F0F7FF'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = row.EsControlado ? '#FFFDFD' : idx % 2 === 0 ? '#FFFFFF' : '#FBFDFF'; }}
                     >
-                      <td style={{ padding: '0.85rem 1.25rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <td className="cl-text-secondary" style={{ padding: '0.85rem 1.25rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         {new Date(row.Fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' })} <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>{new Date(row.Fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                       </td>
-                      <td style={{ padding: '0.85rem 1.25rem', color: '#1E293B', fontWeight: 600 }}>
+                      <td className="cl-text-primary" style={{ padding: '0.85rem 1.25rem', color: '#1E293B', fontWeight: 600 }}>
                         {row.Medico}
                       </td>
-                      <td style={{ padding: '0.85rem 1.25rem', color: '#0F172A', fontWeight: 700 }}>
+                      <td className="cl-text-primary" style={{ padding: '0.85rem 1.25rem', color: '#0F172A', fontWeight: 700 }}>
                         {row.Paciente}
                       </td>
                       <td style={{ padding: '0.85rem 1.25rem' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#005FA9', fontWeight: 700, display: 'block' }}>{row.Codigo}</span>
-                        <span style={{ fontWeight: 600, color: row.EsControlado ? '#991B1B' : '#0F172A' }}>{row.Medicamento}</span>
+                        <span className="cl-text-code" style={{ fontSize: '0.75rem', color: '#005FA9', fontWeight: 700, display: 'block' }}>{row.Codigo}</span>
+                        <span className="cl-text-primary" style={{ fontWeight: 600, color: row.EsControlado ? '#991B1B' : '#0F172A' }}>{row.Medicamento}</span>
                       </td>
                       <td style={{ padding: '0.85rem 1.25rem', textAlign: 'center' }}>
                         <span style={{
@@ -506,7 +668,7 @@ export default function ControlledLedger() {
                         </span>
                       </td>
                       <td style={{ padding: '0.85rem 1.25rem', textAlign: 'center' }}>
-                        <span style={{ background: '#F1F5F9', color: '#334155', padding: '0.25rem 0.6rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.82rem', fontFamily: 'monospace', border: '1px solid #E2E8F0' }}>
+                        <span className="cl-lote-box" style={{ background: '#F1F5F9', color: '#334155', padding: '0.25rem 0.6rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.82rem', fontFamily: 'monospace', border: '1px solid #E2E8F0' }}>
                           {row.Lote}
                         </span>
                       </td>

@@ -8,14 +8,14 @@ Este documento contiene los ajustes específicos realizados en el servidor produ
 
 El servidor de producción opera mediante un proceso Node.js integrado que entrega tanto la **API REST (Backend)** como la **aplicación React SPA (Frontend)** compilada en el puerto `5173`.
 
-### 1.1 Conexión a SQL Server / Túnel Remote (`REMOTE_DB_SERVER`)
+### 1.1 Conexión a SQL Server / Tailscale VPN (`REMOTE_DB_SERVER`)
 - **Archivo**: `backend/.env`
 - **Configuración**: 
   ```env
-  REMOTE_DB_SERVER=159.223.110.159
-  REMOTE_DB_PORT=37368
+  REMOTE_DB_SERVER=100.121.115.8
+  REMOTE_DB_PORT=1433
   ```
-- **Nota Técnica**: En la red local del servidor productivo, la resolución DNS de Windows traducía el dominio `bore.pub` hacia la IP `1.1.1.1` (IP ficticia de filtrado DNS). Usar la IP directa `159.223.110.159` garantiza la conectividad TCP inmediata hacia la base de datos Vertical SQL Server.
+- **Nota Técnica**: Se migró completamente de Bore a **Tailscale Mesh VPN (WireGuard)**. La conexión hacia SQL Server (`KH_HE`) se realiza de forma directa y cifrada extremo a extremo a través de la IP privada fija `100.121.115.8` en el puerto estándar `1433`, eliminando dependencias de relays públicos, cambios dinámicos de puerto y problemas de resolución DNS. Consulta `GUIA_CONEXION_PRODUCCION_TAILSCALE.md` para más detalles.
 
 ### 1.2 Arranque en Producción
 - **Script**: `iniciar_produccion.bat`
@@ -82,7 +82,7 @@ El script de empaquetado `build_deploy.ps1` excluye estrictamente:
 La plataforma utiliza una **arquitectura híbrida de 3 capas**:
 
 1. **SAP Service Layer (ERP)**: Consultas en tiempo real para transacciones del día actual (facturación, inventario valorizado, partidas).
-2. **SQL Server / Túnel Remote (Vertical)**: Consultas en vivo para el día en curso (censo, expediente, agendas).
+2. **SQL Server / Tailscale (Vertical)**: Consultas en vivo para el día en curso (censo, expediente, agendas).
 3. **PostgreSQL Data Warehouse (Local)**: Concentra todo el histórico (ayer y pasado). Todos los tableros analíticos (Quirófano, CEX, Urgencias, Eficiencia) leen el DW local para dar respuestas inmediatas.
 
 ### 4.1 Frecuencia de Sincronización

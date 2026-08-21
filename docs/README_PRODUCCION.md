@@ -8,14 +8,14 @@ Este documento contiene los ajustes específicos realizados en el servidor produ
 
 Respecto al entorno de desarrollo local, se realizaron las siguientes adaptaciones en el servidor de producción:
 
-### 1.1 Conexión a SQL Server / Túnel Bore (`REMOTE_DB_SERVER`)
+### 1.1 Conexión a SQL Server / Tailscale VPN (`REMOTE_DB_SERVER`)
 - **Archivo**: `backend/.env`
 - **Cambio**: 
   ```env
-  REMOTE_DB_SERVER=159.223.110.159
-  REMOTE_DB_PORT=50351
+  REMOTE_DB_SERVER=100.121.115.8
+  REMOTE_DB_PORT=1433
   ```
-- **Motivo Técnico**: En la red local del servidor productivo, la resolución DNS de Windows traducía el dominio `bore.pub` hacia la IP `1.1.1.1` (IP ficticia de filtrado DNS), haciendo fallar las conexiones TCP al puerto `50351`. Usar la IP directa `159.223.110.159` garantiza la conectividad inmediata sin depender de la resolución DNS del router/servidor.
+- **Motivo Técnico**: Se migró de Bore a **Tailscale Mesh VPN**. La conexión hacia SQL Server (`KH_HE`) se realiza de forma directa y cifrada extremo a extremo a través de la IP privada fija `100.121.115.8` en el puerto estándar `1433`. Consulta `GUIA_CONEXION_PRODUCCION_TAILSCALE.md` para más información.
 
 ### 1.2 Mensajes de Diagnóstico en la Conexión Remota
 - **Archivo**: `backend/config/remote-db.js`
@@ -112,7 +112,7 @@ La plataforma utiliza una **arquitectura híbrida de 3 capas** para garantizar c
 
 ### 4.1 Distribución de Fuentes de Datos
 1. **SAP Service Layer (ERP)**: Se consulta en **tiempo real para el día en curso** (facturación, ingresos oficiales grupo 111, inventario valorizado).
-2. **SQL Server / Túnel Bore (Vertical)**: Se consulta en **tiempo real para el día en curso** (cuentas de pacientes activas, expediente clínico, censos).
+2. **SQL Server / Tailscale VPN (Vertical)**: Se consulta en **tiempo real para el día en curso** (cuentas de pacientes activas, expediente clínico, censos).
 3. **PostgreSQL Data Warehouse (Local)**: Concentra **todo el histórico (ayer y fechas pasadas)**. Todos los tableros analíticos (Quirófano, Urgencias, Eficiencia, CEX) leen el histórico directamente desde PostgreSQL local para ofrecer respuestas en milisegundos.
 
 ---
