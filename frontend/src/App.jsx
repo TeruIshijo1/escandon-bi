@@ -49,6 +49,7 @@ const DashboardSiti       = lazy(() => import('./components/dashboard/DashboardS
 const DashboardComparativo= lazy(() => import('./components/dashboard/DashboardComparativo'));
 const DataQualityDashboard= lazy(() => import('./pages/DataQualityDashboard'));
 const ConsultaExternaPage = lazy(() => import('./pages/ConsultaExternaPage'));
+const TraceOrder          = lazy(() => import('./pages/TraceOrder'));
 
 /* ── Fallback de carga ───────────────────────────────────────── */
 function PageLoader() {
@@ -302,6 +303,14 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
                     <DataQualityDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="rastreo-ordenes"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO]}>
+                    <TraceOrder />
                   </ProtectedRoute>
                 }
               />

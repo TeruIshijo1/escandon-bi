@@ -63,7 +63,7 @@ export default function InventarioAlmacen() {
       setSelectedItemHistory(item);
       setLoadingHistory(true);
       setHistorySearchTerm(''); // reset search
-      const response = await fetch(`${API_BASE}/almacen/historial-movimientos/${encodeURIComponent(item.ItemCode)}`, {
+      const response = await fetch(`${API_BASE}/almacen/historial-movimientos?itemCode=${encodeURIComponent(item.ItemCode)}`, {
         headers: authHeaders()
       });
       const json = await response.json();
@@ -84,7 +84,7 @@ export default function InventarioAlmacen() {
     try {
       setSelectedItemLocations(item);
       setLoadingLocations(true);
-      const response = await fetch(`${API_BASE}/almacen/ubicaciones/${encodeURIComponent(item.ItemCode)}`, {
+      const response = await fetch(`${API_BASE}/almacen/ubicaciones?itemCode=${encodeURIComponent(item.ItemCode)}`, {
         headers: authHeaders()
       });
       const json = await response.json();
@@ -580,9 +580,9 @@ export default function InventarioAlmacen() {
                   <tbody>
                     {locations.map((loc, i) => (
                       <tr key={i} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: '600', color: '#0369a1' }}>{loc.WhsCode}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: '600', color: '#0369a1' }}>{loc.almacen || loc.whsCode || loc.WhsCode}</td>
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: '#0f172a' }}>
-                          {loc.QuantityOnStock}
+                          {loc.stock !== undefined ? loc.stock : loc.QuantityOnStock}
                         </td>
                       </tr>
                     ))}

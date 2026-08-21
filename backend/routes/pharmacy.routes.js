@@ -62,8 +62,8 @@ router.get('/inventario', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
   }
 });
 
-router.get('/lotes/:itemCode', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
-  const { itemCode } = req.params;
+router.get('/lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
+  const itemCode = req.query.itemCode;
   try {
     const warehouseCode = req.query.warehouse || 'FAR';
     
@@ -83,9 +83,9 @@ router.get('/lotes/:itemCode', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
  * GET /api/pharmacy/historial-lotes/:itemCode
  * Extrae el historial de movimientos de inventario desde Vertical (Cirrus) cruzando PCPRBT y UDR_CUENTAS_SERVICIOS
  */
-router.get('/historial-lotes/:itemCode', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
+router.get('/historial-lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
-    const { itemCode } = req.params;
+    const itemCode = req.query.itemCode;
     if (!itemCode) return res.status(400).json({ ok: false, error: 'ItemCode requerido' });
 
     const pool = await connectRemoteDB();
@@ -131,8 +131,9 @@ router.get('/historial-lotes/:itemCode', authenticate, authorize(['ADMIN', 'DIRE
  * GET /api/pharmacy/ubicaciones/:itemCode
  * Devuelve en qué otros almacenes del hospital hay stock del artículo
  */
-router.get('/ubicaciones/:itemCode', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
-  const itemCode = req.params.itemCode;
+router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
+  const itemCode = req.query.itemCode;
+  if (!itemCode) return res.status(400).json({ ok: false, error: 'ItemCode requerido' });
   
   if (sapInventoryService.getInventoryCache().length > 0) {
     // Buscar en el caché global en qué almacenes hay stock de este ItemCode

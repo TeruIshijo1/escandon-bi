@@ -90,6 +90,42 @@ router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
 });
 
 /**
+ * GET /api/almacen/historial-movimientos
+ * Devuelve el historial de movimientos de un articulo desde dw_sap_kardex
+ */
+router.get('/historial-movimientos', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
+  try {
+    const { itemCode } = req.query;
+    if (!itemCode) return res.status(400).json({ ok: false, error: 'Código de artículo requerido (itemCode)' });
+    
+    const { pool: pgPool } = require('../config/pg-db');
+
+    const pgRes = await pgPool.query(`
+      SELECT 
+        codigo AS "Codigo", descripcion AS "Descripcion", almacenorigen AS "AlmacenOrigen", almacendestino AS "AlmacenDestino", documentoref AS "DocumentoRef", fecha AS "Fecha", servicio AS "Servicio", usuario AS "Usuario", movimiento AS "Movimiento"
+      FROM dw_sap_kardex
+      WHERE codigo = $1
+      ORDER BY fecha DESC
+      LIMIT 100
+    `, [itemCode]);
+
+    // Mapear los campos para que coincidan con lo que espera el frontend (que fue copiado de farmacia)
+    const formattedData = pgRes.rows.map(row => ({
+      Fecha: row.Fecha,
+      Lote: row.DocumentoRef || 'S/D',
+      Cantidad: row.Movimiento,
+      Paciente: row.AlmacenOrigen || 'General',
+      TipoMovimiento: (row.AlmacenDestino ? 'A: ' + row.AlmacenDestino : '') + (row.Servicio ? ' - ' + row.Servicio : '')
+    }));
+
+    res.json({ ok: true, data: formattedData });
+  } catch (err) {
+    console.error('[Historial Movimientos Almacen Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al obtener el historial de movimientos' });
+  }
+});
+
+/**
  * GET /api/almacen/traslados
  * Lista las solicitudes de traslado desde PostgreSQL (caching de SAP)
  */

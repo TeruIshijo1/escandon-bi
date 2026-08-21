@@ -60,6 +60,7 @@ export const ROUTE_PERMISSIONS = {
   '/almacen/reorden':       [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
   '/almacen/traslados':     [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
   '/almacen/reportes':      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL],
+  '/rastreo-ordenes':       [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
   '/consulta-externa':      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.CONSULTA_EXTERNA],
   '/calidad-datos':         [ROLES.ADMIN, ROLES.DIRECTOR],
   '/estadisticas':          [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
@@ -97,6 +98,7 @@ export const ROUTE_TO_PERMISSION = {
   '/almacen/reorden':       'almacen-reorden',
   '/almacen/traslados':     'almacen-traslados',
   '/almacen/reportes':      'almacen-reportes',
+  '/rastreo-ordenes':       'rastreo-ordenes',
   '/consulta-externa':      'consulta-externa',
   '/admin/usuarios':        'admin-usuarios',
   '/admin/auditoria-log':   'admin-auditoria-log',
@@ -375,15 +377,13 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
       path:    '/auditoria/inventarios',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
-    /*
     {
       section: 'Auditoría',
       icon:    '📋',
-      label:   'Auditoría: Análisis de Cargos (Cirrus/SAP)',
-      path:    '/auditoria/cargos',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
+      label:   'Rastreo de Órdenes e Insumos',
+      path:    '/rastreo-ordenes',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
     },
-    */
     {
       section: 'Farmacia',
       icon:    '📦',

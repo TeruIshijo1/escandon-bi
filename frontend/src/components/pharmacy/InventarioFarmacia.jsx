@@ -67,7 +67,7 @@ export default function InventarioFarmacia() {
     try {
       setSelectedItemBatches(item);
       setLoadingBatches(true);
-      const response = await fetch(`${API_BASE}/pharmacy/lotes/${encodeURIComponent(item.ItemCode)}?warehouse=${selectedWarehouse}`, {
+      const response = await fetch(`${API_BASE}/pharmacy/lotes?itemCode=${encodeURIComponent(item.ItemCode)}&warehouse=${selectedWarehouse}`, {
         headers: authHeaders()
       });
       const json = await response.json();
@@ -89,7 +89,7 @@ export default function InventarioFarmacia() {
       setSelectedItemHistory(item);
       setLoadingHistory(true);
       setHistorySearchTerm(''); // reset search
-      const response = await fetch(`${API_BASE}/pharmacy/historial-lotes/${encodeURIComponent(item.ItemCode)}`, {
+      const response = await fetch(`${API_BASE}/pharmacy/historial-lotes?itemCode=${encodeURIComponent(item.ItemCode)}`, {
         headers: authHeaders()
       });
       const json = await response.json();
@@ -110,7 +110,7 @@ export default function InventarioFarmacia() {
     try {
       setSelectedItemLocations(item);
       setLoadingLocations(true);
-      const response = await fetch(`${API_BASE}/pharmacy/ubicaciones/${encodeURIComponent(item.ItemCode)}`, {
+      const response = await fetch(`${API_BASE}/pharmacy/ubicaciones?itemCode=${encodeURIComponent(item.ItemCode)}`, {
         headers: authHeaders()
       });
       const json = await response.json();
