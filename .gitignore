@@ -43,6 +43,19 @@ backend/uploads/
 scratch/
 backend/scratch/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+venv/
+.venv/
+env/
+*.egg-info/
+backend/ml/models/*_backup.joblib
+
+
 # Scripts temporales
 scratch_*.js
 test_*.js
@@ -50,3 +63,5 @@ check_*.js
 search_*.js
 pase_a_produccion/
 .obsidian/
+
+

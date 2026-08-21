@@ -50,14 +50,15 @@ def main():
         
     print(f"[Predict] Último mes con datos: {ultimo_mes_str}")
     
-    # Obtener los datos del último mes para usarlos como "ingresos_mes_anterior" del siguiente
+    # Obtener los datos del último mes para usarlos como rezagos (Lag-1) del siguiente
     query_data = f"""
         SELECT 
             area,
             servicio,
             ingresos_total as ingresos_mes_anterior,
-            ticket_promedio,
-            num_cuentas
+            num_cuentas as num_cuentas_mes_anterior,
+            ticket_promedio as ticket_promedio_mes_anterior,
+            crecimiento_mensual as crecimiento_mensual_anterior
         FROM ml_dataset_ingresos_mensual
         WHERE periodo_mes = '{ultimo_mes_str}'
     """
@@ -90,8 +91,9 @@ def main():
         'servicio_encoded',
         'month',
         'ingresos_mes_anterior',
-        'ticket_promedio',
-        'num_cuentas'
+        'num_cuentas_mes_anterior',
+        'ticket_promedio_mes_anterior',
+        'crecimiento_mensual_anterior'
     ]
     
     # Limpiar posibles NaNs
@@ -102,19 +104,26 @@ def main():
     # Realizar predicción
     predictions = model.predict(X)
     
-    # En RandomForest podemos estimar un intervalo sencillo basado en los árboles
-    preds_trees = np.array([tree.predict(X.values) for tree in model.estimators_])
-    # preds_trees tiene shape (n_estimators, n_samples)
+    # Estimar intervalo de predicción
+    try:
+        if hasattr(model, 'estimators_') and hasattr(model.estimators_[0], 'predict'):
+            preds_trees = np.array([tree.predict(X.values) for tree in model.estimators_])
+            intervalo_bajo = np.percentile(preds_trees, 5, axis=0)
+            intervalo_alto = np.percentile(preds_trees, 95, axis=0)
+        else:
+            intervalo_bajo = predictions * 0.85
+            intervalo_alto = predictions * 1.15
+    except Exception:
+        intervalo_bajo = predictions * 0.85
+        intervalo_alto = predictions * 1.15
     
-    intervalo_bajo = np.percentile(preds_trees, 5, axis=0)
-    intervalo_alto = np.percentile(preds_trees, 95, axis=0)
-    
+    model_name = model.__class__.__name__
     df_pred['periodo_predicho'] = periodo_predicho
     df_pred['ingreso_estimado'] = predictions
     df_pred['intervalo_bajo'] = intervalo_bajo
     df_pred['intervalo_alto'] = intervalo_alto
-    df_pred['modelo_version'] = "RF-1.0"
-    df_pred['metodo'] = "RandomForestRegressor"
+    df_pred['modelo_version'] = "v1.1.0"
+    df_pred['metodo'] = model_name
     
     # Limpiar predicciones que den negativo
     df_pred['ingreso_estimado'] = df_pred['ingreso_estimado'].clip(lower=0)

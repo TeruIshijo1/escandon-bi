@@ -554,6 +554,22 @@ async function initPostgresDW() {
       );
     `);
 
+    // 15. Monitoreo y Registro de Ejecución de Jobs ML (Paso F4/Almacén DataScience)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ml_job_runs (
+        job_id SERIAL PRIMARY KEY,
+        job_name VARCHAR(100) NOT NULL,
+        status VARCHAR(50) NOT NULL,
+        triggered_by VARCHAR(100) DEFAULT 'SYSTEM',
+        started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        finished_at TIMESTAMP WITH TIME ZONE,
+        duration_seconds DECIMAL(10,2),
+        stdout TEXT,
+        stderr TEXT,
+        error_message TEXT
+      );
+    `);
+
     // Índices para mejorar las consultas en las nuevas tablas
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_t_date ON dw_sap_traslados (docdate);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_c_cons_cuenta ON dw_cirrus_consumo (cuentahospitalaria);`);
@@ -562,6 +578,13 @@ async function initPostgresDW() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_e_factura ON dw_sap_entradas (numerofactura);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_ml_hist_code ON ml_dataset_reorden_sku_history (itemcode);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_ml_hist_date ON ml_dataset_reorden_sku_history (snapshot_date);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_ml_job_runs_name_status ON ml_job_runs (job_name, status, started_at DESC);`);
+
+    // Migraciones: columnas para soporte de modelos de regresión en ml_model_runs
+    await pool.query(`ALTER TABLE ml_model_runs ADD COLUMN IF NOT EXISTS model_type VARCHAR(50);`).catch(() => {});
+    await pool.query(`ALTER TABLE ml_model_runs ADD COLUMN IF NOT EXISTS mae DECIMAL(18,4);`).catch(() => {});
+    await pool.query(`ALTER TABLE ml_model_runs ADD COLUMN IF NOT EXISTS rmse DECIMAL(18,4);`).catch(() => {});
+    await pool.query(`ALTER TABLE ml_model_runs ADD COLUMN IF NOT EXISTS r2 DECIMAL(8,6);`).catch(() => {});
 
     // Migraciones: ampliar columnas VARCHAR(50) a VARCHAR(255) en tablas existentes
     await pool.query(`ALTER TABLE dw_sap_kardex ALTER COLUMN almacenorigen TYPE VARCHAR(255);`).catch(() => {});

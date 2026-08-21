@@ -1,0 +1,46 @@
+{
+  "model_name": "RandomForestRegressor",
+  "model_version": "1.1.0",
+  "training_date": "2026-08-21T10:00:06.435332",
+  "evaluation_mode": "Out-of-Sample Holdout Validation (Mes: 2026-08)",
+  "train_samples": 41,
+  "test_samples": 14,
+  "features": [
+    "area_encoded",
+    "servicio_encoded",
+    "month",
+    "ingresos_mes_anterior",
+    "num_cuentas_mes_anterior",
+    "ticket_promedio_mes_anterior",
+    "crecimiento_mensual_anterior"
+  ],
+  "performance_out_of_sample": {
+    "mae": 799626.92,
+    "rmse": 2036156.2,
+    "r2": 0.1081,
+    "note": "Metrica principal de desempeno predictivo real para toma de decisiones"
+  },
+  "training_set_fit_diagnostics": {
+    "train_mae": 283906.6,
+    "train_rmse": 781251.34,
+    "train_r2": 0.6099,
+    "note": "Metrica interna de ajuste sobre datos de entrenamiento (no representa error fuera de muestra)"
+  },
+  "candidate_evaluations": {
+    "GradientBoostingRegressor": {
+      "mae": 887691.0393161594,
+      "rmse": 2102709.965568839,
+      "r2": 0.04879617793298752
+    },
+    "RandomForestRegressor": {
+      "mae": 799626.9205684095,
+      "rmse": 2036156.1973342015,
+      "r2": 0.10805716400864063
+    },
+    "ExtraTreesRegressor": {
+      "mae": 807925.0408115534,
+      "rmse": 1984856.0200653526,
+      "r2": 0.1524353043416301
+    }
+  }
+}

@@ -933,22 +933,66 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
 });
 
 /**
- * POST /api/almacen/ml-predictions/run
- * Ejecuta el script de predicción de Machine Learning asíncronamente
+ * GET /api/almacen/ml-predictions/status
+ * Retorna el estado del último job ejecutado para predicciones de almacén
  */
-router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), (req, res) => {
-  const { exec } = require('child_process');
-  const scriptPath = path.join(__dirname, '..', 'ml', 'predict_reorder_risk.py');
-  
-  console.log(`[ML Express] Ejecutando subproceso python en: ${scriptPath}`);
-  exec(`python "${scriptPath}"`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`[POST Run ML Predictions Error]`, error);
-      return res.status(500).json({ ok: false, error: 'Error al ejecutar modelo predictivo: ' + error.message, stderr });
+router.get('/ml-predictions/status', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const { getLatestJobStatus } = require('../services/mlJobRunner.service');
+    const status = await getLatestJobStatus('REORDER_RISK');
+    res.json({ ok: true, data: status });
+  } catch (err) {
+    console.error('[GET ML Predictions Status Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar estado de predicciones' });
+  }
+});
+
+/**
+ * POST /api/almacen/ml-predictions/run
+ * Ejecuta el script de predicción de Machine Learning con trazabilidad en ml_job_runs y control de concurrencia
+ */
+router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  const { startJob, runPythonScript } = require('../services/mlJobRunner.service');
+  const triggeredBy = req.user?.username || req.user?.email || 'USER';
+
+  try {
+    const jobResult = await startJob('REORDER_RISK', async () => {
+      console.log('[ML Express] Iniciando predicción de riesgo de desabasto...');
+      const { stdout } = await runPythonScript('predict_reorder_risk.py');
+      return stdout;
+    }, triggeredBy, { waitForCompletion: true });
+
+    if (jobResult.alreadyRunning) {
+      return res.status(409).json({
+        ok: false,
+        alreadyRunning: true,
+        error: jobResult.message
+      });
     }
-    console.log(`[POST Run ML Predictions Output]`, stdout);
-    res.json({ ok: true, message: 'Predicciones de Machine Learning ejecutadas y guardadas correctamente.', stdout });
-  });
+
+    if (jobResult.status === 'ERROR') {
+      return res.status(500).json({
+        ok: false,
+        jobId: jobResult.jobId,
+        error: jobResult.error_message || 'Error al ejecutar modelo predictivo',
+        stderr: jobResult.stderr || ''
+      });
+    }
+
+    res.json({
+      ok: true,
+      jobId: jobResult.jobId,
+      message: 'Predicciones de Machine Learning ejecutadas y guardadas correctamente.',
+      duration_seconds: jobResult.duration_seconds,
+      stdout: jobResult.stdout
+    });
+  } catch (error) {
+    console.error('[POST Run ML Predictions Error]', error);
+    res.status(500).json({
+      ok: false,
+      error: 'Error al procesar job de predicciones: ' + error.message
+    });
+  }
 });
 
 module.exports = router;

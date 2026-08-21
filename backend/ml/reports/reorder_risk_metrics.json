@@ -1,9 +1,9 @@
 {
-  "model_name": "RandomForestClassifier",
-  "model_version": "1.0.0",
-  "training_date": "2026-08-13T14:29:36.463275",
-  "train_samples": 19200,
-  "test_samples": 4800,
+  "model_name": "ExtraTreesClassifier",
+  "model_version": "1.1.0",
+  "training_date": "2026-08-21T09:56:08.385859",
+  "train_samples": 20000,
+  "test_samples": 5600,
   "features": [
     "stock_actual",
     "consumo_7d",
@@ -18,38 +18,38 @@
     "riesgo_base_enc"
   ],
   "performance": {
-    "accuracy": 0.9416666666666667,
-    "precision": 0.5965417867435159,
-    "recall": 1.0,
-    "f1_score": 0.7472924187725631,
-    "roc_auc": 0.999965304625389,
+    "accuracy": 0.9792857142857143,
+    "precision": 0.8076256499133448,
+    "recall": 0.9893842887473461,
+    "f1_score": 0.8893129770992366,
+    "roc_auc": 0.9943313881889708,
     "confusion_matrix": [
       [
-        4106,
-        280
+        5018,
+        111
       ],
       [
-        0,
-        414
+        5,
+        466
       ]
     ]
   },
   "baseline": {
     "name": "Reglas de negocio (riesgo_base CRITICO/ALTO)",
-    "accuracy": 0.8752083333333334,
-    "precision": 0.40868706811451133,
-    "recall": 1.0,
-    "f1_score": 0.5802382620882971,
+    "accuracy": 0.8605357142857143,
+    "precision": 0.3752012882447665,
+    "recall": 0.9893842887473461,
+    "f1_score": 0.5440747227086982,
     "confusion_matrix": [
       [
-        3787,
-        599
+        4353,
+        776
       ],
       [
-        0,
-        414
+        5,
+        466
       ]
     ],
-    "mejora_f1_vs_baseline": 0.1671
+    "mejora_f1_vs_baseline": 0.3452
   }
 }

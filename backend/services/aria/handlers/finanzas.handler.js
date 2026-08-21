@@ -13,6 +13,10 @@ async function queryForecastIngresos(userQuery) {
         intervalo_bajo,
         intervalo_alto
       FROM ml_forecast_ingresos_mensual
+      WHERE periodo_predicho = (
+        SELECT MAX(periodo_predicho)
+        FROM ml_forecast_ingresos_mensual
+      )
       ORDER BY ingreso_estimado DESC
     `;
     const res = await pool.query(query);
