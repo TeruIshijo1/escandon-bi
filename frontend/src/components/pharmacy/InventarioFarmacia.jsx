@@ -137,9 +137,39 @@ export default function InventarioFarmacia() {
     return items.filter(item => {
       const code = String(item.ItemCode || '').toLowerCase();
       const name = String(item.ItemName || '').toLowerCase();
-      return code.includes(term) || name.includes(term);
+      const group = String(item.ItemGroupName || '').toLowerCase();
+      const mfg = String(item.ManufacturerName || '').toLowerCase();
+      const medClass = String(item.MedicalClassification || '').toLowerCase();
+      const secClass = String(item.SecondaryClassification || '').toLowerCase();
+      return code.includes(term) || name.includes(term) || group.includes(term) || mfg.includes(term) || medClass.includes(term) || secClass.includes(term);
     });
   }, [items, searchTerm]);
+
+  // Helper de clasificación médica SAP
+  const getMedClassificationBadge = (item) => {
+    const c1 = (item.MedicalClassification || '').toUpperCase().trim();
+    const c2 = (item.SecondaryClassification || '').toUpperCase().trim();
+    
+    if (c1 === 'CON' || c2 === 'CON') {
+      return { text: '💊 CONTROLADO', bg: '#FEE2E2', color: '#DC2626', border: '#FECACA' };
+    }
+    if (c1 === 'ANTI' || c2 === 'ANTI') {
+      return { text: '💉 ANTIBIÓTICO', bg: '#EFF6FF', color: '#2563EB', border: '#BFDBFE' };
+    }
+    if (c1 === 'REFRI' || c2 === 'REFRI') {
+      return { text: '❄️ RED FRÍA', bg: '#ECFDF5', color: '#059669', border: '#A7F3D0' };
+    }
+    if (c1 === 'AR' || c2 === 'AR') {
+      return { text: '⚠️ ALTO RIESGO', bg: '#FEF3C7', color: '#D97706', border: '#FDE68A' };
+    }
+    if (c1 === 'LASA' || c2 === 'LASA') {
+      return { text: '🏷️ LASA', bg: '#F5F3FF', color: '#7C3AED', border: '#DDD6FE' };
+    }
+    if (c1 && c1 !== 'GENERAL' && c1 !== 'NULL' && c1 !== 'N/A') {
+      return { text: c1, bg: '#F1F5F9', color: '#475569', border: '#CBD5E1' };
+    }
+    return { text: '📦 GENERAL', bg: '#F8FAFC', color: '#64748B', border: '#E2E8F0' };
+  };
 
   // KPIs y Reabastecimiento
   const totalItems = items.length;
@@ -155,6 +185,7 @@ export default function InventarioFarmacia() {
     const cols = [
       { header: 'ItemCode', key: 'ItemCode', width: 100 },
       { header: 'Descripción', key: 'ItemName', width: 300 },
+      { header: 'Clasificación SAP', key: 'MedicalClassification', width: 130 },
       { header: 'Stock Actual', key: 'QuantityOnStock', width: 100, align: 'center' },
       { header: 'Costo Unitario ($)', key: 'PurchaseCost', width: 120, align: 'right' }
     ];
@@ -180,9 +211,9 @@ export default function InventarioFarmacia() {
   <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
   ${lowStockItems.map((row, i) => `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">${cols.map(c => {
     let val = row[c.key];
+    if (c.key === 'PurchaseCost' && typeof val === 'number') val = `$${val.toFixed(2)}`;
     if (val == null) val = '';
-    let cls = c.key === 'QuantityOnStock' ? ' class="critico"' : '';
-    if (c.key === 'PurchaseCost') val = `$${Number(val).toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+    let cls = (c.key === 'QuantityOnStock' && row.QuantityOnStock < 5) ? ' class="critico"' : '';
     return `<td${cls} style="text-align:${c.align || 'left'}">${String(val).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`;
   }).join('')}</tr>`).join('')}
 </table></body></html>`;
@@ -191,7 +222,7 @@ export default function InventarioFarmacia() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Sugerencias_Pedido_Farmacia_${new Date().toISOString().slice(0,10)}.xls`);
+    link.setAttribute('download', `Reabastecimiento_Farmacia_${new Date().toISOString().slice(0,10)}.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -203,7 +234,6 @@ export default function InventarioFarmacia() {
     { id: 'pending', label: '🛎️ Recetas Pendientes' },
     { id: 'ledger', label: '📤 Salidas Farmacia' },
     { id: 'history', label: '🩺 Historial de Pacientes' }
-    // { id: 'kits', label: '🔪 Kits Quirúrgicos' }
   ];
 
   return (
@@ -266,87 +296,80 @@ export default function InventarioFarmacia() {
       )}
 
       {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
-        {/* Card 1 */}
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)', border: '1px solid #e2e8f0', borderTop: '4px solid #3b82f6' }}>
-          <h3 style={{ margin: '0 0 0.5rem 0', color: '#64748b', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Catálogo Activo (Top 500)
-          </h3>
-          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#0f172a' }}>
-            {loading ? '...' : totalItems.toLocaleString()} <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 'normal' }}>SKUs</span>
+        {/* Catálogo Activo */}
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ fontSize: '0.875rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold' }}>Catálogo Activo (Top 500)</div>
+          <div style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#0f172a', marginTop: '0.5rem', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+            {totalItems} <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 'normal' }}>SKUs</span>
           </div>
         </div>
 
-        {/* Card 2 */}
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)', border: '1px solid #e2e8f0', borderTop: '4px solid #10b981' }}>
-          <h3 style={{ margin: '0 0 0.5rem 0', color: '#64748b', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Valor Total de Inventario
-          </h3>
-          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#0f172a' }}>
+        {/* Valor Total Inventario */}
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ fontSize: '0.875rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold' }}>Valor Total de Inventario</div>
+          <div style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#0f172a', marginTop: '0.5rem' }}>
             {loading ? '...' : `$${totalValue.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           </div>
         </div>
 
-        {/* Card 3 (Interactivo) */}
-        <div 
-          onClick={() => setShowReplenishmentModal(true)}
-          style={{ 
-            background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
-            border: '1px solid #e2e8f0', borderTop: '4px solid #f59e0b', cursor: 'pointer', transition: 'transform 0.2s'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: '#64748b', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Artículos Bajo Stock
-            </h3>
-            <span style={{ fontSize: '0.75rem', background: '#fef3c7', color: '#d97706', padding: '0.2rem 0.5rem', borderRadius: '9999px', fontWeight: 'bold' }}>
-              VER SUGERENCIAS &rarr;
-            </span>
+        {/* Artículos Bajo Stock */}
+        <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', cursor: 'pointer' }} onClick={() => setShowReplenishmentModal(true)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: '0.875rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold' }}>Artículos Bajo Stock</div>
+            {lowStockCount > 0 && (
+              <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#d97706', textDecoration: 'underline' }}>
+                Ver sugerencias →
+              </span>
+            )}
           </div>
-          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#0f172a', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-            {loading ? '...' : lowStockCount}
-            <span style={{ fontSize: '1rem', color: '#f59e0b', fontWeight: '500' }}>⚠️ Requieren atención</span>
+          <div style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#0f172a', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {lowStockCount}
+            {lowStockCount > 0 && (
+              <span style={{ fontSize: '0.875rem', color: '#d97706', background: '#fef3c7', padding: '0.2rem 0.6rem', borderRadius: '9999px', fontWeight: 'bold' }}>
+                ⚠️ Requieren atención
+              </span>
+            )}
           </div>
         </div>
 
       </div>
 
-      {/* Main Table Area */}
-      <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+      {/* Main Table Card */}
+      <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
         
-        {/* Toolbar */}
-        <div style={{ padding: '1.25rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          
-          <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', display: 'flex', alignItems: 'center' }}>
-            [FAR] FARMACIA
-          </h2>
-
-          <div style={{ display: 'flex', gap: '0.5rem', width: '100%', maxWidth: '500px' }}>
-            <input 
-              type="text" 
-              placeholder="🔍 Buscar por Código o Nombre..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') setSearchTerm(searchInput);
-              }}
-              style={{
-                padding: '0.75rem 1rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                width: '100%',
-                fontSize: '0.95rem'
-              }}
-            />
-            <button 
+        {/* Search & Actions Header */}
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', background: '#f8fafc' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, minWidth: '300px' }}>
+            <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '1.1rem' }}>
+              [FAR] FARMACIA
+            </span>
+            <div style={{ position: 'relative', flex: 1, maxWidth: '450px' }}>
+              <input
+                type="text"
+                placeholder="Buscar por código, descripción, grupo o clasificación..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') setSearchTerm(searchInput); }}
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 1rem',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+              />
+            </div>
+            <button
               onClick={() => setSearchTerm(searchInput)}
               style={{
-                padding: '0.75rem 1.5rem',
-                background: '#3b82f6',
-                color: 'white',
+                padding: '0.6rem 1.25rem',
+                background: '#0f172a',
+                color: '#ffffff',
                 border: 'none',
-                borderRadius: '6px',
+                borderRadius: '8px',
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 transition: 'background 0.2s'
@@ -358,13 +381,14 @@ export default function InventarioFarmacia() {
         </div>
 
         {/* Table */}
-        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
+        <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 350px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
               <tr style={{ background: '#f1f5f9', color: '#334155', fontSize: '0.875rem', letterSpacing: '0.025em', textTransform: 'uppercase' }}>
                 <th style={{ padding: '1rem 1.25rem', borderBottom: '2px solid #e2e8f0' }}>ItemCode</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem' }}>Descripción SAP</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem' }}>Grupo / Laboratorio</th>
+                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'center' }}>Clasificación SAP</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Stock Actual</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Costo Compra</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Precio Venta</th>
@@ -377,7 +401,7 @@ export default function InventarioFarmacia() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="9" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                  <td colSpan="11" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                       <div className="spinner" style={{ border: '4px solid #f3f3f3', borderTop: '4px solid #3b82f6', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }}></div>
                       Conectando con SAP Service Layer...
@@ -386,7 +410,7 @@ export default function InventarioFarmacia() {
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                  <td colSpan="11" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                     No se encontraron artículos que coincidan con la búsqueda.
                   </td>
                 </tr>
@@ -397,6 +421,7 @@ export default function InventarioFarmacia() {
                   const sales = item.SalesPrice || 0;
                   const isLow = stock < 10;
                   const formatCurrency = (val) => `$${(val || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  const medBadge = getMedClassificationBadge(item);
 
                   return (
                     <tr key={item.ItemCode || idx} style={{ borderBottom: '1px solid #e2e8f0', transition: 'background 0.2s' }}>
@@ -405,6 +430,22 @@ export default function InventarioFarmacia() {
                       <td style={{ padding: '1rem', color: '#475569', fontSize: '0.85rem' }}>
                         <div style={{ fontWeight: '500', color: '#334155' }}>{item.ItemGroupName}</div>
                         <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{item.ManufacturerName}</div>
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '0.3rem 0.75rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          whiteSpace: 'nowrap',
+                          background: medBadge.bg,
+                          color: medBadge.color,
+                          border: `1px solid ${medBadge.border}`
+                        }}>
+                          {medBadge.text}
+                        </span>
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500', color: '#0f172a' }}>{stock.toLocaleString()}</td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#b45309' }}>{formatCurrency(purchase)}</td>
