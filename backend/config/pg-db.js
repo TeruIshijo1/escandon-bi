@@ -644,6 +644,8 @@ async function initPostgresDW() {
     await pool.query(`ALTER TABLE dw_sap_pedidos ALTER COLUMN cardname TYPE TEXT;`).catch(() => {});
     await pool.query(`ALTER TABLE dw_sap_pedidos ALTER COLUMN usuarionombre TYPE TEXT;`).catch(() => {});
 
+    // Corrección de error de Excel en el código SAP del guante 8.5
+    await pool.query(`UPDATE dw_sap_reorder_settings SET itemcode = 'ALG0065' WHERE itemcode = '#REF!';`).catch(() => {});
 
     // Sembrar configuraciones de reorden por defecto
     const fs = require('fs');
