@@ -1,0 +1,1 @@
+import{j as o}from"./index-DoLLNU6H.js";import r from"./InventarioVsCargos-D9Gm1WhL.js";import"./router-LvRPBkFM.js";import"./ExportButton-c_hEI4WB.js";import"./auth-MnRnPDsF.js";import"./jspdf.es.min-ZitnLsjP.js";function e(){return o.jsx(r,{defaultEstado:"DIFERENCIA"})}export{e as default};
