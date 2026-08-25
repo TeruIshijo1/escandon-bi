@@ -1,0 +1,1 @@
+﻿require('./backend/node_modules/dotenv').config({path: './backend/.env'}); const sapService = require('./backend/services/sap.service'); sapService._ensureSession().then(()=>sapService.get('/SQLQueries(\'VidasSalvChoqueDet\')')).then(r=>{ console.log(r.data.SqlText); process.exit(0)}).catch(e=>{console.error(e);process.exit(1)});

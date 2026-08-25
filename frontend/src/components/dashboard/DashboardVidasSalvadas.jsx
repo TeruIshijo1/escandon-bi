@@ -208,18 +208,26 @@ export default function DashboardVidasSalvadas({ periodo }) {
                         <th style={{ padding: '0.5rem' }}>Total Línea</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {detailData.sap.map((s, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                          <td style={{ padding: '0.5rem' }}>{s.FolioSAP}</td>
-                          <td style={{ padding: '0.5rem' }}>{formatDate(s.Fecha)}</td>
-                          <td style={{ padding: '0.5rem' }}>{s.CodigoArticulo}</td>
-                          <td style={{ padding: '0.5rem' }}>{s.Descripcion}</td>
-                          <td style={{ padding: '0.5rem' }}>{s.Cantidad}</td>
-                          <td style={{ padding: '0.5rem' }}>{formatCurrency(s.TotalLinea)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
+                      <tbody>
+                        {detailData.sap.map((s, i) => {
+                          const isChoque = s.CodigoArticulo === 'SER0515' || s.CodigoArticulo === 'SER0533';
+                          return (
+                            <tr key={i} style={{ 
+                              borderBottom: '1px solid #E2E8F0', 
+                              color: isChoque ? '#E63946' : 'inherit',
+                              fontWeight: isChoque ? 600 : 'inherit',
+                              backgroundColor: isChoque ? 'rgba(230, 57, 70, 0.03)' : 'transparent'
+                            }}>
+                              <td style={{ padding: '0.5rem' }}>{s.FolioSAP}</td>
+                              <td style={{ padding: '0.5rem' }}>{formatDate(s.Fecha)}</td>
+                              <td style={{ padding: '0.5rem' }}>{s.CodigoArticulo}</td>
+                              <td style={{ padding: '0.5rem' }}>{s.Descripcion}</td>
+                              <td style={{ padding: '0.5rem' }}>{s.Cantidad}</td>
+                              <td style={{ padding: '0.5rem' }}>{formatCurrency(s.TotalLinea)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
                   </table>
                 ) : <p>No se encontraron registros en SAP para esta atención.</p>}
 
