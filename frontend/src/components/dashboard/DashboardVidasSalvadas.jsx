@@ -223,7 +223,7 @@ export default function DashboardVidasSalvadas({ periodo }) {
                   </table>
                 ) : <p>No se encontraron registros en SAP para esta atención.</p>}
 
-                <h3 style={{ borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem' }}>Cargos Vertical (SITI)</h3>
+                <h3 style={{ borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem' }}>Cargos Vertical</h3>
                 {detailData.vertical && detailData.vertical.length > 0 ? (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
