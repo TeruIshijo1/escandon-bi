@@ -17,6 +17,27 @@ const path = require('path');
 const { splitDateRange } = require('../utils/dashboard-helper');
 const { pool: pgPool } = require('../config/pg-db');
 
+async function fetchAllSapPages(sapService, initialUrl) {
+  let allData = [];
+  let nextLink = initialUrl;
+  
+  while (nextLink) {
+    const res = await sapService.get(nextLink);
+    if (res.data && res.data.value) {
+      allData = allData.concat(res.data.value);
+    }
+    
+    if (res.data && res.data['odata.nextLink']) {
+      let link = res.data['odata.nextLink'];
+      if (!link.startsWith('/')) link = '/' + link;
+      nextLink = link;
+    } else {
+      nextLink = null;
+    }
+  }
+  return allData;
+}
+
 // Asegurar que las consultas de analíticas de Quirófano de SAP B1 existan al arrancar
 const initSapQueries = async () => {
   try {
@@ -672,9 +693,9 @@ router.get(
 
       if (seccion === '01_VIDAS SALVADAS') {
         try {
-          const vsRes = await sapService.get(`/SQLQueries('VidasSalvChoqueDet')/List?startDate='2026-04-01'`);
-          if (vsRes.data && vsRes.data.value) {
-            vsRes.data.value.forEach(row => {
+          const allSapRows = await fetchAllSapPages(sapService, `/SQLQueries('VidasSalvChoqueDet')/List?startDate='2026-04-01'`);
+          if (allSapRows && allSapRows.length > 0) {
+            allSapRows.forEach(row => {
               if (row.FechaPrimeraOV) {
                 let mes;
                 if (typeof row.FechaPrimeraOV === 'string' && row.FechaPrimeraOV.length === 8 && /^\d{8}$/.test(row.FechaPrimeraOV)) {
@@ -3192,12 +3213,12 @@ router.get('/sap/vidas-salvadas', authenticate, async (req, res) => {
     }
 
     const sapService = require('../services/sap.service');
-    const result = await sapService.get(`/SQLQueries('VidasSalvChoqueDet')/List?startDate='${sapDate}'`);
+    const allSapRows = await fetchAllSapPages(sapService, `/SQLQueries('VidasSalvChoqueDet')/List?startDate='${sapDate}'`);
     
     res.json({
       ok: true,
-      data: result.data?.value || [],
-      totalVidasSalvadas: result.data?.value?.length || 0
+      data: allSapRows || [],
+      totalVidasSalvadas: allSapRows?.length || 0
     });
 
   } catch (err) {
