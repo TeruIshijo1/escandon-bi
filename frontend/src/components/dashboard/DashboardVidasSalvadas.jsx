@@ -243,17 +243,26 @@ export default function DashboardVidasSalvadas({ periodo }) {
                         <th style={{ padding: '0.5rem' }}>Total Línea</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {detailData.vertical.map((v, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                          <td style={{ padding: '0.5rem' }}>{formatDate(v.ChargeDate)}</td>
-                          <td style={{ padding: '0.5rem' }}>{v.ItemCode || v.SUCode}</td>
-                          <td style={{ padding: '0.5rem' }}>{v.ItemDescription || 'N/A'}</td>
-                          <td style={{ padding: '0.5rem' }}>{v.Quantity}</td>
-                          <td style={{ padding: '0.5rem' }}>{formatCurrency(v.Total)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
+                      <tbody>
+                        {detailData.vertical.map((v, i) => {
+                          const cod = v.ItemCode || v.SUCode;
+                          const isChoque = cod === 'SER0515' || cod === 'SER0533';
+                          return (
+                            <tr key={i} style={{ 
+                              borderBottom: '1px solid #E2E8F0',
+                              color: isChoque ? '#E63946' : 'inherit',
+                              fontWeight: isChoque ? 600 : 'inherit',
+                              backgroundColor: isChoque ? 'rgba(230, 57, 70, 0.03)' : 'transparent'
+                            }}>
+                              <td style={{ padding: '0.5rem' }}>{formatDate(v.ChargeDate)}</td>
+                              <td style={{ padding: '0.5rem' }}>{cod}</td>
+                              <td style={{ padding: '0.5rem' }}>{v.ItemDescription || 'N/A'}</td>
+                              <td style={{ padding: '0.5rem' }}>{v.Quantity}</td>
+                              <td style={{ padding: '0.5rem' }}>{formatCurrency(v.Total)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
                   </table>
                 ) : <p>No se encontraron cargos en Vertical para esta atención.</p>}
               </div>
