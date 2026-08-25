@@ -406,6 +406,31 @@ async function initPostgresDW() {
       );
     `);
 
+    // 6b. Snapshot persistente del inventario SAP (fallback offline cuando SAP no responde)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dw_sap_inventory_cache (
+        itemcode VARCHAR(100),
+        itemname TEXT,
+        whscode VARCHAR(20),
+        quantity DECIMAL(18,4) DEFAULT 0,
+        avgprice DECIMAL(18,4) DEFAULT 0,
+        salesprice DECIMAL(18,4) DEFAULT 0,
+        medicalclassification VARCHAR(20),
+        secondaryclassification VARCHAR(20),
+        lastsync TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_inv_cache_code ON dw_sap_inventory_cache (itemcode, whscode);`);
+
+    // 6c. Vínculos manuales producto-Excel -> código SAP (Configuración Dinámica Farmacia)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dw_reorder_excel_map (
+        producto VARCHAR(255) PRIMARY KEY,
+        itemcode VARCHAR(100),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // 7. Tabla SAP Pedidos
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_sap_pedidos (

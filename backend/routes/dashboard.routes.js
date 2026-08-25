@@ -675,8 +675,17 @@ router.get(
           const vsRes = await sapService.get(`/SQLQueries('VidasSalvChoqueDet')/List?startDate='2026-04-01'`);
           if (vsRes.data && vsRes.data.value) {
             vsRes.data.value.forEach(row => {
-              if (row.FechaPrimeraOV && row.FechaPrimeraOV.length === 8) {
-                const mes = parseInt(row.FechaPrimeraOV.substring(4, 6), 10);
+              if (row.FechaPrimeraOV) {
+                let mes;
+                if (typeof row.FechaPrimeraOV === 'string' && row.FechaPrimeraOV.length === 8 && /^\d{8}$/.test(row.FechaPrimeraOV)) {
+                  mes = parseInt(row.FechaPrimeraOV.substring(4, 6), 10);
+                } else if (typeof row.FechaPrimeraOV === 'string' && row.FechaPrimeraOV.length >= 10) {
+                  mes = parseInt(row.FechaPrimeraOV.substring(5, 7), 10);
+                } else {
+                  const d = new Date(row.FechaPrimeraOV);
+                  if (!isNaN(d.getTime())) mes = d.getMonth() + 1;
+                }
+                
                 if (mes >= 4 && mes <= 12) {
                   activeData[mes] = (activeData[mes] || 0) + 1;
                 }
@@ -3194,6 +3203,92 @@ router.get('/sap/vidas-salvadas', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Error en vidas salvadas SAP detalle:', err.error || err);
     res.status(500).json({ ok: false, error: err.error?.message?.value || err.message });
+  }
+});
+
+/**
+ * GET /api/dashboard/sap/vidas-salvadas/:atencion/detalle
+ * Obtiene el detalle de la atencion (SAP y Vertical) para el modal
+ */
+router.get('/sap/vidas-salvadas/:atencion/detalle', authenticate, async (req, res) => {
+  try {
+    const atencion = req.params.atencion;
+    const pool = await connectRemoteDB();
+    
+    // 1. SAP Details via Service Layer
+    const sapService = require('../services/sap.service');
+    await sapService._ensureSession();
+    const queryName = 'EscandonBIDetalleAtencion';
+    const sapSqlText = `
+      SELECT 
+        T0.DocNum AS "FolioSAP",
+        T0.DocDate AS "Fecha",
+        T1.ItemCode AS "CodigoArticulo",
+        T1.Dscription AS "Descripcion",
+        T1.Quantity AS "Cantidad",
+        T1.Price AS "PrecioUnitario",
+        T1.LineTotal AS "TotalLinea"
+      FROM OINV T0
+      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
+      WHERE T0.U_PCNum = '${atencion}' AND T0.CANCELED = 'N'
+      
+      UNION ALL
+      
+      SELECT 
+        T0.DocNum AS "FolioSAP",
+        T0.DocDate AS "Fecha",
+        T1.ItemCode AS "CodigoArticulo",
+        T1.Dscription AS "Descripcion",
+        T1.Quantity AS "Cantidad",
+        T1.Price AS "PrecioUnitario",
+        T1.LineTotal AS "TotalLinea"
+      FROM ORDR T0
+      INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
+      WHERE T0.U_PCNum = '${atencion}' AND T0.CANCELED = 'N'
+    `;
+    
+    let sapData = [];
+    try {
+      try {
+        await sapService.post('/SQLQueries', { SqlCode: queryName, SqlName: queryName, SqlText: sapSqlText });
+      } catch(e) {
+        await sapService.patch(`/SQLQueries('${queryName}')`, { SqlText: sapSqlText });
+      }
+      const sapRes = await sapService.get(`/SQLQueries('${queryName}')/List`);
+      sapData = sapRes?.data?.value || [];
+    } catch(err) {
+      console.error('[SAP SL] Error en query de atencion:', err.error || err);
+    }
+
+    // 2. Vertical Details (PCIT)
+    const verticalQuery = `
+      SELECT 
+        PCITNum,
+        ChargeDate,
+        SUCode,
+        ItemCode,
+        ItemDescription,
+        Quantity,
+        UnitPrice,
+        (Quantity * UnitPrice) as Total
+      FROM PCIT
+      WHERE PCNum = @atencion
+      ORDER BY ChargeDate ASC
+    `;
+    
+    const verticalResult = await pool.request()
+      .input('atencion', atencion)
+      .query(verticalQuery);
+
+    res.json({
+      ok: true,
+      sap: sapData || [],
+      vertical: verticalResult.recordset || []
+    });
+
+  } catch (err) {
+    console.error('Error en detalle de vidas salvadas:', err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 

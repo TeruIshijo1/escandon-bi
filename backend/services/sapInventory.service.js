@@ -1,6 +1,7 @@
 'use strict';
 
 const sapService = require('./sap.service');
+const { pool } = require('../config/pg-db');
 
 // ==== MOTOR DE CACHÉ EN MEMORIA ====
 let globalInventoryCache = [];
@@ -11,6 +12,7 @@ let globalItemGroups = {};
 let globalManufacturers = {};
 let syncPromise = null;
 let lastSyncTime = null;
+let usingDBFallback = false; // true cuando el caché viene del snapshot de PostgreSQL (SAP no disponible)
 
 async function ensureSqlQuery(sqlCode, sqlText) {
   try {
@@ -152,7 +154,10 @@ async function syncInventoryCache() {
         ExpirationDate: formatSapDate(b.ExpirationDate)
       }));
       lastSyncTime = new Date();
+      usingDBFallback = false;
       console.log(`[SAP Cache SQL] Sincronización exitosa: ${globalInventoryCache.length} artículos, ${globalBatchesCache.length} lotes y ${globalMedicalClassificationMap.size} clasificaciones médicas en memoria.`);
+      // Persistir snapshot en PostgreSQL para operar si SAP llega a caerse
+      persistInventorySnapshot();
     }
     } catch (error) {
       console.error(`[SAP Cache SQL] Error al sincronizar inventario:`, error.message || error);
@@ -161,6 +166,176 @@ async function syncInventoryCache() {
     }
   })();
   return syncPromise;
+}
+
+/**
+ * Persiste el caché de inventario actual en PostgreSQL (dw_sap_inventory_cache).
+ * Permite que los módulos sigan operando (modo degradado) si SAP Service Layer no responde.
+ */
+async function persistInventorySnapshot() {
+  if (!globalInventoryCache || globalInventoryCache.length === 0) return;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM dw_sap_inventory_cache');
+    const batchSize = 500;
+    for (let i = 0; i < globalInventoryCache.length; i += batchSize) {
+      const batch = globalInventoryCache.slice(i, i + batchSize);
+      const values = [];
+      const params = [];
+      batch.forEach((item, idx) => {
+        const base = idx * 9;
+        values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`);
+        params.push(
+          String(item.ItemCode || ''),
+          item.ItemName || null,
+          String(item.WhsCode || ''),
+          Number(item.QuantityOnStock || 0),
+          Number(item.PurchaseCost || 0),
+          Number(item.SalesPrice || 0),
+          item.MedicalClassification || null,
+          item.SecondaryClassification || null,
+          new Date()
+        );
+      });
+      await client.query(`
+        INSERT INTO dw_sap_inventory_cache (itemcode, itemname, whscode, quantity, avgprice, salesprice, medicalclassification, secondaryclassification, lastsync)
+        VALUES ${values.join(',')}
+      `, params);
+    }
+    await client.query('COMMIT');
+    console.log(`[SAP Cache SQL] Snapshot de inventario persistido en PostgreSQL (${globalInventoryCache.length} registros).`);
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.warn('[SAP Cache SQL] No se pudo persistir el snapshot de inventario:', err.message);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Carga el último snapshot de inventario desde PostgreSQL a memoria.
+ * Se usa como fallback cuando SAP Service Layer no está disponible.
+ * Si nunca se ha persistido un snapshot, deriva un stock aproximado del
+ * Kardex (última existencia registrada por artículo) en modo degradado.
+ */
+async function loadInventoryFromDB() {
+  try {
+    let loaded = await loadSnapshotFromTable();
+
+    // Fallback nivel 2: derivar del Kardex (existencias de la última sincronización)
+    if (!loaded) {
+      loaded = await loadFromKardex();
+    }
+
+    if (loaded) {
+      usingDBFallback = true;
+      console.log(`[SAP Cache SQL] ⚠️ Modo degradado: inventario cargado desde PostgreSQL (${globalInventoryCache.length} registros, último sync: ${lastSyncTime || 'desconocido'}).`);
+    }
+    return loaded;
+  } catch (err) {
+    console.error('[SAP Cache SQL] Error al cargar snapshot de inventario desde PostgreSQL:', err.message);
+    return false;
+  }
+}
+
+async function loadSnapshotFromTable() {
+  const res = await pool.query(`
+      SELECT itemcode AS "ItemCode", itemname AS "ItemName", whscode AS "WhsCode",
+             quantity AS "QuantityOnStock", avgprice AS "PurchaseCost", salesprice AS "SalesPrice",
+             medicalclassification AS "MedicalClassification", secondaryclassification AS "SecondaryClassification",
+             lastsync AS "LastSync"
+      FROM dw_sap_inventory_cache
+    `);
+  if (res.rows.length === 0) return false;
+  applyInventoryRows(res.rows, res.rows[0]?.LastSync || null);
+  return true;
+}
+
+async function loadFromKardex() {
+  // Última existencia registrada por artículo en el Kardex (aprox. del stock total al último sync)
+  const res = await pool.query(`
+      SELECT DISTINCT ON (k.codigo)
+        k.codigo AS "ItemCode", k.descripcion AS "ItemName",
+        k.existencias AS "QuantityOnStock", k.fecha AS "LastSync"
+      FROM dw_sap_kardex k
+      WHERE k.codigo IS NOT NULL AND k.codigo <> ''
+        AND k.codigo NOT IN ('ENTRADA', 'TRASLADO')
+      ORDER BY k.codigo, k.fecha DESC, k.idkardex DESC
+    `);
+  if (res.rows.length === 0) return false;
+
+  // Sólo exponer los SKUs mapeados en la matriz de reorden (universo Farmacia/Almacén)
+  const settingsRes = await pool.query('SELECT itemcode, itemdescription FROM dw_sap_reorder_settings');
+  const mappedCodes = new Set(settingsRes.rows.map(r => r.itemcode));
+
+  const rows = res.rows
+    .filter(r => mappedCodes.has(r.ItemCode))
+    .map(r => ({
+      ItemCode: r.ItemCode,
+      ItemName: r.ItemName || settingsRes.rows.find(s => s.itemcode === r.ItemCode)?.itemdescription || 'Insumo Médico',
+      WhsCode: 'FAR',
+      QuantityOnStock: Number(r.QuantityOnStock || 0),
+      PurchaseCost: 0,
+      SalesPrice: 0,
+      MedicalClassification: null,
+      SecondaryClassification: null,
+      LastSync: r.LastSync
+    }));
+  if (rows.length === 0) return false;
+  applyInventoryRows(rows, rows[0]?.LastSync || null);
+  return true;
+}
+
+function applyInventoryRows(rows, lastSync) {
+  globalInventoryCache = rows.map(item => {
+    const cost = item.PurchaseCost || 0;
+    const price = item.SalesPrice || 0;
+    return {
+      ...item,
+      ItemGroupName: 'General',
+      ManufacturerName: 'Genérico',
+      ProfitMargin: price > 0 ? ((price - cost) / price) * 100 : 0,
+      ExpectedUtility: (price - cost) * (item.QuantityOnStock || 0)
+    };
+  });
+  globalInventoryMap = new Map(globalInventoryCache.map(i => [i.ItemCode, i]));
+  lastSyncTime = lastSync;
+  // Cargar clasificaciones desde el mismo snapshot
+  globalMedicalClassificationMap.clear();
+  globalInventoryCache.forEach(item => {
+    if (item.MedicalClassification || item.SecondaryClassification) {
+      const c1 = item.MedicalClassification ? String(item.MedicalClassification).trim().toUpperCase() : null;
+      const c2 = item.SecondaryClassification ? String(item.SecondaryClassification).trim().toUpperCase() : null;
+      globalMedicalClassificationMap.set(item.ItemCode, {
+        ItemCode: item.ItemCode,
+        ItemName: item.ItemName,
+        MedicalClassification: c1,
+        SecondaryClassification: c2,
+        isControlled: c1 === 'CON' || c2 === 'CON',
+        isAntibiotic: c1 === 'ANTI' || c2 === 'ANTI',
+        isColdChain: c1 === 'REFRI' || c2 === 'REFRI',
+        isHighRisk: c1 === 'AR' || c2 === 'AR',
+        isLasa: c1 === 'LASA' || c2 === 'LASA'
+      });
+    }
+  });
+}
+
+/**
+ * Garantiza que haya datos de inventario disponibles (SAP en vivo → fallback PostgreSQL).
+ */
+async function ensureInventoryData() {
+  if (globalInventoryCache.length > 0) return true;
+  try {
+    await syncInventoryCache();
+  } catch (e) {
+    // Ignorar: el fallback de BD se evalúa abajo
+  }
+  if (globalInventoryCache.length === 0) {
+    await loadInventoryFromDB();
+  }
+  return globalInventoryCache.length > 0;
 }
 
 // Iniciar sincronización en background cada 15 minutos
@@ -173,8 +348,13 @@ if (process.env.NODE_ENV !== 'test') {
 
 module.exports = {
   syncInventoryCache,
+  ensureInventoryData,
+  persistInventorySnapshot,
+  loadInventoryFromDB,
   getInventoryCache: () => globalInventoryCache,
   getBatchesCache: () => globalBatchesCache,
   getInventoryMap: () => globalInventoryMap,
-  getMedicalClassificationMap: () => globalMedicalClassificationMap
+  getMedicalClassificationMap: () => globalMedicalClassificationMap,
+  isUsingDBFallback: () => usingDBFallback,
+  getLastSyncTime: () => lastSyncTime
 };

@@ -9,11 +9,24 @@ const sapInventoryService = require('./sapInventory.service');
 async function syncMLDataset() {
   console.log('[ML Dataset] Iniciando generación del dataset analítico...');
 
-  // 1. Asegurar que el caché de inventario SAP esté cargado
-  if (sapInventoryService.getInventoryCache().length === 0) {
-    await sapInventoryService.syncInventoryCache();
-  }
+  // 1. Asegurar que el caché de inventario SAP esté cargado (SAP en vivo o snapshot PostgreSQL)
+  await sapInventoryService.ensureInventoryData();
   const inventoryMap = sapInventoryService.getInventoryMap();
+
+  // Stock total por artículo (suma entre almacenes, priorizando Farmacia 'FAR')
+  const stockBySku = new Map();
+  sapInventoryService.getInventoryCache().forEach(row => {
+    const prev = stockBySku.get(row.ItemCode) || { far: 0, total: 0 };
+    const qty = Number(row.QuantityOnStock || row.OnHand || 0);
+    prev.total += qty;
+    if (row.WhsCode === 'FAR') prev.far += qty;
+    stockBySku.set(row.ItemCode, prev);
+  });
+  const getStock = (itemCode) => {
+    const s = stockBySku.get(itemCode);
+    if (!s) return 0;
+    return s.far > 0 ? s.far : s.total;
+  };
 
   // 2. Obtener Universo de SKUs (dw_sap_reorder_settings)
   const pgResSettings = await pool.query(`
@@ -116,9 +129,9 @@ async function syncMLDataset() {
   for (const item of skus) {
     const itemCode = item.itemcode;
     
-    // A. Stock Actual (SAP cache)
+    // A. Stock Actual (prioriza almacén Farmacia; fallback total entre almacenes)
     const sapItem = inventoryMap.get(itemCode);
-    const stockActual = sapItem ? Number(sapItem.QuantityOnStock ?? sapItem.OnHand ?? 0) : 0;
+    const stockActual = getStock(itemCode);
 
     // B. Mínimos / Máximos
     const minStock = Number(item.minstock || 0);

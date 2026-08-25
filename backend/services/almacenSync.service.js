@@ -338,23 +338,25 @@ async function syncPedidosSAP() {
     const sapService = require('../services/sap.service');
     console.log('[Sync] Consultando Pedidos y Requisiciones abiertas en SAP Service Layer...');
 
-    // Mapear usuarios SAP
+    // Mapear usuarios SAP (con paginación completa: SL devuelve solo ~20 por página)
     let usersMap = {};
     try {
-      const uRes = await sapService.get('/Users?$select=InternalKey,UserCode,UserName');
-      (uRes.data.value || []).forEach(u => {
+      const users = await sapService.fetchAllPages('/Users?$select=InternalKey,UserCode,UserName');
+      users.forEach(u => {
         usersMap[u.InternalKey] = u.UserName || u.UserCode;
       });
-    } catch(e){}
+      console.log(`[Sync] Mapa de usuarios SAP generado: ${Object.keys(usersMap).length} usuarios.`);
+    } catch(e) {
+      console.warn('[Sync] No se pudo obtener el catálogo de usuarios de SAP:', e.status || e.message);
+    }
 
     let totalSynced = 0;
 
-    // 1. Fetch Purchase Orders (PO)
+    // 1. Fetch Purchase Orders (PO) — con paginación completa
     try {
-      const poRes = await sapService.get("/PurchaseOrders?$top=200&$orderby=DocDate desc&$filter=DocumentStatus eq 'bost_Open'");
-      const poList = poRes.data.value || [];
+      const poList = await sapService.fetchAllPages("/PurchaseOrders?$orderby=DocDate desc&$filter=DocumentStatus eq 'bost_Open'");
       for (const po of poList) {
-        const userName = usersMap[po.UserSign] || `Usuario #${po.UserSign}`;
+        const userName = po.RequesterName || usersMap[po.UserSign] || `Usuario #${po.UserSign}`;
         const lineItems = (po.DocumentLines || []).map(l => ({
           itemCode: l.ItemCode,
           description: l.ItemDescription,
@@ -399,10 +401,9 @@ async function syncPedidosSAP() {
       console.error('[Sync Pedidos PO Error]', e.message);
     }
 
-    // 2. Fetch Purchase Requests (PR)
+    // 2. Fetch Purchase Requests (PR) — con paginación completa
     try {
-      const prRes = await sapService.get("/PurchaseRequests?$top=200&$orderby=DocDate desc&$filter=DocumentStatus eq 'bost_Open'");
-      const prList = prRes.data.value || [];
+      const prList = await sapService.fetchAllPages("/PurchaseRequests?$orderby=DocDate desc&$filter=DocumentStatus eq 'bost_Open'");
       for (const pr of prList) {
         const userName = pr.RequesterName || usersMap[pr.UserSign] || `Usuario #${pr.UserSign}`;
         const lineItems = (pr.DocumentLines || []).map(l => ({
@@ -447,6 +448,26 @@ async function syncPedidosSAP() {
       }
     } catch(e) {
       console.error('[Sync Pedidos PR Error]', e.message);
+    }
+
+    // 3. Auto-reparación: registros históricos que quedaron como 'Usuario #N'
+    if (Object.keys(usersMap).length > 0) {
+      try {
+        const repairRes = await pool.query(`
+          UPDATE dw_sap_pedidos p
+          SET usuarionombre = u.nombre
+          FROM (
+            SELECT unnest($1::int[]) AS usersign, unnest($2::text[]) AS nombre
+          ) u
+          WHERE p.usersign = u.usersign
+            AND p.usuarionombre LIKE 'Usuario #%'
+        `, [Object.keys(usersMap).map(Number), Object.values(usersMap)]);
+        if (repairRes.rowCount > 0) {
+          console.log(`[Sync] Reparados ${repairRes.rowCount} registros históricos con nombre de usuario genérico.`);
+        }
+      } catch(e) {
+        console.warn('[Sync] No se pudieron reparar registros históricos:', e.message);
+      }
     }
 
     console.log(`[Sync] Pedidos SAP sincronizados exitosamente en PostgreSQL: ${totalSynced} documentos.`);

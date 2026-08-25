@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
+import * as XLSX from 'xlsx';
 
 export default function DashboardVidasSalvadas({ periodo }) {
   const [data, setData] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  const [selectedAtencion, setSelectedAtencion] = useState(null);
+  const [detailData, setDetailData] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -31,7 +36,6 @@ export default function DashboardVidasSalvadas({ periodo }) {
       }
 
       let listData = json.data || [];
-      // Client side sort since Service Layer SQLQuery blocked ORDER BY
       listData.sort((a, b) => {
         if (a.FechaPrimeraOV !== b.FechaPrimeraOV) {
           return b.FechaPrimeraOV > a.FechaPrimeraOV ? 1 : -1;
@@ -50,6 +54,30 @@ export default function DashboardVidasSalvadas({ periodo }) {
     }
   };
 
+  const fetchDetail = async (atencion) => {
+    setSelectedAtencion(atencion);
+    setLoadingDetail(true);
+    try {
+      const token = sessionStorage.getItem('escandon_token');
+      const res = await fetch(`${API_BASE}/dashboard/sap/vidas-salvadas/${atencion}/detalle`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setDetailData(json);
+      } else {
+        alert(json.error || 'Error al cargar detalle');
+        setSelectedAtencion(null);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error de conexión');
+      setSelectedAtencion(null);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
   const formatCurrency = (val) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
   };
@@ -57,17 +85,39 @@ export default function DashboardVidasSalvadas({ periodo }) {
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
     
-    // SAP a veces devuelve la fecha como 'YYYYMMDD' (ej. '20260121')
-    if (typeof dateStr === 'string' && /^\\d{8}$/.test(dateStr)) {
-      const y = dateStr.substring(0, 4);
-      const m = parseInt(dateStr.substring(4, 6), 10) - 1;
-      const d = dateStr.substring(6, 8);
-      const dt = new Date(y, m, d);
+    let y, m, d;
+    if (typeof dateStr === 'string' && /^\d{8}$/.test(dateStr)) {
+      y = dateStr.substring(0, 4);
+      m = parseInt(dateStr.substring(4, 6), 10) - 1;
+      d = dateStr.substring(6, 8);
+    } else if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      y = dateStr.substring(0, 4);
+      m = parseInt(dateStr.substring(5, 7), 10) - 1;
+      d = dateStr.substring(8, 10);
+    } else {
+      const dt = new Date(dateStr);
+      if (isNaN(dt.getTime())) return 'Invalid Date';
       return dt.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: '2-digit' });
     }
     
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: '2-digit' });
+    const dt = new Date(y, m, d);
+    return dt.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: '2-digit' });
+  };
+
+  const exportDetailToExcel = () => {
+    if (!detailData) return;
+    const wb = XLSX.utils.book_new();
+    
+    if (detailData.sap && detailData.sap.length > 0) {
+      const wsSap = XLSX.utils.json_to_sheet(detailData.sap);
+      XLSX.utils.book_append_sheet(wb, wsSap, 'Facturas SAP');
+    }
+    if (detailData.vertical && detailData.vertical.length > 0) {
+      const wsVert = XLSX.utils.json_to_sheet(detailData.vertical);
+      XLSX.utils.book_append_sheet(wb, wsVert, 'Cargos Vertical');
+    }
+    
+    XLSX.writeFile(wb, `Detalle_Atencion_${selectedAtencion}.xlsx`);
   };
 
   if (loading) {
@@ -99,8 +149,14 @@ export default function DashboardVidasSalvadas({ periodo }) {
             </thead>
             <tbody>
               {data.map((row, idx) => (
-                <tr key={`${row.AtencionMedica}-${idx}`} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background = '#F8FAFC'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#005FA9' }}>{row.AtencionMedica}</td>
+                <tr 
+                  key={`${row.AtencionMedica}-${idx}`} 
+                  onClick={() => fetchDetail(row.AtencionMedica)}
+                  style={{ borderBottom: '1px solid #F1F5F9', transition: 'background 0.2s', cursor: 'pointer' }} 
+                  onMouseOver={e => e.currentTarget.style.background = '#F8FAFC'} 
+                  onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#005FA9', textDecoration: 'underline' }}>{row.AtencionMedica}</td>
                   <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{row.NoPaciente}</td>
                   <td style={{ padding: '0.75rem 1rem', color: '#0D1B2A', fontWeight: 500 }}>{row.NombrePaciente}</td>
                   <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{formatDate(row.FechaPrimeraOV)}</td>
@@ -121,6 +177,82 @@ export default function DashboardVidasSalvadas({ periodo }) {
         </div>
       </div>
 
+      {selectedAtencion && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000
+        }}>
+          <div style={{ background: 'white', padding: '2rem', borderRadius: 12, width: '90%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ margin: 0, color: '#0D1B2A' }}>Detalle de Atención: {selectedAtencion}</h2>
+              <div>
+                <button onClick={exportDetailToExcel} style={{ padding: '0.5rem 1rem', background: '#10B981', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', marginRight: '1rem', fontWeight: 600 }}>Exportar a Excel</button>
+                <button onClick={() => { setSelectedAtencion(null); setDetailData(null); }} style={{ padding: '0.5rem 1rem', background: '#EF4444', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>Cerrar</button>
+              </div>
+            </div>
+            
+            {loadingDetail ? (
+              <PremiumLoader text="Cargando detalles..." style={{ height: '200px' }} />
+            ) : detailData ? (
+              <div>
+                <h3 style={{ borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem' }}>Facturas / Órdenes SAP</h3>
+                {detailData.sap && detailData.sap.length > 0 ? (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '2rem' }}>
+                    <thead>
+                      <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
+                        <th style={{ padding: '0.5rem' }}>Folio SAP</th>
+                        <th style={{ padding: '0.5rem' }}>Fecha</th>
+                        <th style={{ padding: '0.5rem' }}>Código</th>
+                        <th style={{ padding: '0.5rem' }}>Descripción</th>
+                        <th style={{ padding: '0.5rem' }}>Cant.</th>
+                        <th style={{ padding: '0.5rem' }}>Total Línea</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailData.sap.map((s, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                          <td style={{ padding: '0.5rem' }}>{s.FolioSAP}</td>
+                          <td style={{ padding: '0.5rem' }}>{formatDate(s.Fecha)}</td>
+                          <td style={{ padding: '0.5rem' }}>{s.CodigoArticulo}</td>
+                          <td style={{ padding: '0.5rem' }}>{s.Descripcion}</td>
+                          <td style={{ padding: '0.5rem' }}>{s.Cantidad}</td>
+                          <td style={{ padding: '0.5rem' }}>{formatCurrency(s.TotalLinea)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : <p>No se encontraron registros en SAP para esta atención.</p>}
+
+                <h3 style={{ borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem' }}>Cargos Vertical (SITI)</h3>
+                {detailData.vertical && detailData.vertical.length > 0 ? (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: '#F8FAFC', textAlign: 'left' }}>
+                        <th style={{ padding: '0.5rem' }}>Fecha</th>
+                        <th style={{ padding: '0.5rem' }}>Código</th>
+                        <th style={{ padding: '0.5rem' }}>Descripción</th>
+                        <th style={{ padding: '0.5rem' }}>Cant.</th>
+                        <th style={{ padding: '0.5rem' }}>Total Línea</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailData.vertical.map((v, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                          <td style={{ padding: '0.5rem' }}>{formatDate(v.ChargeDate)}</td>
+                          <td style={{ padding: '0.5rem' }}>{v.ItemCode || v.SUCode}</td>
+                          <td style={{ padding: '0.5rem' }}>{v.ItemDescription || 'N/A'}</td>
+                          <td style={{ padding: '0.5rem' }}>{v.Quantity}</td>
+                          <td style={{ padding: '0.5rem' }}>{formatCurrency(v.Total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : <p>No se encontraron cargos en Vertical para esta atención.</p>}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

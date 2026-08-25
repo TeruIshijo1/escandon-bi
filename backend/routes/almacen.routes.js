@@ -180,20 +180,26 @@ router.get('/traslados/:id', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
 });
 
 let lastAutoSyncTimestamp = 0;
+let almacenSyncRunning = false;
 
 async function checkAndSyncStaleData(cleanEnd) {
   const yesterdayClean = new Date(Date.now() - 86400000).toISOString().split('T')[0].replace(/-/g, '');
   const isRecentQuery = cleanEnd >= yesterdayClean;
   const isStale = (Date.now() - lastAutoSyncTimestamp > 15 * 60 * 1000);
 
-  if (isRecentQuery && isStale) {
+  if (isRecentQuery && isStale && !almacenSyncRunning) {
     lastAutoSyncTimestamp = Date.now();
+    almacenSyncRunning = true;
     try {
-      console.log('[Almacén Reportes] Sincronizando datos recientes en background...');
+      console.log('[Almacén Reportes] Sincronizando datos recientes en background (sin bloquear la respuesta)...');
       const { runAlmacenSync } = require('../services/almacenSync.service');
-      await runAlmacenSync();
+      // Fire-and-forget: la respuesta del reporte NO debe esperar al ETL completo
+      runAlmacenSync()
+        .catch(err => console.error('[Almacén Reportes] Error en sincronización bajo demanda:', err.message))
+        .finally(() => { almacenSyncRunning = false; });
     } catch (err) {
-      console.error('[Almacén Reportes] Error en sincronización bajo demanda:', err.message);
+      almacenSyncRunning = false;
+      console.error('[Almacén Reportes] Error al disparar sincronización:', err.message);
     }
   }
 }

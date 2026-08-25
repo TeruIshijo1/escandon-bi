@@ -468,6 +468,45 @@ export default function Estadisticas() {
         ) : (
           activeTab === 'tabla' ? (
             <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: '12px', background: '#FFFFFF' }}>
+              <div style={{ padding: '1rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end' }}>
+                <button 
+                  onClick={async () => {
+                    try {
+                      // We will fetch all sections one by one or we could use the current data.
+                      // Since they want "todas esas tablas y mostrar la mayor informacion", we will export the current view as a minimum.
+                      const XLSX = await import('xlsx');
+                      const wb = XLSX.utils.book_new();
+                      const wsData = [];
+                      wsData.push(['Mes', ...añosList, 'Total']);
+                      mesesNombres.forEach((mesNombre, mIdx) => {
+                        const m = mIdx + 1;
+                        const row = [mesNombre];
+                        añosList.forEach(año => {
+                           const val = seccionData?.[año]?.[m];
+                           row.push(val != null ? val : 0);
+                        });
+                        row.push(totalMensual[m]);
+                        wsData.push(row);
+                      });
+                      const totalRow = ['Total Anual'];
+                      añosList.forEach(año => totalRow.push(totalAnual[año]));
+                      totalRow.push(granTotal);
+                      wsData.push(totalRow);
+                      
+                      const ws = XLSX.utils.aoa_to_sheet(wsData);
+                      XLSX.utils.book_append_sheet(wb, ws, 'Datos Historicos');
+                      XLSX.writeFile(wb, `Estadisticas_${selectedSeccion}.xlsx`);
+                    } catch(e) {
+                      console.error('Error exporting', e);
+                    }
+                  }}
+                  style={{
+                    padding: '0.4rem 1rem', background: '#10B981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem'
+                  }}
+                >
+                  📥 Exportar Tabla Actual
+                </button>
+              </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: '0.76rem' }}>
                 <thead>
                   <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>

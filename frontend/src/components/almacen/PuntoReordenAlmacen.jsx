@@ -74,10 +74,11 @@ export default function PuntoReordenAlmacen() {
     }
   };
 
-  const fetchPedidosData = async () => {
+  const fetchPedidosData = async (force = false) => {
     try {
       setLoadingPedidos(true);
-      const res = await fetch(`${API_BASE}/almacen/pedidos-sap`, {
+      const url = force ? `${API_BASE}/almacen/pedidos-sap?refresh=true` : `${API_BASE}/almacen/pedidos-sap`;
+      const res = await fetch(url, {
         headers: authHeaders()
       });
       const json = await res.json();
@@ -1064,7 +1065,7 @@ export default function PuntoReordenAlmacen() {
               </p>
             </div>
             <button
-              onClick={fetchPedidosData}
+              onClick={() => fetchPedidosData(true)}
               style={{ padding: '0.65rem 1.25rem', background: '#0284c7', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
             >
               ↻ Refrescar Pedidos
@@ -1101,7 +1102,7 @@ export default function PuntoReordenAlmacen() {
                     </div>
                     <div>
                       <strong style={{ display: 'block', color: 'var(--text-muted, #64748b)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Fecha de Emisión</strong>
-                      📅 {p.fecha}
+                      📅 {p.fecha ? new Date(p.fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                     </div>
                     {p.proveedor && (
                       <div style={{ gridColumn: '1 / -1' }}>
@@ -1366,7 +1367,7 @@ export default function PuntoReordenAlmacen() {
                       const daysRemaining = Number(row.dias_stock_restante);
                       const daysText = daysRemaining >= 9999 ? '∞' : Math.round(daysRemaining);
                       const riskColor = 
-                        row.riesgo_base === 'CRITICO' ? { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' } :
+                        row.riesgo_base === 'CRITICO' ? { bg: '#dc2626', text: '#ffffff', border: '#b91c1c' } :
                         row.riesgo_base === 'ALTO' ? { bg: '#ffedd5', text: '#9a3412', border: '#fed7aa' } :
                         row.riesgo_base === 'MEDIO' ? { bg: '#fef9c3', text: '#854d0e', border: '#fef08a' } :
                         { bg: '#dcfce7', text: '#166534', border: '#bbf7d0' };
@@ -1451,7 +1452,7 @@ export default function PuntoReordenAlmacen() {
                       const daysRemaining = Number(row.dias_stock_restante);
                       const daysText = daysRemaining >= 9999 ? '∞' : Math.round(daysRemaining);
                       const riskColor = 
-                        row.riesgo_base === 'CRITICO' ? { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' } :
+                        row.riesgo_base === 'CRITICO' ? { bg: '#dc2626', text: '#ffffff', border: '#b91c1c' } :
                         row.riesgo_base === 'ALTO' ? { bg: '#ffedd5', text: '#9a3412', border: '#fed7aa' } :
                         row.riesgo_base === 'MEDIO' ? { bg: '#fef9c3', text: '#854d0e', border: '#fef08a' } :
                         { bg: '#dcfce7', text: '#166534', border: '#bbf7d0' };
@@ -1553,14 +1554,14 @@ export default function PuntoReordenAlmacen() {
                       const daysText = daysRemaining >= 9999 ? '∞' : Math.round(daysRemaining);
                       
                       const riskColorBase = 
-                        row.riesgo_base === 'CRITICO' ? { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' } :
+                        row.riesgo_base === 'CRITICO' ? { bg: '#dc2626', text: '#ffffff', border: '#b91c1c' } :
                         row.riesgo_base === 'ALTO' ? { bg: '#ffedd5', text: '#9a3412', border: '#fed7aa' } :
                         row.riesgo_base === 'MEDIO' ? { bg: '#fef9c3', text: '#854d0e', border: '#fef08a' } :
                         { bg: '#dcfce7', text: '#166534', border: '#bbf7d0' };
 
                       const riskColorML = 
                         row.riesgo_ml === 'YA EN DESABASTO' ? { bg: '#7f1d1d', text: '#ffffff', border: '#991b1b' } :
-                        row.riesgo_ml === 'CRITICO' ? { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' } :
+                        row.riesgo_ml === 'CRITICO' ? { bg: '#dc2626', text: '#ffffff', border: '#b91c1c' } :
                         row.riesgo_ml === 'ALTO' ? { bg: '#ffedd5', text: '#9a3412', border: '#fed7aa' } :
                         row.riesgo_ml === 'MEDIO' ? { bg: '#fef9c3', text: '#854d0e', border: '#fef08a' } :
                         { bg: '#dcfce7', text: '#166534', border: '#bbf7d0' };

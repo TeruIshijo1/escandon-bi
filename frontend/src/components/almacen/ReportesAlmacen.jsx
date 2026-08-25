@@ -190,7 +190,7 @@ export default function ReportesAlmacen() {
   };
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ padding: '2rem', maxWidth: 'var(--content-max, 1400px)', margin: '0 auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
       
       <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
@@ -367,7 +367,23 @@ export default function ReportesAlmacen() {
         </div>
 
         <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 400px)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+          {loading && (
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          )}
+          {loading && (
+            <div style={{ padding: '3rem', textAlign: 'center' }}>
+              <div style={{
+                width: 44, height: 44, margin: '0 auto 1.25rem',
+                border: '4px solid #e2e8f0', borderTopColor: '#0284c7',
+                borderRadius: '50%', animation: 'spin 0.8s linear infinite'
+              }} />
+              <p style={{ color: '#475569', fontWeight: 600, fontSize: '1rem', margin: 0 }}>Consultando datos...</p>
+              <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
+                La primera consulta del día puede tardar un poco más mientras se actualizan los datos en segundo plano.
+              </p>
+            </div>
+          )}
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px', display: loading ? 'none' : 'table' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
               <tr style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.85rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                 {data.length > 0 ? (
@@ -446,7 +462,7 @@ export default function ReportesAlmacen() {
             {/* Header Modal */}
             <div style={{ padding: '1.5rem 2rem', background: 'linear-gradient(135deg, #0f172a 0%, #004687 100%)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '700' }}>
+                <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '700', color: 'white' }}>
                   🔍 Detalle y Trazabilidad de Movimiento
                 </h3>
                 <p style={{ margin: '0.25rem 0 0 0', color: '#93c5fd', fontSize: '0.9rem' }}>

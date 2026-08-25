@@ -48,9 +48,8 @@ router.get('/inventario', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
     const warehouseCode = req.query.warehouse || 'FAR';
 
     // Si el caché está vacío (ej. servidor recién prendido), forzamos una carga
-    if (sapInventoryService.getInventoryCache().length === 0) {
-      await sapInventoryService.syncInventoryCache();
-    }
+    // (SAP en vivo; si no responde, se usa el snapshot persistido en PostgreSQL)
+    await sapInventoryService.ensureInventoryData();
     
     // Filtrar únicamente los items que pertenecen al almacén solicitado
     const warehouseItems = sapInventoryService.getInventoryCache().filter(item => item.WhsCode === warehouseCode);
@@ -668,4 +667,643 @@ router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR',
   }
 });
 
+const pool = pgPool;
+
+/**
+ * GET /api/pharmacy/punto-reorden
+ * Devuelve el catálogo de Insumos con Mínimos, Máximos, Stock Actual, Pedidos SAP en curso y Notas de Almacén.
+ */
+router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
+  try {
+    const sapInventoryService = require('../services/sapInventory.service');
+    // Garantiza inventario disponible (SAP en vivo o snapshot PostgreSQL)
+    await sapInventoryService.ensureInventoryData();
+    const inventoryMap = sapInventoryService.getInventoryMap();
+
+    // 1. Obtener Pedidos (PO) y Solicitudes (PR) abiertas en PostgreSQL (ultra-rápido)
+    let openOrdersMap = new Map();
+    const pgResPedidos = await pool.query(`
+      SELECT dockey AS "DocKey", docentry AS "DocEntry", docnum AS "DocNum", tipodocumento AS "TipoDocumento", tiponombre AS "TipoNombre", fechadoc AS "FechaDoc", cardcode AS "CardCode", cardname AS "CardName", usersign AS "UserSign", usuarionombre AS "UsuarioNombre", docstatus AS "DocStatus", doctotal AS "DocTotal", estatustexto AS "EstatusTexto", itemsjson AS "ItemsJSON" 
+      FROM dw_sap_pedidos 
+      WHERE docstatus = 'bost_Open'
+    `);
+    let pedidosDB = pgResPedidos.rows;
+    
+    // Si la tabla local no tiene datos aún, disparar sync asíncrono
+    if (pedidosDB.length === 0) {
+      const { syncPedidosSAP } = require('../services/almacenSync.service');
+      syncPedidosSAP().catch(console.error);
+    }
+
+    pedidosDB.forEach(p => {
+      let itemsList = [];
+      try { itemsList = JSON.parse(p.ItemsJSON || '[]'); } catch(e){}
+      itemsList.forEach(l => {
+        if (l.openQuantity > 0) {
+          const list = openOrdersMap.get(l.itemCode) || [];
+          list.push({
+            folio: p.DocNum,
+            tipo: p.TipoNombre,
+            fecha: p.FechaDoc,
+            usuario: p.UsuarioNombre,
+            proveedor: p.CardName || 'N/A',
+            cantPedida: l.quantity,
+            cantPendiente: l.openQuantity,
+            estatus: p.EstatusTexto
+          });
+          openOrdersMap.set(l.itemCode, list);
+        }
+      });
+    });
+
+    // 2. Cruzar con tabla de settings en PostgreSQL
+    const pgResSettings = await pool.query(`
+      SELECT itemcode AS "ItemCode", itemdescription AS "ItemDescription", minstock AS "MinStock", maxstock AS "MaxStock", note AS "Note", customsolicitud AS "CustomSolicitud", lastupdated AS "LastUpdated" 
+      FROM dw_sap_reorder_settings 
+      ORDER BY itemcode ASC
+    `);
+    const settings = pgResSettings.rows;
+    
+    let reorderList = [];
+    let itemsRequiringPurchase = 0;
+    let itemsCritical = 0;
+    let itemsWithActiveOrder = 0;
+
+    for (const item of settings) {
+      const sapItem = inventoryMap.get(item.ItemCode);
+      // Stock de Farmacia (almacén FAR) si el artículo existe ahí;
+      // si no, se usa el total entre almacenes (p.ej. códigos ALG heredados)
+      const farRows = sapInventoryService.getInventoryCache().filter(i => i.ItemCode === item.ItemCode && i.WhsCode === 'FAR');
+      const farStock = farRows.reduce((acc, curr) => acc + (curr.QuantityOnStock || curr.OnHand || 0), 0);
+      let stock = farStock;
+      let stockFuente = 'FAR';
+      if (farRows.length === 0) {
+        stock = sapInventoryService.getInventoryCache()
+          .filter(i => i.ItemCode === item.ItemCode)
+          .reduce((acc, curr) => acc + (curr.QuantityOnStock || curr.OnHand || 0), 0);
+        stockFuente = 'TOTAL';
+      }
+      const minStock = Number(item.MinStock || 0);
+      const maxStock = Number(item.MaxStock || 0);
+      const calcPromedio = maxStock - stock;
+      const hasCustomSolicitud = item.CustomSolicitud !== null && item.CustomSolicitud !== undefined;
+      const sugCompra = hasCustomSolicitud 
+        ? Number(item.CustomSolicitud) 
+        : ((stock <= minStock && maxStock > 0) ? Math.max(0, maxStock - stock) : 0);
+      const costoCompra = sapItem ? Number(sapItem.PurchaseCost || 0) : 0;
+
+      let estatus = 'OPTIMO';
+      if (stock === 0 && minStock > 0) {
+        estatus = 'CRITICO';
+        itemsCritical++;
+      } else if (stock <= minStock && minStock > 0) {
+        estatus = 'REORDEN';
+      } else if (stock > maxStock && maxStock > 0) {
+        estatus = 'SOBRESTOCK';
+      }
+
+      const pedidos = openOrdersMap.get(item.ItemCode) || [];
+      if (sugCompra > 0) itemsRequiringPurchase++;
+      if (pedidos.length > 0) itemsWithActiveOrder++;
+
+      reorderList.push({
+        ...item,
+        StockActual: stock,
+        StockFuente: stockFuente,
+        CalculoPromedio: calcPromedio,
+        SolicitudCompra: sugCompra,
+        EsPersonalizada: hasCustomSolicitud,
+        CostoUnitario: costoCompra,
+        ImporteSugerido: Math.round(sugCompra * costoCompra * 100) / 100,
+        Estatus: estatus,
+        PedidosEnCurso: pedidos
+      });
+    }
+
+    res.json({
+      ok: true,
+      data: reorderList,
+
+      stats: {
+        totalItems: reorderList.length,
+        itemsRequiringPurchase,
+        itemsCritical,
+        itemsWithActiveOrder
+      },
+      meta: {
+        sapOnline: !sapInventoryService.isUsingDBFallback(),
+        inventorySource: sapInventoryService.isUsingDBFallback() ? 'snapshot_postgresql' : 'sap_live',
+        lastInventorySync: sapInventoryService.getLastSyncTime()
+      }
+    });
+  } catch (err) {
+    console.error('[Punto Reorden Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar Punto de Reorden' });
+  }
+});
+
+
+/**
+ * PUT /api/pharmacy/punto-reorden/:code
+ * Actualiza Mínimo, Máximo, Notita o Solicitud de Compra Personalizada de un artículo en PostgreSQL.
+ */
+router.put('/punto-reorden/:code', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { minStock, maxStock, note, customSolicitud } = req.body;
+
+    const pgResExisting = await pool.query(`
+      SELECT itemcode AS "ItemCode", itemdescription AS "ItemDescription", minstock AS "MinStock", maxstock AS "MaxStock", note AS "Note", customsolicitud AS "CustomSolicitud", lastupdated AS "LastUpdated" 
+      FROM dw_sap_reorder_settings 
+      WHERE itemcode = $1
+    `, [code]);
+    const existing = pgResExisting.rows[0] || null;
+
+    let finalCustom = existing ? existing.CustomSolicitud : null;
+    if (customSolicitud !== undefined) {
+      if (customSolicitud === null || customSolicitud === '' || customSolicitud === 'RESET') {
+        finalCustom = null;
+      } else {
+        finalCustom = Math.max(0, parseInt(customSolicitud));
+      }
+    }
+
+    if (!existing) {
+      await pool.query(`
+        INSERT INTO dw_sap_reorder_settings (itemcode, itemdescription, minstock, maxstock, note, customsolicitud, lastupdated)
+        VALUES ($1, 'Insumo Médico', $2, $3, $4, $5, CURRENT_TIMESTAMP)
+      `, [code, Number(minStock || 0), Number(maxStock || 0), String(note || ''), finalCustom]);
+    } else {
+      await pool.query(`
+        UPDATE dw_sap_reorder_settings 
+        SET minstock = $1, maxstock = $2, note = $3, customsolicitud = $4, lastupdated = CURRENT_TIMESTAMP
+        WHERE itemcode = $5
+      `, [
+        minStock !== undefined ? Number(minStock) : existing.MinStock,
+        maxStock !== undefined ? Number(maxStock) : existing.MaxStock,
+        note !== undefined ? String(note) : existing.Note,
+        finalCustom,
+        code
+      ]);
+    }
+
+    res.json({ ok: true, message: 'Configuración de reorden actualizada correctamente' });
+  } catch (err) {
+    console.error('[PUT Punto Reorden Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al actualizar notita / punto de reorden' });
+  }
+});
+
+
+/**
+ * GET /api/pharmacy/pedidos-sap
+ * Devuelve todas las Ordenes de Compra y Solicitudes abiertas en SAP con desglose de usuarios y estatus en tiempo real.
+ */
+router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
+  try {
+    const pgResPedidos = await pool.query(`
+      SELECT dockey AS "DocKey", docentry AS "DocEntry", docnum AS "DocNum", tipodocumento AS "TipoDocumento", tiponombre AS "TipoNombre", fechadoc AS "FechaDoc", cardcode AS "CardCode", cardname AS "CardName", usersign AS "UserSign", usuarionombre AS "UsuarioNombre", docstatus AS "DocStatus", doctotal AS "DocTotal", estatustexto AS "EstatusTexto", itemsjson AS "ItemsJSON" 
+      FROM dw_sap_pedidos 
+      ORDER BY docnum DESC
+    `);
+    let pedidosDB = pgResPedidos.rows;
+
+    // Si PostgreSQL está vacío o se solicita refresco forzado
+    if (pedidosDB.length === 0 || req.query.refresh === 'true') {
+      const { syncPedidosSAP } = require('../services/almacenSync.service');
+      await syncPedidosSAP();
+      const pgResPedidosRefreshed = await pool.query(`
+        SELECT dockey AS "DocKey", docentry AS "DocEntry", docnum AS "DocNum", tipodocumento AS "TipoDocumento", tiponombre AS "TipoNombre", fechadoc AS "FechaDoc", cardcode AS "CardCode", cardname AS "CardName", usersign AS "UserSign", usuarionombre AS "UsuarioNombre", docstatus AS "DocStatus", doctotal AS "DocTotal", estatustexto AS "EstatusTexto", itemsjson AS "ItemsJSON" 
+        FROM dw_sap_pedidos 
+        ORDER BY docnum DESC
+      `);
+      pedidosDB = pgResPedidosRefreshed.rows;
+    } else {
+      // Disparar sincronización silenciosa en background
+      const { syncPedidosSAP } = require('../services/almacenSync.service');
+      syncPedidosSAP().catch(console.error);
+    }
+
+    const resultList = pedidosDB.map(p => ({
+      docEntry: p.DocEntry,
+      folio: p.DocNum,
+      tipo: p.TipoNombre,
+      tipoCod: p.TipoDocumento,
+      fecha: p.FechaDoc,
+      proveedor: p.CardName || 'N/A',
+      usuario: p.UsuarioNombre,
+      total: p.DocTotal || 0,
+      estatus: p.EstatusTexto,
+      items: JSON.parse(p.ItemsJSON || '[]')
+    }));
+
+    res.json({ ok: true, data: resultList });
+  } catch (err) {
+    console.error('[GET Pedidos SAP Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar pedidos SAP' });
+  }
+});
+
+
+/**
+ * GET /api/pharmacy/ml-dataset
+ * Retorna el dataset analítico completo ordenado por nivel de riesgo
+ */
+router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const pgRes = await pool.query(`
+      SELECT 
+        itemcode AS "itemcode",
+        itemdescription AS "itemdescription",
+        stock_actual AS "stock_actual",
+        consumo_7d AS "consumo_7d",
+        consumo_15d AS "consumo_15d",
+        consumo_30d AS "consumo_30d",
+        consumo_promedio_diario AS "consumo_promedio_diario",
+        variabilidad_consumo AS "variabilidad_consumo",
+        minstock AS "minstock",
+        maxstock AS "maxstock",
+        pedidos_abiertos AS "pedidos_abiertos",
+        fecha_ultimo_movimiento AS "fecha_ultimo_movimiento",
+        dias_stock_restante AS "dias_stock_restante",
+        riesgo_base AS "riesgo_base",
+        fecha_calculo AS "fecha_calculo"
+      FROM ml_dataset_reorden_sku
+      ORDER BY 
+        CASE riesgo_base 
+          WHEN 'CRITICO' THEN 1
+          WHEN 'ALTO' THEN 2
+          WHEN 'MEDIO' THEN 3
+          ELSE 4 
+        END, 
+        dias_stock_restante ASC,
+        itemcode ASC
+    `);
+    res.json({ ok: true, data: pgRes.rows });
+  } catch (err) {
+    console.error('[GET ML Dataset Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar el dataset analítico de ML' });
+  }
+});
+
+
+/**
+ * POST /api/pharmacy/ml-dataset/sync
+ * Fuerza la regeneración y cálculo del dataset analítico
+ */
+router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const { syncMLDataset } = require('../services/mlDataset.service');
+    const count = await syncMLDataset();
+    res.json({ ok: true, message: `Dataset analítico sincronizado con éxito. ${count} registros calculados.` });
+  } catch (err) {
+    console.error('[POST Sync ML Dataset Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al sincronizar el dataset analítico: ' + err.message });
+  }
+});
+
+
+/**
+ * GET /api/pharmacy/ml-history
+ * Retorna el historial completo del dataset analítico
+ */
+router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const pgRes = await pool.query(`
+      SELECT 
+        snapshot_date AS "snapshot_date",
+        itemcode AS "itemcode",
+        itemdescription AS "itemdescription",
+        stock_actual AS "stock_actual",
+        consumo_7d AS "consumo_7d",
+        consumo_15d AS "consumo_15d",
+        consumo_30d AS "consumo_30d",
+        consumo_promedio_diario AS "consumo_promedio_diario",
+        variabilidad_consumo AS "variabilidad_consumo",
+        minstock AS "minstock",
+        maxstock AS "maxstock",
+        pedidos_abiertos AS "pedidos_abiertos",
+        fecha_ultimo_movimiento AS "fecha_ultimo_movimiento",
+        fecha_desabasto AS "fecha_desabasto",
+        dias_stock_restante AS "dias_stock_restante",
+        riesgo_base AS "riesgo_base",
+        target_desabasto_7d AS "target_desabasto_7d",
+        target_desabasto_15d AS "target_desabasto_15d",
+        fecha_calculo AS "fecha_calculo"
+      FROM ml_dataset_reorden_sku_history
+      ORDER BY snapshot_date DESC, itemcode ASC
+    `);
+    res.json({ ok: true, data: pgRes.rows });
+  } catch (err) {
+    console.error('[GET ML History Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar el historial analítico de ML' });
+  }
+});
+
+
+/**
+ * GET /api/pharmacy/ml-history/download
+ * Descarga el historial completo en formato CSV preparado para pandas/python
+ */
+router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const pgRes = await pool.query(`
+      SELECT 
+        snapshot_date, itemcode, itemdescription, stock_actual, consumo_7d, consumo_15d, consumo_30d, 
+        consumo_promedio_diario, variabilidad_consumo, minstock, maxstock, pedidos_abiertos, 
+        fecha_ultimo_movimiento, fecha_desabasto, dias_stock_restante, riesgo_base, target_desabasto_7d, target_desabasto_15d, fecha_calculo
+      FROM ml_dataset_reorden_sku_history
+      ORDER BY snapshot_date DESC, itemcode ASC
+    `);
+    
+    const headers = [
+      'snapshot_date', 'itemcode', 'itemdescription', 'stock_actual', 'consumo_7d', 'consumo_15d', 
+      'consumo_30d', 'consumo_promedio_diario', 'variabilidad_consumo', 'minstock', 'maxstock', 'pedidos_abiertos', 
+      'fecha_ultimo_movimiento', 'fecha_desabasto', 'dias_stock_restante', 'riesgo_base', 'target_desabasto_7d', 'target_desabasto_15d', 'fecha_calculo'
+    ];
+    
+    let csv = '\uFEFF' + headers.join(',') + '\n';
+    
+    pgRes.rows.forEach(row => {
+      const line = headers.map(h => {
+        let val = row[h];
+        if (val === null || val === undefined) {
+          val = '';
+        } else if (val instanceof Date) {
+          val = val.toISOString();
+        } else if (h === 'snapshot_date') {
+          // Format snapshot_date as YYYY-MM-DD
+          val = new Date(val).toISOString().split('T')[0];
+        } else {
+          val = String(val);
+        }
+        val = val.replace(/"/g, '""');
+        if (val.includes(',') || val.includes('\n') || val.includes('"')) {
+          return `"${val}"`;
+        }
+        return val;
+      });
+      csv += line.join(',') + '\n';
+    });
+    
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="ml_dataset_reorden_sku_history.csv"');
+    res.send(csv);
+  } catch (err) {
+    console.error('[GET Download ML History Error]', err);
+    res.status(500).send('Error al generar la descarga del historial analítico');
+  }
+});
+
+
+/**
+ * GET /api/pharmacy/ml-predictions
+ * Retorna las predicciones de Machine Learning actuales
+ */
+router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const pgRes = await pool.query(`
+      SELECT 
+        itemcode AS "itemcode",
+        itemdescription AS "itemdescription",
+        stock_actual AS "stock_actual",
+        consumo_promedio_diario AS "consumo_promedio_diario",
+        dias_stock_restante AS "dias_stock_restante",
+        riesgo_base AS "riesgo_base",
+        prob_desabasto_7d AS "prob_desabasto_7d",
+        riesgo_ml AS "riesgo_ml",
+        modelo_version AS "modelo_version",
+        fecha_ultimo_movimiento AS "fecha_ultimo_movimiento",
+        fecha_desabasto AS "fecha_desabasto",
+        fecha_estimada_agotamiento AS "fecha_estimada_agotamiento",
+        fecha_prediccion AS "fecha_prediccion"
+      FROM ml_predictions_reorden_sku
+      ORDER BY prob_desabasto_7d DESC, itemcode ASC
+    `);
+    res.json({ ok: true, data: pgRes.rows });
+  } catch (err) {
+    console.error('[GET ML Predictions Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar predicciones de Machine Learning' });
+  }
+});
+
+
+/**
+ * GET /api/pharmacy/ml-predictions/status
+ * Retorna el estado del último job ejecutado para predicciones de almacén
+ */
+router.get('/ml-predictions/status', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const { getLatestJobStatus } = require('../services/mlJobRunner.service');
+    const status = await getLatestJobStatus('REORDER_RISK');
+    res.json({ ok: true, data: status });
+  } catch (err) {
+    console.error('[GET ML Predictions Status Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al consultar estado de predicciones' });
+  }
+});
+
+
+/**
+ * POST /api/pharmacy/ml-predictions/run
+ * Ejecuta el script de predicción de Machine Learning con trazabilidad en ml_job_runs y control de concurrencia
+ */
+router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  const { startJob, runPythonScript } = require('../services/mlJobRunner.service');
+  const triggeredBy = req.user?.username || req.user?.email || 'USER';
+
+  try {
+    const jobResult = await startJob('REORDER_RISK', async () => {
+      console.log('[ML Express] Iniciando predicción de riesgo de desabasto...');
+      const { stdout } = await runPythonScript('predict_reorder_risk.py');
+      return stdout;
+    }, triggeredBy, { waitForCompletion: true });
+
+    if (jobResult.alreadyRunning) {
+      return res.status(409).json({
+        ok: false,
+        alreadyRunning: true,
+        error: jobResult.message
+      });
+    }
+
+    if (jobResult.status === 'ERROR') {
+      return res.status(500).json({
+        ok: false,
+        jobId: jobResult.jobId,
+        error: jobResult.error_message || 'Error al ejecutar modelo predictivo',
+        stderr: jobResult.stderr || ''
+      });
+    }
+
+    res.json({
+      ok: true,
+      jobId: jobResult.jobId,
+      message: 'Predicciones de Machine Learning ejecutadas y guardadas correctamente.',
+      duration_seconds: jobResult.duration_seconds,
+      stdout: jobResult.stdout
+    });
+  } catch (error) {
+    console.error('[POST Run ML Predictions Error]', error);
+    res.status(500).json({
+      ok: false,
+      error: 'Error al procesar job de predicciones: ' + error.message
+    });
+  }
+});
+
+/**
+ * GET /api/pharmacy/config-dinamica
+ * Configuración Dinámica (Farmacia): lee el Excel de MÁXIMOS, MÍNIMOS Y PUNTOS DE REORDEN,
+ * calcula los puntos MIN/REORDEN/MAX por producto y los vincula con códigos SAP.
+ */
+router.get('/config-dinamica', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const reorderConfig = require('../services/reorderConfig.service');
+    const data = await reorderConfig.getDynamicConfig();
+    res.json(data);
+  } catch (err) {
+    console.error('[GET Config Dinamica Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al procesar el Excel de configuración dinámica: ' + err.message });
+  }
+});
+
+/**
+ * GET /api/pharmacy/config-dinamica/search-sap?q=
+ * Busca artículos SAP por código/descripción para vinculación manual del Excel.
+ */
+router.get('/config-dinamica/search-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const reorderConfig = require('../services/reorderConfig.service');
+    const results = await reorderConfig.searchSapCatalog(req.query.q, 20);
+    res.json({ ok: true, data: results });
+  } catch (err) {
+    console.error('[GET Config Dinamica Search Error]', err);
+    res.status(500).json({ ok: false, error: 'Error en la búsqueda SAP: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/pharmacy/config-dinamica/link
+ * Vincula (o desvincula con itemcode null) un producto del Excel con un código SAP.
+ */
+router.post('/config-dinamica/link', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const { producto, itemcode } = req.body || {};
+    if (!producto) return res.status(400).json({ ok: false, error: 'El nombre del producto es requerido' });
+    const reorderConfig = require('../services/reorderConfig.service');
+    await reorderConfig.saveManualLinks([{ producto, itemcode: itemcode || null }]);
+    const config = await reorderConfig.getDynamicConfig(true);
+    res.json({ ok: true, message: 'Vínculo guardado correctamente', stats: config.stats });
+  } catch (err) {
+    console.error('[POST Config Dinamica Link Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al guardar el vínculo: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/pharmacy/config-dinamica/apply
+ * Aplica los puntos MIN/MAX calculados a la matriz dw_sap_reorder_settings.
+ * Body: { productos?: string[], soloVinculados?: boolean, syncMl?: boolean }
+ */
+router.post('/config-dinamica/apply', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+  try {
+    const { productos, syncMl } = req.body || {};
+    const reorderConfig = require('../services/reorderConfig.service');
+
+    const config = await reorderConfig.getDynamicConfig(true);
+    if (!config.available) {
+      return res.status(400).json({ ok: false, error: 'No hay Excel de configuración cargado' });
+    }
+
+    let rows = config.rows.filter(r => r.itemcode);
+    if (Array.isArray(productos) && productos.length > 0) {
+      const set = new Set(productos.map(p => String(p).trim()));
+      rows = rows.filter(r => set.has(r.producto));
+    }
+
+    if (rows.length === 0) {
+      return res.status(400).json({ ok: false, error: 'No hay productos vinculados a códigos SAP para aplicar' });
+    }
+
+    const result = await reorderConfig.applyToSettings(rows, { onlyLinked: true });
+
+    // Regenerar el dataset de ML con los nuevos mínimos/máximos
+    let mlSynced = 0;
+    if (syncMl !== false) {
+      try {
+        const { syncMLDataset } = require('../services/mlDataset.service');
+        mlSynced = await syncMLDataset();
+      } catch (mlErr) {
+        console.warn('[Config Dinamica Apply] No se pudo sincronizar el dataset ML:', mlErr.message);
+      }
+    }
+
+    res.json({
+      ok: true,
+      applied: result.applied,
+      errors: result.errors,
+      mlSynced,
+      message: `Configuración aplicada a ${result.applied} SKUs. ${syncMl !== false ? 'Dataset de IA regenerado.' : ''}`
+    });
+  } catch (err) {
+    console.error('[POST Config Dinamica Apply Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al aplicar la configuración: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/pharmacy/config-dinamica/upload
+ * Carga una nueva versión del Excel (.xlsm/.xlsx) de Puntos de Reorden.
+ */
+router.post('/config-dinamica/upload', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
+  try {
+    const multer = require('multer');
+    const fs = require('fs');
+    const path = require('path');
+    const uploadDir = path.join(__dirname, '..', 'uploads', 'excel');
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+    const uploadMiddleware = multer({
+      storage: multer.diskStorage({
+        destination: (rq, fl, cb) => cb(null, uploadDir),
+        filename: (rq, fl, cb) => cb(null, `reorder_config_${Date.now()}${path.extname(fl.originalname).toLowerCase()}`)
+      }),
+      limits: { fileSize: 50 * 1024 * 1024 },
+      fileFilter: (rq, fl, cb) => {
+        if (!/\.(xlsm|xlsx)$/i.test(fl.originalname)) {
+          return cb(new Error('Solo se aceptan archivos .xlsm o .xlsx'));
+        }
+        cb(null, true);
+      }
+    }).single('file');
+
+    uploadMiddleware(req, res, async (uploadErr) => {
+      if (uploadErr) return res.status(400).json({ ok: false, error: uploadErr.message });
+      if (!req.file) return res.status(400).json({ ok: false, error: 'No se recibió archivo' });
+      try {
+        const reorderConfig = require('../services/reorderConfig.service');
+        const parsed = await reorderConfig.parseReorderExcel(req.file.path);
+        const matched = await reorderConfig.buildMatches(parsed.rows);
+        reorderConfig.invalidateCache();
+        const stats = {
+          total: matched.length,
+          linked: matched.filter(r => r.matchType === 'MANUAL').length,
+          autoHigh: matched.filter(r => r.matchType === 'AUTO_ALTA').length,
+          autoMedium: matched.filter(r => r.matchType === 'AUTO_MEDIA').length,
+          unmatched: matched.filter(r => !r.itemcode).length
+        };
+        res.json({ ok: true, fileName: parsed.fileName, totalRows: parsed.totalRows, stats, message: `Excel procesado: ${parsed.totalRows} productos detectados.` });
+      } catch (parseErr) {
+        console.error('[POST Config Dinamica Upload Parse Error]', parseErr);
+        res.status(400).json({ ok: false, error: 'El archivo no tiene el formato esperado: ' + parseErr.message });
+      }
+    });
+  } catch (err) {
+    console.error('[POST Config Dinamica Upload Error]', err);
+    res.status(500).json({ ok: false, error: 'Error al cargar el archivo: ' + err.message });
+  }
+});
+
 module.exports = router;
+

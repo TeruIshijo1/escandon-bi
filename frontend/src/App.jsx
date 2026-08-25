@@ -38,6 +38,7 @@ const CargosSAP            = lazy(() => import('./components/pharmacy/CargosSAP'
 const ResumenMaestro       = lazy(() => import('./components/pharmacy/ResumenMaestro'));
 const InventarioAlmacen    = lazy(() => import('./components/almacen/InventarioAlmacen'));
 const PuntoReordenAlmacen   = lazy(() => import('./components/almacen/PuntoReordenAlmacen'));
+const PuntoReordenFarmacia  = lazy(() => import('./components/pharmacy/PuntoReordenFarmacia'));
 const TrasladosAlmacen    = lazy(() => import('./components/almacen/TrasladosAlmacen'));
 const ReportesAlmacen      = lazy(() => import('./components/almacen/ReportesAlmacen'));
 const Estadisticas        = lazy(() => import('./pages/Estadisticas'));
@@ -225,14 +226,22 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="farmacia/inventario"
-                element={
-                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA]}>
-                    <InventarioFarmacia />
-                  </ProtectedRoute>
-                }
-              />
+                <Route
+                  path="farmacia/inventario"
+                  element={
+                    <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA]}>
+                      <InventarioFarmacia />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="farmacia/reorden"
+                  element={
+                    <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO]}>
+                      <PuntoReordenFarmacia />
+                    </ProtectedRoute>
+                  }
+                />
               <Route path="quirofano" element={<Navigate to="/quirofano/agenda" replace />} />
               <Route
                 path="quirofano/agenda"
