@@ -63,10 +63,12 @@ class SapService {
               data: json
             });
           } else {
-            reject({
-              status: res.statusCode,
-              error: json
-            });
+            const sapMsg = json?.error?.message?.value || json?.error?.message || (typeof json === 'string' ? json : JSON.stringify(json));
+            const err = new Error(`[SAP ${res.statusCode}] ${sapMsg || 'Error en Service Layer'}`);
+            err.status = res.statusCode;
+            err.error = json;
+            err.code = json?.error?.code;
+            reject(err);
           }
         });
       });
@@ -84,7 +86,7 @@ class SapService {
   /**
    * Inicia sesión en SAP y guarda la cookie en caché
    */
-  async login() {
+  async login(retries = 2) {
     if (!sapConfig.companyDb || !sapConfig.username || !sapConfig.password) {
       throw new Error('Credenciales de SAP no configuradas en el servidor.');
     }
@@ -110,13 +112,18 @@ class SapService {
       }
 
       // El timeout default de SAP suele ser de 30 mins. Restamos 5 min de margen.
-      const timeoutMinutes = response.data.SessionTimeout || 30;
+      const timeoutMinutes = response.data?.SessionTimeout || 30;
       this.sessionExpiresAt = Date.now() + ((timeoutMinutes - 5) * 60 * 1000);
       
       console.log('[SAP] Login exitoso. Sesión cacheada.');
       return true;
     } catch (error) {
-      console.error('[SAP] Error al iniciar sesión:', error);
+      console.error('[SAP] Error al iniciar sesión:', error.message || error);
+      if (retries > 0 && (error.status === 500 || error.status === 502 || error.status === 503 || error.code === 299 || error.status === 299)) {
+        console.warn(`[SAP] Reintentando login en 2.5s (${retries} restantes)...`);
+        await new Promise(r => setTimeout(r, 2500));
+        return this.login(retries - 1);
+      }
       throw error;
     }
   }

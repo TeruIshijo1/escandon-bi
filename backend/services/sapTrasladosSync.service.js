@@ -72,7 +72,7 @@ async function syncTraslados() {
     console.log('[Sync] Sincronización de traslados completada exitosamente.');
     return allRecords.length;
   } catch (err) {
-    console.error('[Sync] Error durante la sincronización de traslados:', err.response?.data || err.message);
+    console.error('[Sync] Error durante la sincronización de traslados:', err.message || err);
     throw err;
   }
 }
