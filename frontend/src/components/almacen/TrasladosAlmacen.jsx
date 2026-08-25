@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
 import '../../styles/print-receipt.css';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function TrasladosAlmacen() {
   const [traslados, setTraslados] = useState([]);
@@ -10,6 +11,8 @@ export default function TrasladosAlmacen() {
   
   const [selectedTraslado, setSelectedTraslado] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEscapeKey(() => setSelectedTraslado(null), !!selectedTraslado);
 
   // Filtros
   const today = new Date().toISOString().split('T')[0];

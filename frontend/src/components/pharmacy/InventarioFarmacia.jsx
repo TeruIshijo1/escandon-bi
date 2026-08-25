@@ -5,6 +5,7 @@ import ControlledLedger from './ControlledLedger';
 import PendingMonitor from './PendingMonitor';
 import PatientHistory from './PatientHistory';
 import SurgicalKits from './SurgicalKits';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function InventarioFarmacia() {
   const [activeTab, setActiveTab] = useState('inventory');
@@ -32,6 +33,11 @@ export default function InventarioFarmacia() {
   const [selectedItemLocations, setSelectedItemLocations] = useState(null);
   const [locations, setLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
+
+  useEscapeKey(() => setSelectedItemBatches(null), !!selectedItemBatches);
+  useEscapeKey(() => setSelectedItemHistory(null), !!selectedItemHistory);
+  useEscapeKey(() => setShowReplenishmentModal(false), showReplenishmentModal);
+  useEscapeKey(() => setSelectedItemLocations(null), !!selectedItemLocations);
 
   useEffect(() => {
     fetchInventory();

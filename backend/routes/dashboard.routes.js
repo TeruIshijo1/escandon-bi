@@ -600,15 +600,19 @@ const mapSectionToQuery = (section) => {
       `;
     case '06_TERAPIA INTENSIVA (SER501, SER600, SER710, SER730)':
       return `
-        SELECT MONTH(FECHA_DE_CARGO) AS mes, COUNT(DISTINCT CUENTA) AS total
+        SELECT MONTH(FECHA_DE_CARGO) AS mes, COUNT(DISTINCT FOLIO_DE_ATENCION) AS total
         FROM UDR_CUENTAS_SERVICIOS
         WHERE FECHA_DE_CARGO >= '2026-04-01' AND FECHA_DE_CARGO <= '2026-12-31'
-          AND (CODIGO_DEL_ARTICULO IN ('SER501', 'SER600', 'SER710', 'SER730') OR DESCRIPCION_DEL_ARTICULO LIKE '%TERAPIA%')
+          AND (
+            CODIGO IN ('SER501', 'SER600', 'SER710', 'SER730', 'SER0501', 'SER0600', 'SER0710', 'SER0730') 
+            OR DESCRIPCION_DEL_ARTICULO LIKE '%TERAPIA INTENSIVA%'
+            OR UNIDAD_DE_SERVICIO IN ('UCI', 'UCIN')
+          )
         GROUP BY MONTH(FECHA_DE_CARGO)
       `;
     case '07_PERSONAS EN QX (USOQX1HR)':
       return `
-        SELECT MONTH(FechaInicio) AS mes, COUNT(DISTINCT CUENTA) AS total
+        SELECT MONTH(FechaInicio) AS mes, COUNT(DISTINCT Numero_Atencion_Medica) AS total
         FROM UDR_USOQX
         WHERE FechaInicio >= '2026-04-01' AND FechaInicio <= '2026-12-31'
         GROUP BY MONTH(FechaInicio)
@@ -622,34 +626,34 @@ const mapSectionToQuery = (section) => {
       `;
     case '08_CX ENDOSCOPIA, COLONOSCOPIA, BRONCOSCOPIA, PANENDOSCOPIA':
       return `
-        SELECT MONTH(FECHA_DE_CARGO) AS mes, COUNT(DISTINCT CUENTA) AS total
+        SELECT MONTH(FECHA_DE_CARGO) AS mes, COUNT(DISTINCT FOLIO_DE_ATENCION) AS total
         FROM UDR_CUENTAS_SERVICIOS
         WHERE FECHA_DE_CARGO >= '2026-04-01' AND FECHA_DE_CARGO <= '2026-12-31'
-          AND (DESCRIPCION_DEL_ARTICULO LIKE '%ENDOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%COLONOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%BRONCOSCOP%')
+          AND (DESCRIPCION_DEL_ARTICULO LIKE '%ENDOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%COLONOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%BRONCOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%PANENDOSCOP%')
         GROUP BY MONTH(FECHA_DE_CARGO)
       `;
     case '09_CONSULTAS DE ESPECIALIDAD':
       return `
         SELECT MONTH(Fecha) AS mes, COUNT(*) AS total
         FROM V_UDR_CONSULTA_DIA
-        WHERE Fecha >= '2026-04-01' AND Fecha <= '2026-12-31'
+        WHERE Fecha >= '2026-04-01' AND Fecha <= GETDATE()
         GROUP BY MONTH(Fecha)
       `;
     case '10_ESTADISTICO DE EST. IMAGEN':
       return `
-        SELECT MONTH(FECHA_DE_CARGO) AS mes, COUNT(*) AS total
-        FROM UDR_CUENTAS_SERVICIOS
-        WHERE FECHA_DE_CARGO >= '2026-04-01' AND FECHA_DE_CARGO <= '2026-12-31'
-          AND UNIDAD_DE_SERVICIO = 'IMA'
-        GROUP BY MONTH(FECHA_DE_CARGO)
+        SELECT MONTH(Fecha) AS mes, COUNT(*) AS total
+        FROM UDR_BI_SOLICITUDES_ESTUDIOS
+        WHERE Fecha >= '2026-04-01' AND Fecha <= '2026-12-31'
+          AND AreaNombre = 'IMAGENOLOGIA'
+        GROUP BY MONTH(Fecha)
       `;
     case '11_ESTADISTICO EST. LABORA':
       return `
-        SELECT MONTH(FECHA_DE_CARGO) AS mes, COUNT(*) AS total
-        FROM UDR_CUENTAS_SERVICIOS
-        WHERE FECHA_DE_CARGO >= '2026-04-01' AND FECHA_DE_CARGO <= '2026-12-31'
-          AND UNIDAD_DE_SERVICIO = 'LAB'
-        GROUP BY MONTH(FECHA_DE_CARGO)
+        SELECT MONTH(Fecha) AS mes, COUNT(*) AS total
+        FROM UDR_BI_SOLICITUDES_ESTUDIOS
+        WHERE Fecha >= '2026-04-01' AND Fecha <= '2026-12-31'
+          AND AreaNombre = 'LABORATORIO'
+        GROUP BY MONTH(Fecha)
       `;
     default:
       return null;
@@ -746,6 +750,339 @@ router.get(
         ok: true,
         seccion,
         data: seccionData
+      });
+
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /api/dashboard/stats-detalle
+ * Retorna el desglose granular (drill-down) de registros para una sección, año y mes dados.
+ */
+router.get(
+  '/stats-detalle',
+  authenticate,
+  async (req, res, next) => {
+    try {
+      const { seccion, year = 2026, mes } = req.query;
+      if (!seccion || !mes) {
+        return res.status(400).json({ ok: false, error: 'Parámetros seccion y mes son requeridos.' });
+      }
+
+      const numYear = parseInt(year, 10) || 2026;
+      const numMes = parseInt(mes, 10);
+
+      if (numMes < 1 || numMes > 12) {
+        return res.status(400).json({ ok: false, error: 'Mes inválido.' });
+      }
+
+      let records = [];
+
+      if (seccion === '01_VIDAS SALVADAS') {
+        try {
+          const startDate = `${numYear}-${String(numMes).padStart(2, '0')}-01`;
+          const allSapRows = await fetchAllSapPages(sapService, `/SQLQueries('VidasSalvChoqueDet')/List?startDate='${startDate}'`);
+          if (allSapRows && allSapRows.length > 0) {
+            records = allSapRows.filter(r => {
+              let m;
+              let y;
+              const dStr = r.FechaPrimeraOV;
+              if (typeof dStr === 'string' && dStr.length === 8 && /^\d{8}$/.test(dStr)) {
+                y = parseInt(dStr.substring(0, 4), 10);
+                m = parseInt(dStr.substring(4, 6), 10);
+              } else if (typeof dStr === 'string' && dStr.length >= 7) {
+                y = parseInt(dStr.substring(0, 4), 10);
+                m = parseInt(dStr.substring(5, 7), 10);
+              } else {
+                const d = new Date(dStr);
+                if (!isNaN(d.getTime())) {
+                  y = d.getFullYear();
+                  m = d.getMonth() + 1;
+                }
+              }
+              return y === numYear && m === numMes;
+            }).map(r => ({
+              FolioAtencion: r.AtencionMedica,
+              NoPaciente: r.NoPaciente,
+              Paciente: r.NombrePaciente,
+              Fecha: r.FechaPrimeraOV,
+              OrdenesDeVenta: r.OrdenesDeVenta,
+              HorasSalaChoque: r.CantidadTotalSalaChoque,
+              TotalMonto: r.ImporteTotalSalaChoque
+            }));
+          }
+        } catch (e) {
+          console.error('[SAP] Error al consultar detalle Vidas Salvadas:', e.message);
+        }
+      } else {
+        let query = '';
+        switch (seccion) {
+          case '02_NACIMIENTOS':
+            query = `
+              SELECT 
+                p2.PCNum AS [FolioAtencion],
+                pt.PTNum AS [NoPaciente],
+                pt.FullName AS [PacienteBebe],
+                pt.Gender AS [Genero],
+                p2.Date AS [FechaNacimiento],
+                p2.MedicalDischargeDate AS [FechaEgreso],
+                v.RoomName AS [HabitacionCunero],
+                p2.PC_ST AS [EstadoCuenta]
+              FROM PC p2 
+              JOIN PT pt ON p2.PTNum = pt.PTNum
+              JOIN (SELECT PTNum, MAX(RoomName) as RoomName FROM V_MRPT WHERE RoomName LIKE '%CUNERO%' OR RoomCode LIKE '%CUN%' GROUP BY PTNum) v ON p2.PTNum = v.PTNum 
+              WHERE YEAR(p2.MedicalDischargeDate) = ${numYear} AND MONTH(p2.MedicalDischargeDate) = ${numMes}
+                AND p2.PC_ST = 'CL' 
+                AND DATEDIFF(day, pt.BirthDate, p2.Date) = 0
+              ORDER BY p2.MedicalDischargeDate DESC
+            `;
+            break;
+          case '03_CUENTAS HOSPITALARIAS (HOSPITALIZACIÓN)':
+            query = `
+              SELECT 
+                pc.PCNum AS [FolioCuenta],
+                pt.PTNum AS [NoPaciente],
+                pt.FullName AS [Paciente],
+                pt.Gender AS [Genero],
+                pc.Date AS [FechaIngreso],
+                pc.MedicalDischargeDate AS [FechaEgreso],
+                DATEDIFF(day, pc.Date, pc.MedicalDischargeDate) AS [DiasEstancia],
+                v.RoomName AS [Habitacion],
+                pc.MedicalDischarge AS [TipoEgreso],
+                pc.Total AS [TotalCuenta],
+                pc.Balance AS [Saldo]
+              FROM PC pc
+              LEFT JOIN PT pt ON pc.PTNum = pt.PTNum
+              LEFT JOIN (SELECT PTNum, MAX(RoomName) as RoomName FROM V_MRPT GROUP BY PTNum) v ON pc.PTNum = v.PTNum
+              WHERE YEAR(pc.MedicalDischargeDate) = ${numYear} AND MONTH(pc.MedicalDischargeDate) = ${numMes}
+                AND pc.PC_ST = 'CL' AND pc.PCType = 'IP'
+              ORDER BY pc.MedicalDischargeDate DESC
+            `;
+            break;
+          case '03_CUENTAS HOSPITALARIAS DE URGENCIAS':
+            query = `
+              SELECT 
+                pc.PCNum AS [FolioCuenta],
+                pt.PTNum AS [NoPaciente],
+                pt.FullName AS [Paciente],
+                pt.Gender AS [Genero],
+                pc.Date AS [FechaIngreso],
+                pc.MedicalDischargeDate AS [FechaEgreso],
+                v.RoomName AS [UbicacionUrgencias],
+                pc.MedicalDischarge AS [TipoEgreso],
+                pc.Total AS [TotalCuenta],
+                pc.Balance AS [Saldo]
+              FROM PC pc
+              LEFT JOIN PT pt ON pc.PTNum = pt.PTNum
+              LEFT JOIN (SELECT PTNum, MAX(RoomName) as RoomName FROM V_MRPT GROUP BY PTNum) v ON pc.PTNum = v.PTNum
+              WHERE YEAR(pc.MedicalDischargeDate) = ${numYear} AND MONTH(pc.MedicalDischargeDate) = ${numMes}
+                AND pc.PC_ST = 'CL' AND pc.PCType = 'ER'
+              ORDER BY pc.MedicalDischargeDate DESC
+            `;
+            break;
+          case '03_CUENTAS HOSPITALARIAS DE VA - SEGURO':
+            query = `
+              SELECT 
+                pc.PCNum AS [FolioCuenta],
+                pt.PTNum AS [NoPaciente],
+                pt.FullName AS [Paciente],
+                ag.AGCode AS [AseguradoraConvenio],
+                pc.Date AS [FechaIngreso],
+                pc.MedicalDischargeDate AS [FechaEgreso],
+                pc.Total AS [TotalCuenta],
+                pc.Balance AS [Saldo]
+              FROM PC pc
+              LEFT JOIN PT pt ON pc.PTNum = pt.PTNum
+              LEFT JOIN (SELECT PCNum, MAX(AGCode) as AGCode FROM PCAG GROUP BY PCNum) ag ON pc.PCNum = ag.PCNum
+              WHERE YEAR(pc.MedicalDischargeDate) = ${numYear} AND MONTH(pc.MedicalDischargeDate) = ${numMes}
+                AND pc.PC_ST = 'CL'
+                AND EXISTS (SELECT 1 FROM PCAG a WHERE a.PCNum = pc.PCNum)
+              ORDER BY pc.MedicalDischargeDate DESC
+            `;
+            break;
+          case '04_ADMISIÓN CONTINUA (CONSULTAS DE URGENCIAS)':
+            query = `
+              SELECT 
+                pc.PCNum AS [FolioAtencion],
+                pt.PTNum AS [NoPaciente],
+                pt.FullName AS [Paciente],
+                pt.Gender AS [Genero],
+                pc.Date AS [FechaAtencion],
+                pc.PC_ST AS [Estado],
+                v.RoomName AS [AreaUrgencias]
+              FROM PC pc
+              LEFT JOIN PT pt ON pc.PTNum = pt.PTNum
+              LEFT JOIN (SELECT PTNum, MAX(RoomName) as RoomName FROM V_MRPT GROUP BY PTNum) v ON pc.PTNum = v.PTNum
+              WHERE YEAR(pc.Date) = ${numYear} AND MONTH(pc.Date) = ${numMes}
+                AND pc.PCType = 'ER'
+              ORDER BY pc.Date DESC
+            `;
+            break;
+          case '05_ESTANCIA':
+            query = `
+              SELECT 
+                pc.PCNum AS [FolioCuenta],
+                pt.FullName AS [Paciente],
+                pc.Date AS [FechaIngreso],
+                pc.MedicalDischargeDate AS [FechaAlta],
+                DATEDIFF(day, pc.Date, pc.MedicalDischargeDate) AS [DiasEstancia],
+                v.RoomName AS [HabitacionPiso],
+                pc.Total AS [TotalCuenta]
+              FROM PC pc
+              LEFT JOIN PT pt ON pc.PTNum = pt.PTNum
+              LEFT JOIN (SELECT PTNum, MAX(RoomName) as RoomName FROM V_MRPT GROUP BY PTNum) v ON pc.PTNum = v.PTNum
+              WHERE YEAR(pc.MedicalDischargeDate) = ${numYear} AND MONTH(pc.MedicalDischargeDate) = ${numMes}
+                AND pc.PC_ST = 'CL' AND pc.PCType = 'IP'
+              ORDER BY [DiasEstancia] DESC
+            `;
+            break;
+          case '06_TERAPIA INTENSIVA (SER501, SER600, SER710, SER730)':
+            query = `
+              SELECT 
+                FOLIO_DE_ATENCION AS [FolioAtencion],
+                NOMBRE_DEL_PACIENTE AS [Paciente],
+                FECHA_DE_CARGO AS [FechaCargo],
+                CODIGO AS [CodigoServicio],
+                DESCRIPCION_DEL_ARTICULO AS [Servicio],
+                CANTIDAD_TOTAL AS [Cantidad],
+                TOTAL_COBRADO AS [TotalCobrado],
+                Medico_Solicitante AS [MedicoSolicitante],
+                Medico_Tratante AS [MedicoTratante],
+                UNIDAD_DE_SERVICIO AS [UnidadServicio]
+              FROM UDR_CUENTAS_SERVICIOS
+              WHERE YEAR(FECHA_DE_CARGO) = ${numYear} AND MONTH(FECHA_DE_CARGO) = ${numMes}
+                AND (
+                  CODIGO IN ('SER501', 'SER600', 'SER710', 'SER730', 'SER0501', 'SER0600', 'SER0710', 'SER0730') 
+                  OR DESCRIPCION_DEL_ARTICULO LIKE '%TERAPIA INTENSIVA%'
+                  OR UNIDAD_DE_SERVICIO IN ('UCI', 'UCIN')
+                )
+              ORDER BY FECHA_DE_CARGO DESC
+            `;
+            break;
+          case '07_PERSONAS EN QX (USOQX1HR)':
+            query = `
+              SELECT 
+                Numero_Atencion_Medica AS [FolioAtencion],
+                Numero_Paciente AS [NoPaciente],
+                Paciente,
+                Quirofano,
+                FechaInicio,
+                FechaFin,
+                Medicos AS [CirujanosMedicos],
+                Procedimientos
+              FROM UDR_USOQX
+              WHERE YEAR(FechaInicio) = ${numYear} AND MONTH(FechaInicio) = ${numMes}
+              ORDER BY FechaInicio DESC
+            `;
+            break;
+          case '13_ESTADÍSTICO DE CIRUGÍAS':
+            query = `
+              SELECT 
+                Numero_Atencion_Medica AS [FolioAtencion],
+                Numero_Paciente AS [NoPaciente],
+                Paciente,
+                Quirofano,
+                FechaInicio,
+                FechaFin,
+                DATEDIFF(minute, FechaInicio, FechaFin) AS [DuracionMinutos],
+                Medicos AS [CirujanosMedicos],
+                Procedimientos
+              FROM UDR_USOQX
+              WHERE YEAR(FechaInicio) = ${numYear} AND MONTH(FechaInicio) = ${numMes}
+              ORDER BY FechaInicio DESC
+            `;
+            break;
+          case '08_CX ENDOSCOPIA, COLONOSCOPIA, BRONCOSCOPIA, PANENDOSCOPIA':
+            query = `
+              SELECT 
+                FOLIO_DE_ATENCION AS [FolioAtencion],
+                NOMBRE_DEL_PACIENTE AS [Paciente],
+                FECHA_DE_CARGO AS [FechaCargo],
+                CODIGO AS [Codigo],
+                DESCRIPCION_DEL_ARTICULO AS [EstudioProcedimiento],
+                Medico_Solicitante AS [MedicoSolicitante],
+                Medico_Tratante AS [MedicoTratante],
+                Anestesiologo,
+                TOTAL_COBRADO AS [TotalCobrado]
+              FROM UDR_CUENTAS_SERVICIOS
+              WHERE YEAR(FECHA_DE_CARGO) = ${numYear} AND MONTH(FECHA_DE_CARGO) = ${numMes}
+                AND (DESCRIPCION_DEL_ARTICULO LIKE '%ENDOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%COLONOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%BRONCOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%PANENDOSCOP%')
+              ORDER BY FECHA_DE_CARGO DESC
+            `;
+            break;
+          case '09_CONSULTAS DE ESPECIALIDAD':
+            query = `
+              SELECT 
+                Numero_Cita AS [NoCita],
+                Paciente,
+                Edad_Anios AS [Edad],
+                MSDescription_ES AS [Especialidad],
+                Medico AS [MedicoEspecialista],
+                Fecha AS [FechaConsulta],
+                Hora,
+                Telefono_1 AS [Telefono],
+                Estatus_Orden_Venta AS [Estatus],
+                Articulo AS [Servicio]
+              FROM V_UDR_CONSULTA_DIA
+              WHERE YEAR(Fecha) = ${numYear} AND MONTH(Fecha) = ${numMes} AND Fecha <= GETDATE()
+              ORDER BY Fecha DESC, Hora DESC
+            `;
+            break;
+          case '10_ESTADISTICO DE EST. IMAGEN':
+            query = `
+              SELECT 
+                PCPRITNum AS [FolioSolicitud],
+                Estudio AS [EstudioImagenologia],
+                Fecha AS [FechaSolicitud],
+                Medico AS [MedicoSolicitante],
+                TipoAtencion,
+                Cantidad
+              FROM UDR_BI_SOLICITUDES_ESTUDIOS
+              WHERE YEAR(Fecha) = ${numYear} AND MONTH(Fecha) = ${numMes}
+                AND AreaNombre = 'IMAGENOLOGIA'
+              ORDER BY Fecha DESC
+            `;
+            break;
+          case '11_ESTADISTICO EST. LABORA':
+            query = `
+              SELECT 
+                PCPRITNum AS [FolioSolicitud],
+                Estudio AS [EstudioLaboratorio],
+                Fecha AS [FechaSolicitud],
+                Medico AS [MedicoSolicitante],
+                TipoAtencion,
+                Cantidad
+              FROM UDR_BI_SOLICITUDES_ESTUDIOS
+              WHERE YEAR(Fecha) = ${numYear} AND MONTH(Fecha) = ${numMes}
+                AND AreaNombre = 'LABORATORIO'
+              ORDER BY Fecha DESC
+            `;
+            break;
+          default:
+            query = null;
+        }
+
+        if (query) {
+          try {
+            const pool = await connectRemoteDB();
+            const result = await pool.request().query(query);
+            records = result.recordset || [];
+          } catch (e) {
+            console.error(`[HIS] Error al consultar detalle ${seccion}:`, e.message);
+          }
+        }
+      }
+
+      res.json({
+        ok: true,
+        seccion,
+        year: numYear,
+        mes: numMes,
+        total: records.length,
+        data: records
       });
 
     } catch (err) {

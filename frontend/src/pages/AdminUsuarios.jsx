@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import { getPermissionSections } from '../utils/rbac';
+import useEscapeKey from '../hooks/useEscapeKey';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE = '/api';
@@ -60,6 +61,9 @@ export default function AdminUsuarios() {
   const [toast, setToast] = useState('');
   const [modalEdit, setModalEdit] = useState(null);
   const [editForm, setEditForm] = useState({ username:'', nombre:'', email:'', password:'', roleId:4, area:'' });
+
+  useEscapeKey(() => setModalTableros(null), !!modalTableros);
+  useEscapeKey(() => setModalEdit(null), !!modalEdit);
 
   useEffect(() => {
     fetchUsers();

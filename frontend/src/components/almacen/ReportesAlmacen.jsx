@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { authHeaders } from '../../api/auth';
 import { API_BASE } from '../../api/config';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function ReportesAlmacen() {
   const location = useLocation();
@@ -39,6 +40,8 @@ export default function ReportesAlmacen() {
   // Modal State
   const [selectedRow, setSelectedRow] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  useEscapeKey(() => setModalOpen(false), modalOpen);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalData, setModalData] = useState(null);
 

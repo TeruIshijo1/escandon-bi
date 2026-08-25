@@ -6,6 +6,7 @@ import {
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
 import ExportButton from '../shared/ExportButton';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function DashboardFinancieroNativo({ globalFilters, globalTrigger }) {
   const [data, setData] = useState(null);
@@ -19,6 +20,8 @@ export default function DashboardFinancieroNativo({ globalFilters, globalTrigger
   const [accountDetails, setAccountDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState(null);
+
+  useEscapeKey(() => setAccountDetails(null), !!accountDetails);
 
   useEffect(() => {
     fetchData();

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
 import * as XLSX from 'xlsx';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function DashboardVidasSalvadas({ periodo }) {
   const [data, setData] = useState([]);
@@ -12,6 +13,8 @@ export default function DashboardVidasSalvadas({ periodo }) {
   const [selectedAtencion, setSelectedAtencion] = useState(null);
   const [detailData, setDetailData] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEscapeKey(() => { setSelectedAtencion(null); setDetailData(null); }, !!selectedAtencion);
 
   useEffect(() => {
     fetchData();

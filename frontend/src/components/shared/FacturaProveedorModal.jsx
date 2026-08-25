@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import PremiumLoader from './PremiumLoader';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function FacturaProveedorModal({ docNum, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  useEscapeKey(onClose);
 
   useEffect(() => {
     async function fetchFactura() {

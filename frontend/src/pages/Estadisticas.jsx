@@ -10,7 +10,9 @@ import EditableKPIWrapper from '../components/shared/EditableKPIWrapper';
 import PBIModal from '../components/shared/PBIModal';
 import { useKPIConfig } from '../hooks/useKPIConfig';
 import DashboardVidasSalvadas from '../components/dashboard/DashboardVidasSalvadas';
+import ModalDetalleEstadisticas from '../components/dashboard/ModalDetalleEstadisticas';
 import PremiumLoader from '../components/shared/PremiumLoader';
+import useEscapeKey from '../hooks/useEscapeKey';
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -51,12 +53,26 @@ export default function Estadisticas() {
   const [pbiModal, setPBIModal] = useState(null);
   const [showVidasSalvadasModal, setShowVidasSalvadasModal] = useState(false);
 
+  useEscapeKey(() => setShowVidasSalvadasModal(false), showVidasSalvadasModal);
+
   // Estados para el explorador histórico de Excel
   const [selectedSeccion, setSelectedSeccion] = useState('01_VIDAS SALVADAS');
   const [seccionData, setSeccionData] = useState(null);
   const [loadingHist, setLoadingHist] = useState(false);
   const [activeTab, setActiveTab] = useState('tabla');
-  const [selectedYearGraf, setSelectedYearGraf] = useState(2025);
+  const [selectedYearGraf, setSelectedYearGraf] = useState(2026);
+
+  // Estado para el modal de desglose interactivo (drill-down)
+  const [detailModal, setDetailModal] = useState({
+    isOpen: false,
+    seccionId: '',
+    seccionLabel: '',
+    year: 2026,
+    mes: 1,
+    mesNombre: '',
+    data: [],
+    loading: false
+  });
 
   const handleKPIClick = (url, title, url2, url3, multiPagina) => setPBIModal({ url, title, url2, url3, multiPagina });
 
@@ -135,6 +151,44 @@ export default function Estadisticas() {
       console.error('Error fetching stats historico:', e);
     } finally {
       setLoadingHist(false);
+    }
+  };
+
+  const handleOpenDetail = async (seccionId, year, mes, mesNombre) => {
+    const secObj = SECCIONES_ESTADISTICAS.find(s => s.id === seccionId);
+    const seccionLabel = secObj?.label || seccionId;
+
+    setDetailModal({
+      isOpen: true,
+      seccionId,
+      seccionLabel,
+      year,
+      mes,
+      mesNombre,
+      data: [],
+      loading: true
+    });
+
+    try {
+      const token = sessionStorage.getItem('escandon_token');
+      const res = await fetch(`/api/dashboard/stats-detalle?seccion=${encodeURIComponent(seccionId)}&year=${year}&mes=${mes}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setDetailModal(prev => ({
+          ...prev,
+          data: json.data || [],
+          loading: false
+        }));
+      } else {
+        setDetailModal(prev => ({ ...prev, loading: false }));
+        showToast(json.error || 'No se pudieron obtener los detalles');
+      }
+    } catch (err) {
+      console.error('Error fetching detail:', err);
+      setDetailModal(prev => ({ ...prev, loading: false }));
+      showToast('Error al consultar el detalle');
     }
   };
 
@@ -525,10 +579,49 @@ export default function Estadisticas() {
                         <td style={{ padding: '0.65rem 1rem', textAlign: 'left', fontFamily: 'var(--font-display)', color: 'var(--text-primary)', fontWeight: 600 }}>{mesNombre}</td>
                         {añosList.map(año => {
                           const val = seccionData?.[año]?.[m];
-                          const isSap = año === 2026 && m >= 4;
+                          const isClickable = año === 2026 && val != null && val > 0 && !selectedSeccion.includes('INGRESOS');
                           return (
-                            <td key={año} style={{ padding: '0.65rem 0.6rem', color: isSap ? 'var(--color-azul-claro)' : 'var(--text-primary)', fontWeight: isSap ? 700 : 400 }}>
-                              {val != null ? (selectedSeccion.includes('INGRESOS') ? `$${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : val.toLocaleString('en-US')) : '-'}
+                            <td key={año} style={{ padding: '0.45rem 0.5rem', textAlign: 'right' }}>
+                              {isClickable ? (
+                                <button
+                                  onClick={() => handleOpenDetail(selectedSeccion, año, m, mesNombre)}
+                                  title={`Ver detalle y exportar los ${val.toLocaleString('en-US')} registros de ${mesNombre} ${año}`}
+                                  style={{
+                                    background: 'rgba(0, 70, 135, 0.07)',
+                                    color: 'var(--color-azul-fuerte)',
+                                    border: '1px solid rgba(0, 70, 135, 0.22)',
+                                    borderRadius: '7px',
+                                    padding: '0.25rem 0.55rem',
+                                    fontFamily: 'var(--font-mono)',
+                                    fontSize: '0.76rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  onMouseOver={e => {
+                                    e.currentTarget.style.background = 'var(--color-azul-fuerte)';
+                                    e.currentTarget.style.color = '#FFFFFF';
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                    e.currentTarget.style.boxShadow = '0 3px 8px rgba(0,70,135,0.28)';
+                                  }}
+                                  onMouseOut={e => {
+                                    e.currentTarget.style.background = 'rgba(0, 70, 135, 0.07)';
+                                    e.currentTarget.style.color = 'var(--color-azul-fuerte)';
+                                    e.currentTarget.style.transform = 'none';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                  }}
+                                >
+                                  <span>{val.toLocaleString('en-US')}</span>
+                                  <span style={{ fontSize: '0.62rem', opacity: 0.8 }}>🔍</span>
+                                </button>
+                              ) : (
+                                <span style={{ color: año === 2026 ? 'var(--color-azul-claro)' : 'var(--text-primary)', fontWeight: año === 2026 ? 700 : 400 }}>
+                                  {val != null ? (selectedSeccion.includes('INGRESOS') ? `$${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : val.toLocaleString('en-US')) : '-'}
+                                </span>
+                              )}
                             </td>
                           );
                         })}
@@ -662,6 +755,12 @@ export default function Estadisticas() {
           </div>
         </div>
       )}
+
+      {/* Modal Desglose Granular & Exportación Excel */}
+      <ModalDetalleEstadisticas
+        {...detailModal}
+        onClose={() => setDetailModal(prev => ({ ...prev, isOpen: false }))}
+      />
 
       {/* Toast Notification */}
       {toast && (

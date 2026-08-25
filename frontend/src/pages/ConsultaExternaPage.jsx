@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import cexService from '../services/cex.service';
 import PremiumLoader from '../components/shared/PremiumLoader';
 import ExportButton from '../components/shared/ExportButton';
+import useEscapeKey from '../hooks/useEscapeKey';
 
 export default function ConsultaExternaPage() {
   const [citas, setCitas] = useState([]);
@@ -18,6 +19,8 @@ export default function ConsultaExternaPage() {
   const [openNotas, setOpenNotas] = useState(false);
   const [selectedCita, setSelectedCita] = useState(null);
   const [toast, setToast] = useState('');
+
+  useEscapeKey(() => setOpenNotas(false), openNotas);
   
   // Form state
   const [notasData, setNotasData] = useState({

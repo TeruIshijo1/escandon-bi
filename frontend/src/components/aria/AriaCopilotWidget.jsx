@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '../../api/client';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 function formatMarkdown(text) {
   if (!text) return '';
@@ -52,6 +53,8 @@ export default function AriaCopilotWidget() {
   const [loading, setLoading] = useState(false);
   const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
   const chatEndRef = useRef(null);
+
+  useEscapeKey(() => setIsOpen(false), isOpen);
 
   // Load suggestions dynamically from API based on user's IA profile
   useEffect(() => {

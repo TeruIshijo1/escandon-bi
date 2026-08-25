@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function ExportApiModal({ isOpen, onClose }) {
   const { user } = useAuth();
@@ -7,6 +8,8 @@ export default function ExportApiModal({ isOpen, onClose }) {
   const [apiUrl, setApiUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEscapeKey(onClose, isOpen);
 
   if (!isOpen) return null;
 

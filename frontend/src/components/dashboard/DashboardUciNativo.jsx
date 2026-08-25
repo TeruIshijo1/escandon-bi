@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function DashboardUciNativo({ data }) {
   const [selectedStatus, setSelectedStatus] = useState(null);
@@ -14,6 +15,8 @@ export default function DashboardUciNativo({ data }) {
   const [detailItems, setDetailItems] = useState([]);
   const [detailSearchQuery, setDetailSearchQuery] = useState('');
   const [detailSelectedGroup, setDetailSelectedGroup] = useState(null);
+
+  useEscapeKey(() => setSelectedPatientDetail(null), !!selectedPatientDetail);
 
   if (!data) return null;
 

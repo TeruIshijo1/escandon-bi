@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { apiFetch } from '../../api/client';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function SurgicalAgenda() {
   const [events, setEvents] = useState([]);
@@ -14,6 +15,8 @@ export default function SurgicalAgenda() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [modalTab, setModalTab] = useState('ACTUAL'); // 'ACTUAL' or 'SUGGESTED'
   const [copied, setCopied] = useState(false);
+
+  useEscapeKey(() => setSelectedEvent(null), !!selectedEvent);
 
   useEffect(() => {
     setLoading(true);

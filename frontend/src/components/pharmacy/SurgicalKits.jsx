@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function SurgicalKits() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedKit, setSelectedKit] = useState(null);
+
+  useEscapeKey(() => setSelectedKit(null), !!selectedKit);
   
   // Filters & State
   const [months, setMonths] = useState(12);

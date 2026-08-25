@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   AreaChart, Area, PieChart, Pie, Cell
 } from 'recharts';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function DashboardUrgenciasNativo({ data, searchFilter, setSearchFilter }) {
   const [selectedEstatus, setSelectedEstatus] = useState(null);
@@ -14,6 +15,8 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
   const [detailItems, setDetailItems] = useState([]);
   const [detailSearchQuery, setDetailSearchQuery] = useState('');
   const [detailSelectedGroup, setDetailSelectedGroup] = useState(null);
+
+  useEscapeKey(() => setSelectedPatientDetail(null), !!selectedPatientDetail);
 
   useEffect(() => {
     if (!selectedPatientDetail) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function InventarioAlmacen() {
   const navigate = useNavigate();
@@ -25,6 +26,10 @@ export default function InventarioAlmacen() {
   const [selectedItemLocations, setSelectedItemLocations] = useState(null);
   const [locations, setLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
+
+  useEscapeKey(() => setSelectedItemHistory(null), !!selectedItemHistory);
+  useEscapeKey(() => setShowReplenishmentModal(false), showReplenishmentModal);
+  useEscapeKey(() => setSelectedItemLocations(null), !!selectedItemLocations);
 
   useEffect(() => {
     fetchInventory();

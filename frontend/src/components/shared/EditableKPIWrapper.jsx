@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, cloneElement } from 'react';
 import { useKPIConfig } from '../../hooks/useKPIConfig';
+import useEscapeKey from '../../hooks/useEscapeKey';
 import { useAuth } from '../../context/AuthContext';
 
 const ICONOS_RAPIDOS = ['📊','🏥','❤️','🔪','📅','🚪','📦','💼','⚙️','🎯','⭐','📋','👤','♀️','📉','👶','✅','⚠️','💰','🛏️','🔄'];
@@ -27,6 +28,8 @@ export default function EditableKPIWrapper({
   const [form, setForm] = useState({ nombreCustom: '', icono: '', pbiUrl: '' });
 
   const modalRef = useRef(null);
+
+  useEscapeKey(() => setEditing(false), editing);
 
   const openEdit = (e) => {
     e.stopPropagation();

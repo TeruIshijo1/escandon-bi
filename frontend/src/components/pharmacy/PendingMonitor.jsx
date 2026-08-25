@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 function formatTimeAgo(totalMins) {
   if (!totalMins || isNaN(totalMins) || totalMins <= 0) return '0 min';
@@ -29,6 +30,8 @@ export default function PendingMonitor() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedPrescription, setSelectedPrescription] = useState(null);
+
+  useEscapeKey(() => setSelectedPrescription(null), !!selectedPrescription);
 
   const fetchData = () => {
     fetch(`${API_BASE}/pharmacy/pending-prescriptions`, {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
+import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function PuntoReordenAlmacen() {
   const [activeTab, setActiveTab] = useState('reorden'); // 'reorden' | 'pedidos' | 'ml_dataset'
@@ -38,6 +39,9 @@ export default function PuntoReordenAlmacen() {
 
   // Modal para ver detalle de Pedidos SAP de un SKU
   const [selectedItemOrders, setSelectedItemOrders] = useState(null);
+
+  useEscapeKey(() => setEditingItem(null), !!editingItem);
+  useEscapeKey(() => setSelectedItemOrders(null), !!selectedItemOrders);
 
   useEffect(() => {
     fetchReorderData();

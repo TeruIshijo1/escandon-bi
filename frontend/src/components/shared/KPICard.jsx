@@ -12,6 +12,7 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import { useKPIConfig } from '../../hooks/useKPIConfig';
+import useEscapeKey from '../../hooks/useEscapeKey';
 import { useAuth } from '../../context/AuthContext';
 
 const ICONOS_RAPIDOS = ['📊','🏥','❤️','🔪','📅','🚪','📦','💼','⚙️','🎯','⭐','📋','👤','♀️','📉','👶','✅','⚠️','💰','🛏️','🔄'];
@@ -27,6 +28,8 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
   const [form, setForm] = useState({ nombreCustom: '', icono: '', pbiUrl: '' });
 
   const modalRef = useRef(null);
+
+  useEscapeKey(() => setEditing(false), editing);
 
   // Al abrir el modal, inicializar con los valores actuales
   const openEdit = (e) => {
