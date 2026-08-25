@@ -4,17 +4,136 @@
  * Rediseño premium con identidad de marca y consistencia visual
  */
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import PremiumLoader from '../components/shared/PremiumLoader';
 
 const API_BASE = '/api';
 
 const SECCION_LABELS = {
+  directivo: '💼 Directivo',
+  mando:     '🎯 Mando',
   area:      '🏥 Tablero de Área',
-  stats:     '📈 Estadísticas'
+  stats:     '📈 Estadísticas',
+  audit:     '📋 Auditoría',
+  home:      '🏠 Inicio'
+};
+
+const getSeccionBadge = (sec) => {
+  if (!sec) return 'General';
+  const label = SECCION_LABELS[sec.toLowerCase()] || sec;
+  const parts = label.split(' ');
+  return parts.length > 1 ? parts.slice(1).join(' ') : label;
 };
 
 const ICONOS_RAPIDOS = ['📊','🏥','❤️','🔪','📅','🚪','📦','💼','⚙️','🎯','⭐','📋','👤','♀️','📉','👶','✅','⚠️','💰','🛏️','🔄'];
+
+function JsonUploader({ label, onUpload }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('jsonFile', file);
+
+    try {
+      const token = sessionStorage.getItem('escandon_token');
+      const res = await fetch(`${API_BASE}/admin/upload-json`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (!res.ok) {
+        const errorJson = await res.json().catch(() => ({}));
+        throw new Error(errorJson.error || `Error del servidor (${res.status})`);
+      }
+
+      const json = await res.json();
+      if (json.ok) onUpload(json.filePath);
+      else alert('Error al subir: ' + json.error);
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Error al subir archivo JSON: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.3rem' }}>
+      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</span>
+      <input type="file" accept=".json" onChange={handleFile} disabled={uploading} style={{ fontSize: '0.75rem' }} />
+      {uploading && <span style={{ fontSize: '0.7rem', color: 'var(--color-azul-fuerte)' }}>Subiendo...</span>}
+    </div>
+  );
+}
+
+function FileUploader({ label, value, onUpload, accept }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = sessionStorage.getItem('escandon_token');
+      const res = await fetch(`/upload-assets`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (!res.ok) {
+        const errorJson = await res.json().catch(() => ({}));
+        throw new Error(errorJson.error || `Error del servidor (${res.status})`);
+      }
+
+      const json = await res.json();
+      if (json.ok) onUpload(json.filename);
+      else alert('Error al subir: ' + json.error);
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Error al subir archivo: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: '0.85rem' }}>
+      <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem', fontFamily: 'var(--font-display)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</label>
+      <div 
+        onClick={() => document.getElementById(`upload-${label}`).click()}
+        style={{ 
+          border: '1.5px dashed #CBD5E0', borderRadius: 10, padding: '0.65rem', 
+          background: uploading ? 'rgba(0,136,201,0.06)' : 'white', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: '0.75rem', transition: 'all var(--transition-fast)',
+          fontFamily: 'var(--font-body)',
+        }}
+        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--color-azul-claro)'}
+        onMouseLeave={e => e.currentTarget.style.borderColor = '#CBD5E0'}
+      >
+        <span style={{ color: value ? 'var(--text-primary)' : '#A0AEC0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '80%', fontWeight: value ? 600 : 400 }}>
+          {uploading ? '⏳ Subiendo...' : (value || 'Seleccionar archivo local...')}
+        </span>
+        <span style={{ fontSize: '0.9rem' }}>{uploading ? '◌' : '📤'}</span>
+        <input 
+          id={`upload-${label}`} 
+          type="file" 
+          accept={accept} 
+          onChange={handleFile} 
+          style={{ display: 'none' }} 
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function AdminConfiguracion() {
   const [reports, setReports] = useState([]);
@@ -35,15 +154,6 @@ export default function AdminConfiguracion() {
   const [kpiEditForm,     setKPIEditForm]    = useState({ nombreCustom: '', icono: '', pbiUrl: '', jsonApiUrl: '', jsonFilePath: '', multiPagina: false });
   const [kpiSaving,       setKPISaving]      = useState(false);
 
-  const ROL_DISPLAY = {
-    ADMIN: 'Administrador',
-    DIRECTOR: 'Directivo',
-    JEFE_AREA: 'Jefatura',
-    USUARIO_OPERATIVO: 'Usuario Operativo',
-  };
-
-  const AREAS_LIST = ['QUIROFANO', 'UCI', 'URGENCIAS', 'CUNEROS', 'IMAGENOLOGIA', 'LABORATORIO', 'CONSULTA_EXTERNA', 'HOSPITALIZACION'];
-
   useEffect(() => {
     fetchReports();
     fetchKPIConfig();
@@ -56,19 +166,24 @@ export default function AdminConfiguracion() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await res.json();
-      if (json.ok) setKPIList(json.data);
-    } catch (err) { console.error('Error fetching KPI config:', err); }
+      if (json.ok && Array.isArray(json.data)) {
+        setKPIList(json.data);
+      }
+    } catch (err) {
+      console.error('Error fetching KPI config:', err);
+    }
   };
 
   const handleKPIEdit = (kpi) => {
-    setKPIEditing(kpi.ElementoId);
+    const elId = kpi.ElementoId || kpi.elementoid || kpi.id;
+    setKPIEditing(elId);
     setKPIEditForm({
-      nombreCustom: kpi.NombreCustom || '',
-      icono:        kpi.Icono || '📊',
-      pbiUrl:       kpi.PBIUrl || '',
-      jsonApiUrl:   kpi.JsonApiUrl || '',
-      jsonFilePath: kpi.JsonFilePath || '',
-      multiPagina:  kpi.MultiPagina === 1 || !!kpi.multiPagina,
+      nombreCustom: kpi.NombreCustom || kpi.nombrecustom || '',
+      icono:        kpi.Icono || kpi.icono || '📊',
+      pbiUrl:       kpi.PBIUrl || kpi.pbiurl || '',
+      jsonApiUrl:   kpi.JsonApiUrl || kpi.jsonapiurl || '',
+      jsonFilePath: kpi.JsonFilePath || kpi.jsonfilepath || '',
+      multiPagina:  kpi.MultiPagina === 1 || kpi.multipagina === 1 || !!kpi.MultiPagina || !!kpi.multipagina,
     });
   };
 
@@ -95,17 +210,18 @@ export default function AdminConfiguracion() {
         fetchKPIConfig();
         setTimeout(() => setToast(''), 3000);
       }
-    } catch (err) { alert(err.message); }
-    finally { setKPISaving(false); }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setKPISaving(false);
+    }
   };
 
   const handleKPICancel = () => setKPIEditing(null);
 
   const kpiFiltered = kpiFilter === 'all'
     ? kpiList
-    : kpiList.filter(k => k.Seccion === kpiFilter);
-
-
+    : kpiList.filter(k => (k.Seccion || k.seccion || '').toLowerCase() === kpiFilter.toLowerCase());
 
   const fetchReports = async () => {
     try {
@@ -114,7 +230,9 @@ export default function AdminConfiguracion() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const json = await res.json();
-      if (json.ok) setReports(json.data);
+      if (json.ok && Array.isArray(json.data)) {
+        setReports(json.data);
+      }
     } catch (err) {
       console.error('Error fetching reports:', err);
     } finally {
@@ -122,189 +240,8 @@ export default function AdminConfiguracion() {
     }
   };
 
-  const handleOpenAdd = () => {
-    setCurrentReport({ 
-      id: null, reportId: '', name: '', 
-      workspaceId: '', pbiReportId: '', lookerUrl: '', 
-      jsonApiUrl: '', jsonFilePath: '',
-      pbixPath: '', excelPath: '', thumbnailPath: '',
-      roles: [], area: '', multiPagina: false, active: true 
-    });
-    setModalReportOpen(true);
-  };
-
-  const handleOpenConfig = (r) => {
-    setCurrentReport({ 
-      ...r,
-      multiPagina: r.multiPagina === 1 || !!r.multiPagina
-    });
-    setModalReportOpen(true);
-  };
-
-  const handleSaveReport = async () => {
-    if (!currentReport.name.trim() || !currentReport.reportId.trim()) {
-      alert('Nombre e ID Interno son requeridos');
-      return;
-    }
-
-    try {
-      const token = sessionStorage.getItem('escandon_token');
-      const method = currentReport.id ? 'PUT' : 'POST';
-      const url = currentReport.id ? `${API_BASE}/admin/config-bi/${currentReport.id}` : `${API_BASE}/admin/config-bi`;
-      
-      const res = await fetch(url, {
-        method,
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(currentReport)
-      });
-
-      if (!res.ok) throw new Error('Error al guardar configuración');
-
-      setToast(currentReport.id ? `Reporte "${currentReport.name}" actualizado` : 'Nuevo reporte añadido');
-      fetchReports();
-      setModalReportOpen(false);
-      setTimeout(() => setToast(''), 3000);
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-
-
-  const handleDeleteReport = async (id) => {
-    if (!confirm('¿Está seguro de eliminar este reporte del catálogo?')) return;
-    try {
-      const token = sessionStorage.getItem('escandon_token');
-      const res = await fetch(`${API_BASE}/admin/config-bi/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!res.ok) throw new Error('Error al eliminar');
-      
-      setToast('Reporte eliminado');
-      fetchReports();
-      setTimeout(() => setToast(''), 3000);
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const JsonUploader = ({ label, onUpload }) => {
-    const [uploading, setUploading] = useState(false);
-    
-    const handleFile = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('jsonFile', file);
-      
-      try {
-        const token = sessionStorage.getItem('escandon_token');
-        const res = await fetch(`${API_BASE}/admin/upload-json`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        });
-        
-        if (!res.ok) {
-          const errorJson = await res.json().catch(() => ({}));
-          throw new Error(errorJson.error || `Error del servidor (${res.status})`);
-        }
-
-        const json = await res.json();
-        if (json.ok) onUpload(json.filePath);
-        else alert('Error al subir: ' + json.error);
-      } catch (err) {
-        console.error('Upload error:', err);
-        alert('Error al subir archivo JSON: ' + err.message);
-      } finally {
-        setUploading(false);
-      }
-    };
-
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.3rem' }}>
-        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</span>
-        <input type="file" accept=".json" onChange={handleFile} disabled={uploading} style={{ fontSize: '0.75rem' }} />
-        {uploading && <span style={{ fontSize: '0.7rem', color: 'var(--color-azul-fuerte)' }}>Subiendo...</span>}
-      </div>
-    );
-  };
-
-  const FileUploader = ({ label, value, onUpload, accept }) => {
-    const [uploading, setUploading] = useState(false);
-    
-    const handleFile = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      try {
-        const token = sessionStorage.getItem('escandon_token');
-        const res = await fetch(`/upload-assets`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        });
-        
-        if (!res.ok) {
-          const errorJson = await res.json().catch(() => ({}));
-          throw new Error(errorJson.error || `Error del servidor (${res.status})`);
-        }
-
-        const json = await res.json();
-        if (json.ok) onUpload(json.filename);
-        else alert('Error al subir: ' + json.error);
-      } catch (err) {
-        console.error('Upload error:', err);
-        alert('Error al subir archivo: ' + err.message);
-      } finally {
-        setUploading(false);
-      }
-    };
-
-    return (
-      <div style={{ marginBottom:'0.85rem' }}>
-        <label style={{ display:'block', fontSize:'0.7rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.35rem', fontFamily: 'var(--font-display)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</label>
-        <div 
-          onClick={() => document.getElementById(`upload-${label}`).click()}
-          style={{ 
-            border:'1.5px dashed #CBD5E0', borderRadius:10, padding:'0.65rem', 
-            background: uploading ? 'rgba(0,136,201,0.06)' : 'white', cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'space-between',
-            fontSize:'0.75rem', transition:'all var(--transition-fast)',
-            fontFamily: 'var(--font-body)',
-          }}
-          onMouseEnter={e => e.currentTarget.style.borderColor='var(--color-azul-claro)'}
-          onMouseLeave={e => e.currentTarget.style.borderColor='#CBD5E0'}
-        >
-          <span style={{ color: value ? 'var(--text-primary)' : '#A0AEC0', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'80%', fontWeight: value ? 600 : 400 }}>
-            {uploading ? '⏳ Subiendo...' : (value || 'Seleccionar archivo local...')}
-          </span>
-          <span style={{ fontSize:'0.9rem' }}>{uploading ? '◌' : '📤'}</span>
-          <input 
-            id={`upload-${label}`} 
-            type="file" 
-            accept={accept} 
-            onChange={handleFile} 
-            style={{ display:'none' }} 
-          />
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div style={{ maxWidth:'var(--content-max, 1200px)', width:'100%', margin:'0 auto' }}>
+    <div style={{ maxWidth: 'var(--content-max, 1200px)', width: '100%', margin: '0 auto' }}>
       <style>{`
         .config-card {
           background:#FFFFFF; 
@@ -365,8 +302,6 @@ export default function AdminConfiguracion() {
         </div>
       </div>
 
-
-
       {/* ── SECCIÓN KPI CONFIG ── */}
       <div style={{ background: '#FFFFFF', borderRadius: 16, padding: '1.75rem 1.5rem', marginBottom: '2rem', border: '1px solid rgba(0,70,135,0.05)', boxShadow: 'var(--shadow-xs)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.65rem', borderBottom: '1px solid rgba(0,70,135,0.06)' }}>
@@ -387,9 +322,9 @@ export default function AdminConfiguracion() {
               onClick={() => setKPIFilter(key)}
               style={{
                 padding: '0.35rem 0.95rem', borderRadius: 100, border: 'none', cursor: 'pointer',
-                background: kpiFilter === key ? 'var(--color-azul-fuerte)' : 'rgba(0,70,135,0.05)',
-                color: kpiFilter === key ? 'white' : 'var(--text-secondary)',
-                fontSize: '0.75rem', fontWeight: kpiFilter === key ? 700 : 500,
+                background: kpiFilter.toLowerCase() === key.toLowerCase() ? 'var(--color-azul-fuerte)' : 'rgba(0,70,135,0.05)',
+                color: kpiFilter.toLowerCase() === key.toLowerCase() ? 'white' : 'var(--text-secondary)',
+                fontSize: '0.75rem', fontWeight: kpiFilter.toLowerCase() === key.toLowerCase() ? 700 : 500,
                 transition: 'all var(--transition-fast)',
                 fontFamily: 'var(--font-display)'
               }}
@@ -409,14 +344,23 @@ export default function AdminConfiguracion() {
             </thead>
             <tbody>
               {kpiFiltered.map(kpi => {
-                const isEditing = kpiEditing === kpi.ElementoId;
+                const elementoId = kpi.ElementoId || kpi.elementoid || kpi.id;
+                const seccion = kpi.Seccion || kpi.seccion || '';
+                const nombreDefault = kpi.NombreDefault || kpi.nombredefault || '';
+                const nombreCustom = kpi.NombreCustom || kpi.nombrecustom || '';
+                const icono = kpi.Icono || kpi.icono || '📊';
+                const jsonApiUrl = kpi.JsonApiUrl || kpi.jsonapiurl || '';
+                const jsonFilePath = kpi.JsonFilePath || kpi.jsonfilepath || '';
+                const multiPagina = kpi.MultiPagina === 1 || kpi.multipagina === 1;
+                const isEditing = kpiEditing === elementoId;
+
                 return (
-                  <tr key={kpi.ElementoId} style={{ borderBottom: '1px solid rgba(0,70,135,0.04)', background: isEditing ? 'rgba(0,136,201,0.03)' : '#FFFFFF', transition: 'background-color 150ms' }}>
+                  <tr key={elementoId} style={{ borderBottom: '1px solid rgba(0,70,135,0.04)', background: isEditing ? 'rgba(0,136,201,0.03)' : '#FFFFFF', transition: 'background-color 150ms' }}>
                     
                     {/* Sección */}
                     <td style={{ padding: '0.75rem 0.75rem', whiteSpace: 'nowrap' }}>
                       <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-azul-fuerte)', background: 'rgba(0,70,135,0.05)', padding: '0.2rem 0.6rem', borderRadius: 6, fontFamily: 'var(--font-mono)' }}>
-                        {(SECCION_LABELS[kpi.Seccion] || kpi.Seccion).split(' ')[1] || kpi.Seccion}
+                        {getSeccionBadge(seccion)}
                       </span>
                     </td>
 
@@ -435,12 +379,12 @@ export default function AdminConfiguracion() {
                           ))}
                         </div>
                       ) : (
-                        <span style={{ fontSize: '1.25rem', display: 'block' }}>{kpi.Icono}</span>
+                        <span style={{ fontSize: '1.25rem', display: 'block' }}>{icono}</span>
                       )}
                     </td>
 
                     {/* Nombre original */}
-                    <td style={{ padding: '0.75rem 0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', fontFamily: 'var(--font-body)' }}>{kpi.NombreDefault}</td>
+                    <td style={{ padding: '0.75rem 0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', fontFamily: 'var(--font-body)' }}>{nombreDefault}</td>
 
                     {/* Nombre personalizado */}
                     <td style={{ padding: '0.75rem 0.75rem' }}>
@@ -448,14 +392,14 @@ export default function AdminConfiguracion() {
                         <input
                           value={kpiEditForm.nombreCustom}
                           onChange={e => setKPIEditForm(f => ({ ...f, nombreCustom: e.target.value }))}
-                          placeholder={kpi.NombreDefault}
+                          placeholder={nombreDefault}
                           maxLength={60}
                           className="config-input-field"
                           style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: 8, padding: '0.45rem 0.75rem', fontSize: '0.82rem', fontFamily: 'var(--font-body)', outline: 'none', minWidth: 140, background: '#F8FAFC', transition: 'all var(--transition-fast)' }}
                         />
                       ) : (
-                        <span style={{ color: kpi.NombreCustom ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: kpi.NombreCustom ? 700 : 400, fontFamily: 'var(--font-body)' }}>
-                          {kpi.NombreCustom || '— (Defecto)'}
+                        <span style={{ color: nombreCustom ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: nombreCustom ? 700 : 400, fontFamily: 'var(--font-body)' }}>
+                          {nombreCustom || '— (Defecto)'}
                         </span>
                       )}
                     </td>
@@ -478,7 +422,7 @@ export default function AdminConfiguracion() {
                           />
                           {kpiEditForm.jsonFilePath && (
                             <span style={{ fontSize: '0.7rem', color: 'var(--color-verde-e)', fontWeight: 700 }}>
-                              ✓ Archivo cargado: {kpiEditForm.jsonFilePath.split('/').pop()}
+                              ✓ Archivo cargado: {String(kpiEditForm.jsonFilePath).split('/').pop()}
                             </span>
                           )}
                           <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-azul-fuerte)', cursor: 'pointer', marginTop: '0.2rem' }}>
@@ -491,19 +435,19 @@ export default function AdminConfiguracion() {
                           </label>
                         </div>
                       ) : (
-                        kpi.JsonApiUrl || kpi.JsonFilePath ? (
+                        jsonApiUrl || jsonFilePath ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                            {kpi.JsonApiUrl && (
+                            {jsonApiUrl && (
                               <span style={{ color: 'var(--color-azul-fuerte)', fontSize: '0.74rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'var(--font-body)' }}>
                                 <span style={{ fontSize: '0.8rem' }}>✓</span> API JSON
                               </span>
                             )}
-                            {kpi.JsonFilePath && (
+                            {jsonFilePath && (
                               <span style={{ color: 'var(--color-naranja-e)', fontSize: '0.74rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'var(--font-body)' }}>
                                 <span style={{ fontSize: '0.8rem' }}>✓</span> Archivo JSON
                               </span>
                             )}
-                            {kpi.MultiPagina === 1 && (
+                            {multiPagina && (
                               <span style={{ fontSize: '0.65rem', color: 'var(--color-azul-fuerte)', fontWeight: 700, paddingLeft: '1.1rem' }}>
                                 (Multinavegación activa)
                               </span>
@@ -520,7 +464,7 @@ export default function AdminConfiguracion() {
                       {isEditing ? (
                         <div style={{ display: 'flex', gap: '0.45rem' }}>
                           <button
-                            onClick={() => handleKPISave(kpi.ElementoId)}
+                            onClick={() => handleKPISave(elementoId)}
                             disabled={kpiSaving}
                             style={{ padding: '0.4rem 0.85rem', background: 'var(--color-azul-fuerte)', color: 'white', border: 'none', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, fontFamily: 'var(--font-display)', cursor: kpiSaving ? 'wait' : 'pointer', boxShadow: '0 2px 8px rgba(0, 70, 135, 0.2)' }}
                           >{kpiSaving ? '⏳' : '💾 Guardar'}</button>
@@ -533,8 +477,8 @@ export default function AdminConfiguracion() {
                         <button
                           onClick={() => handleKPIEdit(kpi)}
                           style={{ padding: '0.45rem 0.85rem', background: 'rgba(0,70,135,0.05)', border: '1.5px solid rgba(0,70,135,0.12)', borderRadius: 8, fontSize: '0.72rem', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--color-azul-fuerte)', cursor: 'pointer', transition: 'all 150ms' }}
-                          onMouseEnter={e=>{e.currentTarget.style.background='var(--color-azul-fuerte)'; e.currentTarget.style.color='white';}}
-                          onMouseLeave={e=>{e.currentTarget.style.background='rgba(0,70,135,0.05)'; e.currentTarget.style.color='var(--color-azul-fuerte)';}}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-azul-fuerte)'; e.currentTarget.style.color = 'white'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,70,135,0.05)'; e.currentTarget.style.color = 'var(--color-azul-fuerte)'; }}
                         >✏️ Configurar</button>
                       )}
                     </td>
@@ -549,8 +493,8 @@ export default function AdminConfiguracion() {
         </div>
       </div>
 
-      <div style={{ display:'flex', gap:'0.875rem', justifyContent:'flex-end', marginBottom: '2.5rem' }}>
-        <button onClick={() => { setToast('Configuración del sistema guardada'); setTimeout(() => setToast(''), 3000); }} style={{ padding:'0.65rem 1.5rem', border:'none', borderRadius:10, background:'linear-gradient(135deg, var(--color-azul-claro), var(--color-azul-cruz))', color:'white', fontFamily:"var(--font-display)", fontSize:'0.88rem', fontWeight:700, cursor:'pointer', boxShadow:'0 4px 14px rgba(0,136,201,0.25)', transition: 'all 200ms' }} onMouseEnter={e=>e.currentTarget.style.transform='translateY(-1px)'} onMouseLeave={e=>e.currentTarget.style.transform='translateY(0)'}>
+      <div style={{ display: 'flex', gap: '0.875rem', justifyContent: 'flex-end', marginBottom: '2.5rem' }}>
+        <button onClick={() => { setToast('Configuración del sistema guardada'); setTimeout(() => setToast(''), 3000); }} style={{ padding: '0.65rem 1.5rem', border: 'none', borderRadius: 10, background: 'linear-gradient(135deg, var(--color-azul-claro), var(--color-azul-cruz))', color: 'white', fontFamily: "var(--font-display)", fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(0,136,201,0.25)', transition: 'all 200ms' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
           💾 Guardar Todo
         </button>
       </div>

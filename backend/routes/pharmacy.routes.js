@@ -939,7 +939,20 @@ router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
         dias_stock_restante ASC,
         itemcode ASC
     `);
-    res.json({ ok: true, data: pgRes.rows });
+    
+      // FILTRO EXCLUSIVO FARMACIA:
+      const sapInventoryService = require('../services/sapInventory.service');
+      const allCache = sapInventoryService.getInventoryCache();
+      const farItems = new Set();
+      if (allCache && Array.isArray(allCache)) {
+        allCache.forEach(i => {
+          if (i.WhsCode === 'FAR') farItems.add(i.ItemCode);
+        });
+      }
+      
+      const filteredData = pgRes.rows.filter(r => farItems.has(r.itemcode));
+      res.json({ ok: true, data: filteredData, count: filteredData.length });
+
   } catch (err) {
     console.error('[GET ML Dataset Error]', err);
     res.status(500).json({ ok: false, error: 'Error al consultar el dataset analítico de ML' });
@@ -993,7 +1006,20 @@ router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
       FROM ml_dataset_reorden_sku_history
       ORDER BY snapshot_date DESC, itemcode ASC
     `);
-    res.json({ ok: true, data: pgRes.rows });
+    
+      // FILTRO EXCLUSIVO FARMACIA:
+      const sapInventoryService = require('../services/sapInventory.service');
+      const allCache = sapInventoryService.getInventoryCache();
+      const farItems = new Set();
+      if (allCache && Array.isArray(allCache)) {
+        allCache.forEach(i => {
+          if (i.WhsCode === 'FAR') farItems.add(i.ItemCode);
+        });
+      }
+      
+      const filteredData = pgRes.rows.filter(r => farItems.has(r.itemcode));
+      res.json({ ok: true, data: filteredData, count: filteredData.length });
+
   } catch (err) {
     console.error('[GET ML History Error]', err);
     res.status(500).json({ ok: false, error: 'Error al consultar el historial analítico de ML' });
@@ -1080,7 +1106,20 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
       FROM ml_predictions_reorden_sku
       ORDER BY prob_desabasto_7d DESC, itemcode ASC
     `);
-    res.json({ ok: true, data: pgRes.rows });
+    
+      // FILTRO EXCLUSIVO FARMACIA:
+      const sapInventoryService = require('../services/sapInventory.service');
+      const allCache = sapInventoryService.getInventoryCache();
+      const farItems = new Set();
+      if (allCache && Array.isArray(allCache)) {
+        allCache.forEach(i => {
+          if (i.WhsCode === 'FAR') farItems.add(i.ItemCode);
+        });
+      }
+      
+      const filteredData = pgRes.rows.filter(r => farItems.has(r.itemcode));
+      res.json({ ok: true, data: filteredData, count: filteredData.length });
+
   } catch (err) {
     console.error('[GET ML Predictions Error]', err);
     res.status(500).json({ ok: false, error: 'Error al consultar predicciones de Machine Learning' });

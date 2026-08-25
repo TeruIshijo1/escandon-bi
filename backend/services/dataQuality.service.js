@@ -188,10 +188,15 @@ async function resolveIssue(id, status, notes = '', resolvedBy = 'AUDITOR') {
 async function getQualityStats() {
   const db = getDb();
 
-  const totalIssues = (await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues`).get()).count;
-  const pendingIssues = (await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'PENDIENTE'`).get()).count;
-  const resolvedIssues = (await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'RESUELTO'`).get()).count;
-  const highSeverity = (await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'PENDIENTE' AND severity = 'ALTA'`).get()).count;
+  const totalRow = await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues`).get();
+  const pendingRow = await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'PENDIENTE'`).get();
+  const resolvedRow = await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'RESUELTO'`).get();
+  const highSeverityRow = await db.prepare(`SELECT COUNT(*) as count FROM data_quality_issues WHERE status = 'PENDIENTE' AND severity = 'ALTA'`).get();
+
+  const totalIssues = parseInt(totalRow?.count ?? 0, 10) || 0;
+  const pendingIssues = parseInt(pendingRow?.count ?? 0, 10) || 0;
+  const resolvedIssues = parseInt(resolvedRow?.count ?? 0, 10) || 0;
+  const highSeverity = parseInt(highSeverityRow?.count ?? 0, 10) || 0;
 
   const baseScore = Math.max(0, 100 - (pendingIssues * 2.5));
 

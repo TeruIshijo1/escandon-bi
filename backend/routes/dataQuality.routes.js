@@ -28,7 +28,7 @@ router.get('/stats', authenticate, async (req, res) => {
   try {
     // Correr escaneo ligero en vivo
     await dataQualityService.runLiveQualityScan();
-    const stats = dataQualityService.getQualityStats();
+    const stats = await dataQualityService.getQualityStats();
     res.json({ success: true, data: stats });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -38,11 +38,11 @@ router.get('/stats', authenticate, async (req, res) => {
 /**
  * GET /api/data-quality/issues — Listar hallazgos de calidad con filtros
  */
-router.get('/issues', authenticate, (req, res) => {
+router.get('/issues', authenticate, async (req, res) => {
   try {
     const { status, severity, limit } = req.query;
-    const issues = dataQualityService.getQualityIssues({ status, severity, limit });
-    res.json({ success: true, count: issues.length, data: issues });
+    const issues = await dataQualityService.getQualityIssues({ status, severity, limit });
+    res.json({ success: true, count: Array.isArray(issues) ? issues.length : 0, data: Array.isArray(issues) ? issues : [] });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -51,13 +51,13 @@ router.get('/issues', authenticate, (req, res) => {
 /**
  * POST /api/data-quality/issues/:id/resolve — Resolver o ignorar una anomalía
  */
-router.post('/issues/:id/resolve', authenticate, (req, res) => {
+router.post('/issues/:id/resolve', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
     const resolvedBy = req.user?.username || 'AUDITOR';
 
-    const success = dataQualityService.resolveIssue(id, status, notes, resolvedBy);
+    const success = await dataQualityService.resolveIssue(id, status, notes, resolvedBy);
     if (!success) {
       return res.status(404).json({ success: false, message: 'Anomalía no encontrada.' });
     }
@@ -71,11 +71,11 @@ router.post('/issues/:id/resolve', authenticate, (req, res) => {
 /**
  * POST /api/data-quality/inspect — Probar inspección sobre un registro individual
  */
-router.post('/inspect', authenticate, (req, res) => {
+router.post('/inspect', authenticate, async (req, res) => {
   try {
     const record = req.body;
-    const issues = dataQualityService.inspectRecord(record, 'INSPECCION_MANUAL');
-    res.json({ success: true, issuesFoundCount: issues.length, issues });
+    const issues = await dataQualityService.inspectRecord(record, 'INSPECCION_MANUAL');
+    res.json({ success: true, issuesFoundCount: Array.isArray(issues) ? issues.length : 0, issues: Array.isArray(issues) ? issues : [] });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }

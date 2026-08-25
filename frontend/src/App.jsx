@@ -308,6 +308,22 @@ export default function App() {
                 }
               />
               <Route
+                path="almacen/precios-articulos"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO]}>
+                    <ReportesAlmacen />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="interconsultas-jornadas"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.CONSULTA_EXTERNA, ROLES.ALMACEN_GENERAL]}>
+                    <ReportesAlmacen />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="calidad-datos"
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>

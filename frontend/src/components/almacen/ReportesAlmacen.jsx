@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { authHeaders } from '../../api/auth';
 import { API_BASE } from '../../api/config';
 
 export default function ReportesAlmacen() {
+  const location = useLocation();
   const today = new Date().toISOString().split('T')[0];
   
   const [activeTab, setActiveTab] = useState('kardex');
@@ -18,6 +20,21 @@ export default function ReportesAlmacen() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const isPreciosArticulos = location.pathname.includes('/almacen/precios-articulos');
+  const isInterconsultas = location.pathname.includes('/interconsultas-jornadas');
+  const isDedicatedView = isPreciosArticulos || isInterconsultas;
+
+  // Set initial state based on URL
+  useEffect(() => {
+    if (location.pathname.includes('/almacen/precios-articulos')) {
+      setActiveTab('custom-sap');
+      setCustomReport('precios-articulos');
+    } else if (location.pathname.includes('/interconsultas-jornadas')) {
+      setActiveTab('custom-sap');
+      setCustomReport('interconsultas-jornadas');
+    }
+  }, [location.pathname]);
 
   // Modal State
   const [selectedRow, setSelectedRow] = useState(null);
@@ -186,7 +203,8 @@ export default function ReportesAlmacen() {
     const ws = XLSX.utils.json_to_sheet(formattedData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
-    XLSX.writeFile(wb, `Reporte_Almacen_${activeTab}_${today}.xlsx`);
+    const filenamePrefix = isInterconsultas ? 'Interconsultas_Jornadas' : isPreciosArticulos ? 'Precios_Articulos' : `Almacen_${activeTab}`;
+    XLSX.writeFile(wb, `Reporte_${filenamePrefix}_${today}.xlsx`);
   };
 
   return (
@@ -195,10 +213,20 @@ export default function ReportesAlmacen() {
       <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '2.5rem', color: '#0f172a', fontWeight: '800', letterSpacing: '-1px' }}>
-            📑 Reportes <span style={{ color: '#004687' }}>(SAP)</span>
+            {isInterconsultas ? (
+              <>🩺 Interconsultas y Jornadas Especiales <span style={{ color: '#004687' }}>(SER*)</span></>
+            ) : isPreciosArticulos ? (
+              <>💰 Lista de Precios de Artículos <span style={{ color: '#004687' }}>(SAP)</span></>
+            ) : (
+              <>📑 Reportes <span style={{ color: '#004687' }}>(SAP)</span></>
+            )}
           </h1>
           <p style={{ color: '#64748b', fontSize: '1.1rem', marginTop: '0.25rem' }}>
-            Auditoría integral, trazabilidad de almacén y desgloses interactivos
+            {isInterconsultas
+              ? 'Reporte detallado de servicios de interconsulta y jornadas médicas registradas en SAP'
+              : isPreciosArticulos
+              ? 'Consulta de precios por artículo y servicio: Lista 1 (Hospitalización), Lista 2 (Público General) y Lista 4 (2025)'
+              : 'Auditoría integral, trazabilidad de almacén y desgloses interactivos'}
           </p>
         </div>
         <button 
@@ -222,33 +250,37 @@ export default function ReportesAlmacen() {
       </header>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', background: '#f1f5f9', padding: '0.5rem', borderRadius: '12px' }}>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => { setActiveTab(tab.id); setData([]); setError(null); }}
-            style={{
-              flex: 1,
-              padding: '1rem',
-              background: activeTab === tab.id ? 'white' : 'transparent',
-              color: activeTab === tab.id ? '#004687' : '#64748b',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: activeTab === tab.id ? '700' : '500',
-              fontSize: '1.05rem',
-              cursor: 'pointer',
-              boxShadow: activeTab === tab.id ? '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.2s'
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {!isDedicatedView && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', background: '#f1f5f9', padding: '0.5rem', borderRadius: '12px' }}>
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setData([]); setError(null); }}
+              style={{
+                flex: 1,
+                padding: '1rem',
+                background: activeTab === tab.id ? 'white' : 'transparent',
+                color: activeTab === tab.id ? '#004687' : '#64748b',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: activeTab === tab.id ? '700' : '500',
+                fontSize: '1.05rem',
+                cursor: 'pointer',
+                boxShadow: activeTab === tab.id ? '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Filtros */}
       <div style={{ background: 'white', padding: '2rem', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
-        <h2 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem', color: '#1e293b' }}>Filtros de Búsqueda</h2>
+        <h2 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem', color: '#1e293b' }}>
+          {isDedicatedView ? 'Parámetros de Consulta' : 'Filtros de Búsqueda'}
+        </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-end' }}>
           
           {(activeTab === 'kardex' || activeTab === 'consumo') && (
@@ -264,7 +296,7 @@ export default function ReportesAlmacen() {
             </div>
           )}
 
-          {activeTab === 'custom-sap' && (
+          {activeTab === 'custom-sap' && !isDedicatedView && (
             <div style={{ flex: '1 1 300px' }}>
               <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Reporte de Soporte SAP</label>
               <select 
@@ -277,7 +309,6 @@ export default function ReportesAlmacen() {
                 <option value="consultas-medicas">Consultas Médicas por Fecha (con Folio Orden Venta)</option>
                 <option value="detalles-salida">Detalle de Salidas de Almacén (IGE1/OIGE)</option>
                 <option value="precios-articulos">Lista de Precios de Artículos y Servicios (Lista 1, 2, 4)</option>
-                <option value="interconsultas-jornadas">Interconsultas y Jornadas Especiales (SER*)</option>
               </select>
             </div>
           )}

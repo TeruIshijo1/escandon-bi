@@ -588,13 +588,28 @@ router.post('/metric-mappings', async (req, res, next) => {
 router.get('/kpi-config', async (req, res, next) => {
   try {
     const db   = getDb();
-    const kpis = await db.prepare(`
+    const rows = await db.prepare(`
       SELECT KPIId AS id, ElementoId, Seccion,
              NombreDefault, NombreCustom, Icono, PBIUrl, PBIUrl2, PBIUrl3, MultiPagina, Activo, JsonApiUrl, JsonFilePath
       FROM KPIConfig
       ORDER BY Seccion, KPIId
     `).all();
-    res.json({ ok: true, data: kpis });
+    const data = (rows || []).map(k => ({
+      id:            k.id,
+      ElementoId:    k.ElementoId || k.elementoid,
+      Seccion:       k.Seccion || k.seccion,
+      NombreDefault: k.NombreDefault || k.nombredefault,
+      NombreCustom:  k.NombreCustom || k.nombrecustom,
+      Icono:         k.Icono || k.icono || '📊',
+      PBIUrl:        k.PBIUrl || k.pbiurl,
+      PBIUrl2:       k.PBIUrl2 || k.pbiurl2,
+      PBIUrl3:       k.PBIUrl3 || k.pbiurl3,
+      MultiPagina:   k.MultiPagina !== undefined ? k.MultiPagina : k.multipagina,
+      Activo:        k.Activo !== undefined ? k.Activo : k.activo,
+      JsonApiUrl:    k.JsonApiUrl || k.jsonapiurl,
+      JsonFilePath:  k.JsonFilePath || k.jsonfilepath
+    }));
+    res.json({ ok: true, data });
   } catch (err) { next(err); }
 });
 

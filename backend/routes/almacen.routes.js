@@ -375,97 +375,208 @@ const executeSapQueryViaSL = async (queryName, sqlText, params) => {
  * GET /api/almacen/reportes/custom-sap
  * Ejecuta reportes personalizados provistos por soporte de SAP directamente a través de SAP Service Layer
  */
-router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
+router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO', 'CONSULTA_EXTERNA']), async (req, res) => {
   try {
     const { reportName, startDate, endDate, docNum } = req.query;
+    const sapService = require('../services/sap.service');
     
-    let sqlText = '';
-    let params = {};
-    let queryCode = `sq_custom_${reportName.replace(/-/g, '_')}`;
+    let data = [];
+
+    // Funciones auxiliares de formateo para igualar el output de SQL
+    const formatStatus = (s) => s === 'bost_Open' ? 'Abierta' : s === 'bost_Close' ? 'Cerrada' : s;
+    const formatStatusShort = (s) => s === 'bost_Open' ? 'Abierto' : s === 'bost_Close' ? 'Cerrado' : s;
+    const formatType = (t) => t === 'IP' ? 'Hospitalizacion' : t === 'ER' ? 'Urgencias' : t;
+
     switch (reportName) {
-      case 'cuentas-hospitalarias':
-        sqlText = `
-          SELECT T0.[U_PCNum] AS [Folio de Atencion Medica], T0.[DocNum] AS [Folio Orden Venta (SAP)], T0.[DocStatus] AS [Status de Documento (SAP)], T0.[TaxDate] AS [Fecha de Documento (SAP)], T0.[DocDate] AS [Fecha de Contabilizacion (SAP)], T0.[DocDueDate] AS [Fecha de Vencimiento (SAP)], T0.[U_PT_Id] AS [CURP], T0.[U_PCType] AS [Tipo de Atencion Medica], T0.[U_PTName] AS [Nombre de Paciente], T0.[U_PTNum] AS [Numero de Paciente], T0.[CardName] AS [Nombre de Cliente o Proveedor (SAP)], T0.[DocTotal] AS [Total del Documento (SAP)], T0.[U_UserName] AS [Usuario] 
-          FROM ORDR T0
-          WHERE T0.[DocDate] >= :startDate AND T0.[DocDate] <= :endDate
-          ORDER BY T0.[DocDate]
-        `;
-        params = { startDate, endDate };
+      case 'cuentas-hospitalarias': {
+        const query = `/Orders?$select=U_PCNum,DocNum,DocumentStatus,TaxDate,DocDate,DocDueDate,U_PT_Id,U_PCType,U_PTName,U_PTNum,CardName,DocTotal,U_UserName&$filter=DocDate ge '${startDate}' and DocDate le '${endDate}'`;
+        const orders = await sapService.fetchAllPages(query);
+        
+        data = orders.map(o => ({
+          'Folio de Atencion Medica': o.U_PCNum,
+          'Folio Orden Venta (SAP)': o.DocNum,
+          'Status de Documento (SAP)': formatStatus(o.DocumentStatus),
+          'Fecha de Documento (SAP)': o.TaxDate,
+          'Fecha de Contabilizacion (SAP)': o.DocDate,
+          'Fecha de Vencimiento (SAP)': o.DocDueDate,
+          'CURP': o.U_PT_Id,
+          'Tipo de Atencion Medica': formatType(o.U_PCType),
+          'Nombre de Paciente': o.U_PTName,
+          'Numero de Paciente': o.U_PTNum,
+          'Nombre de Cliente o Proveedor (SAP)': o.CardName,
+          'Total del Documento (SAP)': o.DocTotal,
+          'Usuario': o.U_UserName
+        })).sort((a, b) => new Date(a['Fecha de Contabilizacion (SAP)']) - new Date(b['Fecha de Contabilizacion (SAP)']));
         break;
-      case 'atencion-medica-detalle':
-        sqlText = `
-          SELECT T0.DocNum AS [Folio Orden Venta (SAP)], T0.DocDate AS [Fecha de Documento (SAP)], T0.U_PCNum AS [Folio de Atencion Medica], T0.U_PTName AS [Nombre de Paciente], T0.U_PRName AS [Nombre de Medico], CASE WHEN T0.U_PCType = 'IP' THEN 'Hospitalizacion' WHEN T0.U_PCType = 'ER' THEN 'Urgencias' ELSE T0.U_PCType END AS [Tipo de Atencion], T0.CardCode AS [Codigo de Cliente (SAP)], T0.CardName AS [Nombre de Cliente (SAP)], T0.DocTotal AS [Total Orden Venta (SAP)], CASE WHEN T0.DocStatus = 'O' THEN 'Abierta' WHEN T0.DocStatus = 'C' THEN 'Cerrada' END AS [Estatus de Documento (SAP)] 
-          FROM ORDR T0
-          WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND T0.CANCELED = 'N' AND ISNULL(T0.U_PCNum, '') <> '' AND T0.U_PCType IN ('IP', 'ER')
-          ORDER BY T0.DocDate, T0.DocNum
-        `;
-        params = { startDate, endDate };
+      }
+      
+      case 'atencion-medica-detalle': {
+        const query = `/Orders?$select=DocNum,DocDate,U_PCNum,U_PTName,U_PRName,U_PCType,CardCode,CardName,DocTotal,DocumentStatus&$filter=DocDate ge '${startDate}' and DocDate le '${endDate}' and CancelStatus eq 'csNo'`;
+        const orders = await sapService.fetchAllPages(query);
+        
+        data = orders
+          .filter(o => o.U_PCNum && o.U_PCNum.toString().trim() !== '' && (o.U_PCType === 'IP' || o.U_PCType === 'ER'))
+          .map(o => ({
+            'Folio Orden Venta (SAP)': o.DocNum,
+            'Fecha de Documento (SAP)': o.DocDate,
+            'Folio de Atencion Medica': o.U_PCNum,
+            'Nombre de Paciente': o.U_PTName,
+            'Nombre de Medico': o.U_PRName,
+            'Tipo de Atencion': formatType(o.U_PCType),
+            'Codigo de Cliente (SAP)': o.CardCode,
+            'Nombre de Cliente (SAP)': o.CardName,
+            'Total Orden Venta (SAP)': o.DocTotal,
+            'Estatus de Documento (SAP)': formatStatus(o.DocumentStatus)
+          })).sort((a, b) => new Date(a['Fecha de Documento (SAP)']) - new Date(b['Fecha de Documento (SAP)']) || a['Folio Orden Venta (SAP)'] - b['Folio Orden Venta (SAP)']);
         break;
-      case 'consultas-medicas':
-        sqlText = `
-          SELECT T0.DocNum AS [Folio Orden Venta (SAP)], T0.DocDate AS [Fecha de Documento (SAP)], T0.DocDueDate AS [Fecha de Entrega (SAP)], T0.TaxDate AS [Fecha de Contabilizacion (SAP)], T0.CardCode AS [Codigo Cliente (SAP)], T0.CardName AS [Nombre de Cliente (SAP)], T1.ItemCode AS [Codigo de Articulo (SAP)], T1.Dscription AS [Descripcion (SAP)], T1.Quantity AS [Cantidad (SAP)], T1.Price AS [Precio Unitario (SAP)], T1.LineTotal AS [Total Linea (SAP)], T0.DocTotal AS [Total Documento (SAP)], T0.U_SONum AS [Folio Orden Venta (SAP)], T0.U_PTNum AS [Numero Paciente], T0.U_PTName AS [Nombre Paciente], T0.U_PRName AS [Medico Responsable], T0.U_PRNum AS [Numero Medico], T0.U_PC_CL AS [Usuario Medical Suite], T0.U_UserName AS [Usuario], CASE T0.DocStatus WHEN 'O' THEN 'Abierto' WHEN 'C' THEN 'Cerrado' END AS [Estatus (SAP)]
-          FROM ORDR T0
-          INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
-          WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND ISNULL(T0.U_SONum,'') <> ''
-          ORDER BY T0.DocDate, T0.DocNum
-        `;
-        params = { startDate, endDate };
+      }
+      
+      case 'consultas-medicas': {
+        const query = `/Orders?$select=DocNum,DocDate,DocDueDate,TaxDate,CardCode,CardName,DocTotal,U_SONum,U_PTNum,U_PTName,U_PRName,U_PRNum,U_PC_CL,U_UserName,DocumentStatus,DocumentLines&$filter=DocDate ge '${startDate}' and DocDate le '${endDate}'`;
+        const orders = await sapService.fetchAllPages(query);
+        
+        orders
+          .filter(o => o.U_SONum && o.U_SONum.toString().trim() !== '')
+          .forEach(o => {
+            (o.DocumentLines || []).forEach(line => {
+              data.push({
+                'Folio Orden Venta (SAP)': o.DocNum,
+                'Fecha de Documento (SAP)': o.DocDate,
+                'Fecha de Entrega (SAP)': o.DocDueDate,
+                'Fecha de Contabilizacion (SAP)': o.TaxDate,
+                'Codigo Cliente (SAP)': o.CardCode,
+                'Nombre de Cliente (SAP)': o.CardName,
+                'Codigo de Articulo (SAP)': line.ItemCode,
+                'Descripcion (SAP)': line.ItemDescription,
+                'Cantidad (SAP)': line.Quantity,
+                'Precio Unitario (SAP)': line.UnitPrice,
+                'Total Linea (SAP)': line.LineTotal,
+                'Total Documento (SAP)': o.DocTotal,
+                'Numero Paciente': o.U_PTNum,
+                'Nombre Paciente': o.U_PTName,
+                'Medico Responsable': o.U_PRName,
+                'Numero Medico': o.U_PRNum,
+                'Usuario Medical Suite': o.U_PC_CL,
+                'Usuario': o.U_UserName,
+                'Estatus (SAP)': formatStatusShort(o.DocumentStatus)
+              });
+            });
+          });
+          
+        data.sort((a, b) => new Date(a['Fecha de Documento (SAP)']) - new Date(b['Fecha de Documento (SAP)']) || a['Folio Orden Venta (SAP)'] - b['Folio Orden Venta (SAP)']);
         break;
-      case 'detalles-salida':
+      }
+      
+      case 'detalles-salida': {
+        let query = `/InventoryGenExits?$select=DocNum,U_PTName,U_PCNum,DocDate,DocumentLines`;
         if (docNum && docNum !== 'undefined') {
-          queryCode += '_by_doc';
-          sqlText = `
-            SELECT T1.[DocNum] AS [Folio Orden Venta (SAP)], T1.[U_PTName] AS [Nombre de Paciente], T1.[U_PCNum] AS [Folio de Atencion Medica], T0.[ItemCode] AS [Codigo de Articulo (SAP)], T0.[Dscription] AS [Descripcion Articulo o Servicio (SAP)], T0.[Quantity] AS [Cantidad (SAP)], T1.[DocDate] AS [Fecha de Contabilizacion (SAP)] 
-            FROM IGE1 T0 
-            INNER JOIN OIGE T1 ON T1.[DocEntry] = T0.[DocEntry]
-            WHERE T1.[DocNum] = :docNum
-            ORDER BY T1.[DocNum], T0.[ItemCode]
-          `;
-          params = { docNum };
+          query += `&$filter=DocNum eq ${docNum}`;
         } else {
-          queryCode += '_by_range';
-          sqlText = `
-            SELECT T1.[DocNum] AS [Folio Orden Venta (SAP)], T1.[U_PTName] AS [Nombre de Paciente], T1.[U_PCNum] AS [Folio de Atencion Medica], T0.[ItemCode] AS [Codigo de Articulo (SAP)], T0.[Dscription] AS [Descripcion Articulo o Servicio (SAP)], T0.[Quantity] AS [Cantidad (SAP)], T1.[DocDate] AS [Fecha de Contabilizacion (SAP)] 
-            FROM IGE1 T0 
-            INNER JOIN OIGE T1 ON T1.[DocEntry] = T0.[DocEntry]
-            WHERE T1.[DocDate] >= :startDate AND T1.[DocDate] <= :endDate
-            ORDER BY T1.[DocNum], T0.[ItemCode]
-          `;
-          params = { startDate, endDate };
+          query += `&$filter=DocDate ge '${startDate}' and DocDate le '${endDate}'`;
         }
+        
+        const exits = await sapService.fetchAllPages(query);
+        exits.forEach(o => {
+          (o.DocumentLines || []).forEach(line => {
+            data.push({
+              'Folio Orden Venta (SAP)': o.DocNum,
+              'Nombre de Paciente': o.U_PTName,
+              'Folio de Atencion Medica': o.U_PCNum,
+              'Codigo de Articulo (SAP)': line.ItemCode,
+              'Descripcion Articulo o Servicio (SAP)': line.ItemDescription,
+              'Cantidad (SAP)': line.Quantity,
+              'Fecha de Contabilizacion (SAP)': o.DocDate
+            });
+          });
+        });
+        
+        data.sort((a, b) => a['Folio Orden Venta (SAP)'] - b['Folio Orden Venta (SAP)'] || a['Codigo de Articulo (SAP)'].localeCompare(b['Codigo de Articulo (SAP)']));
         break;
-      case 'precios-articulos':
-        sqlText = `
-          SELECT T0.ItemCode AS [Codigo de Articulo (SAP)], T0.ItemName AS [Nombre de Articulo (SAP)], T1.ItmsGrpNam AS [Nombre de Grupo (SAP)], T2.Price AS [Precio Publico General (SAP)], T3.Price AS [Precio Hospitalizacion (SAP)], T4.Price AS [Precio 2025 (SAP)] 
-          FROM OITM T0
-          INNER JOIN OITB T1 ON T0.ItmsGrpCod = T1.ItmsGrpCod
-          LEFT JOIN ITM1 T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 2
-          LEFT JOIN ITM1 T3 ON T0.ItemCode = T3.ItemCode AND T3.PriceList = 1
-          LEFT JOIN ITM1 T4 ON T0.ItemCode = T4.ItemCode AND T4.PriceList = 4
-          ORDER BY T1.ItmsGrpNam, T0.ItemCode
-        `;
-        params = {};
+      }
+      
+      case 'precios-articulos': {
+        // Obtenemos los grupos para cruzar el nombre
+        const groupsResp = await sapService.fetchAllPages(`/ItemGroups?$select=Number,GroupName`);
+        const groupsMap = {};
+        groupsResp.forEach(g => { groupsMap[g.Number] = g.GroupName; });
+        
+        // Obtenemos los items con sus listas de precios
+        // Excluimos grupos que sabemos no tienen precios (ACTIVO FIJO=134, ALIAS=100)
+        const items = await sapService.fetchAllPages(`/Items?$select=ItemCode,ItemName,ItemsGroupCode,ItemPrices&$filter=ItemsGroupCode ne 134 and ItemsGroupCode ne 100`);
+        console.log(`[precios-articulos] Total items fetched (excl. 100,134): ${items.length}`);
+        
+        data = items.map(i => {
+          const prices = i.ItemPrices || [];
+          const pPublico = prices.find(p => p.PriceList === 2)?.Price || 0;
+          const pHospital = prices.find(p => p.PriceList === 1)?.Price || 0;
+          const p2025 = prices.find(p => p.PriceList === 4)?.Price || 0;
+          
+          return {
+            'Codigo de Articulo (SAP)': i.ItemCode,
+            'Nombre de Articulo (SAP)': i.ItemName,
+            'Nombre de Grupo (SAP)': groupsMap[i.ItemsGroupCode] || i.ItemsGroupCode,
+            'Precio Publico General (SAP)': pPublico,
+            'Precio Hospitalizacion (SAP)': pHospital,
+            'Precio 2025 (SAP)': p2025
+          };
+        }).sort((a, b) => a['Nombre de Grupo (SAP)'].localeCompare(b['Nombre de Grupo (SAP)']) || a['Codigo de Articulo (SAP)'].localeCompare(b['Codigo de Articulo (SAP)']));
+        console.log(`[precios-articulos] Final data rows: ${data.length}`);
         break;
-      case 'interconsultas-jornadas':
-        sqlText = `
-          SELECT T0.DocDate AS [Fecha Contable (SAP)], T0.DocNum AS [Folio Factura (SAP)], T0.CardCode AS [Codigo Cliente (SAP)], T0.CardName AS [Nombre de Cliente (SAP)], T0.U_PCNum AS [Folio de Atencion Medica], CASE WHEN T0.U_PCType = 'IP' THEN 'Hospitalizacion' WHEN T0.U_PCType = 'ER' THEN 'Urgencias' ELSE T0.U_PCType END AS [Tipo de Atencion Medica], T0.U_PRNum AS [Codigo Medico], T0.U_PRName AS [Nombre Medico], T0.U_PTNum AS [Folio Paciente], T0.U_PTName AS [Nombre Paciente], T1.ItemCode AS [Codigo Servicio (SAP)], T1.Dscription AS [Servicio (SAP)], CASE WHEN T1.ItemCode IN ('SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716') THEN 'Jornada' WHEN T1.ItemCode IN ('SER1277', 'SER1423', 'SER0507', 'SER0525') THEN 'Interconsulta' END AS [Tipo de Servicio], T1.Quantity AS [Cantidad (SAP)], T1.Price AS [Precio Unitario (SAP)], T1.DiscPrcnt AS [Porcentaje Descuento (SAP)], T1.LineTotal AS [Total Linea (SAP)], CASE WHEN T0.DocStatus = 'O' THEN 'Abierta' WHEN T0.DocStatus = 'C' THEN 'Cerrada' END AS [Estatus Factura (SAP)]
-          FROM OINV T0
-          INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-          WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate AND T0.CANCELED = 'N' AND T0.U_PCNum IS NOT NULL AND T0.U_PCNum <> 0 AND T1.ItemCode IN ('SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716', 'SER1277', 'SER1423', 'SER0507', 'SER0525')
-          ORDER BY T0.DocDate, T0.DocNum, T1.ItemCode
-        `;
-        params = { startDate, endDate };
+      }
+      
+      case 'interconsultas-jornadas': {
+        const query = `/Invoices?$select=DocDate,DocNum,CardCode,CardName,U_PCNum,U_PCType,U_PRNum,U_PRName,U_PTNum,U_PTName,DocumentStatus,CancelStatus,DocumentLines&$filter=DocDate ge '${startDate}' and DocDate le '${endDate}' and CancelStatus eq 'csNo'`;
+        const invoices = await sapService.fetchAllPages(query);
+        
+        const validItemCodes = ['SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716', 'SER1277', 'SER1423', 'SER0507', 'SER0525'];
+        
+        invoices
+          .filter(o => o.U_PCNum && o.U_PCNum.toString() !== '0')
+          .forEach(o => {
+            (o.DocumentLines || []).forEach(line => {
+              if (validItemCodes.includes(line.ItemCode)) {
+                let tipoServicio = '';
+                if (['SER0655', 'SER0715', 'SER0664', 'SER0519', 'SER0537', 'SER0716'].includes(line.ItemCode)) tipoServicio = 'Jornada';
+                if (['SER1277', 'SER1423', 'SER0507', 'SER0525'].includes(line.ItemCode)) tipoServicio = 'Interconsulta';
+                
+                data.push({
+                  'Fecha Contable (SAP)': o.DocDate,
+                  'Folio Factura (SAP)': o.DocNum,
+                  'Codigo Cliente (SAP)': o.CardCode,
+                  'Nombre de Cliente (SAP)': o.CardName,
+                  'Folio de Atencion Medica': o.U_PCNum,
+                  'Tipo de Atencion Medica': formatType(o.U_PCType),
+                  'Codigo Medico': o.U_PRNum,
+                  'Nombre Medico': o.U_PRName,
+                  'Folio Paciente': o.U_PTNum,
+                  'Nombre Paciente': o.U_PTName,
+                  'Codigo Servicio (SAP)': line.ItemCode,
+                  'Servicio (SAP)': line.ItemDescription,
+                  'Tipo de Servicio': tipoServicio,
+                  'Cantidad (SAP)': line.Quantity,
+                  'Precio Unitario (SAP)': line.UnitPrice,
+                  'Porcentaje Descuento (SAP)': line.DiscountPercent,
+                  'Total Linea (SAP)': line.LineTotal,
+                  'Estatus Factura (SAP)': formatStatus(o.DocumentStatus)
+                });
+              }
+            });
+          });
+          
+        data.sort((a, b) => new Date(a['Fecha Contable (SAP)']) - new Date(b['Fecha Contable (SAP)']) || a['Folio Factura (SAP)'] - b['Folio Factura (SAP)'] || a['Codigo Servicio (SAP)'].localeCompare(b['Codigo Servicio (SAP)']));
         break;
+      }
+      
       default:
         return res.status(400).json({ ok: false, error: 'Reporte no válido o no especificado.' });
     }
 
-    const data = await executeSapQueryViaSL(queryCode, sqlText, params);
     res.json({ ok: true, data });
   } catch (err) {
     console.error(`[Almacen] Error en reporte custom-sap:`, err);
     res.status(500).json({ ok: false, error: 'Error al consultar la base de datos remota de SAP' });
   }
+
 });
 
 /**

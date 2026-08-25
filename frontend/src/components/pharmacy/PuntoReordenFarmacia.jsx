@@ -74,6 +74,7 @@ export default function PuntoReordenFarmacia() {
     }
     if (activeTab === 'dynamic_config' && !configData && !loadingConfig) {
       fetchConfigDinamica();
+      fetchMLDataset();
     }
   }, [activeTab, mlViewMode]);
 
@@ -1853,291 +1854,107 @@ onClick={() => fetchPedidosData(true)}
         </div>
       )}
 
-      {/* TAB 4: Configuración Dinámica de Reorden (basada en Excel de Puntos de Reorden 2026) */}
+      {/* TAB 4: Configuración Dinámica de Reorden (UI Premium) */}
       {activeTab === 'dynamic_config' && (
         <div style={{ animation: 'fadeIn 0.4s ease-out' }}>
           {/* Header de la Pestaña */}
-          <div style={{ background: 'linear-gradient(to right, #0f172a, #1e293b)', padding: '2rem', borderRadius: '16px', color: 'white', marginBottom: '1.5rem', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: '800', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '2.2rem' }}>⚙️</span>
-                  Configuración Dinámica
-                </h2>
-                <p style={{ margin: 0, color: '#94a3b8', fontSize: '1rem', maxWidth: '640px', lineHeight: '1.5' }}>
-                  Calculadora inteligente basada en el archivo <strong style={{ color: '#e2e8f0' }}>MÁXIMOS, MÍNIMOS Y PUNTOS DE REORDEN 2026</strong>.
-                  Calcula automáticamente los puntos mínimos (7 días), reorden (10.5) y máximos (14) con la fórmula ODD del Excel.
-                </p>
-                {configData?.available && (
-                  <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#6ee7b7', padding: '0.3rem 0.7rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '600' }}>
-                      📄 {configData.fileName}
-                    </span>
-                    <span style={{ background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.3)', color: '#cbd5e1', padding: '0.3rem 0.7rem', borderRadius: '8px', fontSize: '0.8rem' }}>
-                      🕒 {configData.fileModified ? new Date(configData.fileModified).toLocaleString('es-MX') : '—'}
-                    </span>
-                    <span style={{ background: 'rgba(2,132,199,0.15)', border: '1px solid rgba(2,132,199,0.4)', color: '#7dd3fc', padding: '0.3rem 0.7rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '600' }}>
-                      📦 {configData.stats?.total ?? 0} productos
-                    </span>
-                    <span style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#6ee7b7', padding: '0.3rem 0.7rem', borderRadius: '8px', fontSize: '0.8rem' }}>
-                      ✅ {configData.stats?.inSync ?? 0} sincronizados
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <label
-                  style={{ padding: '0.8rem 1.25rem', background: uploadingExcel ? '#64748b' : '#334155', color: 'white', border: '1px solid #475569', borderRadius: '10px', fontWeight: 'bold', cursor: uploadingExcel ? 'wait' : 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}
-                >
-                  {uploadingExcel ? '⏳ Procesando...' : '📤 Cargar Excel (.xlsm)'}
-                  <input type="file" accept=".xlsm,.xlsx" style={{ display: 'none' }} onChange={handleUploadExcel} disabled={uploadingExcel} />
-                </label>
-                <button
-                  onClick={exportConfigToCSV}
-                  style={{ padding: '0.8rem 1.25rem', background: '#0284c7', color: 'white', border: '1px solid #0369a1', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}
-                >
-                  📊 Descargar Excel (.csv)
-                </button>
-                <button
-                  onClick={() => {
-                    const pending = (configData?.rows || []).filter(r => r.itemcode && !r.inSync);
-                    if (pending.length === 0) {
-                      showConfigToast('ok', 'Todos los productos vinculados ya están sincronizados con la matriz.');
-                      return;
-                    }
-                    if (window.confirm(`¿Aplicar los puntos MIN/MAX calculados a ${pending.length} SKUs en la matriz de reorden?\n\nSe recomienda revisar primero los vínculos de confianza media.`)) {
-                      handleApplyConfig(pending.map(r => r.producto));
-                    }
-                  }}
-                  disabled={applyingAll || loadingConfig}
-                  style={{ padding: '0.8rem 1.5rem', background: applyingAll ? '#64748b' : '#10b981', color: 'white', border: '1px solid #059669', borderRadius: '10px', fontWeight: 'bold', cursor: applyingAll ? 'wait' : 'pointer', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(16,185,129,0.3)', opacity: (applyingAll || loadingConfig) ? 0.7 : 1 }}
-                >
-                  {applyingAll ? '⏳ Aplicando...' : '🚀 Aplicar Todo a la Matriz'}
-                </button>
-              </div>
+          <div style={{ background: 'linear-gradient(to right, #0f172a, #1e293b)', padding: '2rem', borderRadius: '16px', color: 'white', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+            <div>
+              <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: '800', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '2.2rem' }}>⚙️</span> 
+                Configuración Dinámica (SAP)
+              </h2>
+              <p style={{ margin: 0, color: '#94a3b8', fontSize: '1rem', maxWidth: '600px', lineHeight: '1.5' }}>
+                Catálogo vertical de Farmacia basado en el Consumo Real de SAP. 
+                Calcula automáticamente los días mínimos (7), reorden (10.5) y máximos (14).
+              </p>
+            </div>
+            <div>
+              <button
+                onClick={() => {
+                  const headers = ['CÓDIGO SAP', 'DESCRIPCIÓN', 'CONSUMO MENSUAL', 'CONSUMO DIARIO', 'PUNTO MIN (7 DÍAS)', 'PUNTO REORDEN (10.5 DÍAS)', 'PUNTO MAX (14 DÍAS)'];
+                  const rows = [headers.join(',')];
+                  mlDataset.forEach(row => {
+                    const consDiario = row.consumo_promedio_diario || 0;
+                    rows.push(`"${row.itemcode}","${row.itemdescription}",${row.consumo_30d},${consDiario.toFixed(2)},${Math.ceil(consDiario * 7)},${Math.ceil(consDiario * 10.5)},${Math.ceil(consDiario * 14)}`);
+                  });
+                  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'catalogo_farmacia_reorden.csv';
+                  link.click();
+                }}
+                style={{ padding: '0.8rem 1.5rem', background: '#10b981', color: 'white', border: '1px solid #059669', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(16,185,129,0.3)' }}
+                onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                📊 Descargar Excel
+              </button>
             </div>
           </div>
 
-          {/* Toast de notificaciones */}
-          {configToast && (
-            <div style={{
-              padding: '0.9rem 1.25rem', marginBottom: '1rem', borderRadius: '10px', fontWeight: '600', fontSize: '0.9rem',
-              background: configToast.type === 'ok' ? '#dcfce7' : '#fef2f2',
-              color: configToast.type === 'ok' ? '#166534' : '#991b1b',
-              border: `1px solid ${configToast.type === 'ok' ? '#86efac' : '#fecaca'}`
-            }}>
-              {configToast.type === 'ok' ? '✅ ' : '❌ '}{configToast.message}
+          {/* Búsqueda y Tabla */}
+          <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="🔍 Buscar por código SAP o descripción..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ padding: '0.75rem 1.25rem', borderRadius: '10px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '400px', fontSize: '0.95rem', outline: 'none', transition: 'border-color 0.2s' }}
+                onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+              />
+              <span style={{ marginLeft: '1rem', color: '#64748b', fontSize: '0.9rem', fontWeight: '500' }}>
+                Mostrando {mlDataset.filter(item => (item.itemcode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (item.itemdescription?.toLowerCase() || '').includes(searchTerm.toLowerCase())).length} productos del catálogo SAP.
+              </span>
             </div>
-          )}
 
-          {loadingConfig && !configData ? (
-            <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)', background: 'var(--color-bg-base, #f8fafc)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)' }}>
-              <span className="skeleton-pulse" style={{ width: '220px' }}></span>
-              <p style={{ marginTop: '1rem' }}>Leyendo el Excel de Puntos de Reorden y vinculando con SAP...</p>
-            </div>
-          ) : !configData?.available ? (
-            <div style={{ padding: '4rem', textAlign: 'center', background: 'var(--color-bg-white, white)', borderRadius: '14px', border: '1px solid var(--border-color, #e2e8f0)' }}>
-              <span style={{ fontSize: '3rem' }}>📄</span>
-              <h3 style={{ color: 'var(--text-primary, #0f172a)', margin: '1rem 0 0.5rem 0' }}>No se encontró el Excel de configuración</h3>
-              <p style={{ color: 'var(--text-secondary, #64748b)', maxWidth: '480px', margin: '0 auto 1.5rem auto' }}>
-                Carga el archivo <strong>MÁXIMOS, MÍNIMOS Y PUNTOS DE REORDEN 2026.xlsm</strong> para calcular los puntos de reorden dinámicos.
-              </p>
-              <label
-                style={{ padding: '0.8rem 1.5rem', background: '#10b981', color: 'white', border: '1px solid #059669', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-              >
-                📤 Seleccionar archivo (.xlsm / .xlsx)
-                <input type="file" accept=".xlsm,.xlsx" style={{ display: 'none' }} onChange={handleUploadExcel} disabled={uploadingExcel} />
-              </label>
-            </div>
-          ) : (
-            <div style={{ background: 'var(--color-bg-white, white)', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid var(--border-color, #e2e8f0)', overflow: 'hidden' }}>
-              {/* Toolbar */}
-              <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', background: 'var(--color-bg-base, #f8fafc)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                <input
-                  type="text"
-                  placeholder="🔍 Buscar por producto o código SAP..."
-                  value={configSearch}
-                  onChange={(e) => setConfigSearch(e.target.value)}
-                  style={{ padding: '0.75rem 1.25rem', borderRadius: '10px', border: '1px solid var(--border-color, #cbd5e1)', width: '100%', maxWidth: '380px', fontSize: '0.95rem', outline: 'none', background: 'var(--color-bg-white, white)', color: 'var(--text-primary, #0f172a)' }}
-                />
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  {[
-                    { key: 'ALL', label: `Todos (${configData.stats?.total ?? 0})` },
-                    { key: 'AUTO_ALTA', label: `🟢 Alta confianza (${configData.stats?.autoHigh ?? 0})` },
-                    { key: 'AUTO_MEDIA', label: `🟡 Media (${configData.stats?.autoMedium ?? 0})` },
-                    { key: 'UNMATCHED', label: `⚪ Sin vínculo (${configData.stats?.unmatched ?? 0})` },
-                    { key: 'OUT_OF_SYNC', label: `🔄 Pendientes (${(configData.rows || []).filter(r => r.itemcode && !r.inSync).length})` }
-                  ].map(f => (
-                    <button
-                      key={f.key}
-                      onClick={() => setConfigMatchFilter(f.key)}
-                      style={{ padding: '0.5rem 0.85rem', borderRadius: '6px', border: '1px solid var(--border-color, #cbd5e1)', fontSize: '0.78rem', fontWeight: 'bold', cursor: 'pointer', background: configMatchFilter === f.key ? '#334155' : 'var(--color-bg-white, white)', color: configMatchFilter === f.key ? 'white' : 'var(--text-secondary, #475569)' }}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-                <span style={{ marginLeft: 'auto', color: 'var(--text-secondary, #64748b)', fontSize: '0.88rem', fontWeight: '500' }}>
-                  Mostrando {filteredConfigRows.length} de {configData.stats?.total ?? 0} productos
-                </span>
-              </div>
-
-              {/* Tabla */}
-              <div style={{ overflowX: 'auto', maxHeight: '620px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-                  <thead style={{ background: 'var(--color-bg-base, #f1f5f9)', position: 'sticky', top: 0, zIndex: 10 }}>
-                    <tr>
-                      <th style={{ padding: '1rem', color: 'var(--text-secondary, #475569)', fontWeight: '700', borderBottom: '2px solid var(--border-color, #cbd5e1)', background: 'var(--color-bg-base, #f1f5f9)' }}>PRODUCTO (EXCEL)</th>
-                      <th style={{ padding: '1rem', color: 'var(--text-secondary, #475569)', fontWeight: '700', borderBottom: '2px solid var(--border-color, #cbd5e1)', textAlign: 'center', background: 'var(--color-bg-base, #f1f5f9)' }}>CONSUMO TOTAL</th>
-                      <th style={{ padding: '1rem', color: 'var(--text-secondary, #475569)', fontWeight: '700', borderBottom: '2px solid var(--border-color, #cbd5e1)', textAlign: 'center', background: 'var(--color-bg-base, #f1f5f9)' }}>MENSUAL</th>
-                      <th style={{ padding: '1rem', color: 'var(--text-secondary, #475569)', fontWeight: '700', borderBottom: '2px solid var(--border-color, #cbd5e1)', textAlign: 'center', background: 'var(--color-bg-base, #f1f5f9)' }}>DIARIO</th>
-                      <th style={{ padding: '1rem', color: '#b91c1c', fontWeight: '800', borderBottom: '2px solid var(--border-color, #cbd5e1)', textAlign: 'center', background: 'var(--color-bg-base, #f1f5f9)' }}>MÍN (7 Días)</th>
-                      <th style={{ padding: '1rem', color: '#047857', fontWeight: '800', borderBottom: '2px solid var(--border-color, #cbd5e1)', textAlign: 'center', background: 'var(--color-bg-base, #f1f5f9)' }}>REORDEN (10.5)</th>
-                      <th style={{ padding: '1rem', color: '#0369a1', fontWeight: '800', borderBottom: '2px solid var(--border-color, #cbd5e1)', textAlign: 'center', background: 'var(--color-bg-base, #f1f5f9)' }}>MÁX (14 Días)</th>
-                      <th style={{ padding: '1rem', color: 'var(--text-secondary, #475569)', fontWeight: '700', borderBottom: '2px solid var(--border-color, #cbd5e1)', background: 'var(--color-bg-base, #f1f5f9)' }}>CÓDIGO SAP</th>
-                      <th style={{ padding: '1rem', color: 'var(--text-secondary, #475569)', fontWeight: '700', borderBottom: '2px solid var(--border-color, #cbd5e1)', textAlign: 'center', background: 'var(--color-bg-base, #f1f5f9)' }}>ESTADO</th>
-                      <th style={{ padding: '1rem', color: 'var(--text-secondary, #475569)', fontWeight: '700', borderBottom: '2px solid var(--border-color, #cbd5e1)', textAlign: 'center', background: 'var(--color-bg-base, #f1f5f9)' }}>ACCIÓN</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredConfigRows.length === 0 ? (
-                      <tr>
-                        <td colSpan="10" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)' }}>
-                          No se encontraron productos con el filtro seleccionado.
+            <div style={{ overflowX: 'auto', maxHeight: '600px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                <thead style={{ background: '#f1f5f9', position: 'sticky', top: 0, zIndex: 10 }}>
+                  <tr>
+                    <th style={{ padding: '1rem', color: '#475569', fontWeight: '700', borderBottom: '2px solid #cbd5e1', whiteSpace: 'nowrap' }}>CÓDIGO SAP</th>
+                    <th style={{ padding: '1rem', color: '#475569', fontWeight: '700', borderBottom: '2px solid #cbd5e1' }}>DESCRIPCIÓN</th>
+                    <th style={{ padding: '1rem', color: '#475569', fontWeight: '700', borderBottom: '2px solid #cbd5e1', textAlign: 'center' }}>CONSUMO MENS.</th>
+                    <th style={{ padding: '1rem', color: '#475569', fontWeight: '700', borderBottom: '2px solid #cbd5e1', textAlign: 'center' }}>DIARIO</th>
+                    <th style={{ padding: '1rem', color: '#b91c1c', fontWeight: '800', borderBottom: '2px solid #cbd5e1', textAlign: 'center' }}>MÍN (7 Días)</th>
+                    <th style={{ padding: '1rem', color: '#047857', fontWeight: '800', borderBottom: '2px solid #cbd5e1', textAlign: 'center' }}>REORDEN (10.5)</th>
+                    <th style={{ padding: '1rem', color: '#0369a1', fontWeight: '800', borderBottom: '2px solid #cbd5e1', textAlign: 'center' }}>MÁX (14 Días)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mlDataset
+                    .filter(item => (item.itemcode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (item.itemdescription?.toLowerCase() || '').includes(searchTerm.toLowerCase()))
+                    .map((row, i) => {
+                    const consDiario = row.consumo_promedio_diario || 0;
+                    const min7 = Math.ceil(consDiario * 7);
+                    const reo10 = Math.ceil(consDiario * 10.5);
+                    const max14 = Math.ceil(consDiario * 14);
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', background: i % 2 === 0 ? 'white' : '#f8fafc', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#f0f9ff'} onMouseLeave={(e) => e.currentTarget.style.background = i % 2 === 0 ? 'white' : '#f8fafc'}>
+                        <td style={{ padding: '1rem', fontWeight: '700', color: '#334155' }}>{row.itemcode}</td>
+                        <td style={{ padding: '1rem', color: '#475569', maxWidth: '350px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.itemdescription}</td>
+                        <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '700', color: '#1e293b' }}>
+                          <span style={{ background: '#e2e8f0', padding: '4px 10px', borderRadius: '6px' }}>{row.consumo_30d || 0}</span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontWeight: '600' }}>{consDiario.toFixed(3)}</td>
+                        
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          <span style={{ background: '#fef2f2', color: '#b91c1c', padding: '6px 12px', borderRadius: '8px', fontWeight: '800', display: 'inline-block', minWidth: '40px', border: '1px solid #fecaca' }}>{min7}</span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          <span style={{ background: '#ecfdf5', color: '#047857', padding: '6px 12px', borderRadius: '8px', fontWeight: '800', display: 'inline-block', minWidth: '40px', border: '1px solid #a7f3d0' }}>{reo10}</span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          <span style={{ background: '#f0f9ff', color: '#0369a1', padding: '6px 12px', borderRadius: '8px', fontWeight: '800', display: 'inline-block', minWidth: '40px', border: '1px solid #bae6fd' }}>{max14}</span>
                         </td>
                       </tr>
-                    ) : (
-                      filteredConfigRows.map((row, i) => {
-                        const matchBadge =
-                          row.matchType === 'MANUAL' ? { bg: '#ede9fe', color: '#6d28d9', border: '#ddd6fe', label: '👤 Manual' } :
-                          row.matchType === 'AUTO_ALTA' ? { bg: '#dcfce7', color: '#15803d', border: '#bbf7d0', label: `🟢 ${Math.round(row.matchScore * 100)}%` } :
-                          row.matchType === 'AUTO_MEDIA' ? { bg: '#fef9c3', color: '#a16207', border: '#fef08a', label: `🟡 ${Math.round(row.matchScore * 100)}%` } :
-                          { bg: 'var(--color-bg-base, #f1f5f9)', color: 'var(--text-secondary, #64748b)', border: 'var(--border-color, #e2e8f0)', label: '⚪ Sin vínculo' };
-
-                        return (
-                          <tr key={i} style={{ borderBottom: '1px solid var(--border-color, #e2e8f0)', background: i % 2 === 0 ? 'var(--color-bg-white, white)' : 'var(--color-bg-base, #f8fafc)' }}>
-                            <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary, #334155)', fontWeight: '500', maxWidth: '260px' }} title={row.producto}>
-                              {row.producto}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-primary, #1e293b)', fontWeight: '700' }}>
-                              <span style={{ background: 'var(--color-bg-base, #e2e8f0)', padding: '4px 10px', borderRadius: '6px' }}>{row.consumoTotal}</span>
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary, #475569)', fontWeight: '600' }}>{row.consumoMensualPromedio}</td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)', fontWeight: '600' }}>{row.consumoDiario}</td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                              <span style={{ background: '#fef2f2', color: '#b91c1c', padding: '6px 12px', borderRadius: '8px', fontWeight: '800', display: 'inline-block', minWidth: '40px', border: '1px solid #fecaca' }}>{row.puntoMin}</span>
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                              <span style={{ background: '#ecfdf5', color: '#047857', padding: '6px 12px', borderRadius: '8px', fontWeight: '800', display: 'inline-block', minWidth: '40px', border: '1px solid #a7f3d0' }}>{row.puntoReorden}</span>
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                              <span style={{ background: '#f0f9ff', color: '#0369a1', padding: '6px 12px', borderRadius: '8px', fontWeight: '800', display: 'inline-block', minWidth: '40px', border: '1px solid #bae6fd' }}>{row.puntoMax}</span>
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem' }}>
-                              {row.itemcode ? (
-                                <button
-                                  onClick={() => setLinkModal({ producto: row.producto, search: row.itemcode, results: [], searching: false, current: row.itemcode })}
-                                  title="Cambiar vínculo SAP"
-                                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
-                                >
-                                  <span style={{ fontWeight: '700', fontFamily: 'var(--font-mono, monospace)', color: 'var(--text-primary, #0f172a)' }}>{row.itemcode}</span>
-                                  <span style={{ background: matchBadge.bg, color: matchBadge.color, border: `1px solid ${matchBadge.border}`, padding: '0.15rem 0.45rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 'bold' }}>
-                                    {matchBadge.label}
-                                  </span>
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => setLinkModal({ producto: row.producto, search: '', results: [], searching: false, current: null })}
-                                  style={{ padding: '0.35rem 0.7rem', background: 'var(--color-bg-white, white)', color: '#7c3aed', border: '1px dashed #a78bfa', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '700' }}
-                                >
-                                  🔗 Vincular SAP
-                                </button>
-                              )}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                              {!row.itemcode ? (
-                                <span style={{ color: 'var(--text-muted, #94a3b8)', fontSize: '0.8rem' }}>—</span>
-                              ) : row.inSync ? (
-                                <span style={{ background: '#dcfce7', color: '#166534', padding: '0.2rem 0.6rem', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 'bold' }}>✅ Sincronizado</span>
-                              ) : (
-                                <span style={{ background: '#fef3c7', color: '#b45309', padding: '0.2rem 0.6rem', borderRadius: '9999px', fontSize: '0.72rem', fontWeight: 'bold' }}>🔄 Pendiente</span>
-                              )}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                              <button
-                                onClick={() => handleApplyConfig([row.producto])}
-                                disabled={!row.itemcode || applyingRow === row.producto || row.inSync}
-                                style={{ padding: '0.4rem 0.8rem', background: !row.itemcode || row.inSync ? 'var(--color-bg-base, #f1f5f9)' : 'white', color: !row.itemcode || row.inSync ? 'var(--text-muted, #94a3b8)' : '#3b82f6', border: `1px solid ${!row.itemcode || row.inSync ? 'var(--border-color, #e2e8f0)' : '#3b82f6'}`, borderRadius: '6px', cursor: !row.itemcode || row.inSync ? 'not-allowed' : 'pointer', fontSize: '0.78rem', fontWeight: '700', width: '110px' }}
-                              >
-                                {applyingRow === row.producto ? '⏳...' : row.inSync ? '✅ Aplicado' : '🚀 Aplicar'}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Modal Vincular Producto Excel -> Código SAP */}
-      {linkModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }} onClick={() => setLinkModal(null)}>
-          <div className="reorder-modal-content" style={{ padding: '2rem', borderRadius: '16px', width: '90%', maxWidth: '560px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: '1rem' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#7c3aed', textTransform: 'uppercase' }}>Vincular Producto del Excel</span>
-                <h3 style={{ margin: '0.2rem 0 0 0', color: 'var(--text-primary, #0f172a)', fontSize: '1.1rem' }}>{linkModal.producto}</h3>
-              </div>
-              <button onClick={() => setLinkModal(null)} style={{ background: 'var(--color-bg-base, #f1f5f9)', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-secondary, #64748b)', borderRadius: '50%', width: '32px', height: '32px' }}>✕</button>
-            </div>
-
-            <input
-              type="text"
-              autoFocus
-              placeholder="🔍 Buscar código o descripción SAP (ej. ACICLOVIR o FAR1208)..."
-              value={linkModal.search}
-              onChange={(e) => {
-                const val = e.target.value;
-                setLinkModal(prev => prev ? { ...prev, search: val } : prev);
-                searchSapForLink(val);
-              }}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', fontSize: '0.95rem', marginBottom: '0.75rem', background: 'var(--input-bg, white)', color: 'var(--text-primary, #0f172a)' }}
-            />
-
-            {linkModal.current && (
-              <button
-                onClick={() => handleLinkProduct(linkModal.producto, null)}
-                style={{ width: '100%', padding: '0.6rem', marginBottom: '0.75rem', background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem' }}
-              >
-                ✖ Eliminar vínculo actual ({linkModal.current})
-              </button>
-            )}
-
-            <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              {linkModal.searching ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)' }}>Buscando...</div>
-              ) : linkModal.results.length === 0 ? (
-                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted, #94a3b8)', fontSize: '0.85rem' }}>
-                  {linkModal.search.trim().length >= 2 ? 'Sin resultados. Intente con otro término.' : 'Escriba al menos 2 caracteres para buscar.'}
-                </div>
-              ) : (
-                linkModal.results.map((r) => (
-                  <button
-                    key={r.itemcode}
-                    onClick={() => handleLinkProduct(linkModal.producto, r.itemcode)}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', width: '100%', padding: '0.65rem 0.85rem', background: 'var(--color-bg-base, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '8px', cursor: 'pointer', textAlign: 'left' }}
-                  >
-                    <span style={{ fontWeight: '700', fontFamily: 'var(--font-mono, monospace)', color: '#0284c7', fontSize: '0.85rem', minWidth: '70px' }}>{r.itemcode}</span>
-                    <span style={{ color: 'var(--text-primary, #334155)', fontSize: '0.85rem', flex: 1 }}>{r.description}</span>
-                    <span style={{ color: '#7c3aed', fontWeight: 'bold' }}> Vincular →</span>
-                  </button>
-                ))
-              )}
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

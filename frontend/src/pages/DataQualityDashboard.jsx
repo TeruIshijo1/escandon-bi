@@ -25,17 +25,26 @@ export default function DataQualityDashboard() {
     try {
       // Fetch stats
       const statsData = await apiFetch('/data-quality/stats');
-      if (statsData.success) {
-        setStats(statsData.data);
+      if (statsData && statsData.success && statsData.data && typeof statsData.data === 'object') {
+        setStats({
+          cleanliness_score: statsData.data.cleanliness_score ?? 100,
+          pending_issues: statsData.data.pending_issues ?? 0,
+          high_severity_pending: statsData.data.high_severity_pending ?? 0,
+          resolved_issues: statsData.data.resolved_issues ?? 0,
+          total_issues: statsData.data.total_issues ?? 0,
+        });
       }
 
       // Fetch issues
       const issuesData = await apiFetch('/data-quality/issues', { params: { limit: 100, status: statusFilter, severity: severityFilter } });
-      if (issuesData.success) {
-        setIssues(issuesData.data || []);
+      if (issuesData && issuesData.success && Array.isArray(issuesData.data)) {
+        setIssues(issuesData.data);
+      } else {
+        setIssues([]);
       }
     } catch (err) {
       console.error('Error al cargar calidad de datos:', err);
+      setIssues([]);
     } finally {
       setLoading(false);
     }
@@ -264,7 +273,7 @@ export default function DataQualityDashboard() {
                     </div>
                   </td>
                   <td style={{ padding: '12px 16px', color: '#64748B', fontSize: '0.8rem' }}>
-                    {new Date(issue.created_at).toLocaleString()}
+                    {issue.created_at ? new Date(issue.created_at).toLocaleString() : '—'}
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <span style={{
