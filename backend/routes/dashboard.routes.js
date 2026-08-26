@@ -700,20 +700,31 @@ router.get(
           const allSapRows = await fetchAllSapPages(sapService, `/SQLQueries('VidasSalvChoqueDet')/List?startDate='2026-04-01'`);
           if (allSapRows && allSapRows.length > 0) {
             allSapRows.forEach(row => {
-              if (row.FechaPrimeraOV) {
-                let mes;
-                if (typeof row.FechaPrimeraOV === 'string' && row.FechaPrimeraOV.length === 8 && /^\d{8}$/.test(row.FechaPrimeraOV)) {
-                  mes = parseInt(row.FechaPrimeraOV.substring(4, 6), 10);
-                } else if (typeof row.FechaPrimeraOV === 'string' && row.FechaPrimeraOV.length >= 10) {
-                  mes = parseInt(row.FechaPrimeraOV.substring(5, 7), 10);
-                } else {
-                  const d = new Date(row.FechaPrimeraOV);
-                  if (!isNaN(d.getTime())) mes = d.getMonth() + 1;
+              const dStr = row.FechaPrimeraOV;
+              if (!dStr) return;
+              
+              let mes;
+              const str = String(dStr).trim();
+              
+              if (str.length === 8 && /^\d{8}$/.test(str)) {
+                mes = parseInt(str.substring(4, 6), 10);
+              } else if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) {
+                mes = parseInt(str.substring(5, 7), 10);
+              } else if (str.length >= 10 && /^\d{2}\/\d{2}\/\d{4}/.test(str)) {
+                mes = parseInt(str.substring(3, 5), 10);
+              } else if (str.length >= 10 && /^\d{2}-\d{2}-\d{4}/.test(str)) {
+                mes = parseInt(str.substring(3, 5), 10);
+              } else {
+                const d = new Date(str);
+                if (!isNaN(d.getTime())) mes = d.getMonth() + 1;
+                else {
+                  console.warn('[SAP-Historico] Formato de fecha no reconocido:', dStr);
+                  return;
                 }
-                
-                if (mes >= 4 && mes <= 12) {
-                  activeData[mes] = (activeData[mes] || 0) + 1;
-                }
+              }
+              
+              if (mes >= 4 && mes <= 12) {
+                activeData[mes] = (activeData[mes] || 0) + 1;
               }
             });
           }
@@ -734,6 +745,7 @@ router.get(
                   activeData[mes] = total;
                 }
               });
+              console.debug('[HIS-Historico]', { seccion, activeData: { ...activeData } });
             }
           } catch (e) {
             console.error(`[HIS] Error al consultar ${seccion} activo en historico:`, e.message);
@@ -787,23 +799,40 @@ router.get(
           const allSapRows = await fetchAllSapPages(sapService, `/SQLQueries('VidasSalvChoqueDet')/List?startDate='${startDate}'`);
           if (allSapRows && allSapRows.length > 0) {
             records = allSapRows.filter(r => {
-              let m;
-              let y;
               const dStr = r.FechaPrimeraOV;
-              if (typeof dStr === 'string' && dStr.length === 8 && /^\d{8}$/.test(dStr)) {
-                y = parseInt(dStr.substring(0, 4), 10);
-                m = parseInt(dStr.substring(4, 6), 10);
-              } else if (typeof dStr === 'string' && dStr.length >= 7) {
-                y = parseInt(dStr.substring(0, 4), 10);
-                m = parseInt(dStr.substring(5, 7), 10);
+              if (!dStr) return false;
+              
+              let y, m;
+              const str = String(dStr).trim();
+              
+              if (str.length === 8 && /^\d{8}$/.test(str)) {
+                y = parseInt(str.substring(0, 4), 10);
+                m = parseInt(str.substring(4, 6), 10);
+              } else if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) {
+                y = parseInt(str.substring(0, 4), 10);
+                m = parseInt(str.substring(5, 7), 10);
+              } else if (str.length >= 10 && /^\d{2}\/\d{2}\/\d{4}/.test(str)) {
+                y = parseInt(str.substring(6, 10), 10);
+                m = parseInt(str.substring(3, 5), 10);
+              } else if (str.length >= 10 && /^\d{2}-\d{2}-\d{4}/.test(str)) {
+                y = parseInt(str.substring(6, 10), 10);
+                m = parseInt(str.substring(3, 5), 10);
               } else {
-                const d = new Date(dStr);
+                const d = new Date(str);
                 if (!isNaN(d.getTime())) {
                   y = d.getFullYear();
                   m = d.getMonth() + 1;
+                } else {
+                  console.warn('[SAP] Formato de fecha no reconocido:', dStr);
+                  return false;
                 }
               }
-              return y === numYear && m === numMes;
+              
+              const match = y === numYear && m === numMes;
+              if (!match && (y || m)) {
+                console.debug('[SAP] Fila filtrada:', { original: dStr, parsed: { y, m }, target: { y: numYear, m: numMes } });
+              }
+              return match;
             }).map(r => ({
               FolioAtencion: r.AtencionMedica,
               NoPaciente: r.NoPaciente,
@@ -1070,6 +1099,7 @@ router.get(
             const pool = await connectRemoteDB();
             const result = await pool.request().query(query);
             records = result.recordset || [];
+            console.debug('[HIS-Detail]', { seccion, year: numYear, mes: numMes, recordsReturned: records.length, sampleFolio: records[0]?.FolioAtencion || records[0]?.FolioCuenta || records[0]?.FolioSolicitud || records[0]?.NoCita });
           } catch (e) {
             console.error(`[HIS] Error al consultar detalle ${seccion}:`, e.message);
           }

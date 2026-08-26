@@ -153,7 +153,11 @@ app.use('/api/cex',           cexRoutes);
 app.use('/api/files', authenticate, express.static(path.join(__dirname, 'uploads')));
 
 // Servir Frontend compilado en Producción
-const frontendPath = path.join(__dirname, '../frontend/dist');
+let frontendPath = path.join(__dirname, '../frontend/dist');
+if (!fs.existsSync(path.join(frontendPath, 'index.html'))) {
+  frontendPath = path.join(__dirname, '../frontend');
+}
+
 if (fs.existsSync(path.join(frontendPath, 'index.html'))) {
   app.use(express.static(frontendPath));
   app.get('*', (req, res, next) => {

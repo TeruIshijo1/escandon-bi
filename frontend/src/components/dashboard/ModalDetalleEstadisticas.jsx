@@ -87,8 +87,6 @@ export default function ModalDetalleEstadisticas({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   // Filtrado en vivo por texto de búsqueda
   const filteredData = useMemo(() => {
     if (!searchTerm.trim()) return data;
@@ -105,6 +103,8 @@ export default function ModalDetalleEstadisticas({
     if (!data || data.length === 0) return [];
     return Object.keys(data[0]);
   }, [data]);
+
+  if (!isOpen) return null;
 
   // Función para formatear valores en la tabla
   const formatCellValue = (key, val) => {
