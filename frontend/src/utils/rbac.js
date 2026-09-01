@@ -614,7 +614,7 @@ export function getPermissionSections(user) {
       id:       sapPerm.id,
       name:     sapPerm.name,
       icon:     sapPerm.icon,
-      category: '🔌 Consultas SAP (Módulos)',
+      category: sapPerm.category || '🔌 Consultas SAP (Módulos)',
     });
   }
 
@@ -650,22 +650,33 @@ export function getPermissionSections(user) {
 }
 
 export const SAP_QUERY_PERMISSIONS = [
-  { id: 'sap-query-inventory', name: 'Inventario y Stock por Almacén', icon: '📦', entity: 'inventory' },
-  { id: 'sap-query-batches', name: 'Lotes y Caducidades de Insumos', icon: '⏳', entity: 'batches' },
-  { id: 'sap-query-purchase_invoices', name: 'Facturas de Proveedores (Compras)', icon: '🧾', entity: 'purchase_invoices' },
-  { id: 'sap-query-purchase_orders', name: 'Órdenes de Compra a Proveedores', icon: '📋', entity: 'purchase_orders' },
-  { id: 'sap-query-goods_receipts_po', name: 'Recepciones de Mercancía (Entradas)', icon: '📥', entity: 'goods_receipts_po' },
-  { id: 'sap-query-goods_returns', name: 'Devoluciones a Proveedores', icon: '🔄', entity: 'goods_returns' },
-  { id: 'sap-query-purchase_requests', name: 'Requisiciones y Solicitudes de Compra', icon: '📑', entity: 'purchase_requests' },
-  { id: 'sap-query-stock_transfers', name: 'Traslados entre Almacenes Realizados', icon: '🚚', entity: 'stock_transfers' },
-  { id: 'sap-query-transfer_requests', name: 'Solicitudes de Traslado entre Almacenes', icon: '⏳', entity: 'transfer_requests' },
-  { id: 'sap-query-goods_issues', name: 'Salidas de Inventario (Mermas / Bajas)', icon: '📉', entity: 'goods_issues' },
-  { id: 'sap-query-goods_receipts_inv', name: 'Entradas Directas y Ajustes Positivos', icon: '📈', entity: 'goods_receipts_inv' },
-  { id: 'sap-query-sales_invoices', name: 'Facturación e Ingresos Hospitalarios', icon: '💰', entity: 'sales_invoices' },
-  { id: 'sap-query-credit_memos', name: 'Notas de Crédito a Clientes (Devoluciones)', icon: '🧾', entity: 'credit_memos' },
-  { id: 'sap-query-business_partners', name: 'Directorio de Proveedores y Socios', icon: '👥', entity: 'business_partners' },
-  { id: 'sap-query-item_prices', name: 'Listas de Precios y Costos', icon: '🏷️', entity: 'item_prices' },
-  { id: 'sap-query-item_master_data', name: 'Maestro de Artículos y Clasif. Sanitaria', icon: '🧬', entity: 'item_master_data' }
+  // ── INVENTARIOS Y STOCK ──
+  { id: 'sap-query-inventory', name: 'Inventario y Stock por Almacén', icon: '📦', entity: 'inventory', category: '📦 Consultas SAP — Inventarios y Stock' },
+
+  // ── CONTROL DE CADUCIDADES ──
+  { id: 'sap-query-batches', name: 'Lotes y Caducidades de Insumos', icon: '⏳', entity: 'batches', category: '⏳ Consultas SAP — Control de Caducidades' },
+
+  // ── COMPRAS Y PROVEEDORES ──
+  { id: 'sap-query-purchase_invoices', name: 'Facturas de Proveedores (Compras)', icon: '🧾', entity: 'purchase_invoices', category: '🧾 Consultas SAP — Compras y Proveedores' },
+  { id: 'sap-query-purchase_orders', name: 'Órdenes de Compra a Proveedores', icon: '📋', entity: 'purchase_orders', category: '🧾 Consultas SAP — Compras y Proveedores' },
+  { id: 'sap-query-goods_receipts_po', name: 'Recepciones de Mercancía (Entradas)', icon: '📥', entity: 'goods_receipts_po', category: '🧾 Consultas SAP — Compras y Proveedores' },
+  { id: 'sap-query-goods_returns', name: 'Devoluciones a Proveedores', icon: '🔄', entity: 'goods_returns', category: '🧾 Consultas SAP — Compras y Proveedores' },
+  { id: 'sap-query-purchase_requests', name: 'Requisiciones y Solicitudes de Compra', icon: '📑', entity: 'purchase_requests', category: '🧾 Consultas SAP — Compras y Proveedores' },
+
+  // ── MOVIMIENTOS DE ALMACÉN ──
+  { id: 'sap-query-stock_transfers', name: 'Traslados entre Almacenes Realizados', icon: '🚚', entity: 'stock_transfers', category: '🚚 Consultas SAP — Movimientos de Almacén' },
+  { id: 'sap-query-transfer_requests', name: 'Solicitudes de Traslado entre Almacenes', icon: '⏳', entity: 'transfer_requests', category: '🚚 Consultas SAP — Movimientos de Almacén' },
+  { id: 'sap-query-goods_issues', name: 'Salidas de Inventario (Mermas / Bajas)', icon: '📉', entity: 'goods_issues', category: '🚚 Consultas SAP — Movimientos de Almacén' },
+  { id: 'sap-query-goods_receipts_inv', name: 'Entradas Directas y Ajustes Positivos', icon: '📈', entity: 'goods_receipts_inv', category: '🚚 Consultas SAP — Movimientos de Almacén' },
+
+  // ── FACTURACIÓN E INGRESOS ──
+  { id: 'sap-query-sales_invoices', name: 'Facturación e Ingresos Hospitalarios', icon: '💰', entity: 'sales_invoices', category: '💰 Consultas SAP — Facturación e Ingresos' },
+  { id: 'sap-query-credit_memos', name: 'Notas de Crédito a Clientes (Devoluciones)', icon: '🧾', entity: 'credit_memos', category: '💰 Consultas SAP — Facturación e Ingresos' },
+
+  // ── CATÁLOGOS MAESTROS ──
+  { id: 'sap-query-business_partners', name: 'Directorio de Proveedores y Socios', icon: '👥', entity: 'business_partners', category: '🧬 Consultas SAP — Catálogos Maestros' },
+  { id: 'sap-query-item_prices', name: 'Listas de Precios y Costos', icon: '🏷️', entity: 'item_prices', category: '🧬 Consultas SAP — Catálogos Maestros' },
+  { id: 'sap-query-item_master_data', name: 'Maestro de Artículos y Clasif. Sanitaria', icon: '🧬', entity: 'item_master_data', category: '🧬 Consultas SAP — Catálogos Maestros' }
 ];
 
 /**

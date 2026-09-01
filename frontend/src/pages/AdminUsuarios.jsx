@@ -482,12 +482,46 @@ export default function AdminUsuarios() {
                 
                 // Tomar el ícono del primer item de la categoría
                 const categoryIcon = sectionsInCategory[0]?.icon || '📌';
+                const allSelected = sectionsInCategory.every(s => selectedReports.has(s.id));
+                const countSelected = sectionsInCategory.filter(s => selectedReports.has(s.id)).length;
 
                 return (
-                  <div key={category} style={{ marginBottom:'1.5rem' }}>
-                    <h4 style={{ fontFamily: 'var(--font-mono)', fontSize:'0.7rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--color-azul-fuerte)', borderBottom:'1px solid rgba(0,70,135,0.06)', paddingBottom:'0.45rem', marginBottom:'0.85rem' }}>
-                      {categoryIcon} {category}
-                    </h4>
+                  <div key={category} style={{ marginBottom:'1.5rem', background:'rgba(0,70,135,0.015)', padding:'0.75rem', borderRadius:14, border:'1px solid rgba(0,70,135,0.05)' }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'1px solid rgba(0,70,135,0.06)', paddingBottom:'0.45rem', marginBottom:'0.85rem' }}>
+                      <h4 style={{ fontFamily: 'var(--font-mono)', fontSize:'0.72rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--color-azul-fuerte)', margin:0, display:'flex', alignItems:'center', gap:'6px' }}>
+                        <span>{categoryIcon}</span> {category} 
+                        <span style={{ fontSize:'0.65rem', color: countSelected > 0 ? 'var(--color-azul-claro)' : 'var(--text-muted)', fontWeight:700, background: countSelected > 0 ? 'rgba(0,136,201,0.1)' : 'rgba(0,0,0,0.04)', padding:'1px 6px', borderRadius:100 }}>
+                          {countSelected}/{sectionsInCategory.length}
+                        </span>
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedReports(prev => {
+                            const next = new Set(prev);
+                            if (allSelected) {
+                              sectionsInCategory.forEach(s => next.delete(s.id));
+                            } else {
+                              sectionsInCategory.forEach(s => next.add(s.id));
+                            }
+                            return next;
+                          });
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: allSelected ? 'var(--color-danger)' : 'var(--color-azul-claro)',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          fontFamily: 'var(--font-display)',
+                          padding: '2px 6px',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        {allSelected ? '✕ Desmarcar grupo' : '✓ Marcar grupo'}
+                      </button>
+                    </div>
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:'0.75rem' }}>
                       {sectionsInCategory.map(s => (
                         <div 
