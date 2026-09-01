@@ -715,7 +715,7 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
     INNER JOIN dbo.SOLN T1 ON T0.SONum = T1.SONum
     LEFT JOIN dbo.PT PT ON T0.PTNum = PT.PTNum
     LEFT JOIN dbo.V_IT VIT ON T1.ItemCode = VIT.ItemCode
-    LEFT JOIN dbo.V_ITPR ITPR_POS ON ITPR_POS.ItemCode = T1.ItemCode AND ITPR_POS.PriceListNum = COALESCE(T1.PriceListNum, T0.PriceListNum, 1)
+    LEFT JOIN dbo.V_ITPR ITPR_POS ON ITPR_POS.ItemCode = T1.ItemCode AND ITPR_POS.PriceListNum = COALESCE(T0.PriceListNum, 1)
     LEFT JOIN dbo.V_ITPR ITPR_POS_DEF ON ITPR_POS_DEF.ItemCode = T1.ItemCode AND ITPR_POS_DEF.PriceListNum = 1
     WHERE T1.ItemCode NOT LIKE 'SER%'
     ${sqlCond.replace(/PCIT\./g, 'T0.')}
