@@ -668,15 +668,15 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
   const querySQL = `
     SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
     SELECT TOP (@limit)
-        'Hospitalización' AS TipoMovimiento,
+        CASE WHEN PC.PCType = 'ER' THEN 'Urgencias' ELSE 'Hospitalización' END AS TipoMovimiento,
         PCPR.PCPRNum AS Folio,
         PT.FullName AS Referencia,
-        ISNULL(VFR.FRName, 'NO ESPECIFICADA') AS AreaDestino,
+        COALESCE(VFR.FRName, CASE WHEN PC.PCType = 'ER' THEN 'URGENCIAS' ELSE 'NO ESPECIFICADA' END) AS AreaDestino,
         PCPRIT.ItemCode AS Codigo,
         ISNULL(VIT.ItemDescription, PCIT.ItemCode) AS Insumo,
         PCIT.Quantity AS Cantidad,
-        PCIT.UnitPrice AS PrecioUnitario,
-        (PCIT.UnitPrice * PCIT.Quantity) AS MontoTotal,
+        COALESCE(NULLIF(PCIT.UnitPrice, 0), ITPR.Price, ITPR_DEF.Price, 0) AS PrecioUnitario,
+        (COALESCE(NULLIF(PCIT.UnitPrice, 0), ITPR.Price, ITPR_DEF.Price, 0) * PCIT.Quantity) AS MontoTotal,
         PCPRBT.BatchCode AS Lote,
         PCPRBT.ExpirationDate AS Caducidad,
         PCIT.CreatedOn AS FechaMovimiento
@@ -689,6 +689,8 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
     LEFT JOIN dbo.V_IT VIT ON PCPRIT.ItemCode = VIT.ItemCode
     LEFT JOIN dbo.PCBL PCBL ON PCPRIT.PCPRITNum = PCBL.PCPRITNum
     LEFT JOIN dbo.V_FR VFR ON PCBL.FRCode = VFR.FRCode
+    LEFT JOIN dbo.V_ITPR ITPR ON ITPR.ItemCode = PCIT.ItemCode AND ITPR.PriceListNum = COALESCE(PCIT.PriceListNum, PC.PriceListNum, 1)
+    LEFT JOIN dbo.V_ITPR ITPR_DEF ON ITPR_DEF.ItemCode = PCIT.ItemCode AND ITPR_DEF.PriceListNum = 1
     WHERE PCIT.PCIT_ST = N'CH'
     ${sqlCond}
     ORDER BY PCIT.CreatedOn DESC
@@ -704,8 +706,8 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
         T1.ItemCode AS Codigo,
         ISNULL(VIT.ItemDescription, T1.ItemCode) AS Insumo,
         T1.Quantity AS Cantidad,
-        T1.UnitPrice AS PrecioUnitario,
-        (T1.UnitPrice * T1.Quantity) AS MontoTotal,
+        COALESCE(NULLIF(T1.UnitPrice, 0), ITPR_POS.Price, ITPR_POS_DEF.Price, 0) AS PrecioUnitario,
+        (COALESCE(NULLIF(T1.UnitPrice, 0), ITPR_POS.Price, ITPR_POS_DEF.Price, 0) * T1.Quantity) AS MontoTotal,
         T1.BatchCode AS Lote,
         NULL AS Caducidad,
         T0.CreatedOn AS FechaMovimiento
@@ -713,6 +715,8 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
     INNER JOIN dbo.SOLN T1 ON T0.SONum = T1.SONum
     LEFT JOIN dbo.PT PT ON T0.PTNum = PT.PTNum
     LEFT JOIN dbo.V_IT VIT ON T1.ItemCode = VIT.ItemCode
+    LEFT JOIN dbo.V_ITPR ITPR_POS ON ITPR_POS.ItemCode = T1.ItemCode AND ITPR_POS.PriceListNum = COALESCE(T1.PriceListNum, T0.PriceListNum, 1)
+    LEFT JOIN dbo.V_ITPR ITPR_POS_DEF ON ITPR_POS_DEF.ItemCode = T1.ItemCode AND ITPR_POS_DEF.PriceListNum = 1
     WHERE T1.ItemCode NOT LIKE 'SER%'
     ${sqlCond.replace(/PCIT\./g, 'T0.')}
     ORDER BY T0.CreatedOn DESC
