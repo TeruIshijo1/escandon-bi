@@ -598,7 +598,16 @@ export default function ConsultaServiceLayer() {
                     <option value="FAR">Farmacia Central (FAR)</option>
                     <option value="QX">Quirófano General (QX)</option>
                     <option value="QXCR">Quirófano Carro Rojo (QXCR)</option>
-                    <option value="ALM">Almacén General (ALM)</option>
+                    <option value="QXRCR">Recuperación Carro Rojo (QXRCR)</option>
+                    <option value="TERACR">Terapia Intensiva Carro Rojo (TERACR)</option>
+                    <option value="PPBCR">Privados PB Carro Rojo (PPBCR)</option>
+                    <option value="PPACR">Privados PA Carro Rojo (PPACR)</option>
+                    <option value="IMAGCR">Imagen Carro Rojo (IMAGCR)</option>
+                    <option value="CARDIOCR">Cardio Carro Rojo (CARDIOCR)</option>
+                    <option value="CUNACR">Cunas Carro Rojo (CUNACR)</option>
+                    <option value="QXCM">Quirófano Código Mater (QXCM)</option>
+                    <option value="URG1CM">Urgencias 1 Código Mater (URG1CM)</option>
+                    <option value="ALG">Almacén General (ALG)</option>
                   </select>
                 </div>
 

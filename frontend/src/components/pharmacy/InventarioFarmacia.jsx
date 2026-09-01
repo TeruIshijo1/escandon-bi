@@ -189,11 +189,24 @@ export default function InventarioFarmacia() {
   const lowStockItems = useMemo(() => items.filter(item => item.QuantityOnStock < lowStockThreshold), [items]);
   const lowStockCount = lowStockItems.length;
   const warehouseLabels = {
-    FAR: '[FAR] Farmacia',
-    QX: '[QX] Quirófano',
-    QXCR: '[QXCR] Carro Rojo',
-    FAR_QX: 'Farmacia + Quirófano + Carro Rojo',
-    ALL: 'Todos los almacenes'
+    FAR: '[FAR] Farmacia Central',
+    QX: '[QX] Quirófano General',
+    FAR_QX: 'Farmacia + Quirófano + Carros Rojos + Códigos Mater',
+    ALL_CR: '🚨 Todos los Carros Rojos',
+    QXCR: '[QXCR] Quirófano Carro Rojo',
+    QXRCR: '[QXRCR] Recuperación Carro Rojo',
+    TERACR: '[TERACR] Terapia Intensiva Carro Rojo',
+    PPBCR: '[PPBCR] Privados PB Carro Rojo',
+    PPACR: '[PPACR] Privados PA Carro Rojo',
+    IMAGCR: '[IMAGCR] Imagen Carro Rojo',
+    CARDIOCR: '[CARDIOCR] Gabinete Cardio Carro Rojo',
+    CUNACR: '[CUNACR] Cunas Carro Rojo',
+    URG1CR: '[URG1CR] Urgencias 1 Carro Rojo',
+    URG2CR: '[URG2CR] Urgencias 2 Carro Rojo',
+    ALL_CM: '🤰 Todos los Código Mater',
+    QXCM: '[QXCM] Quirófano Código Mater',
+    URG1CM: '[URG1CM] Urgencias 1 Código Mater',
+    ALL: 'Todos los almacenes SAP'
   };
 
   // Helper de formateo numérico: stock sin decimales, precios/costos con 4 decimales de SAP
@@ -461,11 +474,7 @@ export default function InventarioFarmacia() {
             </span>
             <select
               value={selectedWarehouse}
-              onChange={(e) => {
-                setSelectedWarehouse(e.target.value);
-                setSearchTerm('');
-                setSearchInput('');
-              }}
+              onChange={(e) => setSelectedWarehouse(e.target.value)}
               style={{
                 padding: '0.6rem 0.8rem',
                 border: '1px solid #cbd5e1',
@@ -473,14 +482,35 @@ export default function InventarioFarmacia() {
                 fontSize: '0.9rem',
                 background: '#ffffff',
                 color: '#0f172a',
-                minWidth: '230px'
+                minWidth: '260px'
               }}
             >
-              <option value="FAR">Farmacia (FAR)</option>
-              <option value="QX">Quirófano (QX)</option>
-              <option value="QXCR">Carro Rojo (QXCR)</option>
-              <option value="FAR_QX">FAR + QX + QXCR</option>
-              <option value="ALL">Todos los almacenes</option>
+              <optgroup label="Almacenes Principales">
+                <option value="FAR">Farmacia Central (FAR)</option>
+                <option value="QX">Quirófano General (QX)</option>
+                <option value="FAR_QX">FAR + QX + Carros Rojos + Códigos Mater</option>
+              </optgroup>
+              <optgroup label="🚨 Carros Rojos">
+                <option value="ALL_CR">🚨 Todos los Carros Rojos</option>
+                <option value="QXCR">Quirófano Carro Rojo (QXCR)</option>
+                <option value="QXRCR">Recuperación Carro Rojo (QXRCR)</option>
+                <option value="TERACR">Terapia Intensiva Carro Rojo (TERACR)</option>
+                <option value="PPBCR">Privados PB Carro Rojo (PPBCR)</option>
+                <option value="PPACR">Privados PA Carro Rojo (PPACR)</option>
+                <option value="IMAGCR">Imagen Carro Rojo (IMAGCR)</option>
+                <option value="CARDIOCR">Gabinete Cardio Carro Rojo (CARDIOCR)</option>
+                <option value="CUNACR">Cunas Carro Rojo (CUNACR)</option>
+                <option value="URG1CR">Urgencias 1 Carro Rojo (URG1CR)</option>
+                <option value="URG2CR">Urgencias 2 Carro Rojo (URG2CR)</option>
+              </optgroup>
+              <optgroup label="🤰 Código Mater">
+                <option value="ALL_CM">🤰 Todos los Código Mater</option>
+                <option value="QXCM">Quirófano Código Mater (QXCM)</option>
+                <option value="URG1CM">Urgencias 1 Código Mater (URG1CM)</option>
+              </optgroup>
+              <optgroup label="Otros">
+                <option value="ALL">Todos los almacenes SAP</option>
+              </optgroup>
             </select>
             <div style={{ position: 'relative', flex: 1, maxWidth: '450px' }}>
               <input
@@ -621,9 +651,9 @@ export default function InventarioFarmacia() {
                       <td style={{ padding: '0.65rem 0.5rem', color: '#334155', fontSize: '0.85rem', fontWeight: '500' }}>{item.ItemName}</td>
                       <td style={{ padding: '0.65rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <span style={{
-                          background: item.WhsCode === 'QXCR' ? '#fee2e2' : item.WhsCode === 'QX' ? '#dcfce7' : '#dbeafe',
-                          color: item.WhsCode === 'QXCR' ? '#991b1b' : item.WhsCode === 'QX' ? '#166534' : '#1d4ed8',
-                          border: `1px solid ${item.WhsCode === 'QXCR' ? '#fecaca' : item.WhsCode === 'QX' ? '#bbf7d0' : '#bfdbfe'}`,
+                          background: item.WhsCode?.endsWith('CR') ? '#fee2e2' : item.WhsCode?.endsWith('CM') ? '#f3e8ff' : item.WhsCode === 'QX' ? '#dcfce7' : item.WhsCode === 'FAR' ? '#dbeafe' : '#f1f5f9',
+                          color: item.WhsCode?.endsWith('CR') ? '#991b1b' : item.WhsCode?.endsWith('CM') ? '#6b21a8' : item.WhsCode === 'QX' ? '#166534' : item.WhsCode === 'FAR' ? '#1d4ed8' : '#334155',
+                          border: `1px solid ${item.WhsCode?.endsWith('CR') ? '#fecaca' : item.WhsCode?.endsWith('CM') ? '#e9d5ff' : item.WhsCode === 'QX' ? '#bbf7d0' : item.WhsCode === 'FAR' ? '#bfdbfe' : '#cbd5e1'}`,
                           padding: '0.2rem 0.45rem',
                           borderRadius: '6px',
                           fontSize: '0.72rem',

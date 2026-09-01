@@ -43,16 +43,36 @@ router.get('/master-outputs', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
 
 const sapInventoryService = require('../services/sapInventory.service');
 
+const CR_LOCATION_CODES = ['QXCR', 'QXRCR', 'TERACR', 'PPBCR', 'PPACR', 'IMAGCR', 'CARDIOCR', 'CUNACR', 'URG1CR', 'URG2CR'];
+const CM_LOCATION_CODES = ['QXCM', 'URG1CM'];
+
 const STOCK_LOCATIONS = {
   FAR: 'Farmacia',
   QX: 'Quirófano',
-  QXCR: 'Carro Rojo'
+  QXCR: 'Quirófano Carro Rojo',
+  QXRCR: 'Recuperación Carro Rojo',
+  TERACR: 'Terapia Intensiva Carro Rojo',
+  PPBCR: 'Privados PB Carro Rojo',
+  PPACR: 'Privados PA Carro Rojo',
+  IMAGCR: 'Imagen Carro Rojo',
+  CARDIOCR: 'Cardio Carro Rojo',
+  CUNACR: 'Cunas Carro Rojo',
+  URG1CR: 'Urgencias 1 Carro Rojo',
+  URG2CR: 'Urgencias 2 Carro Rojo',
+  QXCM: 'Quirófano Código Mater',
+  URG1CM: 'Urgencias 1 Código Mater'
 };
 
 const STOCK_LOCATION_CODES = Object.keys(STOCK_LOCATIONS);
 
 function normalizeWarehouseFilter(value) {
   const warehouse = String(value || 'FAR').trim().toUpperCase();
+  if (warehouse === 'ALL_CR') {
+    return CR_LOCATION_CODES;
+  }
+  if (warehouse === 'ALL_CM') {
+    return CM_LOCATION_CODES;
+  }
   if (warehouse === 'FAR_QX' || warehouse === 'FAR_QX_QXCR' || warehouse === 'MEDICAMENTOS') {
     return STOCK_LOCATION_CODES;
   }
@@ -78,10 +98,14 @@ function getStockLocations(itemCode) {
     }))
     .filter(location => location.QuantityOnStock > 0);
 
+  const totalCarroRojo = CR_LOCATION_CODES.reduce((sum, c) => sum + (totals[c] || 0), 0);
+  const totalCodigoMater = CM_LOCATION_CODES.reduce((sum, c) => sum + (totals[c] || 0), 0);
+
   return {
     stock_farmacia: totals.FAR || 0,
     stock_quirofano: totals.QX || 0,
-    stock_carro_rojo: totals.QXCR || 0,
+    stock_carro_rojo: totalCarroRojo,
+    stock_codigo_mater: totalCodigoMater,
     stock_ubicaciones: locations,
     stock_fuente: locations.map(location => location.WhsCode).join(', ') || 'SIN_STOCK'
   };
