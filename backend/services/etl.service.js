@@ -38,18 +38,18 @@ const sapService = require('./sap.service');
         ),
         DevolucionesFarmacia AS (
             SELECT
-                PCPR.PCPRNum AS Orden,
+                COALESCE(PCPR.PCPRNum, PCIT.PCPRITNum, PC.PCNum) AS Orden,
                 PC.PCNum AS Cuenta,
                 PT.FullName AS Paciente,
-                VFR.FRName AS Cama,
-                PCPRIT.ItemCode AS Codigo,
-                VIT.ItemDescription AS Insumo,
+                COALESCE(VFR.FRName, CASE WHEN PC.PCType = 'ER' THEN 'URGENCIAS' ELSE 'HOSPITALIZACION' END) AS Cama,
+                PCIT.ItemCode AS Codigo,
+                COALESCE(VIT.ItemDescription, PCIT.ItemCode) AS Insumo,
                 PCIT.Quantity AS CantidadDevuelta,
-                PCPRIT.Quantity AS CantidadOriginal,
+                COALESCE(PCPRIT.Quantity, PCIT.Quantity) AS CantidadOriginal,
                 PCIT.UnitPrice AS PrecioUnitario,
                 PCIT.UnitPrice * PCIT.Quantity AS Monto,
-                (PCPRIT.Quantity - PCIT.Quantity) * PCIT.UnitPrice AS MontoCobrado,
-                PCPR.CreatedBy AS UsuarioDevuelve,
+                (COALESCE(PCPRIT.Quantity, PCIT.Quantity) - PCIT.Quantity) * PCIT.UnitPrice AS MontoCobrado,
+                COALESCE(PCPR.CreatedBy, 'FARMACIA') AS UsuarioDevuelve,
                 PCIT.CreatedOn AS CreatedOn, -- Used for filtering
                 PCIT.CreatedOn AS FechaDevolucion,
                 
@@ -59,7 +59,7 @@ const sapService = require('./sap.service');
                     WHEN 'DR' THEN 'BORRADOR'
                     WHEN 'OP' THEN 'ABIERTO'
                     WHEN 'PR' THEN 'PROCESADA'
-                    ELSE 'CANCELADO'
+                    ELSE CASE WHEN PC.PCType = 'ER' THEN 'CONFIRMADO (URG)' ELSE 'PROCESADA' END
                 END AS Estado,
                 
                 CASE PCIT.PCIT_ST
@@ -69,7 +69,7 @@ const sapService = require('./sap.service');
                     ELSE 'PENDIENTE'
                 END AS EstadoLinea,
                 
-                PR.FullName AS Medico,
+                COALESCE(PR.FullName, 'MEDICO TRATANTE') AS Medico,
                 
                 SP.Status   AS EProcesa,
                 SP.UserName AS UsuarioProceso,
@@ -82,13 +82,14 @@ const sapService = require('./sap.service');
                 PCPRBT.BatchCode AS Lote,
                 PCPRBT.ExpirationDate AS Caducidad,
                 PC.BirthDate AS FechaNacimiento,
+                PC.PCType AS TipoAtencion,
                 (PCIT.UnitPrice * PCIT.Quantity) * (ISNULL((
                     SELECT TOP 1 TX.TaxRate 
                     FROM dbo.CERP_TX TX
                     WHERE TX.TaxCode = (
                         SELECT TOP 1 A.TaxCodeSales 
                         FROM dbo.V_ITPR A 
-                        WHERE A.ItemCode = PCPRIT.ItemCode
+                        WHERE A.ItemCode = PCIT.ItemCode
                     )
                 ), 0) / 100.0) AS IVA,
                 (PCIT.UnitPrice * PCIT.Quantity) * ((ISNULL((
@@ -97,17 +98,17 @@ const sapService = require('./sap.service');
                     WHERE TX.TaxCode = (
                         SELECT TOP 1 A.TaxCodeSales 
                         FROM dbo.V_ITPR A 
-                        WHERE A.ItemCode = PCPRIT.ItemCode
+                        WHERE A.ItemCode = PCIT.ItemCode
                     )
                 ), 0) / 100.0) + 1) AS TotalLinea
             FROM dbo.PCIT PCIT
-            INNER JOIN dbo.PCPRIT PCPRIT ON PCIT.PCPRITNum = PCPRIT.PCPRITNum AND PCIT.ItemCode  = PCPRIT.ItemCode
-            INNER JOIN dbo.PCPR PCPR ON PCPRIT.PCPRNum = PCPR.PCPRNum
-            INNER JOIN dbo.PC PC ON PCPR.PCNum = PC.PCNum
+            INNER JOIN dbo.PC PC ON PCIT.PCNum = PC.PCNum
             INNER JOIN dbo.PT PT ON PC.PTNum = PT.PTNum
-            INNER JOIN dbo.PR PR ON PCPR.PR_PC = PR.PRNum
+            LEFT JOIN dbo.PCPRIT PCPRIT ON PCIT.PCPRITNum = PCPRIT.PCPRITNum AND PCIT.ItemCode = PCPRIT.ItemCode
+            LEFT JOIN dbo.PCPR PCPR ON PCPRIT.PCPRNum = PCPR.PCPRNum
+            LEFT JOIN dbo.PR PR ON COALESCE(PCPR.PR_PC, PC.PRNum) = PR.PRNum
             LEFT JOIN dbo.PCPRBT PCPRBT ON PCPRBT.PCPRNum = PCPR.PCPRNum AND PCPRBT.PCPRITNum = PCPRIT.PCPRITNum
-            LEFT JOIN dbo.V_IT VIT ON PCPRIT.ItemCode = VIT.ItemCode
+            LEFT JOIN dbo.V_IT VIT ON PCIT.ItemCode = VIT.ItemCode
             LEFT JOIN dbo.PCBL PCBL ON PCPRIT.PCPRITNum = PCBL.PCPRITNum
             LEFT JOIN dbo.V_FR VFR ON PCBL.FRCode = VFR.FRCode
             LEFT JOIN STLG SA ON SA.ControllerKey = PCPR.PCPRNum AND SA.Status = N'OP' AND SA.RN = 1

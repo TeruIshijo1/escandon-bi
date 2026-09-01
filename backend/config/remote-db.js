@@ -21,7 +21,8 @@ const dbConfig = {
   },
   options: {
     encrypt: false, // Desactivado para EC2 sin certificado SSL oficial configurado
-    trustServerCertificate: true // Confiar en el certificado autofirmado si existiera
+    trustServerCertificate: true, // Confiar en el certificado autofirmado si existiera
+    useUTC: false // Tratar las fechas de SQL Server en hora local del hospital
   }
 };
 
