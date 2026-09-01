@@ -41,16 +41,50 @@ async function syncMLDataset() {
       return s.total > 0 ? s.total : s.hospitalTotal;
     };
 
-    // 2. Obtener Universo de SKUs (dw_sap_reorder_settings) con deduplicación por itemcode
+    // 2. Obtener Universo de SKUs: combinar inventario SAP con dw_sap_reorder_settings
+    const sapItems = sapInventoryService.getInventoryCache();
+    const skuMap = new Map();
+
+    // Primero cargar todos los artículos de inventario SAP
+    sapItems.forEach(item => {
+      const code = (item.ItemCode || '').trim();
+      if (code) {
+        skuMap.set(code.toUpperCase(), {
+          itemcode: code,
+          itemdescription: item.ItemName || code,
+          minstock: 0,
+          maxstock: 0
+        });
+      }
+    });
+
+    // Luego cruzar y enriquecer con configuraciones personalizadas de dw_sap_reorder_settings
     const pgResSettings = await pool.query(`
-      SELECT DISTINCT ON (UPPER(TRIM(itemcode))) 
-        itemcode, itemdescription, minstock, maxstock 
+      SELECT itemcode, itemdescription, minstock, maxstock 
       FROM dw_sap_reorder_settings
-      ORDER BY UPPER(TRIM(itemcode)), lastupdated DESC NULLS LAST
     `);
-    const skus = pgResSettings.rows;
+    pgResSettings.rows.forEach(r => {
+      const code = (r.itemcode || '').trim().toUpperCase();
+      if (code) {
+        const existing = skuMap.get(code);
+        if (existing) {
+          existing.minstock = Number(r.minstock || 0);
+          existing.maxstock = Number(r.maxstock || 0);
+          if (r.itemdescription) existing.itemdescription = r.itemdescription;
+        } else {
+          skuMap.set(code, {
+            itemcode: r.itemcode,
+            itemdescription: r.itemdescription || r.itemcode,
+            minstock: Number(r.minstock || 0),
+            maxstock: Number(r.maxstock || 0)
+          });
+        }
+      }
+    });
+
+    const skus = Array.from(skuMap.values());
     if (skus.length === 0) {
-      console.log('[ML Dataset] No hay registros en dw_sap_reorder_settings. Sincronización cancelada.');
+      console.log('[ML Dataset] No hay registros de SKUs en SAP ni en dw_sap_reorder_settings. Sincronización cancelada.');
       return 0;
     }
 

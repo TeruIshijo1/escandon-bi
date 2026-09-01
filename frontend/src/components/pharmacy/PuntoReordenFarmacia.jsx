@@ -715,6 +715,85 @@ export default function PuntoReordenFarmacia() {
     link.click();
   };
 
+  const exportExcelConfigDinamica = () => {
+    const list = mlDataset.filter(item => {
+      const isFar = String(item.itemcode || '').toUpperCase().startsWith('FAR');
+      if (!isFar) return false;
+      const term = (searchTerm || '').toLowerCase().trim();
+      if (!term) return true;
+      return (item.itemcode?.toLowerCase() || '').includes(term) || (item.itemdescription?.toLowerCase() || '').includes(term);
+    });
+
+    if (list.length === 0) {
+      alert('No hay artículos de Farmacia para exportar.');
+      return;
+    }
+
+    const fechaReporte = new Date().toLocaleString('es-MX');
+    const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse;width:100%}
+  .title-bar{background:#004687;color:#fff;font-size:16pt;font-weight:bold;padding:12px 16px}
+  .subtitle-bar{background:#0088C9;color:#fff;font-size:11pt;font-weight:bold;padding:6px 16px}
+  .info-row td{font-size:9pt;color:#475569;padding:4px 16px}
+  th{background:#004687;color:#fff;font-weight:bold;font-size:9.5pt;padding:9px 8px;border:1px solid #003366;text-align:center}
+  td{padding:6px 8px;font-size:8.5pt;border:1px solid #D1D5DB;color:#1E293B}
+  .even{background:#F4F6F9}.odd{background:#FFF}
+  .min-col{background:#FEE2E2;color:#991B1B;font-weight:bold;text-align:center}
+  .reo-col{background:#DCFCE7;color:#166534;font-weight:bold;text-align:center}
+  .max-col{background:#E0F2FE;color:#0369A1;font-weight:bold;text-align:center}
+  .num{text-align:center;font-weight:bold}
+  .total-row td{background:#E0EAF4;font-weight:bold;color:#004687;border-top:2px solid #004687;font-size:9.5pt;padding:10px 8px}
+</style></head><body>
+<table>
+  <tr><td colspan="7" class="title-bar">HOSPITAL ESCANDÓN — FARMACIA</td></tr>
+  <tr><td colspan="7" class="subtitle-bar">Configuración Dinámica de Reorden basada en Consumo Real SAP</td></tr>
+  <tr class="info-row"><td colspan="7">Total SKUs: ${list.length} &nbsp;|&nbsp; Fecha de Generación: ${fechaReporte}</td></tr>
+  <tr><td colspan="7" style="height:6px;border:none"></td></tr>
+  <tr>
+    <th style="width:130px">CÓDIGO SAP</th>
+    <th style="width:340px">DESCRIPCIÓN</th>
+    <th style="width:130px">CONSUMO 30D</th>
+    <th style="width:120px">DIARIO PROM.</th>
+    <th style="width:120px">MÍN (7 DÍAS)</th>
+    <th style="width:130px">REORDEN (10.5 DÍAS)</th>
+    <th style="width:120px">MÁX (14 DÍAS)</th>
+  </tr>
+  ${list.map((r, i) => {
+    const cd = Number(r.consumo_promedio_diario) || 0;
+    const m7 = Math.ceil(cd * 7);
+    const r10 = Math.ceil(cd * 10.5);
+    const m14 = Math.ceil(cd * 14);
+    return `<tr class="${i%2===0?'even':'odd'}">
+      <td style="font-weight:bold">${r.itemcode || ''}</td>
+      <td>${(r.itemdescription || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td class="num">${Number(r.consumo_30d) || 0}</td>
+      <td class="num">${cd.toFixed(3)}</td>
+      <td class="min-col">${m7}</td>
+      <td class="reo-col">${r10}</td>
+      <td class="max-col">${m14}</td>
+    </tr>`;
+  }).join('')}
+  <tr class="total-row">
+    <td colspan="2">TOTAL SKUs ACTIVOS: ${list.length}</td>
+    <td class="num">${list.reduce((acc, curr) => acc + (Number(curr.consumo_30d) || 0), 0)}</td>
+    <td colspan="4"></td>
+  </tr>
+</table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Configuracion_Dinamica_Farmacia_${new Date().toISOString().slice(0,10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const exportToExcel = () => {
     const fechaReporte = new Date().toLocaleString('es-MX');
     const rowsToExport = filteredItems;
@@ -734,18 +813,18 @@ export default function PuntoReordenFarmacia() {
 </style></head><body>
 <table>
   <tr><td colspan="9" class="title-bar">HOSPITAL ESCANDÓN - PLATAFORMA BI</td></tr>
-  <tr><td colspan="9" class="subtitle-bar">Control de Inventario - Punto de Reorden y Pedidos SAP</td></tr>
+  <tr><td colspan="9" class="subtitle-bar">Farmacia - Punto de Reorden y Pedidos SAP</td></tr>
   <tr><td colspan="9" style="font-size:9pt;color:#64748b;padding:6px 0">Fecha de reporte: ${fechaReporte} | Insumos Requeridos: ${stats.reordenCount}</td></tr>
   <tr>
     <th>CODIGO SAP</th>
     <th>DESCRIPCION DE MATERIAL</th>
     <th>INSUMOS MINIMOS</th>
     <th>INSUMOS MAXIMOS</th>
-    <th>EXISTENCIAS SISTEMA</th>
+    <th>EXISTENCIAS FARMACIA</th>
     <th>CALCULO PROMEDIO</th>
     <th>SOLICITUD COMPRA</th>
     <th>PEDIDOS SAP EN CURSO</th>
-    <th>NOTAS DE ALMACEN</th>
+    <th>NOTAS DE FARMACIA</th>
   </tr>
   ${rowsToExport.map(r => {
     const pedidosStr = (r.PedidosEnCurso || []).map(p => `${p.tipo} #${p.folio} (${p.cantPendiente} pzas por ${p.usuario})`).join('; ');
@@ -767,7 +846,7 @@ export default function PuntoReordenFarmacia() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Punto_de_Reorden_Almacen_${new Date().toISOString().slice(0,10)}.xls`);
+    link.setAttribute('download', `Punto_de_Reorden_Farmacia_${new Date().toISOString().slice(0,10)}.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1941,20 +2020,7 @@ onClick={() => fetchPedidosData(true)}
             </div>
             <div>
               <button
-                onClick={() => {
-                  const headers = ['CÓDIGO SAP', 'DESCRIPCIÓN', 'CONSUMO MENSUAL', 'CONSUMO DIARIO', 'PUNTO MIN (7 DÍAS)', 'PUNTO REORDEN (10.5 DÍAS)', 'PUNTO MAX (14 DÍAS)'];
-                  const rows = [headers.join(',')];
-                  mlDataset.forEach(row => {
-                    const consDiario = Number(row.consumo_promedio_diario) || 0;
-                    rows.push(`"${row.itemcode}","${row.itemdescription}",${Number(row.consumo_30d) || 0},${consDiario.toFixed(2)},${Math.ceil(consDiario * 7)},${Math.ceil(consDiario * 10.5)},${Math.ceil(consDiario * 14)}`);
-                  });
-                  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-                  const url = URL.createObjectURL(blob);
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = 'catalogo_farmacia_reorden.csv';
-                  link.click();
-                }}
+                onClick={exportExcelConfigDinamica}
                 style={{ padding: '0.8rem 1.5rem', background: '#10b981', color: 'white', border: '1px solid #059669', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(16,185,129,0.3)' }}
                 onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
                 onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
@@ -1977,7 +2043,7 @@ onClick={() => fetchPedidosData(true)}
                 onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
               />
               <span style={{ marginLeft: '1rem', color: '#64748b', fontSize: '0.9rem', fontWeight: '500' }}>
-                Mostrando {mlDataset.filter(item => (item.itemcode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (item.itemdescription?.toLowerCase() || '').includes(searchTerm.toLowerCase())).length} productos del catálogo SAP.
+                Mostrando {mlDataset.filter(item => String(item.itemcode || '').toUpperCase().startsWith('FAR') && ((item.itemcode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (item.itemdescription?.toLowerCase() || '').includes(searchTerm.toLowerCase()))).length} productos de Farmacia en SAP.
               </span>
             </div>
 
@@ -1996,7 +2062,7 @@ onClick={() => fetchPedidosData(true)}
                 </thead>
                 <tbody>
                   {mlDataset
-                    .filter(item => (item.itemcode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (item.itemdescription?.toLowerCase() || '').includes(searchTerm.toLowerCase()))
+                    .filter(item => String(item.itemcode || '').toUpperCase().startsWith('FAR') && ((item.itemcode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (item.itemdescription?.toLowerCase() || '').includes(searchTerm.toLowerCase())))
                     .map((row, i) => {
                     const consDiario = Number(row.consumo_promedio_diario) || 0;
                     const min7 = Math.ceil(consDiario * 7);

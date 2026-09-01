@@ -861,13 +861,62 @@ router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
       });
     });
 
-    // 2. Cruzar con tabla de settings en PostgreSQL
+    // 2. Obtener Universo de Artículos de Farmacia (Almacén FAR y códigos FAR%)
+    const farInventoryItems = sapInventoryService.getInventoryCache()
+      .filter(i => i.WhsCode === 'FAR' || (i.ItemCode && String(i.ItemCode).toUpperCase().startsWith('FAR')));
+    
+    // Obtener configuraciones de settings de PostgreSQL para Farmacia
     const pgResSettings = await pool.query(`
       SELECT itemcode AS "ItemCode", itemdescription AS "ItemDescription", minstock AS "MinStock", maxstock AS "MaxStock", note AS "Note", customsolicitud AS "CustomSolicitud", lastupdated AS "LastUpdated" 
       FROM dw_sap_reorder_settings 
+      WHERE UPPER(TRIM(itemcode)) LIKE 'FAR%'
       ORDER BY itemcode ASC
     `);
-    const settings = pgResSettings.rows;
+
+    // Mapear catálogo consolidado exclusivamente de Farmacia
+    const uniqueFarMap = new Map();
+    farInventoryItems.forEach(i => {
+      const code = (i.ItemCode || '').trim().toUpperCase();
+      if (code && !uniqueFarMap.has(code)) {
+        uniqueFarMap.set(code, {
+          ItemCode: i.ItemCode,
+          ItemDescription: i.ItemName || i.ItemCode,
+          MinStock: 0,
+          MaxStock: 0,
+          Note: '',
+          CustomSolicitud: null,
+          LastUpdated: null
+        });
+      }
+    });
+
+    // Enriquecer con configuraciones guardadas de dw_sap_reorder_settings
+    pgResSettings.rows.forEach(s => {
+      const code = (s.ItemCode || '').trim().toUpperCase();
+      if (code && code.startsWith('FAR')) {
+        if (!uniqueFarMap.has(code)) {
+          uniqueFarMap.set(code, {
+            ItemCode: s.ItemCode,
+            ItemDescription: s.ItemDescription || s.ItemCode,
+            MinStock: Number(s.MinStock || 0),
+            MaxStock: Number(s.MaxStock || 0),
+            Note: s.Note || '',
+            CustomSolicitud: s.CustomSolicitud,
+            LastUpdated: s.LastUpdated
+          });
+        } else {
+          const item = uniqueFarMap.get(code);
+          item.MinStock = Number(s.MinStock || 0);
+          item.MaxStock = Number(s.MaxStock || 0);
+          item.Note = s.Note || '';
+          item.CustomSolicitud = s.CustomSolicitud;
+          item.LastUpdated = s.LastUpdated;
+          if (s.ItemDescription) item.ItemDescription = s.ItemDescription;
+        }
+      }
+    });
+
+    const settings = Array.from(uniqueFarMap.values()).sort((a, b) => a.ItemCode.localeCompare(b.ItemCode));
     
     let reorderList = [];
     let itemsRequiringPurchase = 0;
@@ -875,19 +924,15 @@ router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
     let itemsWithActiveOrder = 0;
 
     for (const item of settings) {
+      // Garantizar que únicamente procesamos artículos de Farmacia (FAR)
+      if (!item.ItemCode || !String(item.ItemCode).toUpperCase().startsWith('FAR')) continue;
+
       const sapItem = inventoryMap.get(item.ItemCode);
-      // Stock de Farmacia (almacén FAR) si el artículo existe ahí;
-      // si no, se usa el total entre almacenes (p.ej. códigos ALG heredados)
       const farRows = sapInventoryService.getInventoryCache().filter(i => i.ItemCode === item.ItemCode && i.WhsCode === 'FAR');
       const farStock = farRows.reduce((acc, curr) => acc + (curr.QuantityOnStock || curr.OnHand || 0), 0);
-      let stock = farStock;
-      let stockFuente = 'FAR';
-      if (farRows.length === 0) {
-        stock = sapInventoryService.getInventoryCache()
-          .filter(i => i.ItemCode === item.ItemCode)
-          .reduce((acc, curr) => acc + (curr.QuantityOnStock || curr.OnHand || 0), 0);
-        stockFuente = 'TOTAL';
-      }
+      const stock = farStock;
+      const stockFuente = 'FAR';
+
       const minStock = Number(item.MinStock || 0);
       const maxStock = Number(item.MaxStock || 0);
       const calcPromedio = maxStock - stock;
@@ -1029,18 +1074,26 @@ router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
       syncPedidosSAP().catch(console.error);
     }
 
-    const resultList = pedidosDB.map(p => ({
-      docEntry: p.DocEntry,
-      folio: p.DocNum,
-      tipo: p.TipoNombre,
-      tipoCod: p.TipoDocumento,
-      fecha: p.FechaDoc,
-      proveedor: p.CardName || 'N/A',
-      usuario: p.UsuarioNombre,
-      total: p.DocTotal || 0,
-      estatus: p.EstatusTexto,
-      items: JSON.parse(p.ItemsJSON || '[]')
-    }));
+    const resultList = [];
+    pedidosDB.forEach(p => {
+      let items = [];
+      try { items = JSON.parse(p.ItemsJSON || '[]'); } catch(e) {}
+      const farItems = items.filter(it => it.itemCode && String(it.itemCode).toUpperCase().startsWith('FAR'));
+      if (farItems.length > 0) {
+        resultList.push({
+          docEntry: p.DocEntry,
+          folio: p.DocNum,
+          tipo: p.TipoNombre,
+          tipoCod: p.TipoDocumento,
+          fecha: p.FechaDoc,
+          proveedor: p.CardName || 'N/A',
+          usuario: p.UsuarioNombre,
+          total: p.DocTotal || 0,
+          estatus: p.EstatusTexto,
+          items: farItems
+        });
+      }
+    });
 
     res.json({ ok: true, data: resultList });
   } catch (err) {
@@ -1052,7 +1105,7 @@ router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
 
 /**
  * GET /api/pharmacy/ml-dataset
- * Retorna el dataset analítico completo ordenado por nivel de riesgo
+ * Retorna el dataset analítico completo ordenado por nivel de riesgo para Farmacia (FAR)
  */
 router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
@@ -1075,6 +1128,7 @@ router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
         riesgo_base AS "riesgo_base",
         fecha_calculo AS "fecha_calculo"
       FROM ml_dataset_reorden_sku
+      WHERE UPPER(TRIM(itemcode)) LIKE 'FAR%'
       ORDER BY 
         CASE riesgo_base 
           WHEN 'CRITICO' THEN 1
@@ -1107,6 +1161,7 @@ router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
           riesgo_base AS "riesgo_base",
           fecha_calculo AS "fecha_calculo"
         FROM ml_dataset_reorden_sku
+        WHERE UPPER(TRIM(itemcode)) LIKE 'FAR%'
         ORDER BY 
           CASE riesgo_base 
             WHEN 'CRITICO' THEN 1
@@ -1114,8 +1169,8 @@ router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
             WHEN 'MEDIO' THEN 3
             ELSE 4 
           END, 
-          dias_stock_restante ASC,
-          itemcode ASC
+            dias_stock_restante ASC,
+            itemcode ASC
       `);
     }
 
@@ -1174,6 +1229,7 @@ router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
         target_desabasto_15d AS "target_desabasto_15d",
         fecha_calculo AS "fecha_calculo"
       FROM ml_dataset_reorden_sku_history
+      WHERE UPPER(TRIM(itemcode)) LIKE 'FAR%'
       ORDER BY snapshot_date DESC, itemcode ASC
     `);
     const filteredData = pgRes.rows.map(row => enrichWithStockLocations(row));
@@ -1198,6 +1254,7 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
         consumo_promedio_diario, variabilidad_consumo, minstock, maxstock, pedidos_abiertos, 
         fecha_ultimo_movimiento, fecha_desabasto, dias_stock_restante, riesgo_base, target_desabasto_7d, target_desabasto_15d, fecha_calculo
       FROM ml_dataset_reorden_sku_history
+      WHERE UPPER(TRIM(itemcode)) LIKE 'FAR%'
       ORDER BY snapshot_date DESC, itemcode ASC
     `);
     
@@ -1217,7 +1274,6 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
         } else if (val instanceof Date) {
           val = val.toISOString();
         } else if (h === 'snapshot_date') {
-          // Format snapshot_date as YYYY-MM-DD
           val = new Date(val).toISOString().split('T')[0];
         } else {
           val = String(val);
@@ -1232,7 +1288,7 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
     });
     
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="ml_dataset_reorden_sku_history.csv"');
+    res.setHeader('Content-Disposition', 'attachment; filename="ml_dataset_reorden_sku_history_farmacia.csv"');
     res.send(csv);
   } catch (err) {
     console.error('[GET Download ML History Error]', err);
@@ -1264,6 +1320,7 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
         fecha_estimada_agotamiento AS "fecha_estimada_agotamiento",
         fecha_prediccion AS "fecha_prediccion"
       FROM ml_predictions_reorden_sku
+      WHERE UPPER(TRIM(itemcode)) LIKE 'FAR%'
       ORDER BY prob_desabasto_7d DESC, itemcode ASC
     `);
     const filteredData = pgRes.rows.map(row => enrichWithStockLocations(row));
