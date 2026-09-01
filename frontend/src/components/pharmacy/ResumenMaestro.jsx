@@ -135,7 +135,7 @@ export default function ResumenMaestro() {
   `;
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ padding: '0.5rem 0', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       <style>{tableStyles}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>

@@ -155,7 +155,7 @@ export default function CargosSAP() {
   `;
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1500px', margin: '0 auto' }}>
+    <div style={{ padding: '0.5rem 0', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       <style>{tableStyles}</style>
 
       {/* ── Encabezado ── */}

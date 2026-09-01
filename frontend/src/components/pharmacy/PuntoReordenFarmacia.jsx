@@ -775,7 +775,7 @@ export default function PuntoReordenFarmacia() {
   };
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1450px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ padding: '0.5rem 0', width: '100%', maxWidth: '100%', boxSizing: 'border-box', fontFamily: 'Inter, sans-serif' }}>
       
       {/* Estilos dinámicos para soporte de tema claro/oscuro */}
       <style>{`
