@@ -21,6 +21,7 @@ const upload = multer({
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,  // 1 minuto
   max:      20,
+  validate: { xForwardedForHeader: false, trustProxy: false },
   message: { error: 'Límite de consultas a Mar-IA alcanzado. Espere 1 minuto.' },
   keyGenerator: (req) => req.user?.id || req.ip,
 });

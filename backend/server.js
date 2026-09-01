@@ -36,6 +36,9 @@ const { syncAllDashboards, initDashboardCron } = require('./services/dashboardSy
 const app  = express();
 const PORT = process.env.PORT || 4000;
 
+// Habilitar trust proxy para Tailscale Serve/Funnel, Nginx y túneles inversos
+app.set('trust proxy', 1);
+
 /* ── Seguridad global ───────────────────────────────────────── */
 app.use(helmet({
   contentSecurityPolicy: {
@@ -84,14 +87,19 @@ app.use(cors({
 /* ── Rate limiting global ───────────────────────────────────── */
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 min
-  max:      300,
+  max:      500,
   standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, trustProxy: false },
   message: { message: 'Demasiadas solicitudes. Intente en 15 minutos.', error: 'Demasiadas solicitudes. Intente en 15 minutos.' },
 });
 
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 min
   max:      200, // Límite alto por si están detrás del mismo NAT del hospital
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, trustProxy: false },
   message: { message: 'Demasiados intentos de autenticación. Intente más tarde.', error: 'Demasiados intentos de autenticación. Intente más tarde.' },
 });
 
