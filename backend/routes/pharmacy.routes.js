@@ -671,10 +671,9 @@ router.get('/doctor-variations', authenticate, authorize(['ADMIN', 'DIRECTOR', '
     res.status(500).json({ ok: false, error: 'Error interno al consultar variaciones por médico desde DW' });
   }
 });
-
 /**
  * GET /api/pharmacy/quirofano-inventory
- * Stock en tiempo real del Almacén Quirófano (QX) y Quirófano Controlados (QXCR)
+ * Stock en tiempo real del Almacén Quirófano (QX), Recuperación, Carros Rojos y Código Mater
  */
 router.get('/quirofano-inventory', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
@@ -682,19 +681,27 @@ router.get('/quirofano-inventory', authenticate, authorize(['ADMIN', 'DIRECTOR',
     await sapInventoryService.ensureInventoryData();
     const cache = sapInventoryService.getInventoryCache();
     
-    // Filtrar solo insumos con presencia en almacenes QX y QXCR
-    const qxItems = cache.filter(item => item.WhsCode === 'QX' || item.WhsCode === 'QXCR');
+    // Almacenes de Quirófano, Recuperación, Carros Rojos, Código Mater y CEYE
+    const qxWhsCodes = ['QX', 'QXCR', 'QXRCR', 'QXCM', 'CEYE', 'TERACR', 'IMAGCR', 'PPBCR', 'PPACR', 'CARDIOCR', 'CUNACR', 'URG1CR', 'URG2CR', 'URG1CM'];
+    
+    const qxItems = cache.filter(item => qxWhsCodes.includes(item.WhsCode));
 
     // Calcular estadísticas
     let totalItems = qxItems.length;
     let totalStock = 0;
     let totalValue = 0;
     let qxcrCount = 0;
+    let qxrcrCount = 0;
+    let qxcmCount = 0;
+    let ceyeCount = 0;
 
     qxItems.forEach(item => {
       totalStock += item.QuantityOnStock || 0;
       totalValue += (item.QuantityOnStock || 0) * (item.SalesPrice || 0);
       if (item.WhsCode === 'QXCR') qxcrCount++;
+      if (item.WhsCode === 'QXRCR') qxrcrCount++;
+      if (item.WhsCode === 'QXCM' || item.WhsCode === 'URG1CM') qxcmCount++;
+      if (item.WhsCode === 'CEYE') ceyeCount++;
     });
 
     res.json({
@@ -704,7 +711,10 @@ router.get('/quirofano-inventory', authenticate, authorize(['ADMIN', 'DIRECTOR',
         totalItems,
         totalStock,
         totalValue: Math.round(totalValue * 100) / 100,
-        qxcrCount
+        qxcrCount,
+        qxrcrCount,
+        qxcmCount,
+        ceyeCount
       }
     });
   } catch (err) {
@@ -750,7 +760,7 @@ router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR',
         INNER JOIN PT pt ON c.PTNum = pt.PTNum
         LEFT JOIN PR pr ON p.PR_PC_ID = pr.PRID
         LEFT JOIN UDR_USOQX q ON p.PCFRNum = q.PCFRNum
-        WHERE (i.WarehouseCode IN ('QX', 'QXCR') OR p.SUCode = 'CQX' OR p.SUCodeReq = 'CQX')
+        WHERE (i.WarehouseCode IN ('QX', 'QXCR', 'QXRCR', 'QXCM', 'CEYE', 'TERACR', 'IMAGCR', 'PPBCR', 'PPACR', 'CARDIOCR', 'CUNACR', 'URG1CR', 'URG2CR', 'URG1CM') OR p.SUCode = 'CQX' OR p.SUCodeReq = 'CQX')
           AND p.CreatedOn >= DATEADD(day, -${clampedDays}, GETDATE())
         ORDER BY p.CreatedOn DESC
       `);
@@ -769,21 +779,20 @@ router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR',
           COALESCE(NULLIF(LTRIM(RTRIM(q.Procedimientos)), ''), NULLIF(LTRIM(RTRIM(h.Notes)), ''), 'DEVOLUCION DE MATERIAL / RETORNO QX') AS Procedimiento,
           l.CreatedOn AS Fecha,
           l.ItemCode AS Codigo,
-          COALESCE(NULLIF(LTRIM(RTRIM(l.ItemDescription)), ''), 'Material Quirúrgico') AS Medicamento,
-          -ABS(l.Quantity) AS Cantidad,
+          COALESCE(NULLIF(LTRIM(RTRIM(l.ItemDescription)), ''), 'Material Quirúrgico Retornado') AS Medicamento,
+          b.Quantity AS Cantidad,
           COALESCE(l.WarehouseCode, 'QX') AS Almacen,
-          'DEVOLUCION' AS TipoMovimiento
-        FROM PCDLBL l
-        INNER JOIN PCDL h ON l.PCDLNum = h.PCDLNum
-        LEFT JOIN PC c ON h.PCNum = c.PCNum
-        LEFT JOIN PT pt ON c.PTNum = pt.PTNum
+          'DEVOLUCION_RETORNO' AS TipoMovimiento
+        FROM PCDL h
+        INNER JOIN PCDLIT l ON h.PCDLNum = l.PCDLNum
+        INNER JOIN PCDLBT b ON l.PCDLITNum = b.PCDLITNum
+        INNER JOIN PC c ON h.PCNum = c.PCNum
+        INNER JOIN PT pt ON c.PTNum = pt.PTNum
         LEFT JOIN UDR_USOQX q ON h.PCFRNum = q.PCFRNum
         WHERE (
-          l.WarehouseCode IN ('QX', 'QXCR') 
-          OR l.U_SUCode = 'CQX' 
-          OR l.ItemCode LIKE 'QUI%' 
-          OR l.U_FRCode LIKE '%QX%'
-          OR l.U_FRCode LIKE '%QUIRO%'
+          l.WarehouseCode IN ('QX', 'QXCR', 'QXRCR', 'QXCM', 'CEYE', 'TERACR', 'IMAGCR', 'PPBCR', 'PPACR', 'CARDIOCR', 'CUNACR', 'URG1CR', 'URG2CR', 'URG1CM') 
+          OR h.SUCode = 'CQX' 
+          OR h.SUCodeReq = 'CQX'
         )
         AND l.CreatedOn >= DATEADD(day, -${clampedDays}, GETDATE())
         ORDER BY l.CreatedOn DESC

@@ -71,7 +71,16 @@ export default function AlmacenQuirofano() {
                           (item.ItemCode || '').toLowerCase().includes(q) ||
                           (item.ItemName || '').toLowerCase().includes(q) ||
                           (item.ItemGroupName || '').toLowerCase().includes(q);
-      const matchWhs = warehouseFilter === 'ALL' || item.WhsCode === warehouseFilter;
+      let matchWhs = false;
+      if (warehouseFilter === 'ALL') {
+        matchWhs = true;
+      } else if (warehouseFilter === 'ALL_CR') {
+        matchWhs = item.WhsCode && item.WhsCode.endsWith('CR');
+      } else if (warehouseFilter === 'ALL_CM') {
+        matchWhs = item.WhsCode && item.WhsCode.endsWith('CM');
+      } else {
+        matchWhs = item.WhsCode === warehouseFilter;
+      }
       return matchSearch && matchWhs;
     });
   }, [stockItems, searchQuery, warehouseFilter]);
@@ -88,16 +97,26 @@ export default function AlmacenQuirofano() {
                           (m.Medicos || '').toLowerCase().includes(q) ||
                           String(m.PCFRNum || '').includes(q) ||
                           String(m.PCNum || '').includes(q);
-      const matchWhs = warehouseFilter === 'ALL' || 
-                       m.Almacen === warehouseFilter || 
-                       (warehouseFilter === 'QX' && (m.Almacen === 'CQX' || m.Almacen === 'QX'));
+      let matchWhs = false;
+      if (warehouseFilter === 'ALL') {
+        matchWhs = true;
+      } else if (warehouseFilter === 'ALL_CR') {
+        matchWhs = m.Almacen && m.Almacen.endsWith('CR');
+      } else if (warehouseFilter === 'ALL_CM') {
+        matchWhs = m.Almacen && m.Almacen.endsWith('CM');
+      } else {
+        matchWhs = m.Almacen === warehouseFilter || (warehouseFilter === 'QX' && (m.Almacen === 'CQX' || m.Almacen === 'QX'));
+      }
       return matchSearch && matchWhs;
     });
   }, [movements, searchQuery, warehouseFilter]);
 
   const exportToExcel = () => {
     const fechaReporte = new Date().toLocaleString('es-MX');
-    const whsLabel = warehouseFilter === 'ALL' ? 'Todos los Almacenes QX (QX / QXCR)' : warehouseFilter === 'QXCR' ? 'Quirófano Carro Rojo (QXCR)' : 'Quirófano General (QX)';
+    const whsLabel = warehouseFilter === 'ALL' ? 'Todos los Almacenes Quirófano' :
+                     warehouseFilter === 'ALL_CR' ? 'Todos los Carros Rojos' :
+                     warehouseFilter === 'ALL_CM' ? 'Todos los Código Mater' :
+                     warehouseFilter;
 
     if (subTab === 'inventory') {
       if (filteredStock.length === 0) {
@@ -270,10 +289,10 @@ export default function AlmacenQuirofano() {
       }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span>🏥</span> Almacén Quirófano (QX / QXCR — Carro Rojo)
+            <span>🏥</span> Almacén Quirófano (QX, Recuperación, Carros Rojos y Código Mater)
           </h2>
           <p style={{ margin: '0.4rem 0 0 0', color: '#E0F2FE', fontSize: '0.95rem', fontWeight: 500 }}>
-            Gestión en tiempo real de insumos en stock, cargos a cirugías y registro de devoluciones/retornos.
+            Gestión en tiempo real de insumos en stock, carros de paro, emergencias obstétricas y registro de devoluciones/retornos.
           </p>
         </div>
 
@@ -344,7 +363,7 @@ export default function AlmacenQuirofano() {
           }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 119, 182, 0.12)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 70, 135, 0.05)'; }}
-          title="Clic para ver todos los artículos de Quirófano (QX y QXCR)"
+          title="Clic para ver todos los artículos de Quirófano y sus áreas"
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ fontSize: '0.78rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Artículos en Stock</div>
@@ -355,7 +374,7 @@ export default function AlmacenQuirofano() {
           <div style={{ fontSize: '2rem', fontWeight: 800, color: '#0077B6', marginTop: '0.25rem' }}>
             {stockStats.totalItems || 0}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>Con existencia disponible en QX/QXCR</div>
+          <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>Existencia en QX / Carros / CEYE</div>
         </div>
 
         <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0, 70, 135, 0.05)' }}>
@@ -376,47 +395,47 @@ export default function AlmacenQuirofano() {
 
         <div 
           onClick={() => {
-            if (warehouseFilter === 'QXCR' && subTab === 'inventory') {
+            if ((warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory') {
               setWarehouseFilter('ALL');
             } else {
-              setWarehouseFilter('QXCR');
+              setWarehouseFilter('ALL_CR');
               setSubTab('inventory');
             }
           }}
           style={{ 
-            background: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#FEF2F2' : '#FFFFFF', 
-            border: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '2px solid #DC2626' : '1px solid #E2E8F0', 
+            background: (warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory' ? '#FEF2F2' : '#FFFFFF', 
+            border: (warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory' ? '2px solid #DC2626' : '1px solid #E2E8F0', 
             borderRadius: '14px', 
             padding: '1.25rem', 
-            boxShadow: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '0 4px 14px rgba(220, 38, 38, 0.15)' : '0 2px 8px rgba(0, 70, 135, 0.05)',
+            boxShadow: (warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory' ? '0 4px 14px rgba(220, 38, 38, 0.15)' : '0 2px 8px rgba(0, 70, 135, 0.05)',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             position: 'relative'
           }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(220, 38, 38, 0.18)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = warehouseFilter === 'QXCR' && subTab === 'inventory' ? '0 4px 14px rgba(220, 38, 38, 0.15)' : '0 2px 8px rgba(0, 70, 135, 0.05)'; }}
-          title="Clic para filtrar y ver los artículos de Quirófano Carro Rojo (QXCR)"
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = (warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory' ? '0 4px 14px rgba(220, 38, 38, 0.15)' : '0 2px 8px rgba(0, 70, 135, 0.05)'; }}
+          title="Clic para filtrar y ver todos los artículos de Carros Rojos"
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ fontSize: '0.78rem', color: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#991B1B' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-              Quirófano Carro Rojo
+            <div style={{ fontSize: '0.78rem', color: (warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory' ? '#991B1B' : '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
+              Carros Rojos & Código Mater
             </div>
             <span style={{ 
               fontSize: '0.7rem', 
-              background: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#DC2626' : '#FEE2E2', 
-              color: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#FFFFFF' : '#DC2626', 
+              background: (warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory' ? '#DC2626' : '#FEE2E2', 
+              color: (warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory' ? '#FFFFFF' : '#DC2626', 
               padding: '0.2rem 0.55rem', 
               borderRadius: '9999px', 
               fontWeight: 700 
             }}>
-              {warehouseFilter === 'QXCR' && subTab === 'inventory' ? '✓ FILTRADO' : '🔍 VER LISTA'}
+              {(warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory' ? '✓ FILTRADO' : '🔍 VER LISTA'}
             </span>
           </div>
           <div style={{ fontSize: '2rem', fontWeight: 800, color: '#DC2626', marginTop: '0.25rem' }}>
-            {stockStats.qxcrCount || 0} artículos
+            {(stockStats.qxcrCount || 0) + (stockStats.qxrcrCount || 0) + (stockStats.qxcmCount || 0)} artículos
           </div>
-          <div style={{ fontSize: '0.8rem', color: warehouseFilter === 'QXCR' && subTab === 'inventory' ? '#B91C1C' : '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>
-            {warehouseFilter === 'QXCR' && subTab === 'inventory' ? 'Mostrando insumos QXCR en tabla ↓' : 'Almacén QXCR (Insumos Carro de Paro)'}
+          <div style={{ fontSize: '0.8rem', color: (warehouseFilter === 'QXCR' || warehouseFilter === 'ALL_CR') && subTab === 'inventory' ? '#B91C1C' : '#94A3B8', marginTop: '0.25rem', fontWeight: 500 }}>
+            {warehouseFilter === 'ALL_CR' && subTab === 'inventory' ? 'Mostrando todos los Carros Rojos en tabla ↓' : 'QXCR, QXRCR (Recuperación), QXCM'}
           </div>
         </div>
       </div>
@@ -519,9 +538,28 @@ export default function AlmacenQuirofano() {
               cursor: 'pointer'
             }}
           >
-            <option value="ALL">🏢 Todos los almacenes QX</option>
-            <option value="QX">QX — Quirófano General</option>
-            <option value="QXCR">QXCR — Quirófano Carro Rojo</option>
+            <optgroup label="Visión Global">
+              <option value="ALL">🏢 Todos los almacenes Quirófano</option>
+              <option value="ALL_CR">🚨 Todos los Carros Rojos</option>
+              <option value="ALL_CM">🤰 Todos los Código Mater</option>
+            </optgroup>
+            <optgroup label="Quirófano & Recuperación">
+              <option value="QX">QX — Quirófano General</option>
+              <option value="QXCR">QXCR — Quirófano Carro Rojo</option>
+              <option value="QXRCR">QXRCR — Recuperación Carro Rojo</option>
+              <option value="QXCM">QXCM — Quirófano Código Mater</option>
+              <option value="CEYE">CEYE — Central de Esterilización</option>
+            </optgroup>
+            <optgroup label="Otros Carros de Soporte">
+              <option value="TERACR">TERACR — Terapia Intensiva Carro Rojo</option>
+              <option value="PPBCR">PPBCR — Privados PB Carro Rojo</option>
+              <option value="PPACR">PPACR — Privados PA Carro Rojo</option>
+              <option value="IMAGCR">IMAGCR — Imagen Carro Rojo</option>
+              <option value="CARDIOCR">CARDIOCR — Gabinete Cardio Carro Rojo</option>
+              <option value="CUNACR">CUNACR — Cunas Carro Rojo</option>
+              <option value="URG1CR">URG1CR — Urgencias 1 Carro Rojo</option>
+              <option value="URG1CM">URG1CM — Urgencias 1 Código Mater</option>
+            </optgroup>
           </select>
         </div>
 
@@ -595,11 +633,18 @@ export default function AlmacenQuirofano() {
                           fontSize: '0.78rem',
                           fontWeight: 700,
                           whiteSpace: 'nowrap',
-                          background: item.WhsCode === 'QXCR' ? '#FEE2E2' : '#EFF6FF',
-                          color: item.WhsCode === 'QXCR' ? '#DC2626' : '#1D4ED8',
-                          border: item.WhsCode === 'QXCR' ? '1px solid #FECACA' : '1px solid #BFDBFE'
+                          background: item.WhsCode?.endsWith('CR') ? '#FEE2E2' : item.WhsCode?.endsWith('CM') ? '#F3E8FF' : item.WhsCode === 'CEYE' ? '#FEF3C7' : '#EFF6FF',
+                          color: item.WhsCode?.endsWith('CR') ? '#DC2626' : item.WhsCode?.endsWith('CM') ? '#7C3AED' : item.WhsCode === 'CEYE' ? '#B45309' : '#1D4ED8',
+                          border: item.WhsCode?.endsWith('CR') ? '1px solid #FECACA' : item.WhsCode?.endsWith('CM') ? '1px solid #E9D5FF' : item.WhsCode === 'CEYE' ? '1px solid #FDE68A' : '1px solid #BFDBFE'
                         }}>
-                          {item.WhsCode === 'QXCR' ? '🚨 QXCR (Carro Rojo)' : '🏥 QX (General)'}
+                          {item.WhsCode === 'QX' ? '🏥 QX (General)' :
+                           item.WhsCode === 'QXCR' ? '🚨 QXCR (Carro Rojo)' :
+                           item.WhsCode === 'QXRCR' ? '🚨 QXRCR (Recuperación)' :
+                           item.WhsCode === 'QXCM' ? '🤰 QXCM (Código Mater)' :
+                           item.WhsCode === 'CEYE' ? '🔬 CEYE (Esterilización)' :
+                           item.WhsCode?.endsWith('CR') ? `🚨 ${item.WhsCode} (Carro Rojo)` :
+                           item.WhsCode?.endsWith('CM') ? `🤰 ${item.WhsCode} (Código Mater)` :
+                           item.WhsCode}
                         </span>
                       </td>
                       <td style={{ padding: '0.85rem 1.25rem', textAlign: 'right', fontWeight: 800, fontSize: '1rem', color: item.QuantityOnStock > 5 ? '#15803D' : '#D97706' }}>
