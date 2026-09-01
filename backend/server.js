@@ -67,8 +67,8 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // Permitir localhost, 127.0.0.1, rangos de IP privadas (192.168.x.x, 10.x.x.x, 172.16-31.x.x) y Tailscale (100.x.x.x)
-    const isAllowedHost = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|100\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)(:\d+)?$/i.test(origin);
+    // Permitir localhost, 127.0.0.1, rangos de IP privadas (192.168.x.x, 10.x.x.x, 172.16-31.x.x), Tailscale (100.x.x.x y *.ts.net) y hostnames locales
+    const isAllowedHost = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|100\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+|([a-zA-Z0-9-]+\.)*ts\.net|([a-zA-Z0-9-]+)(\.local|\.lan)?)(:\d+)?$/i.test(origin);
     if (isAllowedHost || configuredOrigins.length === 0) {
       return callback(null, true);
     }
