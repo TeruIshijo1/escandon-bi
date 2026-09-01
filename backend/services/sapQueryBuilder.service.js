@@ -13,6 +13,7 @@ const { pool } = require('../config/pg-db');
    DICCIONARIO DE ENTIDADES Y CAMPOS (LENGUAJE HOSPITALARIO)
 ══════════════════════════════════════════════════════════════ */
 const ENTITY_CATALOG = {
+  // ── INVENTARIOS Y STOCK ──
   inventory: {
     id: 'inventory',
     title: 'Inventario y Stock por Almacén',
@@ -62,11 +63,12 @@ const ENTITY_CATALOG = {
     ]
   },
 
+  // ── COMPRAS Y PROVEEDORES ──
   purchase_invoices: {
     id: 'purchase_invoices',
     title: 'Facturas de Proveedores (Compras)',
     icon: '🧾',
-    category: 'Adquisiciones y Finanzas',
+    category: 'Compras y Proveedores',
     description: 'Facturas recibidas de proveedores, precios unitarios de compra, IVA, totales y fechas de contabilización.',
     requiresDateFilter: true,
     dateFieldLabel: 'Fecha de Contabilización',
@@ -93,7 +95,7 @@ const ENTITY_CATALOG = {
     id: 'purchase_orders',
     title: 'Órdenes de Compra a Proveedores',
     icon: '📋',
-    category: 'Adquisiciones y Finanzas',
+    category: 'Compras y Proveedores',
     description: 'Pedidos emitidos a proveedores, cantidades solicitadas vs pendientes de entrega y estatus.',
     requiresDateFilter: true,
     dateFieldLabel: 'Fecha de Emisión de Orden',
@@ -103,7 +105,7 @@ const ENTITY_CATALOG = {
       { key: 'DocDate', label: 'Fecha Emisión', type: 'date', width: 120, align: 'center' },
       { key: 'DocDueDate', label: 'Fecha Entrega Prometida', type: 'date', width: 140, align: 'center' },
       { key: 'CardName', label: 'Proveedor', type: 'string', width: 250 },
-      { key: 'DocStatus', label: 'Estatus Pedido', type: 'string', width: 120, align: 'center' },
+      { key: 'DocStatus', label: 'Estatus Pedido', type: 'status', width: 120, align: 'center' },
       { key: 'ItemCode', label: 'Código Insumo', type: 'string', width: 120 },
       { key: 'Dscription', label: 'Descripción del Insumo', type: 'string', width: 280 },
       { key: 'Quantity', label: 'Cant. Pedida', type: 'number', width: 100, align: 'center' },
@@ -115,9 +117,61 @@ const ENTITY_CATALOG = {
     ]
   },
 
+  goods_receipts_po: {
+    id: 'goods_receipts_po',
+    title: 'Recepciones de Mercancía (Entradas)',
+    icon: '📥',
+    category: 'Compras y Proveedores',
+    description: 'Insumos recibidos físicamente en almacén/farmacia de proveedores pendientes de facturar.',
+    requiresDateFilter: true,
+    dateFieldLabel: 'Fecha de Recepción',
+    defaultFields: ['DocNum', 'DocDate', 'CardName', 'ItemCode', 'Dscription', 'Quantity', 'Price', 'LineTotal', 'DocTotal', 'WhsCode'],
+    fields: [
+      { key: 'DocNum', label: 'Folio Entrada SAP', type: 'string', width: 120, align: 'center' },
+      { key: 'DocDate', label: 'Fecha Recepción', type: 'date', width: 130, align: 'center' },
+      { key: 'DocDueDate', label: 'Fecha Vencimiento', type: 'date', width: 130, align: 'center' },
+      { key: 'CardCode', label: 'Cód. Proveedor', type: 'string', width: 110 },
+      { key: 'CardName', label: 'Proveedor / Razón Social', type: 'string', width: 260 },
+      { key: 'ItemCode', label: 'Código Artículo', type: 'string', width: 120 },
+      { key: 'Dscription', label: 'Descripción del Insumo', type: 'string', width: 280 },
+      { key: 'Quantity', label: 'Cant. Recibida', type: 'number', width: 110, align: 'center' },
+      { key: 'Price', label: 'Precio Unitario ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'LineTotal', label: 'Subtotal Línea ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'DocTotal', label: 'Total Recepción ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'WhsCode', label: 'Almacén Destino', type: 'string', width: 110, align: 'center' },
+      { key: 'Comments', label: 'Observaciones / Remisión', type: 'string', width: 240 }
+    ]
+  },
+
+  goods_returns: {
+    id: 'goods_returns',
+    title: 'Devoluciones a Proveedores',
+    icon: '🔄',
+    category: 'Compras y Proveedores',
+    description: 'Medicamentos e insumos devueltos a laboratorios por caducidad, daño de empaque o sobre-stock.',
+    requiresDateFilter: true,
+    dateFieldLabel: 'Fecha de Devolución',
+    defaultFields: ['DocNum', 'DocDate', 'CardName', 'ItemCode', 'Dscription', 'Quantity', 'Price', 'LineTotal', 'DocTotal', 'Comments'],
+    fields: [
+      { key: 'DocNum', label: 'Folio Devolución', type: 'string', width: 120, align: 'center' },
+      { key: 'DocDate', label: 'Fecha Devolución', type: 'date', width: 130, align: 'center' },
+      { key: 'CardCode', label: 'Cód. Proveedor', type: 'string', width: 110 },
+      { key: 'CardName', label: 'Proveedor / Laboratorio', type: 'string', width: 260 },
+      { key: 'ItemCode', label: 'Código Insumo', type: 'string', width: 120 },
+      { key: 'Dscription', label: 'Descripción del Insumo', type: 'string', width: 280 },
+      { key: 'Quantity', label: 'Cant. Devuelta', type: 'number', width: 110, align: 'center' },
+      { key: 'Price', label: 'Costo Unitario ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'LineTotal', label: 'Importe Devolución ($)', type: 'money', width: 150, align: 'right' },
+      { key: 'DocTotal', label: 'Total Devolución ($)', type: 'money', width: 150, align: 'right' },
+      { key: 'WhsCode', label: 'Almacén Origen', type: 'string', width: 110, align: 'center' },
+      { key: 'Comments', label: 'Motivo de Devolución', type: 'string', width: 240 }
+    ]
+  },
+
+  // ── MOVIMIENTOS Y ALMACENES ──
   stock_transfers: {
     id: 'stock_transfers',
-    title: 'Traslados entre Almacenes',
+    title: 'Traslados entre Almacenes Realizados',
     icon: '🚚',
     category: 'Movimientos de Almacén',
     description: 'Movimientos de insumos entre Almacén General, Farmacia, Quirófano y Carro Rojo con fechas y cantidades.',
@@ -136,11 +190,79 @@ const ENTITY_CATALOG = {
     ]
   },
 
+  transfer_requests: {
+    id: 'transfer_requests',
+    title: 'Solicitudes de Traslado entre Almacenes',
+    icon: '⏳',
+    category: 'Movimientos de Almacén',
+    description: 'Solicitudes de reabastecimiento generadas por las áreas (Farmacia/Quirófano) hacia Almacén General.',
+    requiresDateFilter: true,
+    dateFieldLabel: 'Fecha de Solicitud',
+    defaultFields: ['DocNum', 'DocDate', 'Filler', 'ToWhsCode', 'DocStatus', 'ItemCode', 'Dscription', 'Quantity', 'OpenQty'],
+    fields: [
+      { key: 'DocNum', label: 'No. Solicitud', type: 'string', width: 120, align: 'center' },
+      { key: 'DocDate', label: 'Fecha Solicitud', type: 'date', width: 120, align: 'center' },
+      { key: 'DueDate', label: 'Fecha Requerida', type: 'date', width: 120, align: 'center' },
+      { key: 'Filler', label: 'Almacén Origen (De)', type: 'string', width: 140, align: 'center' },
+      { key: 'ToWhsCode', label: 'Almacén Destino (A)', type: 'string', width: 140, align: 'center' },
+      { key: 'DocStatus', label: 'Estatus', type: 'status', width: 110, align: 'center' },
+      { key: 'ItemCode', label: 'Código Insumo', type: 'string', width: 120 },
+      { key: 'Dscription', label: 'Descripción Insumo', type: 'string', width: 280 },
+      { key: 'Quantity', label: 'Cant. Solicitada', type: 'number', width: 110, align: 'center' },
+      { key: 'OpenQty', label: 'Cant. Pendiente', type: 'number', width: 110, align: 'center' },
+      { key: 'Comments', label: 'Justificación / Área', type: 'string', width: 240 }
+    ]
+  },
+
+  goods_issues: {
+    id: 'goods_issues',
+    title: 'Salidas de Inventario (Mermas / Bajas)',
+    icon: '📉',
+    category: 'Movimientos de Almacén',
+    description: 'Bajas de caducados, mermas, consumos de centros de costos y ajustes negativos de inventario.',
+    requiresDateFilter: true,
+    dateFieldLabel: 'Fecha de Salida',
+    defaultFields: ['DocNum', 'DocDate', 'ItemCode', 'Dscription', 'Quantity', 'Price', 'LineTotal', 'WhsCode', 'Comments'],
+    fields: [
+      { key: 'DocNum', label: 'Folio Salida SAP', type: 'string', width: 120, align: 'center' },
+      { key: 'DocDate', label: 'Fecha Salida', type: 'date', width: 120, align: 'center' },
+      { key: 'ItemCode', label: 'Código Insumo', type: 'string', width: 120 },
+      { key: 'Dscription', label: 'Descripción del Insumo', type: 'string', width: 280 },
+      { key: 'Quantity', label: 'Cant. Dada de Baja', type: 'number', width: 120, align: 'center' },
+      { key: 'Price', label: 'Costo Unitario ($)', type: 'money', width: 130, align: 'right' },
+      { key: 'LineTotal', label: 'Costo Total Baja ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'WhsCode', label: 'Almacén Origen', type: 'string', width: 110, align: 'center' },
+      { key: 'Comments', label: 'Motivo / Justificación', type: 'string', width: 260 }
+    ]
+  },
+
+  goods_receipts_inv: {
+    id: 'goods_receipts_inv',
+    title: 'Entradas Directas y Ajustes Positivos',
+    icon: '📈',
+    category: 'Movimientos de Almacén',
+    description: 'Ajustes positivos de inventario físico, altas directas de material y donaciones.',
+    requiresDateFilter: true,
+    dateFieldLabel: 'Fecha de Entrada',
+    defaultFields: ['DocNum', 'DocDate', 'ItemCode', 'Dscription', 'Quantity', 'Price', 'LineTotal', 'WhsCode', 'Comments'],
+    fields: [
+      { key: 'DocNum', label: 'Folio Entrada SAP', type: 'string', width: 120, align: 'center' },
+      { key: 'DocDate', label: 'Fecha Entrada', type: 'date', width: 120, align: 'center' },
+      { key: 'ItemCode', label: 'Código Insumo', type: 'string', width: 120 },
+      { key: 'Dscription', label: 'Descripción Insumo', type: 'string', width: 280 },
+      { key: 'Quantity', label: 'Cant. Ingresada', type: 'number', width: 110, align: 'center' },
+      { key: 'Price', label: 'Costo Valuado ($)', type: 'money', width: 130, align: 'right' },
+      { key: 'LineTotal', label: 'Valor Total ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'WhsCode', label: 'Almacén Destino', type: 'string', width: 110, align: 'center' },
+      { key: 'Comments', label: 'Concepto / Justificación', type: 'string', width: 260 }
+    ]
+  },
+
   purchase_requests: {
     id: 'purchase_requests',
     title: 'Requisiciones y Solicitudes de Compra',
     icon: '📑',
-    category: 'Adquisiciones y Finanzas',
+    category: 'Compras y Proveedores',
     description: 'Solicitudes internas de material y medicamentos generadas por las distintas áreas hospitalarias.',
     requiresDateFilter: true,
     dateFieldLabel: 'Fecha de Requisición',
@@ -151,7 +273,7 @@ const ENTITY_CATALOG = {
       { key: 'ReqDate', label: 'Fecha Requerida', type: 'date', width: 120, align: 'center' },
       { key: 'Requester', label: 'Usuario Solicitante', type: 'string', width: 180 },
       { key: 'Department', label: 'Área / Departamento', type: 'string', width: 160 },
-      { key: 'DocStatus', label: 'Estatus', type: 'string', width: 110, align: 'center' },
+      { key: 'DocStatus', label: 'Estatus', type: 'status', width: 110, align: 'center' },
       { key: 'ItemCode', label: 'Código Insumo', type: 'string', width: 120 },
       { key: 'Dscription', label: 'Insumo Solicitado', type: 'string', width: 280 },
       { key: 'Quantity', label: 'Cant. Solicitada', type: 'number', width: 110, align: 'center' },
@@ -159,6 +281,60 @@ const ENTITY_CATALOG = {
     ]
   },
 
+  // ── FACTURACIÓN Y CLIENTES ──
+  sales_invoices: {
+    id: 'sales_invoices',
+    title: 'Facturación e Ingresos Hospitalarios',
+    icon: '💰',
+    category: 'Facturación e Ingresos',
+    description: 'Facturación emitida a pacientes, aseguradoras y empresas por hospitalización, servicios y medicamentos.',
+    requiresDateFilter: true,
+    dateFieldLabel: 'Fecha de Facturación',
+    defaultFields: ['DocNum', 'DocDate', 'CardName', 'U_PRName', 'ItemCode', 'Dscription', 'Quantity', 'Price', 'LineTotal', 'DocTotal'],
+    fields: [
+      { key: 'DocNum', label: 'Folio Factura Venta', type: 'string', width: 120, align: 'center' },
+      { key: 'DocDate', label: 'Fecha Factura', type: 'date', width: 120, align: 'center' },
+      { key: 'DocDueDate', label: 'Fecha Vencimiento', type: 'date', width: 130, align: 'center' },
+      { key: 'CardCode', label: 'Cód. Cliente/Paciente', type: 'string', width: 120 },
+      { key: 'CardName', label: 'Paciente / Aseguradora / Razón Social', type: 'string', width: 270 },
+      { key: 'U_PRName', label: 'Médico Tratante / Especialista', type: 'string', width: 220 },
+      { key: 'ItemCode', label: 'Código Concepto', type: 'string', width: 120 },
+      { key: 'Dscription', label: 'Concepto / Medicamento Facturado', type: 'string', width: 280 },
+      { key: 'Quantity', label: 'Cantidad', type: 'number', width: 90, align: 'center' },
+      { key: 'Price', label: 'Precio Unitario ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'LineTotal', label: 'Importe Línea ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'VatSum', label: 'IVA ($)', type: 'money', width: 120, align: 'right' },
+      { key: 'DocTotal', label: 'Total Factura ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'WhsCode', label: 'Almacén Salida', type: 'string', width: 110, align: 'center' },
+      { key: 'Comments', label: 'Observaciones / Cuenta', type: 'string', width: 240 }
+    ]
+  },
+
+  credit_memos: {
+    id: 'credit_memos',
+    title: 'Notas de Crédito a Clientes (Devoluciones)',
+    icon: '🧾',
+    category: 'Facturación e Ingresos',
+    description: 'Devoluciones, cancelaciones y notas de crédito aplicadas a cuentas hospitalarias y facturas de clientes.',
+    requiresDateFilter: true,
+    dateFieldLabel: 'Fecha de Nota de Crédito',
+    defaultFields: ['DocNum', 'DocDate', 'CardName', 'ItemCode', 'Dscription', 'Quantity', 'Price', 'LineTotal', 'DocTotal', 'Comments'],
+    fields: [
+      { key: 'DocNum', label: 'Folio Nota Crédito', type: 'string', width: 120, align: 'center' },
+      { key: 'DocDate', label: 'Fecha Emisión', type: 'date', width: 120, align: 'center' },
+      { key: 'CardCode', label: 'Cód. Cliente', type: 'string', width: 110 },
+      { key: 'CardName', label: 'Paciente / Aseguradora', type: 'string', width: 260 },
+      { key: 'ItemCode', label: 'Código Concepto', type: 'string', width: 120 },
+      { key: 'Dscription', label: 'Concepto Cancelado / Devuelto', type: 'string', width: 280 },
+      { key: 'Quantity', label: 'Cant. Bonificada', type: 'number', width: 110, align: 'center' },
+      { key: 'Price', label: 'Precio Unitario ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'LineTotal', label: 'Importe Cancelado ($)', type: 'money', width: 150, align: 'right' },
+      { key: 'DocTotal', label: 'Total Nota Crédito ($)', type: 'money', width: 150, align: 'right' },
+      { key: 'Comments', label: 'Motivo de Cancelación / Descuento', type: 'string', width: 240 }
+    ]
+  },
+
+  // ── CATÁLOGOS MAESTROS ──
   business_partners: {
     id: 'business_partners',
     title: 'Directorio de Proveedores y Socios',
@@ -201,6 +377,32 @@ const ENTITY_CATALOG = {
       { key: 'ItemGroupName', label: 'Grupo de Artículos', type: 'string', width: 160 },
       { key: 'ManufacturerName', label: 'Laboratorio', type: 'string', width: 160 }
     ]
+  },
+
+  item_master_data: {
+    id: 'item_master_data',
+    title: 'Maestro de Artículos y Clasif. Sanitaria',
+    icon: '🧬',
+    category: 'Catálogos Maestros',
+    description: 'Padrón integral de artículos con stock mínimo, stock máximo, punto de reorden y clasificación sanitaria.',
+    requiresDateFilter: false,
+    dateField: null,
+    defaultFields: ['ItemCode', 'ItemName', 'ItemGroupName', 'ManufacturerName', 'MedicalClassification', 'PurchaseCost', 'PriceHos', 'MinStock', 'MaxStock'],
+    fields: [
+      { key: 'ItemCode', label: 'Código Artículo', type: 'string', width: 120 },
+      { key: 'ItemName', label: 'Descripción Insumo / Medicamento', type: 'string', width: 280 },
+      { key: 'ItemGroupName', label: 'Grupo / Familia SAP', type: 'string', width: 160 },
+      { key: 'ManufacturerName', label: 'Laboratorio / Fabricante', type: 'string', width: 160 },
+      { key: 'MedicalClassification', label: 'Clasif. Médica (CON/ANTI/REFRI)', type: 'string', width: 160, align: 'center' },
+      { key: 'SecondaryClassification', label: 'Clasif. Secundaria', type: 'string', width: 140, align: 'center' },
+      { key: 'PurchaseCost', label: 'Último Costo Compra ($)', type: 'money', width: 140, align: 'right' },
+      { key: 'AvgCost', label: 'Costo Promedio ($)', type: 'money', width: 130, align: 'right' },
+      { key: 'PriceHos', label: 'Precio Hospitalización ($)', type: 'money', width: 150, align: 'right' },
+      { key: 'PricePG', label: 'Precio Público General ($)', type: 'money', width: 150, align: 'right' },
+      { key: 'MinStock', label: 'Stock Mínimo', type: 'number', width: 100, align: 'center' },
+      { key: 'MaxStock', label: 'Stock Máximo', type: 'number', width: 100, align: 'center' },
+      { key: 'ValidFor', label: 'Estatus en SAP', type: 'status', width: 110, align: 'center' }
+    ]
   }
 };
 
@@ -209,8 +411,18 @@ const WAREHOUSE_NAMES = {
   'QX': 'Quirófano General',
   'QXCR': 'Quirófano Carro Rojo',
   'ALM': 'Almacén General',
+  'ALG': 'Almacén General',
   'URG': 'Urgencias',
-  'CE': 'Consulta Externa'
+  'CE': 'Consulta Externa',
+  'QXRCR': 'Recuperación Carro Rojo',
+  'TERACR': 'Terapia Intensiva Carro Rojo',
+  'PPBCR': 'Privados PB Carro Rojo',
+  'PPACR': 'Privados PA Carro Rojo',
+  'IMAGCR': 'Imagen Carro Rojo',
+  'CARDIOCR': 'Cardio Carro Rojo',
+  'CUNACR': 'Cunas Carro Rojo',
+  'QXCM': 'Quirófano Código Mater',
+  'URG1CM': 'Urgencias 1 Código Mater'
 };
 
 function formatSapDateStr(val) {
@@ -259,6 +471,8 @@ async function executeQuery({
   almacen,
   proveedor,
   busqueda,
+  estatusDoc,
+  clasificacionMedica,
   limit = 2000
 }) {
   const entityDef = ENTITY_CATALOG[entity];
@@ -291,28 +505,19 @@ async function executeQuery({
   // Formato fechas para SAP SQL (YYYYMMDD o YYYY-MM-DD)
   const dDesdeSap = fechaDesde ? fechaDesde.replace(/-/g, '') : '';
   const dHastaSap = fechaHasta ? fechaHasta.replace(/-/g, '') : '';
-  const dDesdeSql = fechaDesde ? `${fechaDesde} 00:00:00` : '';
-  const dHastaSql = fechaHasta ? `${fechaHasta} 23:59:59` : '';
 
   let rawRows = [];
 
   // 2. Ejecutar según el módulo seleccionado
   switch (entity) {
     case 'inventory':
-    case 'item_prices': {
+    case 'item_prices':
+    case 'item_master_data': {
       await sapInventoryService.ensureInventoryData();
       let inv = sapInventoryService.getInventoryCache() || [];
       
       if (almacen && almacen !== 'ALL') {
         inv = inv.filter(i => i.WhsCode === almacen);
-      }
-      if (busqueda && busqueda.trim()) {
-        const q = busqueda.toLowerCase().trim();
-        inv = inv.filter(i => 
-          String(i.ItemCode || '').toLowerCase().includes(q) ||
-          String(i.ItemName || '').toLowerCase().includes(q) ||
-          String(i.ItemGroupName || '').toLowerCase().includes(q)
-        );
       }
 
       rawRows = inv.map(i => ({
@@ -320,7 +525,10 @@ async function executeQuery({
         WhsName: WAREHOUSE_NAMES[i.WhsCode] || i.WhsCode,
         ProfitMargin: Math.round(Number(i.ProfitMargin || 0) * 10) / 10,
         MarginHos: i.PriceHos > 0 && i.PurchaseCost > 0 ? Math.round(((i.PriceHos - i.PurchaseCost) / i.PriceHos) * 1000) / 10 : 0,
-        MarginPG: i.PricePG > 0 && i.PurchaseCost > 0 ? Math.round(((i.PricePG - i.PurchaseCost) / i.PricePG) * 1000) / 10 : 0
+        MarginPG: i.PricePG > 0 && i.PurchaseCost > 0 ? Math.round(((i.PricePG - i.PurchaseCost) / i.PricePG) * 1000) / 10 : 0,
+        MinStock: Number(i.MinStock || 0),
+        MaxStock: Number(i.MaxStock || 0),
+        ValidFor: i.ValidFor === 'Y' || i.validFor === 't' ? 'Activo' : 'Inactivo'
       }));
       break;
     }
@@ -404,6 +612,45 @@ async function executeQuery({
       break;
     }
 
+    case 'goods_receipts_po': {
+      const sqlCode = 'sq_qb_grpo';
+      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPDN T0 INNER JOIN PDN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
+      
+      await ensureSapQuery(sqlCode, sqlText);
+      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
+      const items = res.data?.value || [];
+
+      rawRows = items.map(p => ({
+        ...p,
+        DocDate: formatSapDateStr(p.DocDate),
+        DocDueDate: formatSapDateStr(p.DocDueDate),
+        Quantity: Number(p.Quantity || 0),
+        Price: Number(p.Price || 0),
+        LineTotal: Number(p.LineTotal || 0),
+        DocTotal: Number(p.DocTotal || 0)
+      }));
+      break;
+    }
+
+    case 'goods_returns': {
+      const sqlCode = 'sq_qb_gret';
+      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM ORPD T0 INNER JOIN RPD1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
+      
+      await ensureSapQuery(sqlCode, sqlText);
+      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
+      const items = res.data?.value || [];
+
+      rawRows = items.map(p => ({
+        ...p,
+        DocDate: formatSapDateStr(p.DocDate),
+        Quantity: Number(p.Quantity || 0),
+        Price: Number(p.Price || 0),
+        LineTotal: Number(p.LineTotal || 0),
+        DocTotal: Number(p.DocTotal || 0)
+      }));
+      break;
+    }
+
     case 'stock_transfers': {
       const sqlCode = 'sq_qb_transfers';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.Filler, T0.ToWhsCode, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OWTR T0 INNER JOIN WTR1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
@@ -418,6 +665,63 @@ async function executeQuery({
         Filler: WAREHOUSE_NAMES[t.Filler] || t.Filler,
         ToWhsCode: WAREHOUSE_NAMES[t.ToWhsCode] || t.ToWhsCode,
         Quantity: Number(t.Quantity || 0)
+      }));
+      break;
+    }
+
+    case 'transfer_requests': {
+      const sqlCode = 'sq_qb_wtq';
+      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DueDate, T0.Filler, T0.ToWhsCode, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T0.Comments FROM OWTQ T0 INNER JOIN WTQ1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
+      
+      await ensureSapQuery(sqlCode, sqlText);
+      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
+      const items = res.data?.value || [];
+
+      rawRows = items.map(t => ({
+        ...t,
+        DocDate: formatSapDateStr(t.DocDate),
+        DueDate: formatSapDateStr(t.DueDate),
+        Filler: WAREHOUSE_NAMES[t.Filler] || t.Filler,
+        ToWhsCode: WAREHOUSE_NAMES[t.ToWhsCode] || t.ToWhsCode,
+        DocStatus: t.DocStatus === 'O' ? 'Abierta' : t.DocStatus === 'C' ? 'Cerrada' : t.DocStatus,
+        Quantity: Number(t.Quantity || 0),
+        OpenQty: Number(t.OpenQty || 0)
+      }));
+      break;
+    }
+
+    case 'goods_issues': {
+      const sqlCode = 'sq_qb_giss';
+      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGE T0 INNER JOIN IGE1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
+      
+      await ensureSapQuery(sqlCode, sqlText);
+      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
+      const items = res.data?.value || [];
+
+      rawRows = items.map(p => ({
+        ...p,
+        DocDate: formatSapDateStr(p.DocDate),
+        Quantity: Number(p.Quantity || 0),
+        Price: Number(p.Price || 0),
+        LineTotal: Number(p.LineTotal || 0)
+      }));
+      break;
+    }
+
+    case 'goods_receipts_inv': {
+      const sqlCode = 'sq_qb_grec_inv';
+      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGN T0 INNER JOIN IGN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
+      
+      await ensureSapQuery(sqlCode, sqlText);
+      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
+      const items = res.data?.value || [];
+
+      rawRows = items.map(p => ({
+        ...p,
+        DocDate: formatSapDateStr(p.DocDate),
+        Quantity: Number(p.Quantity || 0),
+        Price: Number(p.Price || 0),
+        LineTotal: Number(p.LineTotal || 0)
       }));
       break;
     }
@@ -440,6 +744,46 @@ async function executeQuery({
       break;
     }
 
+    case 'sales_invoices': {
+      const sqlCode = 'sq_qb_sinv';
+      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.U_PRName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
+      
+      await ensureSapQuery(sqlCode, sqlText);
+      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
+      const items = res.data?.value || [];
+
+      rawRows = items.map(p => ({
+        ...p,
+        DocDate: formatSapDateStr(p.DocDate),
+        DocDueDate: formatSapDateStr(p.DocDueDate),
+        Quantity: Number(p.Quantity || 0),
+        Price: Number(p.Price || 0),
+        LineTotal: Number(p.LineTotal || 0),
+        VatSum: Number(p.VatSum || 0),
+        DocTotal: Number(p.DocTotal || 0)
+      }));
+      break;
+    }
+
+    case 'credit_memos': {
+      const sqlCode = 'sq_qb_scrm';
+      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM ORIN T0 INNER JOIN RIN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
+      
+      await ensureSapQuery(sqlCode, sqlText);
+      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
+      const items = res.data?.value || [];
+
+      rawRows = items.map(p => ({
+        ...p,
+        DocDate: formatSapDateStr(p.DocDate),
+        Quantity: Number(p.Quantity || 0),
+        Price: Number(p.Price || 0),
+        LineTotal: Number(p.LineTotal || 0),
+        DocTotal: Number(p.DocTotal || 0)
+      }));
+      break;
+    }
+
     case 'business_partners': {
       const sqlCode = 'sq_qb_bp';
       const sqlText = `SELECT TOP ${limit} T0.CardCode, T0.CardName, T0.CardType, T0.LicTradNum, T0.Phone1, T0.E_Mail, T0.Balance, T1.GroupName, T0.CreateDate FROM OCRD T0 LEFT JOIN OCRG T1 ON T0.GroupCode = T1.GroupCode WHERE T0.CardType IN ('S', 'C') ORDER BY T0.CardName ASC`;
@@ -458,12 +802,30 @@ async function executeQuery({
     }
 
     default:
-      throw new Error(`Módulo '${entity}' en proceso de configuración.`);
+      throw new Error(`Módulo '${entity}' no configurado.`);
   }
 
-  // 3. Aplicar filtros rápidos de texto y almacén en memoria
+  // 3. Aplicar filtros en memoria
   if (almacen && almacen !== 'ALL') {
     rawRows = rawRows.filter(r => (r.WhsCode === almacen || r.Filler === almacen || r.ToWhsCode === almacen));
+  }
+  if (estatusDoc && estatusDoc !== 'ALL') {
+    rawRows = rawRows.filter(r => {
+      if (!r.DocStatus && !r.Status) return true;
+      const s = String(r.DocStatus || r.Status).toUpperCase();
+      if (estatusDoc === 'OPEN') return s.includes('ABIERTA') || s.includes('ACTIVO') || s.includes('PRÓXIMO');
+      if (estatusDoc === 'CLOSED') return s.includes('CERRADA') || s.includes('VENCIDO');
+      return true;
+    });
+  }
+  if (clasificacionMedica && clasificacionMedica !== 'ALL') {
+    rawRows = rawRows.filter(r => {
+      const c = String(r.MedicalClassification || '').toUpperCase();
+      if (clasificacionMedica === 'CON') return c.includes('CON') || c.includes('CONTROL');
+      if (clasificacionMedica === 'ANTI') return c.includes('ANTI') || c.includes('ANTIBIOT');
+      if (clasificacionMedica === 'REFRI') return c.includes('REFRI') || c.includes('FRIO');
+      return true;
+    });
   }
   if (proveedor && proveedor.trim()) {
     const p = proveedor.toLowerCase().trim();
@@ -481,7 +843,61 @@ async function executeQuery({
     });
   }
 
-  // 4. Filtrar únicamente las columnas seleccionadas
+  // 4. Calcular KPIs dinámicos de resumen
+  let totalImporte = 0;
+  let totalPiezas = 0;
+  let docAbiertosCount = 0;
+  let lotesAlertaCount = 0;
+
+  rawRows.forEach(r => {
+    if (r.LineTotal != null) totalImporte += Number(r.LineTotal || 0);
+    else if (r.DocTotal != null) totalImporte += Number(r.DocTotal || 0);
+    else if (r.Balance != null) totalImporte += Number(r.Balance || 0);
+
+    if (r.Quantity != null) totalPiezas += Number(r.Quantity || 0);
+    else if (r.QuantityOnStock != null) totalPiezas += Number(r.QuantityOnStock || 0);
+
+    if (r.DocStatus === 'Abierta' || r.DocStatus === 'O') docAbiertosCount++;
+    if (r.Status === 'Vencido' || r.Status === 'Próximo a Vencer') lotesAlertaCount++;
+  });
+
+  const kpis = [
+    { label: 'Total Registros', value: rawRows.length.toLocaleString('es-MX'), color: '#004687' }
+  ];
+
+  if (totalImporte > 0) {
+    kpis.push({
+      label: 'Importe Total ($)',
+      value: `$${Math.round(totalImporte).toLocaleString('es-MX')}`,
+      color: '#15803D'
+    });
+  }
+
+  if (totalPiezas > 0) {
+    kpis.push({
+      label: 'Piezas / Cantidad Total',
+      value: Math.round(totalPiezas).toLocaleString('es-MX'),
+      color: '#0088C9'
+    });
+  }
+
+  if (docAbiertosCount > 0) {
+    kpis.push({
+      label: 'Documentos Abiertos',
+      value: docAbiertosCount.toLocaleString('es-MX'),
+      color: '#D97706'
+    });
+  }
+
+  if (lotesAlertaCount > 0) {
+    kpis.push({
+      label: 'Lotes en Alerta / Vencidos',
+      value: lotesAlertaCount.toLocaleString('es-MX'),
+      color: '#DC2626'
+    });
+  }
+
+  // 5. Filtrar únicamente las columnas seleccionadas
   const activeFields = (selectedFields.length > 0 ? selectedFields : entityDef.defaultFields);
   const activeColsDef = entityDef.fields.filter(f => activeFields.includes(f.key));
 
@@ -498,6 +914,7 @@ async function executeQuery({
     entityTitle: entityDef.title,
     ejecutadoEn: new Date().toISOString(),
     totalRegistros: projectedData.length,
+    kpis,
     columnas: activeColsDef,
     data: projectedData
   };

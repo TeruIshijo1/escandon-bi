@@ -10,11 +10,37 @@ const router = express.Router();
 const sapQueryBuilderService = require('../services/sapQueryBuilder.service');
 const { authenticate } = require('../middleware/auth.middleware');
 
+/**
+ * Función auxiliar para verificar si el usuario tiene permiso para consultar un módulo específico de SAP.
+ * REGLA MAESTRA: Solo amendoza es Superadmin con acceso total absoluto.
+ */
+function checkSapModuleAccess(user, entity) {
+  if (!user) return false;
+  const username = (user.username || '').toLowerCase();
+  
+  // REGLA MAESTRA: amendoza es Superadmin absoluto
+  if (username === 'amendoza') return true;
+
+  const permisos = Array.isArray(user.permisos) ? user.permisos : [];
+  const hasSpecificSapPerms = permisos.some(p => typeof p === 'string' && p.startsWith('sap-query-'));
+  if (hasSpecificSapPerms) {
+    return permisos.includes(`sap-query-${entity}`);
+  }
+
+  // Fallback si tiene acceso a la pantalla pero aún no se le configuran permisos granulares
+  if (permisos.includes('mi-area-consultas-service-layer')) {
+    return ['inventory', 'batches', 'item_prices', 'item_master_data', 'stock_transfers'].includes(entity);
+  }
+
+  return false;
+}
+
 // GET /api/sap-query/catalog
-// Catálogo completo de entidades y campos amigables
+// Catálogo de entidades filtrado según los permisos del usuario autenticado
 router.get('/catalog', authenticate, (req, res) => {
   try {
-    const catalog = sapQueryBuilderService.getEntityCatalog();
+    const fullCatalog = sapQueryBuilderService.getEntityCatalog();
+    const catalog = fullCatalog.filter(c => checkSapModuleAccess(req.user, c.id));
     res.json({ ok: true, catalog });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -22,17 +48,26 @@ router.get('/catalog', authenticate, (req, res) => {
 });
 
 // POST /api/sap-query/execute
-// Ejecuta consulta contra Service Layer / SQL nativo
+// Ejecuta consulta contra Service Layer / SQL nativo verificando permisos
 router.post('/execute', authenticate, async (req, res) => {
   try {
-    const { entity, selectedFields, fechaDesde, fechaHasta, almacen, proveedor, busqueda, limit } = req.body;
+    const { entity, selectedFields, fechaDesde, fechaHasta, almacen, estatusDoc, clasificacionMedica, busqueda, limit } = req.body;
+    
+    if (!checkSapModuleAccess(req.user, entity)) {
+      return res.status(403).json({
+        ok: false,
+        error: `Acceso denegado: No tienes permisos asignados para consultar el módulo SAP '${entity}'. Solicita autorización al Administrador.`
+      });
+    }
+
     const result = await sapQueryBuilderService.executeQuery({
       entity,
       selectedFields,
       fechaDesde,
       fechaHasta,
       almacen,
-      proveedor,
+      estatusDoc,
+      clasificacionMedica,
       busqueda,
       limit: limit ? parseInt(limit, 10) : 2000
     });

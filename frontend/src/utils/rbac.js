@@ -608,6 +608,16 @@ export function getPermissionSections(user) {
     });
   }
 
+  // ── Permisos Consultas SAP (sap-query-*) — Controlan módulos del constructor visual ──
+  for (const sapPerm of SAP_QUERY_PERMISSIONS) {
+    sections.push({
+      id:       sapPerm.id,
+      name:     sapPerm.name,
+      icon:     sapPerm.icon,
+      category: '🔌 Consultas SAP (Módulos)',
+    });
+  }
+
   // ── Permisos IA (ia-*) — Controlan qué módulos de MAR-IA puede usar el usuario ──
   const IA_PERMISSIONS = [
     { id: 'ia-productividad-medica', name: 'Productividad Médica',     icon: '👨‍⚕️' },
@@ -631,9 +641,55 @@ export function getPermissionSections(user) {
     });
   }
 
-  if (user?.username?.toLowerCase() === 'amendoza') {
+  // Para administradores (o amendoza), retornar todas las secciones disponibles en la plataforma
+  if (!user || user?.username?.toLowerCase() === 'amendoza' || user?.role === ROLES.ADMIN || user?.role === 'ADMIN') {
     return sections;
   }
   const userPerms = user?.permisos || [];
   return sections.filter(s => userPerms.includes(s.id));
+}
+
+export const SAP_QUERY_PERMISSIONS = [
+  { id: 'sap-query-inventory', name: 'Inventario y Stock por Almacén', icon: '📦', entity: 'inventory' },
+  { id: 'sap-query-batches', name: 'Lotes y Caducidades de Insumos', icon: '⏳', entity: 'batches' },
+  { id: 'sap-query-purchase_invoices', name: 'Facturas de Proveedores (Compras)', icon: '🧾', entity: 'purchase_invoices' },
+  { id: 'sap-query-purchase_orders', name: 'Órdenes de Compra a Proveedores', icon: '📋', entity: 'purchase_orders' },
+  { id: 'sap-query-goods_receipts_po', name: 'Recepciones de Mercancía (Entradas)', icon: '📥', entity: 'goods_receipts_po' },
+  { id: 'sap-query-goods_returns', name: 'Devoluciones a Proveedores', icon: '🔄', entity: 'goods_returns' },
+  { id: 'sap-query-purchase_requests', name: 'Requisiciones y Solicitudes de Compra', icon: '📑', entity: 'purchase_requests' },
+  { id: 'sap-query-stock_transfers', name: 'Traslados entre Almacenes Realizados', icon: '🚚', entity: 'stock_transfers' },
+  { id: 'sap-query-transfer_requests', name: 'Solicitudes de Traslado entre Almacenes', icon: '⏳', entity: 'transfer_requests' },
+  { id: 'sap-query-goods_issues', name: 'Salidas de Inventario (Mermas / Bajas)', icon: '📉', entity: 'goods_issues' },
+  { id: 'sap-query-goods_receipts_inv', name: 'Entradas Directas y Ajustes Positivos', icon: '📈', entity: 'goods_receipts_inv' },
+  { id: 'sap-query-sales_invoices', name: 'Facturación e Ingresos Hospitalarios', icon: '💰', entity: 'sales_invoices' },
+  { id: 'sap-query-credit_memos', name: 'Notas de Crédito a Clientes (Devoluciones)', icon: '🧾', entity: 'credit_memos' },
+  { id: 'sap-query-business_partners', name: 'Directorio de Proveedores y Socios', icon: '👥', entity: 'business_partners' },
+  { id: 'sap-query-item_prices', name: 'Listas de Precios y Costos', icon: '🏷️', entity: 'item_prices' },
+  { id: 'sap-query-item_master_data', name: 'Maestro de Artículos y Clasif. Sanitaria', icon: '🧬', entity: 'item_master_data' }
+];
+
+/**
+ * Verifica si un usuario tiene permiso para acceder a un módulo específico de SAP Query Builder.
+ * REGLA MAESTRA: Solo amendoza es Superadmin con acceso total automático.
+ * Todos los demás usuarios requieren los permisos asignados por amendoza.
+ */
+export function hasSapModulePermission(user, moduleId) {
+  if (!user) return false;
+  const username = (user.username || user.Username || '').toLowerCase();
+  
+  // REGLA MAESTRA: amendoza es Superadmin absoluto
+  if (username === 'amendoza') return true;
+
+  const permisos = user.permisos || [];
+  const hasSpecificSapPerms = permisos.some(p => typeof p === 'string' && p.startsWith('sap-query-'));
+  if (hasSpecificSapPerms) {
+    return permisos.includes(`sap-query-${moduleId}`);
+  }
+
+  // Fallback si tiene permiso a la pantalla pero aún no se le configuran módulos específicos
+  if (permisos.includes('mi-area-consultas-service-layer')) {
+    return ['inventory', 'batches', 'item_prices', 'item_master_data', 'stock_transfers'].includes(moduleId);
+  }
+
+  return false;
 }

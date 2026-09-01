@@ -3,6 +3,7 @@ import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
+import { hasSapModulePermission } from '../../utils/rbac';
 
 const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align = 'left', maxWidth }) => {
   const uniqueVals = useMemo(() => {
@@ -88,9 +89,12 @@ export default function ConsultaServiceLayer() {
   };
 
   // Filtros
+  const [activeCategory, setActiveCategory] = useState('ALL');
   const [fechaDesde, setFechaDesde] = useState(getDaysAgoStr(30));
   const [fechaHasta, setFechaHasta] = useState(getTodayStr());
   const [almacen, setAlmacen] = useState('ALL');
+  const [estatusDoc, setEstatusDoc] = useState('ALL');
+  const [clasificacionMedica, setClasificacionMedica] = useState('ALL');
   const [busqueda, setBusqueda] = useState('');
 
   // Estado de resultados
@@ -137,9 +141,30 @@ export default function ConsultaServiceLayer() {
     loadSavedQueries();
   }, []);
 
+  const userAllowedCatalog = useMemo(() => {
+    return catalog.filter(c => hasSapModulePermission(user, c.id));
+  }, [catalog, user]);
+
   const currentEntityDef = useMemo(() => {
-    return catalog.find(c => c.id === selectedEntityId) || null;
-  }, [catalog, selectedEntityId]);
+    return userAllowedCatalog.find(c => c.id === selectedEntityId) || null;
+  }, [userAllowedCatalog, selectedEntityId]);
+
+  const filteredCatalog = useMemo(() => {
+    if (activeCategory === 'ALL') return userAllowedCatalog;
+    return userAllowedCatalog.filter(c => c.category === activeCategory);
+  }, [userAllowedCatalog, activeCategory]);
+
+  const categories = useMemo(() => {
+    const cats = new Set(userAllowedCatalog.map(c => c.category).filter(Boolean));
+    return ['ALL', ...Array.from(cats)];
+  }, [userAllowedCatalog]);
+
+  // Si cambia la lista de módulos permitidos, asegurar que selectedEntityId sea válido
+  useEffect(() => {
+    if (userAllowedCatalog.length > 0 && !userAllowedCatalog.some(c => c.id === selectedEntityId)) {
+      handleSelectEntity(userAllowedCatalog[0].id);
+    }
+  }, [userAllowedCatalog, selectedEntityId]);
 
   // Al cambiar de entidad, preseleccionar sus campos default
   const handleSelectEntity = (entId) => {
@@ -216,6 +241,8 @@ export default function ConsultaServiceLayer() {
           fechaDesde,
           fechaHasta,
           almacen,
+          estatusDoc,
+          clasificacionMedica,
           busqueda
         })
       });
@@ -252,7 +279,7 @@ export default function ConsultaServiceLayer() {
           description: saveDescription.trim(),
           entity: selectedEntityId,
           selectedFields,
-          filters: { fechaDesde, fechaHasta, almacen, busqueda },
+          filters: { fechaDesde, fechaHasta, almacen, estatusDoc, clasificacionMedica, busqueda },
           isPublic: saveIsPublic
         })
       });
@@ -281,6 +308,8 @@ export default function ConsultaServiceLayer() {
       if (sq.filters.fechaDesde) setFechaDesde(sq.filters.fechaDesde);
       if (sq.filters.fechaHasta) setFechaHasta(sq.filters.fechaHasta);
       if (sq.filters.almacen) setAlmacen(sq.filters.almacen);
+      if (sq.filters.estatusDoc) setEstatusDoc(sq.filters.estatusDoc);
+      if (sq.filters.clasificacionMedica) setClasificacionMedica(sq.filters.clasificacionMedica);
       if (sq.filters.busqueda) setBusqueda(sq.filters.busqueda);
     }
     setShowSavedModal(false);
@@ -448,15 +477,45 @@ export default function ConsultaServiceLayer() {
 
       {/* ── Selector de Entidades / Módulos de SAP ── */}
       <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '0.6rem', letterSpacing: '0.05em' }}>
-          1. Selecciona el Módulo o Tema a Consultar:
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            1. Selecciona el Módulo o Tema a Consultar ({filteredCatalog.length} de {catalog.length}):
+          </div>
+
+          {/* Selector de Categorías / Tabs */}
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            {categories.map(cat => {
+              const isCatActive = activeCategory === cat;
+              const count = cat === 'ALL' ? catalog.length : catalog.filter(c => c.category === cat).length;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.72rem',
+                    fontWeight: isCatActive ? 800 : 600,
+                    borderRadius: '20px',
+                    border: isCatActive ? '1px solid #0088C9' : '1px solid #CBD5E1',
+                    background: isCatActive ? '#004687' : '#fff',
+                    color: isCatActive ? '#fff' : '#475569',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {cat === 'ALL' ? '🌟 Todos los Módulos' : cat} ({count})
+                </button>
+              );
+            })}
+          </div>
         </div>
+
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
           gap: '0.75rem'
         }}>
-          {catalog.map(ent => {
+          {filteredCatalog.map(ent => {
             const isSelected = ent.id === selectedEntityId;
             return (
               <div
@@ -482,15 +541,22 @@ export default function ConsultaServiceLayer() {
                 <div style={{ fontSize: '0.72rem', color: '#64748B', lineHeight: '1.3' }}>
                   {ent.description}
                 </div>
-                {ent.requiresDateFilter && (
+                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '6px', flexWrap: 'wrap' }}>
                   <span style={{
-                    display: 'inline-block', marginTop: '6px', fontSize: '0.65rem',
-                    fontWeight: 700, color: '#B45309', background: '#FEF3C7',
+                    fontSize: '0.62rem', fontWeight: 600, color: '#0369A1', background: '#E0F2FE',
                     padding: '2px 6px', borderRadius: '4px'
                   }}>
-                    📅 Fechas requeridas
+                    {ent.category}
                   </span>
-                )}
+                  {ent.requiresDateFilter && (
+                    <span style={{
+                      fontSize: '0.62rem', fontWeight: 700, color: '#B45309', background: '#FEF3C7',
+                      padding: '2px 6px', borderRadius: '4px'
+                    }}>
+                      📅 Fechas obligatorias
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -583,8 +649,8 @@ export default function ConsultaServiceLayer() {
                 </div>
               </div>
 
-              {/* Filtro Almacén y Búsqueda */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              {/* Filtros de Almacén, Estatus, Clasificación y Búsqueda */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
                     Almacén
@@ -613,11 +679,42 @@ export default function ConsultaServiceLayer() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                    Estatus Documento
+                  </label>
+                  <select
+                    value={estatusDoc}
+                    onChange={(e) => setEstatusDoc(e.target.value)}
+                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                  >
+                    <option value="ALL">Todos los Estatus</option>
+                    <option value="OPEN">Solo Abiertos / Pendientes / Activos</option>
+                    <option value="CLOSED">Solo Cerrados / Vencidos</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                    Clasificación Sanitaria
+                  </label>
+                  <select
+                    value={clasificacionMedica}
+                    onChange={(e) => setClasificacionMedica(e.target.value)}
+                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                  >
+                    <option value="ALL">Todas las Clasificaciones</option>
+                    <option value="CON">Controlados (Grupo I, II, III)</option>
+                    <option value="ANTI">Antibióticos (Grupo IV)</option>
+                    <option value="REFRI">Red Fría / Refrigerados</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
                     Búsqueda de Texto
                   </label>
                   <input
                     type="text"
-                    placeholder="Código, nombre, proveedor..."
+                    placeholder="Código, nombre, médico, proveedor..."
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                     style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
@@ -640,7 +737,7 @@ export default function ConsultaServiceLayer() {
               </div>
 
               <div style={{
-                maxHeight: '160px',
+                maxHeight: '190px',
                 overflowY: 'auto',
                 border: '1px solid #E2E8F0',
                 borderRadius: '8px',
@@ -739,6 +836,39 @@ export default function ConsultaServiceLayer() {
             </div>
           </div>
 
+          {/* Tarjetas de Métricas KPI Dinámicas */}
+          {queryResult.kpis && queryResult.kpis.length > 0 && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(auto-fit, minmax(180px, 1fr))`,
+              gap: '0.75rem',
+              padding: '1rem 1.25rem',
+              background: '#F1F5F9',
+              borderBottom: '1px solid #E2E8F0'
+            }}>
+              {queryResult.kpis.map((kpi, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: '#fff',
+                    borderRadius: '8px',
+                    padding: '0.75rem 1rem',
+                    border: '1px solid #E2E8F0',
+                    borderLeft: `4px solid ${kpi.color || '#004687'}`,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '2px' }}>
+                    {kpi.label}
+                  </div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: kpi.color || '#004687' }}>
+                    {kpi.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
           {/* Scrollbar Superior Sincronizada */}
           <div
             ref={topScrollRef}
@@ -818,13 +948,34 @@ export default function ConsultaServiceLayer() {
                           formattedVal = Number(val).toLocaleString('es-MX');
                           cellStyle.fontWeight = 700;
                         } else if (col.type === 'status') {
-                          const isVencido = String(val).includes('Vencido');
-                          const isProx = String(val).includes('Próximo');
+                          const sStr = String(val);
+                          const isVencido = sStr.includes('Vencido') || sStr === 'Inactivo';
+                          const isProx = sStr.includes('Próximo');
+                          const isAbierta = sStr.includes('Abierta') || sStr.includes('Abierto') || sStr === 'O';
+                          const isCerrada = sStr.includes('Cerrada') || sStr.includes('Cerrado') || sStr === 'C';
+                          
+                          let bg = '#DCFCE7';
+                          let color = '#15803D';
+
+                          if (isVencido) {
+                            bg = '#FEE2E2';
+                            color = '#DC2626';
+                          } else if (isProx) {
+                            bg = '#FEF3C7';
+                            color = '#B45309';
+                          } else if (isAbierta) {
+                            bg = '#EFF6FF';
+                            color = '#0284C7';
+                          } else if (isCerrada) {
+                            bg = '#F1F5F9';
+                            color = '#64748B';
+                          }
+
                           formattedVal = (
                             <span style={{
                               padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800,
-                              background: isVencido ? '#FEE2E2' : isProx ? '#FEF3C7' : '#DCFCE7',
-                              color: isVencido ? '#DC2626' : isProx ? '#B45309' : '#15803D'
+                              background: bg,
+                              color: color
                             }}>
                               {val}
                             </span>
