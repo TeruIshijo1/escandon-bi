@@ -231,27 +231,27 @@ const TraceOrder = () => {
       {data && (
         <>
           {/* Detalles de la Orden */}
-          <div style={{ ...card, marginBottom: '1.5rem' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-              Detalles de la Orden {data.OrderInfo.DocNum}
+          <div style={{ ...card, marginBottom: '1.5rem', borderLeft: '4px solid #004687' }}>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#004687', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <span>📋</span> DETALLES DE LA ORDEN #{data.OrderInfo.DocNum}
             </div>
             <div style={{ height: 1, background: 'var(--navbar-border)', margin: '0.5rem 0 1rem' }} />
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2.5rem', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Cliente</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{data.OrderInfo.CardName} ({data.OrderInfo.CardCode})</div>
+                <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Cliente</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{data.OrderInfo.CardName} ({data.OrderInfo.CardCode})</div>
               </div>
               <div>
-                <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Fecha</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{new Date(data.OrderInfo.DocDate).toLocaleDateString()}</div>
+                <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Fecha</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{new Date(data.OrderInfo.DocDate).toLocaleDateString('es-MX')}</div>
               </div>
               <div>
-                <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Estatus SAP</div>
+                <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Estatus SAP</div>
                 <span style={{
                   display: 'inline-block',
-                  padding: '0.2rem 0.75rem',
+                  padding: '0.3rem 0.9rem',
                   borderRadius: '100px',
-                  fontSize: '0.75rem',
+                  fontSize: '0.85rem',
                   fontWeight: 700,
                   fontFamily: 'var(--font-mono)',
                   background: data.OrderInfo.DocumentStatus === 'bost_Open' ? 'rgba(var(--color-accent-warm-rgb), 0.15)' : 'rgba(var(--color-verde-e-rgb), 0.15)',
@@ -261,34 +261,41 @@ const TraceOrder = () => {
                 </span>
               </div>
               <div>
-                <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Total</div>
-                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>${parseFloat(data.OrderInfo.DocTotal).toFixed(2)}</div>
+                <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Total</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>${parseFloat(data.OrderInfo.DocTotal).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               </div>
             </div>
           </div>
 
           {/* Artículos */}
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 1rem' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 1rem' }}>
             Artículos de la Orden
           </h2>
 
           {data.Items.map((item, index) => (
             <div key={index} style={{ ...card, marginBottom: '1.25rem', borderLeft: '4px solid var(--color-azul-claro)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {item.ItemCode} - {item.ItemDescription}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 800, color: '#004687' }}>
+                    {item.ItemCode} - {item.ItemDescription}
+                  </div>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.45rem 1.1rem',
+                    borderRadius: '8px',
+                    fontSize: '0.92rem',
+                    fontWeight: 800,
+                    fontFamily: 'var(--font-mono)',
+                    background: '#EFF6FF',
+                    color: '#004687',
+                    border: '1.5px solid #93C5FD',
+                    boxShadow: '0 1px 3px rgba(0, 70, 135, 0.08)'
+                  }}>
+                    <span>📦</span> Solicitado: <strong style={{ fontSize: '1.05rem', color: '#0077B6' }}>{item.RequestedQuantity}</strong> en <strong>{item.TargetWarehouse}</strong>
+                  </span>
                 </div>
-                <span style={{
-                  padding: '0.3rem 0.85rem',
-                  borderRadius: '100px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  fontFamily: 'var(--font-mono)',
-                  background: 'rgba(var(--color-azul-claro-rgb), 0.12)',
-                  color: 'var(--color-azul-claro)',
-                }}>
-                  Solicitado: {item.RequestedQuantity} en {item.TargetWarehouse}
-                </span>
               </div>
 
               <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
