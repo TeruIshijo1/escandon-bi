@@ -15,6 +15,7 @@ export default function InventarioFarmacia() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [itemTypeFilter, setItemTypeFilter] = useState('FAR'); // 'FAR' (Por defecto: Solo Medicamentos FAR) | 'ALL' (Todos los artículos)
 
   const [selectedItemBatches, setSelectedItemBatches] = useState(null);
   const [batches, setBatches] = useState([]);
@@ -140,12 +141,19 @@ export default function InventarioFarmacia() {
 
   // Filtrado local
   const filteredItems = useMemo(() => {
-    if (!searchTerm) return items;
+    let result = items;
+    
+    // Filtro por tipo de artículo (Por defecto FAR)
+    if (itemTypeFilter === 'FAR') {
+      result = result.filter(item => String(item.ItemCode || '').toUpperCase().startsWith('FAR'));
+    }
+
+    if (!searchTerm) return result;
     
     const term = String(searchTerm).toLowerCase().trim();
-    if (term === '') return items;
+    if (term === '') return result;
 
-    return items.filter(item => {
+    return result.filter(item => {
       const code = String(item.ItemCode || '').toLowerCase();
       const name = String(item.ItemName || '').toLowerCase();
       const group = String(item.ItemGroupName || '').toLowerCase();
@@ -154,7 +162,15 @@ export default function InventarioFarmacia() {
       const secClass = String(item.SecondaryClassification || '').toLowerCase();
       return code.includes(term) || name.includes(term) || group.includes(term) || mfg.includes(term) || medClass.includes(term) || secClass.includes(term);
     });
-  }, [items, searchTerm]);
+  }, [items, searchTerm, itemTypeFilter]);
+
+  // Items base según el filtro de tipo de artículo para los KPIs
+  const baseItems = useMemo(() => {
+    if (itemTypeFilter === 'FAR') {
+      return items.filter(item => String(item.ItemCode || '').toUpperCase().startsWith('FAR'));
+    }
+    return items;
+  }, [items, itemTypeFilter]);
 
   // Helper de clasificación médica SAP
   const getMedClassificationBadge = (item) => {
@@ -183,10 +199,10 @@ export default function InventarioFarmacia() {
   };
 
   // KPIs y Reabastecimiento
-  const totalItems = items.length;
-  const totalValue = items.reduce((acc, curr) => acc + ((curr.QuantityOnStock || 0) * (curr.PurchaseCost || 0)), 0);
+  const totalItems = baseItems.length;
+  const totalValue = baseItems.reduce((acc, curr) => acc + ((curr.QuantityOnStock || 0) * (curr.PurchaseCost || 0)), 0);
   const lowStockThreshold = 10;
-  const lowStockItems = useMemo(() => items.filter(item => item.QuantityOnStock < lowStockThreshold), [items]);
+  const lowStockItems = useMemo(() => baseItems.filter(item => item.QuantityOnStock < lowStockThreshold), [baseItems]);
   const lowStockCount = lowStockItems.length;
   const warehouseLabels = {
     FAR: '[FAR] Farmacia Central',
@@ -512,6 +528,54 @@ export default function InventarioFarmacia() {
                 <option value="ALL">Todos los almacenes SAP</option>
               </optgroup>
             </select>
+
+            {/* Selector de Catálogo: Solo FAR vs Todos */}
+            <div style={{ display: 'inline-flex', background: '#e2e8f0', padding: '0.2rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+              <button
+                type="button"
+                onClick={() => setItemTypeFilter('FAR')}
+                title="Mostrar solo artículos que inician con código FAR (Medicamentos)"
+                style={{
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: itemTypeFilter === 'FAR' ? '#0284c7' : 'transparent',
+                  color: itemTypeFilter === 'FAR' ? '#ffffff' : '#475569',
+                  boxShadow: itemTypeFilter === 'FAR' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+              >
+                <span>💊</span> Solo FAR
+              </button>
+              <button
+                type="button"
+                onClick={() => setItemTypeFilter('ALL')}
+                title="Mostrar todos los artículos (FAR + Insumos ALG, Materiales, etc.)"
+                style={{
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: itemTypeFilter === 'ALL' ? '#0284c7' : 'transparent',
+                  color: itemTypeFilter === 'ALL' ? '#ffffff' : '#475569',
+                  boxShadow: itemTypeFilter === 'ALL' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
+                }}
+              >
+                <span>📦</span> Todos los Artículos
+              </button>
+            </div>
             <div style={{ position: 'relative', flex: 1, maxWidth: '450px' }}>
               <input
                 type="text"
