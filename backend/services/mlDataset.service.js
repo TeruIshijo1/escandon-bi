@@ -3,41 +3,56 @@
 const { pool } = require('../config/pg-db');
 const sapInventoryService = require('./sapInventory.service');
 
+let isSyncingML = false;
+
 /**
  * Genera y sincroniza la tabla 'ml_dataset_reorden_sku' en PostgreSQL
  */
 async function syncMLDataset() {
+  if (isSyncingML) {
+    console.log('[ML Dataset] Sincronización de ML ya en progreso. Omitiendo ejecución concurrente.');
+    return;
+  }
+  isSyncingML = true;
+
   console.log('[ML Dataset] Iniciando generación del dataset analítico...');
 
   // 1. Asegurar que el caché de inventario SAP esté cargado (SAP en vivo o snapshot PostgreSQL)
   await sapInventoryService.ensureInventoryData();
   const inventoryMap = sapInventoryService.getInventoryMap();
 
-  // Stock total por artículo (suma entre almacenes, priorizando Farmacia 'FAR')
-  const stockBySku = new Map();
-  sapInventoryService.getInventoryCache().forEach(row => {
-    const prev = stockBySku.get(row.ItemCode) || { far: 0, total: 0 };
-    const qty = Number(row.QuantityOnStock || row.OnHand || 0);
-    prev.total += qty;
-    if (row.WhsCode === 'FAR') prev.far += qty;
-    stockBySku.set(row.ItemCode, prev);
-  });
-  const getStock = (itemCode) => {
-    const s = stockBySku.get(itemCode);
-    if (!s) return 0;
-    return s.far > 0 ? s.far : s.total;
-  };
+    const operationalWarehouses = new Set(['FAR', 'QX', 'QXCR']);
 
-  // 2. Obtener Universo de SKUs (dw_sap_reorder_settings)
-  const pgResSettings = await pool.query(`
-    SELECT itemcode, itemdescription, minstock, maxstock 
-    FROM dw_sap_reorder_settings
-  `);
-  const skus = pgResSettings.rows;
-  if (skus.length === 0) {
-    console.log('[ML Dataset] No hay registros en dw_sap_reorder_settings. Sincronización cancelada.');
-    return 0;
-  }
+    // Stock operativo por artículo: Farmacia, Quirófano y Carro Rojo.
+    const stockBySku = new Map();
+    sapInventoryService.getInventoryCache().forEach(row => {
+      const prev = stockBySku.get(row.ItemCode) || { far: 0, qx: 0, qxcr: 0, total: 0, hospitalTotal: 0 };
+      const qty = Number(row.QuantityOnStock || row.OnHand || 0);
+      prev.hospitalTotal += qty;
+      if (row.WhsCode === 'FAR') prev.far += qty;
+      if (row.WhsCode === 'QX') prev.qx += qty;
+      if (row.WhsCode === 'QXCR') prev.qxcr += qty;
+      if (operationalWarehouses.has(row.WhsCode)) prev.total += qty;
+      stockBySku.set(row.ItemCode, prev);
+    });
+    const getStock = (itemCode) => {
+      const s = stockBySku.get(itemCode);
+      if (!s) return 0;
+      return s.total > 0 ? s.total : s.hospitalTotal;
+    };
+
+    // 2. Obtener Universo de SKUs (dw_sap_reorder_settings) con deduplicación por itemcode
+    const pgResSettings = await pool.query(`
+      SELECT DISTINCT ON (UPPER(TRIM(itemcode))) 
+        itemcode, itemdescription, minstock, maxstock 
+      FROM dw_sap_reorder_settings
+      ORDER BY UPPER(TRIM(itemcode)), lastupdated DESC NULLS LAST
+    `);
+    const skus = pgResSettings.rows;
+    if (skus.length === 0) {
+      console.log('[ML Dataset] No hay registros en dw_sap_reorder_settings. Sincronización cancelada.');
+      return 0;
+    }
 
   // 3. Obtener Pedidos Abiertos (dw_sap_pedidos) y sumar openQuantity por ItemCode
   const openOrdersMap = new Map();
@@ -236,13 +251,29 @@ async function syncMLDataset() {
     console.log(`[ML Dataset] Guardando ${dataset.length} registros calculados en PostgreSQL...`);
 
     for (const item of dataset) {
-      // A. Guardar en la tabla de tiempo real (Dashboard)
+      // A. Guardar en la tabla de tiempo real (Dashboard) - con ON CONFLICT para evitar colisiones
       await client.query(`
         INSERT INTO ml_dataset_reorden_sku (
           itemcode, itemdescription, stock_actual, consumo_7d, consumo_15d, consumo_30d, 
           consumo_promedio_diario, variabilidad_consumo, minstock, maxstock, 
           pedidos_abiertos, fecha_ultimo_movimiento, fecha_desabasto, dias_stock_restante, riesgo_base, fecha_calculo
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
+        ON CONFLICT (itemcode) DO UPDATE SET
+          itemdescription = EXCLUDED.itemdescription,
+          stock_actual = EXCLUDED.stock_actual,
+          consumo_7d = EXCLUDED.consumo_7d,
+          consumo_15d = EXCLUDED.consumo_15d,
+          consumo_30d = EXCLUDED.consumo_30d,
+          consumo_promedio_diario = EXCLUDED.consumo_promedio_diario,
+          variabilidad_consumo = EXCLUDED.variabilidad_consumo,
+          minstock = EXCLUDED.minstock,
+          maxstock = EXCLUDED.maxstock,
+          pedidos_abiertos = EXCLUDED.pedidos_abiertos,
+          fecha_ultimo_movimiento = EXCLUDED.fecha_ultimo_movimiento,
+          fecha_desabasto = EXCLUDED.fecha_desabasto,
+          dias_stock_restante = EXCLUDED.dias_stock_restante,
+          riesgo_base = EXCLUDED.riesgo_base,
+          fecha_calculo = CURRENT_TIMESTAMP
       `, [
         item.itemcode,
         item.itemdescription,
@@ -341,11 +372,12 @@ async function syncMLDataset() {
     console.log('✅ [ML Dataset] Sincronización analítica y cálculo de targets completado.');
     return dataset.length;
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (client) await client.query('ROLLBACK');
     console.error('❌ [ML Dataset] Error al guardar dataset analítico:', err);
     throw err;
   } finally {
-    client.release();
+    if (client) client.release();
+    isSyncingML = false;
   }
 }
 

@@ -262,11 +262,98 @@ export default function DevolucionesFarmacia() {
     w.document.close();
   };
 
+  const exportToExcel = () => {
+    if (filtered.length === 0) {
+      alert('No hay devoluciones para exportar con los filtros seleccionados.');
+      return;
+    }
+
+    const cols = [
+      { header: 'Folio Ticket', key: 'Cuenta', align: 'center', width: 90 },
+      { header: 'No. Requisición', key: 'Orden', align: 'center', width: 100 },
+      { header: 'Fecha Devolución', key: 'FechaDevolucion', align: 'center', width: 140, type: 'datetime' },
+      { header: 'Estado', key: 'EstadoLinea', align: 'center', width: 110 },
+      { header: 'Solicita', key: 'UAbierto', align: 'left', width: 140 },
+      { header: 'Acepta', key: 'UConfirma', align: 'left', width: 140 },
+      { header: 'Paciente', key: 'Paciente', align: 'left', width: 220 },
+      { header: 'Cama', key: 'Cama', align: 'center', width: 90 },
+      { header: 'Código', key: 'Codigo', width: 100, align: 'center' },
+      { header: 'Insumo / Medicamento', key: 'Insumo', align: 'left', width: 280 },
+      { header: 'Cant. Devuelta', key: 'CantidadDevuelta', align: 'center', width: 100, type: 'num' },
+      { header: 'Precio Unitario ($)', key: 'PrecioUnitario', align: 'right', width: 110, type: 'money' },
+      { header: 'Monto Total ($)', key: 'Monto', align: 'right', width: 110, type: 'money' }
+    ];
+
+    const fmt = (val, col) => {
+      if (val == null || val === '') return '';
+      if (col.type === 'date') return new Date(val).toLocaleDateString('es-MX');
+      if (col.type === 'datetime') return new Date(val).toLocaleString('es-MX');
+      if (col.type === 'money') return `$${Number(val).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return String(val).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
+
+    const tMonto = filtered.reduce((s, r) => s + (Number(r.Monto) || 0), 0);
+    const tCant = filtered.reduce((s, r) => s + (Number(r.CantidadDevuelta) || 0), 0);
+    const fechaReporte = new Date().toLocaleString('es-MX');
+
+    const activeColFiltersStr = Object.entries(colFilters)
+      .filter(([, v]) => v)
+      .map(([k, v]) => `${k}: "${v}"`)
+      .join(', ');
+
+    const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse;width:100%}
+  .title-bar{background:#004687;color:#fff;font-size:16pt;font-weight:bold;padding:12px 16px}
+  .subtitle-bar{background:#0088C9;color:#fff;font-size:10pt;padding:6px 16px}
+  .info-row td{font-size:9pt;color:#475569;padding:4px 16px}
+  th{background:#004687;color:#fff;font-weight:bold;font-size:10pt;padding:10px 8px;border:1px solid #003366;text-align:center}
+  td{padding:7px 8px;font-size:9pt;border:1px solid #D1D5DB;color:#1E293B}
+  .even{background:#F4F6F9}.odd{background:#FFF}
+  .money{color:#15803D;font-weight:bold;text-align:right}
+  .code{color:#005FA9;font-weight:bold}
+  .devuelto{background:#D1FAE5;color:#065F46;font-weight:bold}
+  .total-row td{background:#E0EAF4;font-weight:bold;color:#004687;border-top:2px solid #004687;font-size:10pt;padding:10px 8px}
+</style></head><body>
+<table>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte de Devoluciones de Farmacia a Áreas Clínicas</td></tr>
+  <tr class="info-row"><td colspan="${cols.length}">Período: ${fechaDesde || 'Inicio'} al ${fechaHasta || 'Hoy'} &nbsp;|&nbsp; Filtros activos: ${activeColFiltersStr || 'Ninguno (Todos)'} &nbsp;|&nbsp; Registros: ${filtered.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
+  <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
+  <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
+  ${filtered.map((row, i) => `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">${cols.map(c => {
+    let cls = '', val = fmt(row[c.key], c);
+    if (c.key === 'Codigo') cls = ' class="code"';
+    if (c.key === 'EstadoLinea' && row.EstadoLinea === 'DEVUELTO') cls = ' class="devuelto"';
+    if (c.type === 'money') cls = ' class="money"';
+    return `<td${cls} style="text-align:${c.align}">${val}</td>`;
+  }).join('')}</tr>`).join('')}
+  <tr class="total-row">
+    <td colspan="10" style="text-align:right">TOTALES</td>
+    <td style="text-align:center">${tCant.toLocaleString('es-MX')}</td>
+    <td></td>
+    <td style="text-align:right">$${tMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+  </tr>
+</table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Devoluciones_Farmacia_${fechaDesde || 'inicio'}_${fechaHasta || 'hoy'}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const filtered = useMemo(() => {
     return rows.filter(item => {
       return Object.keys(colFilters).every(key => {
         if (!colFilters[key]) return true;
-        return String(item[key]) === String(colFilters[key]);
+        return String(item[key] ?? '').trim().toLowerCase() === String(colFilters[key]).trim().toLowerCase();
       });
     });
   }, [rows, colFilters]);
@@ -341,7 +428,31 @@ export default function DevolucionesFarmacia() {
             >
               🧹 Limpiar Filtros
             </button>
-            <ExportButton type="excel" variant="solid" reportId="devoluciones-farmacia" queryParams={{ fechaDesde, fechaHasta }} />
+            <button
+              onClick={exportToExcel}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.6rem 1.1rem',
+                background: '#00974A',
+                border: 'none',
+                borderRadius: 10,
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,151,74,0.35)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>
+                <line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/>
+              </svg>
+              Exportar Excel
+            </button>
           </div>
         </div>
       </div>

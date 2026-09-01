@@ -45,7 +45,7 @@ const StaticTh = ({ label, align = 'center' }) => (
 export default function CargosSAP() {
   const topScrollRef = useRef(null);
   const tableScrollRef = useRef(null);
-  const [tableScrollWidth, setTableScrollWidth] = useState(1200);
+  const [tableScrollWidth, setTableScrollWidth] = useState(1400);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +55,7 @@ export default function CargosSAP() {
   
   const [fechaDesde, setFechaDesde] = useState(getTodayStr());
   const [fechaHasta, setFechaHasta] = useState(getTodayStr());
-  const [areaBusqueda, setAreaBusqueda] = useState('QUIROFANO');
+  const [areaBusqueda, setAreaBusqueda] = useState('');
 
   const [colFilters, setColFilters] = useState({});
   const [page, setPage] = useState(1);
@@ -115,7 +115,7 @@ export default function CargosSAP() {
     return rows.filter(row => {
       return Object.entries(colFilters).every(([key, val]) => {
         if (!val) return true;
-        return row[key] == val;
+        return String(row[key] ?? '').trim().toLowerCase() === String(val).trim().toLowerCase();
       });
     });
   }, [rows, colFilters]);
@@ -128,6 +128,8 @@ export default function CargosSAP() {
 
   const totalMonto = useMemo(() => filtered.reduce((s, r) => s + (Number(r.MontoCobrado) || 0), 0), [filtered]);
   const totalCant = useMemo(() => filtered.reduce((s, r) => s + (Number(r.CantidadCargada) || 0), 0), [filtered]);
+  const uniqueAreasDestino = useMemo(() => new Set(filtered.map(r => r.AreaDestino).filter(Boolean)).size, [filtered]);
+  const uniqueUsuariosCargo = useMemo(() => new Set(filtered.map(r => r.UsuarioCargo).filter(Boolean)).size, [filtered]);
 
   const handleTopScroll = () => {
     if (topScrollRef.current && tableScrollRef.current) {
@@ -145,7 +147,7 @@ export default function CargosSAP() {
     .cargos-row { transition: all 0.15s ease; }
     .cargos-row:hover { background: #EFF6FF !important; }
     .cargos-badge { transition: all 0.15s ease; }
-    .cargos-row:hover .cargos-badge { transform: scale(1.05); }
+    .cargos-row:hover .cargos-badge { transform: scale(1.03); }
     .cargos-btn { transition: all 0.15s ease; }
     .cargos-btn:hover:not(:disabled) { background: #004687 !important; color: #fff !important; border-color: #004687 !important; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,70,135,0.25); }
     .cargos-export-btn { transition: all 0.2s ease; }
@@ -153,16 +155,16 @@ export default function CargosSAP() {
   `;
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ padding: '2rem', maxWidth: '1500px', margin: '0 auto' }}>
       <style>{tableStyles}</style>
 
       {/* ── Encabezado ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#1E293B', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '2.5rem' }}>🧾</span> Cargos a Pacientes <span style={{ fontSize: '1.25rem', color: '#64748b', fontWeight: 'normal', marginTop: '0.5rem' }}>(SAP)</span>
+            <span style={{ fontSize: '2.5rem' }}>🧾</span> Cargos a Pacientes <span style={{ fontSize: '1.25rem', color: '#0088C9', fontWeight: 'normal', marginTop: '0.5rem' }}>(Farmacia)</span>
           </h1>
-          <p style={{ color: '#64748b' }}>Consulta de consumos facturados extrayendo lotes y caducidades contabilizados en SAP.</p>
+          <p style={{ color: '#64748b' }}>Dispensaciones y consumos de medicamentos e insumos de Farmacia con trazabilidad de origen, destino, usuarios y lotes SAP.</p>
         </div>
         
         {rows.length > 0 && (
@@ -171,16 +173,19 @@ export default function CargosSAP() {
             onClick={() => {
               const cols = [
                 { header: 'Folio/Orden', key: 'OrdenId', align: 'center', width: 90 },
-                { header: 'Paciente', key: 'NombrePaciente', align: 'left', width: 220 },
-                { header: 'Área / Cama', key: 'AreaHospitalaria', align: 'center', width: 140 },
-                { header: 'Código', key: 'Codigo', align: 'center', width: 100 },
-                { header: 'Insumo / Medicamento', key: 'Insumo', align: 'left', width: 280 },
-                { header: 'Cantidad', key: 'CantidadCargada', align: 'center', width: 80, type: 'num' },
-                { header: 'Lote', key: 'Lote', align: 'center', width: 110 },
-                { header: 'Caducidad', key: 'Caducidad', align: 'center', width: 100, type: 'date' },
-                { header: 'Total ($)', key: 'MontoCobrado', align: 'right', width: 100, type: 'money' },
                 { header: 'Fecha Cargo', key: 'FechaCargo', align: 'center', width: 140, type: 'datetime' },
-                { header: 'Médico Tratante', key: 'MedicoTratante', align: 'left', width: 200 },
+                { header: 'Paciente', key: 'NombrePaciente', align: 'left', width: 220 },
+                { header: 'Código', key: 'Codigo', align: 'center', width: 90 },
+                { header: 'Insumo / Medicamento', key: 'Insumo', align: 'left', width: 260 },
+                { header: 'Cantidad', key: 'CantidadCargada', align: 'center', width: 75, type: 'num' },
+                { header: 'Total ($)', key: 'MontoCobrado', align: 'right', width: 95, type: 'money' },
+                { header: 'Lote', key: 'Lote', align: 'center', width: 100 },
+                { header: 'Caducidad', key: 'Caducidad', align: 'center', width: 95, type: 'date' },
+                { header: 'Área Origen (Cargó)', key: 'AreaOrigen', align: 'center', width: 140 },
+                { header: 'Usuario Cargo', key: 'NombreUsuarioCargo', align: 'left', width: 200 },
+                { header: 'Área / Cama Destino', key: 'AreaDestino', align: 'left', width: 170 },
+                { header: 'Usuario Solicitó', key: 'NombreUsuarioSolicita', align: 'left', width: 200 },
+                { header: 'Médico Tratante', key: 'MedicoTratante', align: 'left', width: 190 },
               ];
               const fmt = (val, col) => {
                 if (val == null || val === '') return '';
@@ -208,8 +213,8 @@ export default function CargosSAP() {
 </style></head><body>
 <table>
   <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
-  <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte de Cargos a Pacientes — Lotes y Caducidades (SAP Business One)</td></tr>
-  <tr class="info-row"><td colspan="${cols.length}">Período: ${fechaDesde} al ${fechaHasta} &nbsp;|&nbsp; Área: ${areaBusqueda || 'TODAS'} &nbsp;|&nbsp; Registros: ${filtered.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte de Cargos a Pacientes — Farmacia (Trazabilidad Origen/Destino y SAP)</td></tr>
+  <tr class="info-row"><td colspan="${cols.length}">Período: ${fechaDesde} al ${fechaHasta} &nbsp;|&nbsp; Filtro Área: ${areaBusqueda || 'TODAS'} &nbsp;|&nbsp; Registros: ${filtered.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
   <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
   <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
   ${filtered.map((row, i) => `<tr class="${i%2===0?'even':'odd'}">${cols.map(c => {
@@ -221,15 +226,14 @@ export default function CargosSAP() {
   <tr class="total-row">
     <td colspan="5" style="text-align:right">TOTALES</td>
     <td style="text-align:center">${tCant.toLocaleString('es-MX')}</td>
-    <td colspan="2"></td>
     <td style="text-align:right">$${tMonto.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
-    <td colspan="2"></td>
+    <td colspan="${cols.length - 7}"></td>
   </tr>
 </table></body></html>`;
               const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
-              a.href = url; a.download = `Cargos_Pacientes_SAP_${fechaDesde}_${fechaHasta}.xls`;
+              a.href = url; a.download = `Cargos_Farmacia_Pacientes_${fechaDesde}_${fechaHasta}.xls`;
               document.body.appendChild(a); a.click(); document.body.removeChild(a);
               URL.revokeObjectURL(url);
             }}
@@ -252,7 +256,9 @@ export default function CargosSAP() {
 
       {/* ── Filtros ── */}
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#334155', marginBottom: '1rem' }}>Filtros de Búsqueda</h2>
+        <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#334155', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span>🔍</span> Filtros Generales
+        </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>Fecha Desde</label>
@@ -265,25 +271,23 @@ export default function CargosSAP() {
               style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>Área / Departamento</label>
+            <label style={{ display: 'block', fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>Filtrar Área Destino</label>
             <select value={areaBusqueda} onChange={e => setAreaBusqueda(e.target.value)}
               style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white' }}>
               <option value="">Todas las áreas</option>
               <option value="QUIROFANO">Quirófano</option>
               <option value="URGENCIAS">Urgencias</option>
-              <option value="UCI">UCI</option>
+              <option value="UCI">UCI / Terapia Intensiva</option>
               <option value="HOSPITALIZACION">Hospitalización</option>
-              <option value="CUNEROS">Cuneros</option>
+              <option value="CUNEROS">Cuneros / Neonatal</option>
               <option value="CONSULTA_EXTERNA">Consulta Externa</option>
-              <option value="LABORATORIO">Laboratorio</option>
-              <option value="IMAGENOLOGIA">Imagenología</option>
             </select>
           </div>
         </div>
       </div>
 
       {loading ? (
-        <PremiumLoader text="Consultando información contable en SAP..." />
+        <PremiumLoader text="Consultando cargos de Farmacia en Cirrus y SAP..." />
       ) : error ? (
         <div style={{ padding: '2rem', background: '#fee2e2', color: '#991b1b', borderRadius: '12px', textAlign: 'center' }}>
           <p><strong>Error:</strong> {error}</p>
@@ -295,23 +299,33 @@ export default function CargosSAP() {
           {/* ── Barra de resumen ── */}
           <div style={{ 
             padding: '1rem 1.5rem', borderBottom: '1px solid #e2e8f0', 
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem',
             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', fontWeight: 600 }}>Registros</div>
+                <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', fontWeight: 600 }}>Cargos Farmacia</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#004687' }}>{filtered.length}</div>
               </div>
               <div style={{ width: '1px', height: '32px', background: '#e2e8f0' }} />
               <div>
-                <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', fontWeight: 600 }}>Piezas</div>
+                <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', fontWeight: 600 }}>Piezas / Unid.</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0088C9' }}>{totalCant.toLocaleString('es-MX')}</div>
               </div>
               <div style={{ width: '1px', height: '32px', background: '#e2e8f0' }} />
               <div>
                 <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', fontWeight: 600 }}>Monto Total</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#15803d' }}>${totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+              </div>
+              <div style={{ width: '1px', height: '32px', background: '#e2e8f0' }} />
+              <div>
+                <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', fontWeight: 600 }}>Áreas Receptoras</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#4f46e5' }}>{uniqueAreasDestino}</div>
+              </div>
+              <div style={{ width: '1px', height: '32px', background: '#e2e8f0' }} />
+              <div>
+                <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', fontWeight: 600 }}>Usuarios Dispensadores</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0891b2' }}>{uniqueUsuariosCargo}</div>
               </div>
             </div>
             {Object.keys(colFilters).length > 0 && (
@@ -329,28 +343,32 @@ export default function CargosSAP() {
 
           {/* ── Tabla ── */}
           <div ref={tableScrollRef} onScroll={handleTableScroll} style={{ overflowX: 'auto', maxHeight: '65vh' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1300px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1550px' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr>
                   <ColumnFilter columnKey="OrdenId" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Folio" maxWidth="90px" />
-                  <ColumnFilter columnKey="NombrePaciente" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Paciente" />
-                  <ColumnFilter columnKey="AreaHospitalaria" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Área" maxWidth="130px" />
-                  <ColumnFilter columnKey="Insumo" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Insumo" maxWidth="280px" />
+                  <StaticTh label="Fecha Cargo" />
+                  <ColumnFilter columnKey="NombrePaciente" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Paciente" maxWidth="200px" />
+                  <ColumnFilter columnKey="Codigo" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Código" maxWidth="100px" />
+                  <ColumnFilter columnKey="Insumo" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Insumo / Medicamento" maxWidth="260px" />
                   <StaticTh label="Cant." />
-                  <StaticTh label="Lote" />
-                  <StaticTh label="Caducidad" />
                   <StaticTh label="Total ($)" align="right" />
-                  <StaticTh label="Fecha" />
-                  <ColumnFilter columnKey="MedicoTratante" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Médico" />
+                  <ColumnFilter columnKey="Lote" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Lote" maxWidth="120px" />
+                  <StaticTh label="Caducidad" />
+                  <ColumnFilter columnKey="AreaOrigen" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Área Origen (Cargó)" maxWidth="160px" />
+                  <ColumnFilter columnKey="NombreUsuarioCargo" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Usuario Cargo" maxWidth="180px" />
+                  <ColumnFilter columnKey="AreaDestino" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Área / Cama Destino" maxWidth="180px" />
+                  <ColumnFilter columnKey="NombreUsuarioSolicita" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Usuario Solicitó" maxWidth="180px" />
+                  <ColumnFilter columnKey="MedicoTratante" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Médico" maxWidth="180px" />
                 </tr>
               </thead>
               <tbody>
                 {paginated.length === 0 ? (
                   <tr>
-                    <td colSpan="10" style={{ textAlign: 'center', padding: '4rem 2rem', color: '#94a3b8' }}>
-                      <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📋</div>
-                      <div style={{ fontWeight: '600', fontSize: '1rem', color: '#64748b' }}>Sin resultados</div>
-                      <div style={{ fontSize: '0.85rem' }}>No hay cargos que coincidan con los filtros seleccionados.</div>
+                    <td colSpan="14" style={{ textAlign: 'center', padding: '4rem 2rem', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>💊</div>
+                      <div style={{ fontWeight: '600', fontSize: '1rem', color: '#64748b' }}>Sin resultados de Farmacia</div>
+                      <div style={{ fontSize: '0.85rem' }}>No hay cargos de farmacia que coincidan con los filtros seleccionados.</div>
                     </td>
                   </tr>
                 ) : paginated.map((r, i) => {
@@ -360,62 +378,128 @@ export default function CargosSAP() {
                       borderBottom: '1px solid #f1f5f9', 
                       background: i % 2 === 0 ? '#ffffff' : '#f8fafc',
                     }}>
+                      {/* Folio */}
                       <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <span style={{ 
                           fontWeight: '700', color: '#004687', fontSize: '0.82rem',
-                          background: '#EFF6FF', padding: '3px 10px', borderRadius: '6px',
+                          background: '#EFF6FF', padding: '3px 8px', borderRadius: '6px',
                           border: '1px solid #BFDBFE', display: 'inline-block',
                         }}>{r.OrdenId}</span>
                       </td>
-                      <td style={{ padding: '12px 10px' }}>
-                        <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.84rem' }}>{r.NombrePaciente}</div>
+
+                      {/* Fecha */}
+                      <td style={{ padding: '12px 10px', textAlign: 'center', fontSize: '0.78rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                        {r.FechaCargo ? new Date(r.FechaCargo).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                       </td>
-                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
-                        <span className="cargos-badge" style={{ 
-                          background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#3730a3', 
-                          padding: '3px 10px', borderRadius: '20px', fontSize: '0.7rem', 
-                          fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block',
-                          boxShadow: '0 1px 3px rgba(55,48,163,0.12)',
-                        }}>
-                          {r.AreaHospitalaria}
-                        </span>
+
+                      {/* Paciente */}
+                      <td style={{ padding: '12px 10px', maxWidth: '200px' }}>
+                        <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.82rem' }}>{r.NombrePaciente}</div>
+                        {r.Cuenta && (
+                          <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Cuenta #{r.Cuenta} {r.TipoCuenta ? `· ${r.TipoCuenta}` : ''}</div>
+                        )}
                       </td>
-                      <td style={{ padding: '12px 10px', maxWidth: '280px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
-                        <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontFamily: 'monospace', marginBottom: '1px' }}>{r.Codigo}</div>
-                        <div style={{ fontWeight: '500', color: '#1e293b', fontSize: '0.82rem', lineHeight: '1.3' }}>{r.Insumo}</div>
-                      </td>
+
+                      {/* Código */}
                       <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <span style={{ 
-                          fontWeight: '700', fontSize: '0.9rem', color: '#334155',
-                          background: '#f1f5f9', padding: '2px 10px', borderRadius: '4px',
+                          fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: '700',
+                          color: '#004687', background: '#f0f9ff', padding: '2px 6px', borderRadius: '4px',
+                          border: '1px solid #bae6fd',
+                        }}>{r.Codigo}</span>
+                      </td>
+
+                      {/* Insumo */}
+                      <td style={{ padding: '12px 10px', maxWidth: '260px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
+                        <div style={{ fontWeight: '500', color: '#1e293b', fontSize: '0.82rem', lineHeight: '1.3' }}>{r.Insumo}</div>
+                      </td>
+
+                      {/* Cantidad */}
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                        <span style={{ 
+                          fontWeight: '700', fontSize: '0.88rem', color: '#334155',
+                          background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px',
                         }}>{r.CantidadCargada}</span>
                       </td>
-                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
-                        <span style={{ fontWeight: '700', color: r.Lote ? '#b45309' : '#cbd5e1', fontSize: '0.82rem' }}>
-                          {r.Lote || '—'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
-                        {r.Caducidad ? (
-                          <span style={{ 
-                            fontSize: '0.78rem', fontWeight: '500',
-                            background: caducado ? '#FEE2E2' : '#f0fdf4',
-                            color: caducado ? '#991b1b' : '#166534',
-                            padding: '2px 8px', borderRadius: '4px',
-                          }}>
-                            {new Date(r.Caducidad).toLocaleDateString('es-MX')}
-                          </span>
-                        ) : <span style={{ color: '#cbd5e1' }}>—</span>}
-                      </td>
+
+                      {/* Total $ */}
                       <td style={{ padding: '12px 10px', textAlign: 'right' }}>
                         <span style={{ fontWeight: '700', color: '#15803d', fontSize: '0.88rem' }}>
                           ${(r.MontoCobrado || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 10px', textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>
-                        {r.FechaCargo ? new Date(r.FechaCargo).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+
+                      {/* Lote */}
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                        <span style={{ fontWeight: '700', color: r.Lote ? '#b45309' : '#cbd5e1', fontSize: '0.8rem' }}>
+                          {r.Lote || '—'}
+                        </span>
                       </td>
-                      <td style={{ padding: '12px 10px', fontSize: '0.82rem', color: '#475569' }}>
+
+                      {/* Caducidad */}
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                        {r.Caducidad ? (
+                          <span style={{ 
+                            fontSize: '0.75rem', fontWeight: '600',
+                            background: caducado ? '#FEE2E2' : '#f0fdf4',
+                            color: caducado ? '#991b1b' : '#166534',
+                            padding: '2px 6px', borderRadius: '4px',
+                          }}>
+                            {new Date(r.Caducidad).toLocaleDateString('es-MX')}
+                          </span>
+                        ) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+
+                      {/* Área Origen (Cargó) */}
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                        <span className="cargos-badge" style={{ 
+                          background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)', color: '#065f46', 
+                          border: '1px solid #a7f3d0',
+                          padding: '3px 8px', borderRadius: '12px', fontSize: '0.7rem', 
+                          fontWeight: '700', whiteSpace: 'nowrap', display: 'inline-block',
+                        }}>
+                          {r.AreaOrigen || 'FARMACIA'}
+                        </span>
+                      </td>
+
+                      {/* Usuario que Cargó */}
+                      <td style={{ padding: '12px 10px', maxWidth: '180px' }}>
+                        <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '0.8rem', lineHeight: '1.2' }}>
+                          {r.NombreUsuarioCargo || r.UsuarioCargo || '—'}
+                        </div>
+                        {r.UsuarioCargo && (
+                          <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace' }}>
+                            @{r.UsuarioCargo} {r.DeptoUsuarioCargo ? `(${r.DeptoUsuarioCargo})` : ''}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Área / Cama Destino */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <span className="cargos-badge" style={{ 
+                          background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#3730a3', 
+                          padding: '3px 9px', borderRadius: '12px', fontSize: '0.7rem', 
+                          fontWeight: '600', whiteSpace: 'nowrap', display: 'inline-block',
+                          boxShadow: '0 1px 2px rgba(55,48,163,0.1)',
+                        }}>
+                          {r.AreaDestino || r.AreaHospitalaria || 'NO ESPECIFICADA'}
+                        </span>
+                      </td>
+
+                      {/* Usuario Solicitante */}
+                      <td style={{ padding: '12px 10px', maxWidth: '180px' }}>
+                        <div style={{ fontWeight: '500', color: '#334155', fontSize: '0.78rem', lineHeight: '1.2' }}>
+                          {r.NombreUsuarioSolicita || r.UsuarioSolicita || '—'}
+                        </div>
+                        {r.UsuarioSolicita && (
+                          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+                            @{r.UsuarioSolicita} {r.DeptoUsuarioSolicita ? `(${r.DeptoUsuarioSolicita})` : ''}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Médico */}
+                      <td style={{ padding: '12px 10px', fontSize: '0.78rem', color: '#475569', maxWidth: '180px' }}>
                         {r.MedicoTratante || <span style={{ color: '#cbd5e1', fontStyle: 'italic' }}>No asignado</span>}
                       </td>
                     </tr>

@@ -35,8 +35,8 @@ const executeSAPQuery = async (queryName, sqlText, params) => {
   for(let key in params) {
     qs.append(key, `'${params[key]}'`);
   }
-  const response = await sapService.get(`/SQLQueries('${queryName}')/List?${qs.toString()}`);
-  return response.data.value || [];
+  const list = await sapService.fetchAllPages(`/SQLQueries('${queryName}')/List?${qs.toString()}`, {}, 5000);
+  return list || [];
 };
 
 /**

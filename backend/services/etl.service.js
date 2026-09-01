@@ -452,6 +452,21 @@ async function getTasaMortalidad({ periodo = 'mes' } = {}) {
   };
 }
 
+function parseUserComment(comment, username) {
+  if (!comment) return { name: username || 'No especificado', dept: '' };
+  const parts = String(comment).split(/[-–—]/).map(p => p.trim()).filter(Boolean);
+  if (parts.length === 0) return { name: username || 'No especificado', dept: '' };
+  
+  let name = parts[0];
+  let dept = parts.length > 1 ? parts[1] : '';
+  
+  if (name === name.toUpperCase() && name.length > 3) {
+    name = name.toLowerCase().replace(/(^|\s)\S/g, l => l.toUpperCase());
+  }
+  
+  return { name, dept };
+}
+
 async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000 }) {
   let pool;
   try {
@@ -468,7 +483,9 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
     SELECT TOP (@limit)
         PCPR.PCPRNum AS OrdenId,
         PC.PCNum AS Cuenta,
+        PC.PCType AS TipoCuenta,
         PT.FullName AS NombrePaciente,
+        ISNULL(VFR.FRName, ISNULL(CURR_FR.FRName, 'NO ESPECIFICADA')) AS AreaDestino,
         ISNULL(VFR.FRName, ISNULL(CURR_FR.FRName, 'NO ESPECIFICADA')) AS AreaHospitalaria,
         PCPRIT.ItemCode AS Codigo,
         ISNULL(VIT.ItemDescription, PCIT.ItemCode) AS Insumo,
@@ -478,8 +495,22 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
         PCPRBT.BatchCode AS Lote,
         PCPRBT.ExpirationDate AS Caducidad,
         PCIT.CreatedOn AS FechaCargo,
-        PCPR.CreatedBy AS UsuarioCargo,
-        PR.FullName AS MedicoTratante
+        
+        -- Usuarios
+        PCIT.CreatedBy AS UsuarioCargo,
+        U_CARGO.comment AS CommentUsuarioCargo,
+        PCPR.CreatedBy AS UsuarioSolicita,
+        U_SOLICITA.comment AS CommentUsuarioSolicita,
+        PR.FullName AS MedicoTratante,
+
+        -- Áreas Origen
+        PCIT.SUCode AS CodigoAreaOrigen,
+        ISNULL(SU_CARGO.SUName, PCIT.SUCode) AS AreaOrigen,
+        PCIT.FromWarehouseCode AS AlmacenOrigen,
+
+        -- Áreas Destino
+        PCBL.FRCode AS CodigoCamaCargo,
+        CURR_FR.FRName AS AreaActualPaciente
     FROM dbo.PCIT PCIT
     INNER JOIN dbo.PCPRIT PCPRIT ON PCIT.PCPRITNum = PCPRIT.PCPRITNum AND PCIT.ItemCode = PCPRIT.ItemCode
     INNER JOIN dbo.PCPR PCPR ON PCPRIT.PCPRNum = PCPR.PCPRNum
@@ -490,6 +521,9 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
     LEFT JOIN dbo.V_IT VIT ON PCPRIT.ItemCode = VIT.ItemCode
     LEFT JOIN dbo.PCBL PCBL ON PCPRIT.PCPRITNum = PCBL.PCPRITNum
     LEFT JOIN dbo.V_FR VFR ON PCBL.FRCode = VFR.FRCode
+    LEFT JOIN dbo.SU SU_CARGO ON PCIT.SUCode = SU_CARGO.SUCode
+    LEFT JOIN dbo.Users U_CARGO ON PCIT.CreatedBy = U_CARGO.userName
+    LEFT JOIN dbo.Users U_SOLICITA ON PCPR.CreatedBy = U_SOLICITA.userName
     OUTER APPLY (
       SELECT TOP 1 FR.FRName 
       FROM dbo.PCFR PCFR
@@ -498,6 +532,7 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
       ORDER BY PCFR.EntryDate DESC
     ) CURR_FR
     WHERE PCIT.PCIT_ST = N'CH'
+      AND (PCPRIT.ItemCode LIKE 'FAR%' OR VIT.ItemGroupCode = '115')
   `;
 
   const parseDateStr = (dateStr, isEndOfDay) => {
@@ -520,7 +555,7 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
   }
 
   if (area) {
-    querySQL += ` AND VFR.FRName LIKE @area`;
+    querySQL += ` AND (VFR.FRName LIKE @area OR SU_CARGO.SUName LIKE @area OR PC.PCType LIKE @area)`;
     request.input('area', sql.VarChar, `%${area}%`);
   }
 
@@ -528,6 +563,20 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
 
   const result = await request.query(querySQL);
   let records = result.recordset || [];
+
+  // Parsear nombres y departamentos de usuarios
+  records = records.map(row => {
+    const userCargoInfo = parseUserComment(row.CommentUsuarioCargo, row.UsuarioCargo);
+    const userSolicitaInfo = parseUserComment(row.CommentUsuarioSolicita, row.UsuarioSolicita);
+
+    return {
+      ...row,
+      NombreUsuarioCargo: userCargoInfo.name,
+      DeptoUsuarioCargo: userCargoInfo.dept,
+      NombreUsuarioSolicita: userSolicitaInfo.name,
+      DeptoUsuarioSolicita: userSolicitaInfo.dept,
+    };
+  });
 
   // Enriquecer con caducidad/lotes de SAP (cruzando Vertical y SAP)
   try {

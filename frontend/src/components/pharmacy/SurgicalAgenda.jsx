@@ -118,6 +118,73 @@ export default function SurgicalAgenda() {
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const exportAgendaToExcel = () => {
+    if (filteredEvents.length === 0) {
+      alert('No hay eventos de agenda para exportar con los filtros seleccionados.');
+      return;
+    }
+
+    const fechaReporte = new Date().toLocaleString('es-MX');
+    const cols = [
+      { header: 'Quirófano', width: 140, align: 'center' },
+      { header: 'Folio PCFR', width: 110, align: 'center' },
+      { header: 'Fecha y Hora', width: 150, align: 'center' },
+      { header: 'Paciente', width: 220, align: 'left' },
+      { header: 'Procedimiento', width: 260, align: 'left' },
+      { header: 'Equipo Médico', width: 200, align: 'left' },
+      { header: 'Insumos Cargados', width: 130, align: 'center' },
+      { header: 'Detalle de Insumos', width: 350, align: 'left' }
+    ];
+
+    const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse;width:100%}
+  .title-bar{background:#004687;color:#fff;font-size:16pt;font-weight:bold;padding:12px 16px}
+  .subtitle-bar{background:#0088C9;color:#fff;font-size:10pt;padding:6px 16px}
+  .info-row td{font-size:9pt;color:#475569;padding:4px 16px}
+  th{background:#004687;color:#fff;font-weight:bold;font-size:10pt;padding:10px 8px;border:1px solid #003366;text-align:center}
+  td{padding:7px 8px;font-size:9pt;border:1px solid #D1D5DB;color:#1E293B}
+  .even{background:#F4F6F9}.odd{background:#FFF}
+  .total-row td{background:#E0EAF4;font-weight:bold;color:#004687;border-top:2px solid #004687;font-size:10pt;padding:10px 8px}
+</style></head><body>
+<table>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte de Agenda Quirúrgica y Registro de Consumos</td></tr>
+  <tr class="info-row"><td colspan="${cols.length}">Período: Últimos ${days} días &nbsp;|&nbsp; Quirófano: ${quirofanoFilter} &nbsp;|&nbsp; Búsqueda: ${searchTerm ? `"${searchTerm}"` : 'TODOS'} &nbsp;|&nbsp; Registros: ${filteredEvents.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
+  <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
+  <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
+  ${filteredEvents.map((ev, i) => {
+    const fechaStr = new Date(ev.FechaInicio).toLocaleString('es-MX');
+    const insumosStr = (ev.ActualItems || []).map(item => `${item.Medicamento} (${item.Cantidad} pzas)`).join('; ');
+    return `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">
+      <td style="text-align:center;font-weight:bold">${ev.Quirofano}</td>
+      <td style="text-align:center;color:#005FA9;font-weight:bold">#${ev.PCFRNum}</td>
+      <td style="text-align:center">${fechaStr}</td>
+      <td style="font-weight:bold">${String(ev.Paciente || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td>${String(ev.Procedimiento || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td>${String(ev.Medicos || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td style="text-align:center;font-weight:bold">${ev.ActualItemsCount || 0}</td>
+      <td>${insumosStr || 'Sin consumos cargados'}</td>
+    </tr>`;
+  }).join('')}
+  <tr class="total-row">
+    <td colspan="${cols.length}">TOTAL CIRUGÍAS: ${filteredEvents.length}</td>
+  </tr>
+</table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Agenda_Quirofano_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{ background: 'var(--card-bg, #ffffff)', borderRadius: '16px', padding: '2rem', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)', border: '1px solid var(--border-color, #e2e8f0)' }}>
       {/* Header */}
@@ -132,7 +199,27 @@ export default function SurgicalAgenda() {
         </div>
 
         {!loading && !error && (
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <button
+              onClick={exportAgendaToExcel}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.55rem 1rem',
+                background: '#00974A',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 151, 74, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              📥 Exportar Excel
+            </button>
             <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '0.5rem 1rem', borderRadius: '12px', textAlign: 'center' }}>
               <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#3b82f6' }}>{events.length}</div>
               <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', fontWeight: 'bold' }}>Cirugías Registradas</div>

@@ -250,3 +250,24 @@ CREATE TABLE IF NOT EXISTS ConfiguracionBI (
     JsonApiUrl      TEXT          NULL,
     JsonFilePath    TEXT          NULL
 );
+
+-- ───────────────────────────────────────────────────────────────────
+-- MÓDULO 8: CONSULTAS PERSONALIZADAS SAP (SERVICE LAYER QUERY BUILDER)
+-- ───────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS UserSapQueries (
+    QueryId           SERIAL        PRIMARY KEY,
+    UserId            INTEGER       NULL REFERENCES Usuarios(UsuarioId) ON DELETE CASCADE,
+    Username          TEXT          NOT NULL,
+    Titulo            TEXT          NOT NULL,
+    Descripcion       TEXT          NULL,
+    Entidad           TEXT          NOT NULL,
+    CamposSeleccionados TEXT        NOT NULL,  -- JSON array de campos
+    FiltrosAplicados  TEXT          NOT NULL,  -- JSON object de filtros
+    EsPublico         INTEGER       NOT NULL DEFAULT 0,
+    FechaCreacion     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FechaModificacion TIMESTAMP     NULL
+);
+
+CREATE INDEX IF NOT EXISTS IX_UserSapQueries_User    ON UserSapQueries(Username);
+CREATE INDEX IF NOT EXISTS IX_UserSapQueries_Entidad ON UserSapQueries(Entidad);

@@ -1,16 +1,24 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// INT8 (bigint) → number para que COUNT(*) etc. no lleguen como strings
+types.setTypeParser(20, (v) => (v === null ? null : parseInt(v, 10)));
 
 // Configuración del Pool de PostgreSQL para el Data Warehouse
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'escandon_bi',
-  port: 5432,
-  // Agrega password: 'tu_password' si es necesario en producción
+  user:     process.env.PGUSER     || 'postgres',
+  host:     process.env.PGHOST     || 'localhost',
+  database: process.env.PGDATABASE || 'escandon_bi',
+  port:     parseInt(process.env.PGPORT || '5432', 10),
+  ...(process.env.PGPASSWORD ? { password: process.env.PGPASSWORD } : {}),
+});
+
+// Hora local del hospital para consultas consistentes
+pool.on('connect', (client) => {
+  client.query("SET TIME ZONE 'America/Mexico_City'").catch(() => {});
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Error inesperado en el pool de PostgreSQL:', err);
+  console.error('❌ Error inesperado en el pool de PostgreSQL:', err.message || err);
 });
 
 async function initPostgresDW() {
@@ -415,11 +423,15 @@ async function initPostgresDW() {
         quantity DECIMAL(18,4) DEFAULT 0,
         avgprice DECIMAL(18,4) DEFAULT 0,
         salesprice DECIMAL(18,4) DEFAULT 0,
+        price_pg DECIMAL(18,4) DEFAULT 0,
+        price_hos DECIMAL(18,4) DEFAULT 0,
         medicalclassification VARCHAR(20),
         secondaryclassification VARCHAR(20),
         lastsync TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await pool.query(`ALTER TABLE dw_sap_inventory_cache ADD COLUMN IF NOT EXISTS price_pg DECIMAL(18,4) DEFAULT 0;`).catch(() => {});
+    await pool.query(`ALTER TABLE dw_sap_inventory_cache ADD COLUMN IF NOT EXISTS price_hos DECIMAL(18,4) DEFAULT 0;`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_inv_cache_code ON dw_sap_inventory_cache (itemcode, whscode);`);
 
     // 6c. Vínculos manuales producto-Excel -> código SAP (Configuración Dinámica Farmacia)

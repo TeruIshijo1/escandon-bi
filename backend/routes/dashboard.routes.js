@@ -550,10 +550,9 @@ const mapSectionToQuery = (section) => {
         SELECT MONTH(p2.MedicalDischargeDate) AS mes, COUNT(DISTINCT p2.PTNum) AS total
         FROM PC p2 
         JOIN PT pt ON p2.PTNum = pt.PTNum
-        JOIN V_MRPT v ON p2.PTNum = v.PTNum 
+        JOIN (SELECT PTNum, MAX(RoomName) as RoomName FROM V_MRPT WHERE RoomName LIKE '%CUNERO%' OR RoomCode LIKE '%CUN%' GROUP BY PTNum) v ON p2.PTNum = v.PTNum 
         WHERE p2.MedicalDischargeDate >= '2026-04-01' AND p2.MedicalDischargeDate <= '2026-12-31'
           AND p2.PC_ST = 'CL' 
-          AND (v.RoomName LIKE '%CUNERO%' OR v.RoomCode LIKE '%CUN%')
           AND DATEDIFF(day, pt.BirthDate, p2.Date) = 0
         GROUP BY MONTH(p2.MedicalDischargeDate)
       `;
@@ -745,7 +744,6 @@ router.get(
                   activeData[mes] = total;
                 }
               });
-              console.debug('[HIS-Historico]', { seccion, activeData: { ...activeData } });
             }
           } catch (e) {
             console.error(`[HIS] Error al consultar ${seccion} activo en historico:`, e.message);
@@ -829,9 +827,6 @@ router.get(
               }
               
               const match = y === numYear && m === numMes;
-              if (!match && (y || m)) {
-                console.debug('[SAP] Fila filtrada:', { original: dStr, parsed: { y, m }, target: { y: numYear, m: numMes } });
-              }
               return match;
             }).map(r => ({
               FolioAtencion: r.AtencionMedica,
@@ -973,14 +968,15 @@ router.get(
               SELECT 
                 FOLIO_DE_ATENCION AS [FolioAtencion],
                 NOMBRE_DEL_PACIENTE AS [Paciente],
-                FECHA_DE_CARGO AS [FechaCargo],
-                CODIGO AS [CodigoServicio],
-                DESCRIPCION_DEL_ARTICULO AS [Servicio],
-                CANTIDAD_TOTAL AS [Cantidad],
-                TOTAL_COBRADO AS [TotalCobrado],
-                Medico_Solicitante AS [MedicoSolicitante],
-                Medico_Tratante AS [MedicoTratante],
-                UNIDAD_DE_SERVICIO AS [UnidadServicio]
+                MIN(FECHA_DE_CARGO) AS [FechaCargo],
+                MAX(CODIGO) AS [CodigoServicio],
+                MAX(DESCRIPCION_DEL_ARTICULO) AS [Servicio],
+                MAX(UNIDAD_DE_SERVICIO) AS [UnidadServicio],
+                MAX(Medico_Tratante) AS [MedicoTratante],
+                MAX(Medico_Solicitante) AS [MedicoSolicitante],
+                COUNT(*) AS [TotalCargosServicio],
+                SUM(CANTIDAD_TOTAL) AS [Cantidad],
+                SUM(TOTAL_COBRADO) AS [TotalCobrado]
               FROM UDR_CUENTAS_SERVICIOS
               WHERE YEAR(FECHA_DE_CARGO) = ${numYear} AND MONTH(FECHA_DE_CARGO) = ${numMes}
                 AND (
@@ -988,23 +984,25 @@ router.get(
                   OR DESCRIPCION_DEL_ARTICULO LIKE '%TERAPIA INTENSIVA%'
                   OR UNIDAD_DE_SERVICIO IN ('UCI', 'UCIN')
                 )
-              ORDER BY FECHA_DE_CARGO DESC
+              GROUP BY FOLIO_DE_ATENCION, NOMBRE_DEL_PACIENTE
+              ORDER BY [FechaCargo] DESC
             `;
             break;
           case '07_PERSONAS EN QX (USOQX1HR)':
             query = `
               SELECT 
                 Numero_Atencion_Medica AS [FolioAtencion],
-                Numero_Paciente AS [NoPaciente],
+                MAX(Numero_Paciente) AS [NoPaciente],
                 Paciente,
-                Quirofano,
-                FechaInicio,
-                FechaFin,
-                Medicos AS [CirujanosMedicos],
-                Procedimientos
+                MAX(Quirofano) AS [Quirofano],
+                MIN(FechaInicio) AS [FechaInicio],
+                MAX(FechaFin) AS [FechaFin],
+                MAX(Medicos) AS [CirujanosMedicos],
+                MAX(Procedimientos) AS [Procedimientos]
               FROM UDR_USOQX
               WHERE YEAR(FechaInicio) = ${numYear} AND MONTH(FechaInicio) = ${numMes}
-              ORDER BY FechaInicio DESC
+              GROUP BY Numero_Atencion_Medica, Paciente
+              ORDER BY [FechaInicio] DESC
             `;
             break;
           case '13_ESTADÍSTICO DE CIRUGÍAS':
@@ -1029,17 +1027,18 @@ router.get(
               SELECT 
                 FOLIO_DE_ATENCION AS [FolioAtencion],
                 NOMBRE_DEL_PACIENTE AS [Paciente],
-                FECHA_DE_CARGO AS [FechaCargo],
-                CODIGO AS [Codigo],
-                DESCRIPCION_DEL_ARTICULO AS [EstudioProcedimiento],
-                Medico_Solicitante AS [MedicoSolicitante],
-                Medico_Tratante AS [MedicoTratante],
-                Anestesiologo,
-                TOTAL_COBRADO AS [TotalCobrado]
+                MIN(FECHA_DE_CARGO) AS [FechaCargo],
+                MAX(CODIGO) AS [Codigo],
+                MAX(DESCRIPCION_DEL_ARTICULO) AS [EstudioProcedimiento],
+                MAX(Medico_Solicitante) AS [MedicoSolicitante],
+                MAX(Medico_Tratante) AS [MedicoTratante],
+                MAX(Anestesiologo) AS [Anestesiologo],
+                SUM(TOTAL_COBRADO) AS [TotalCobrado]
               FROM UDR_CUENTAS_SERVICIOS
               WHERE YEAR(FECHA_DE_CARGO) = ${numYear} AND MONTH(FECHA_DE_CARGO) = ${numMes}
                 AND (DESCRIPCION_DEL_ARTICULO LIKE '%ENDOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%COLONOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%BRONCOSCOP%' OR DESCRIPCION_DEL_ARTICULO LIKE '%PANENDOSCOP%')
-              ORDER BY FECHA_DE_CARGO DESC
+              GROUP BY FOLIO_DE_ATENCION, NOMBRE_DEL_PACIENTE
+              ORDER BY [FechaCargo] DESC
             `;
             break;
           case '09_CONSULTAS DE ESPECIALIDAD':
@@ -1099,7 +1098,6 @@ router.get(
             const pool = await connectRemoteDB();
             const result = await pool.request().query(query);
             records = result.recordset || [];
-            console.debug('[HIS-Detail]', { seccion, year: numYear, mes: numMes, recordsReturned: records.length, sampleFolio: records[0]?.FolioAtencion || records[0]?.FolioCuenta || records[0]?.FolioSolicitud || records[0]?.NoCita });
           } catch (e) {
             console.error(`[HIS] Error al consultar detalle ${seccion}:`, e.message);
           }
@@ -2596,7 +2594,7 @@ const ExcelJS = require('exceljs');
  * GET /api/dashboard/export-excel
  * Exporta la tabla de datos cruda del dashboard a Excel con el logo y formato institucional
  */
-router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR']), async (req, res, next) => {
+router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO', 'ALMACEN_GENERAL']), async (req, res, next) => {
   try {
     let { dashboard, startDate, endDate, search, especialidad } = req.query;
     
@@ -2724,13 +2722,15 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR']), asyn
         request.input('search', `%${search}%`);
       }
       query = `
-        SELECT TOP 500
+        SELECT TOP 10000
           Quirofano AS 'Quirófano',
+          Paciente AS 'Paciente',
           Procedimientos AS 'Procedimiento',
           Medicos AS 'Médicos',
           CONVERT(varchar(16), FechaInicio, 120) AS 'Fecha Inicio',
           CONVERT(varchar(16), FechaFin, 120) AS 'Fecha Fin',
-          DATEDIFF(MINUTE, FechaInicio, FechaFin) AS 'Duración (Min)'
+          DATEDIFF(MINUTE, FechaInicio, FechaFin) AS 'Duración (Min)',
+          ISNULL(Notas, 'Cirugía Registrada') AS 'Estado (SAP)'
         FROM UDR_USOQX
         WHERE ${whereClauses.join(' AND ')}
         ORDER BY FechaInicio DESC

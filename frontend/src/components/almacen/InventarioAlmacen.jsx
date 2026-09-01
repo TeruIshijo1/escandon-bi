@@ -394,8 +394,8 @@ export default function InventarioAlmacen() {
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#b45309' }}>{formatCurrency(purchase)}</td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#10b981' }}>{formatCurrency(sales)}</td>
                       <td style={{ padding: '1rem', textAlign: 'right' }}>
-                        <div style={{ fontWeight: '600', color: (item.ProfitMargin || 0) > 0 ? '#0ea5e9' : '#64748b' }}>
-                          {(item.ProfitMargin || 0).toFixed(1) + '%'}
+                        <div style={{ fontWeight: '600', color: (Number(item.ProfitMargin) || 0) > 0 ? '#0ea5e9' : '#64748b' }}>
+                          {Number(item.ProfitMargin || 0).toFixed(1) + '%'}
                         </div>
                         <div style={{ color: '#64748b', fontSize: '0.75rem' }}>
                           {formatCurrency(item.ExpectedUtility)}

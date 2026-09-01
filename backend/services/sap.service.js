@@ -193,7 +193,7 @@ class SapService {
    * Fetch a SAP Service Layer endpoint handling pagination automatically (odata.nextLink)
    * Returns an array of all values. Caches results for 5 minutes by endpoint key.
    */
-  async fetchAllPages(endpoint, additionalHeaders = {}) {
+  async fetchAllPages(endpoint, additionalHeaders = {}, maxPages = 1000) {
     if (!this.cache) this.cache = new Map();
     
     const cacheKey = endpoint;
@@ -211,8 +211,9 @@ class SapService {
     }
     
     let pageCount = 0;
-    const maxPages = 10; // Cap at 10 pages max (up to 10,000 records) to prevent hanging
-    
+    // Por defecto se recorren todas las paginas (hasta maxPages) para no truncar reportes por fecha.
+    // Los reportes que filtran por rango ya acotan el volumen; se usa un tope alto solo como salvaguarda.
+
     const headers = { 'Prefer': 'odata.maxpagesize=1000', ...additionalHeaders };
     
     while (currentEndpoint && pageCount < maxPages) {

@@ -411,13 +411,13 @@ export default function DashboardArea() {
             {area === AREAS.URGENCIAS && (
               <ExportButton 
                 type="excel" 
-                directUrl={`/dashboard/export-excel?dashboard=urgencias&search=${encodeURIComponent(urgenciasSearch)}`} 
+                directUrl={`/dashboard/export-excel?dashboard=urgencias&startDate=${globalFilters.startDate || ''}&endDate=${globalFilters.endDate || ''}&search=${encodeURIComponent(urgenciasSearch || globalFilters.search || '')}`} 
               />
             )}
             {area === AREAS.QUIROFANO && (
               <ExportButton 
                 type="excel" 
-                directUrl={`/dashboard/export-excel?dashboard=quirofano`} 
+                directUrl={`/dashboard/export-excel?dashboard=quirofano&startDate=${globalFilters.startDate || ''}&endDate=${globalFilters.endDate || ''}&search=${encodeURIComponent(globalFilters.search || '')}`} 
               />
             )}
           </div>

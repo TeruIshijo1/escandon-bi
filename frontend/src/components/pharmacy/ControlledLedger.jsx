@@ -170,9 +170,9 @@ export default function ControlledLedger() {
           box-shadow: 0 4px 14px rgba(0, 119, 182, 0.15);
         }
         .cl-card-con.active {
-          background: #FEF2F2;
-          border: 2px solid #DC2626;
-          box-shadow: 0 4px 14px rgba(220, 38, 38, 0.15);
+          background: #F5F3FF;
+          border: 2px solid #7C3AED;
+          box-shadow: 0 4px 14px rgba(124, 58, 237, 0.15);
         }
         .cl-card-anti.active {
           background: #EFF6FF;
@@ -180,16 +180,16 @@ export default function ControlledLedger() {
           box-shadow: 0 4px 14px rgba(37, 99, 235, 0.15);
         }
         .cl-card-refri.active {
-          background: #F0FDF4;
-          border: 2px solid #059669;
-          box-shadow: 0 4px 14px rgba(5, 150, 105, 0.15);
+          background: #E0F2FE;
+          border: 2px solid #0284C7;
+          box-shadow: 0 4px 14px rgba(2, 132, 199, 0.15);
         }
 
         /* ── KPI Numbers (Light Mode) ── */
         .cl-num-all { color: #0077B6; }
-        .cl-num-con { color: #DC2626; }
+        .cl-num-con { color: #7C3AED; }
         .cl-num-anti { color: #2563EB; }
-        .cl-num-refri { color: #059669; }
+        .cl-num-refri { color: #0284C7; }
 
         /* ── Badges in Cards (Light Mode) ── */
         .cl-card-badge {
@@ -199,12 +199,12 @@ export default function ControlledLedger() {
           font-weight: 700;
         }
         .cl-badge-all { background: #0077B6; color: #FFFFFF; }
-        .cl-badge-con { background: #FEE2E2; color: #DC2626; }
-        .cl-badge-con.active { background: #DC2626; color: #FFFFFF; }
+        .cl-badge-con { background: #F5F3FF; color: #7C3AED; }
+        .cl-badge-con.active { background: #7C3AED; color: #FFFFFF; }
         .cl-badge-anti { background: #DBEAFE; color: #1D4ED8; }
         .cl-badge-anti.active { background: #2563EB; color: #FFFFFF; }
-        .cl-badge-refri { background: #D1FAE5; color: #047857; }
-        .cl-badge-refri.active { background: #059669; color: #FFFFFF; }
+        .cl-badge-refri { background: #E0F2FE; color: #0284C7; }
+        .cl-badge-refri.active { background: #0284C7; color: #FFFFFF; }
 
         /* ══════════════════════════════════════════════════════════════════
            DARK MODE STYLES
@@ -228,9 +228,9 @@ export default function ControlledLedger() {
           box-shadow: 0 0 20px rgba(56, 189, 248, 0.3) !important;
         }
         [data-theme="dark"] .cl-card-con.active {
-          background: rgba(220, 38, 38, 0.25) !important;
-          border: 2px solid #F87171 !important;
-          box-shadow: 0 0 20px rgba(248, 113, 113, 0.3) !important;
+          background: rgba(124, 58, 237, 0.25) !important;
+          border: 2px solid #A78BFA !important;
+          box-shadow: 0 0 20px rgba(167, 139, 250, 0.3) !important;
         }
         [data-theme="dark"] .cl-card-anti.active {
           background: rgba(37, 99, 235, 0.25) !important;
@@ -238,16 +238,16 @@ export default function ControlledLedger() {
           box-shadow: 0 0 20px rgba(96, 165, 250, 0.3) !important;
         }
         [data-theme="dark"] .cl-card-refri.active {
-          background: rgba(5, 150, 105, 0.25) !important;
-          border: 2px solid #34D399 !important;
-          box-shadow: 0 0 20px rgba(52, 211, 153, 0.3) !important;
+          background: rgba(2, 132, 199, 0.25) !important;
+          border: 2px solid #38BDF8 !important;
+          box-shadow: 0 0 20px rgba(56, 189, 248, 0.3) !important;
         }
 
         /* Numbers in Dark Mode */
         [data-theme="dark"] .cl-num-all { color: #38BDF8 !important; }
-        [data-theme="dark"] .cl-num-con { color: #F87171 !important; }
+        [data-theme="dark"] .cl-num-con { color: #A78BFA !important; }
         [data-theme="dark"] .cl-num-anti { color: #60A5FA !important; }
-        [data-theme="dark"] .cl-num-refri { color: #34D399 !important; }
+        [data-theme="dark"] .cl-num-refri { color: #38BDF8 !important; }
 
         /* Badges in Dark Mode */
         [data-theme="dark"] .cl-badge-all {
@@ -255,12 +255,12 @@ export default function ControlledLedger() {
           color: #FFFFFF !important;
         }
         [data-theme="dark"] .cl-badge-con {
-          background: rgba(220, 38, 38, 0.25) !important;
-          color: #FCA5A5 !important;
-          border: 1px solid rgba(248, 113, 113, 0.4) !important;
+          background: rgba(124, 58, 237, 0.25) !important;
+          color: #C4B5FD !important;
+          border: 1px solid rgba(167, 139, 250, 0.4) !important;
         }
         [data-theme="dark"] .cl-badge-con.active {
-          background: #DC2626 !important;
+          background: #7C3AED !important;
           color: #FFFFFF !important;
           border: none !important;
         }
@@ -275,12 +275,12 @@ export default function ControlledLedger() {
           border: none !important;
         }
         [data-theme="dark"] .cl-badge-refri {
-          background: rgba(5, 150, 105, 0.25) !important;
-          color: #6EE7B7 !important;
-          border: 1px solid rgba(52, 211, 153, 0.4) !important;
+          background: rgba(2, 132, 199, 0.25) !important;
+          color: #7DD3FC !important;
+          border: 1px solid rgba(56, 189, 248, 0.4) !important;
         }
         [data-theme="dark"] .cl-badge-refri.active {
-          background: #059669 !important;
+          background: #0284C7 !important;
           color: #FFFFFF !important;
           border: none !important;
         }
@@ -613,15 +613,15 @@ export default function ControlledLedger() {
                 {filteredData.map((row, idx) => {
                   let badge = { text: '📦 GENERAL', bg: '#F1F5F9', color: '#475569', border: '#E2E8F0' };
                   if (row.EsControlado) {
-                    badge = { text: '💊 CONTROLADO', bg: '#FEE2E2', color: '#DC2626', border: '#FECACA' };
+                    badge = { text: '💊 CONTROLADO', bg: '#F5F3FF', color: '#7C3AED', border: '#DDD6FE' };
                   } else if (row.EsAntibiotico) {
                     badge = { text: '💉 ANTIBIÓTICO', bg: '#EFF6FF', color: '#2563EB', border: '#BFDBFE' };
                   } else if (row.EsRedFria) {
-                    badge = { text: '❄️ RED FRÍA', bg: '#ECFDF5', color: '#059669', border: '#A7F3D0' };
+                    badge = { text: '❄️ RED FRÍA', bg: '#E0F2FE', color: '#0284C7', border: '#BAE6FD' };
                   } else if (row.EsAltoRiesgo) {
-                    badge = { text: '⚠️ ALTO RIESGO', bg: '#FEF3C7', color: '#D97706', border: '#FDE68A' };
+                    badge = { text: '⚠️ ALTO RIESGO', bg: '#FEE2E2', color: '#DC2626', border: '#FECACA' };
                   } else if (row.EsLasa) {
-                    badge = { text: '🏷️ LASA', bg: '#F5F3FF', color: '#7C3AED', border: '#DDD6FE' };
+                    badge = { text: '🏷️ LASA', bg: '#FFF7ED', color: '#EA580C', border: '#FED7AA' };
                   }
 
                   const rowClass = row.EsControlado ? 'cl-row-con' : idx % 2 === 0 ? 'cl-row-even' : 'cl-row-odd';
@@ -672,7 +672,7 @@ export default function ControlledLedger() {
                           {row.Lote}
                         </span>
                       </td>
-                      <td style={{ padding: '0.85rem 1.25rem', fontWeight: 800, textAlign: 'right', fontSize: '1.05rem', color: row.EsControlado ? '#DC2626' : '#0F172A' }}>
+                      <td style={{ padding: '0.85rem 1.25rem', fontWeight: 800, textAlign: 'right', fontSize: '1.05rem', color: row.EsControlado ? '#7C3AED' : '#0F172A' }}>
                         {row.Cantidad}
                       </td>
                     </tr>

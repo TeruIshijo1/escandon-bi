@@ -11,8 +11,8 @@ const ExcelJS     = require('exceljs');
 const fs          = require('fs');
 const path        = require('path');
 const { getDb }   = require('../config/db');
-const { authenticate, authorize, authorizeCapability } = require('../middleware/auth.middleware');
 const { getInventariosVsCargos, getDevolucionesFarmacia, getCargosFarmaciaSAP } = require('../services/etl.service');
+const auditMovementService = require('../services/auditMovement.service');
 
 /* ══════════════════════════════════════════════════════════════
    ESTILO INSTITUCIONAL — Formato Excel Hospital Escandón
@@ -332,7 +332,7 @@ router.get(
       const hasFilters = Boolean(area || estado || fechaDesde || fechaHasta);
 
       // Si NO hay filtros seleccionados en auditoría, generar CSV con TODOS los registros sin tope (23,000+)
-      if (!hasFilters && (reportId === 'auditoria-inventarios' || reportId === 'directivo-main' || reportId === 'devoluciones-farmacia')) {
+      if (!hasFilters && (reportId === 'auditoria-inventarios' || reportId === 'directivo-main')) {
         const reporte = await resolveReportData(reportId, { limit: 100000 });
         const escapeCsv = (str) => `"${String(str ?? '').replace(/"/g, '""')}"`;
         const headers = reporte.columnas.map(c => escapeCsv(c.header)).join(',');
@@ -354,7 +354,7 @@ router.get(
       }
 
       // Ignorar ConfigJSON para reportes que tienen lógica dedicada de exportación en resolveReportData
-      const customReports = ['consulta-externa', 'auditoria-inventarios', 'directivo-main', 'devoluciones-farmacia'];
+      const customReports = ['consulta-externa', 'auditoria-inventarios', 'directivo-main', 'devoluciones-farmacia', 'movimientos-paciente'];
       if (!customReports.includes(reportId)) {
         // Verificar si el reporte tiene un JSON asignado (override)
         const db = require('../config/db').getDb();
@@ -571,13 +571,25 @@ async function resolveReportData(reportId, filters) {
       };
     }
     case 'devoluciones-farmacia': {
-      const { fechaDesde, fechaHasta } = filters;
+      const { fechaDesde, fechaHasta, token, userRole, userArea, ...extraFilters } = filters;
       const raw = await getDevolucionesFarmacia(fechaDesde, fechaHasta);
-      const data = raw?.data || [];
+      let data = raw?.data || [];
+      if (Object.keys(extraFilters).length > 0) {
+        data = data.filter(row => {
+          return Object.entries(extraFilters).every(([k, v]) => {
+            if (!v) return true;
+            return String(row[k] ?? '').toLowerCase().includes(String(v).toLowerCase());
+          });
+        });
+      }
+      const totalPiezas = data.reduce((s, r) => s + (Number(r.CantidadDevuelta) || 0), 0);
+      const totalMonto = data.reduce((s, r) => s + (Number(r.Monto) || 0), 0);
       return {
         titulo: 'Devoluciones de Farmacia',
         resumen: {
           'Total Registros': data.length,
+          'Total Artículos Devueltos': totalPiezas,
+          'Monto Total Devuelto': `$${totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
         },
         columnas: [
           { header: 'Folio Ticket', key: 'Cuenta', width: 14 },
@@ -612,22 +624,80 @@ async function resolveReportData(reportId, filters) {
       }
 
       return {
-        titulo: 'Cargos a Pacientes (SAP)',
+        titulo: 'Cargos a Pacientes — Farmacia (SAP)',
         resumen: {
           'Total Registros': data.length,
+          'Total Piezas': data.reduce((s, r) => s + (Number(r.CantidadCargada) || 0), 0),
+          'Monto Total': `$${data.reduce((s, r) => s + (Number(r.MontoCobrado) || 0), 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
         },
         columnas: [
           { header: 'Folio/Orden', key: 'OrdenId', width: 14 },
+          { header: 'Fecha Cargo', key: 'FechaCargo', width: 22 },
           { header: 'Paciente', key: 'NombrePaciente', width: 30 },
-          { header: 'Área / Cama', key: 'AreaHospitalaria', width: 20 },
           { header: 'Código', key: 'Codigo', width: 14 },
           { header: 'Insumo', key: 'Insumo', width: 35 },
-          { header: 'Cantidad', key: 'CantidadCargada', width: 14 },
+          { header: 'Cantidad', key: 'CantidadCargada', width: 12 },
           { header: 'Lote', key: 'Lote', width: 15 },
           { header: 'Caducidad', key: 'Caducidad', width: 15 },
           { header: 'Total ($)', key: 'MontoCobrado', width: 15 },
-          { header: 'Fecha Cargo', key: 'FechaCargo', width: 22 },
+          { header: 'Área Origen (Cargó)', key: 'AreaOrigen', width: 20 },
+          { header: 'Usuario Cargo', key: 'NombreUsuarioCargo', width: 25 },
+          { header: 'Área / Cama Destino', key: 'AreaDestino', width: 25 },
+          { header: 'Usuario Solicitó', key: 'NombreUsuarioSolicita', width: 25 },
           { header: 'Médico', key: 'MedicoTratante', width: 25 },
+        ],
+        filas: data,
+      };
+    }
+    case 'movimientos-paciente': {
+      const { fechaDesde, fechaHasta, tipoMovimiento, unidadServicio, busqueda, token, userRole, userArea, ...extraFilters } = filters;
+      const raw = await auditMovementService.getMovimientosPaciente({
+        fechaDesde,
+        fechaHasta,
+        tipoMovimiento,
+        unidadServicio,
+        busqueda
+      });
+      let data = raw?.data || [];
+
+      if (Object.keys(extraFilters).length > 0) {
+        data = data.filter(row => {
+          return Object.entries(extraFilters).every(([k, v]) => {
+            if (!v) return true;
+            return String(row[k] ?? '').toLowerCase().includes(String(v).toLowerCase());
+          });
+        });
+      }
+
+      const r = raw.resumen || {};
+      return {
+        titulo: 'Auditoría: Cargos y Reversas por Paciente',
+        resumen: {
+          'Total Movimientos': r.totalMovimientos || data.length,
+          'Total Cargos': r.totalCargos || 0,
+          'Total Reversas': r.totalReversas || 0,
+          'Monto Neto Venta': `$${(r.montoNetoCobrado || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+          'Costo Total Compra (SAP)': `$${(r.costoTotalCompra || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+          'Margen Neto ($)': `$${(r.margenNetoMonto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })} (${r.margenNetoPct || 0}%)`,
+        },
+        columnas: [
+          { header: 'No. Cuenta', key: 'cuenta', width: 14 },
+          { header: 'Paciente', key: 'paciente', width: 30 },
+          { header: 'Tipo Mov.', key: 'tipoMovimiento', width: 14 },
+          { header: 'Fecha y Hora', key: 'fechaMovimiento', width: 20 },
+          { header: 'Código', key: 'codigo', width: 14 },
+          { header: 'Insumo / Servicio', key: 'insumo', width: 35 },
+          { header: 'Unidad de Servicio', key: 'unidadServicio', width: 24 },
+          { header: 'Cant.', key: 'cantidad', width: 10 },
+          { header: 'P. Venta Unit. ($)', key: 'precioVentaUnitario', width: 16 },
+          { header: 'P. Venta Total ($)', key: 'precioVentaTotal', width: 16 },
+          { header: 'Costo Compra Unit. ($)', key: 'costoCompraUnitario', width: 18 },
+          { header: 'Costo Compra Total ($)', key: 'costoCompraTotal', width: 18 },
+          { header: 'Margen ($)', key: 'margenMonto', width: 14 },
+          { header: 'Lote', key: 'lote', width: 15 },
+          { header: 'Caducidad', key: 'caducidad', width: 14 },
+          { header: 'Responsable', key: 'usuarioCargo', width: 24 },
+          { header: 'Médico', key: 'medicoTratante', width: 25 },
         ],
         filas: data,
       };

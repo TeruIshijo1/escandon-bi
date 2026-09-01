@@ -277,28 +277,70 @@ router.get('/reportes/censo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
  */
 router.get('/reportes/entradas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    
+    const { startDate, endDate, supplierName, invoiceNum, proveedor, factura } = req.query;
+    const searchSupplier = (supplierName || proveedor || '').trim().toLowerCase();
+    const searchInvoice = (invoiceNum || factura || '').trim().toLowerCase();
+
     const cleanEnd = endDate ? endDate.replace(/-/g, '') : '';
     await checkAndSyncStaleData(cleanEnd);
 
-    let query = `
-      SELECT 
-        fecha AS "Fecha",
-        numeroentrada AS "Numero de entrada",
-        numerofactura AS "Numero de factura",
-        nombreproveedor AS "Nombre proveedor",
-        COUNT(DISTINCT codigo) AS "Tipos de articulos",
-        SUM(cantidadarticulos) AS "Cantidad de articulos",
-        SUM(importefactura) AS "Importe de factura"
-      FROM dw_sap_entradas
-      WHERE fecha::date >= $1 AND fecha::date <= $2
-      GROUP BY numeroentrada, numerofactura, nombreproveedor, fecha
-      ORDER BY fecha DESC
-    `;
-    
-    const pgRes = await pool.query(query, [startDate, endDate]);
-    res.json({ ok: true, data: pgRes.rows });
+    const sapService = require('../services/sap.service');
+    let data = [];
+    let fetchedFromSAP = false;
+
+    if (startDate && endDate) {
+      try {
+        const queryName = 'sq_reporte_entradas_resumen';
+        const sqlText = `SELECT T0.DocDate AS "Fecha", T0.DocNum AS "Numero de entrada", ISNULL(T0.NumAtCard, '') AS "Numero de factura", T0.CardName AS "Nombre proveedor", COUNT(DISTINCT T1.ItemCode) AS "Tipos de articulos", SUM(T1.Quantity) AS "Cantidad de articulos", T0.DocTotal AS "Importe de factura" FROM OPDN T0 INNER JOIN PDN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :sDate AND T0.DocDate <= :eDate GROUP BY T0.DocNum, T0.NumAtCard, T0.CardName, T0.DocDate, T0.DocTotal ORDER BY T0.DocDate DESC`;
+
+        try {
+          await sapService.post('/SQLQueries', { SqlCode: queryName, SqlName: queryName, SqlText: sqlText });
+        } catch (e) {
+          try {
+            await sapService.patch(`/SQLQueries('${queryName}')`, { SqlName: queryName, SqlText: sqlText });
+          } catch (err) {}
+        }
+
+        const sDate = startDate.replace(/-/g, '');
+        const eDate = endDate.replace(/-/g, '');
+
+        data = await sapService.fetchAllPages(`/SQLQueries('${queryName}')/List?sDate='${sDate}'&eDate='${eDate}'`, {}, 5000);
+        fetchedFromSAP = true;
+      } catch (sapErr) {
+        console.warn('[Reporte Entradas SAP Warning, falling back to PG]:', sapErr.message);
+      }
+    }
+
+    if (!fetchedFromSAP) {
+      let query = `
+        SELECT 
+          fecha AS "Fecha",
+          numeroentrada AS "Numero de entrada",
+          numerofactura AS "Numero de factura",
+          nombreproveedor AS "Nombre proveedor",
+          COUNT(DISTINCT codigo) AS "Tipos de articulos",
+          SUM(cantidadarticulos) AS "Cantidad de articulos",
+          SUM(importefactura) AS "Importe de factura"
+        FROM dw_sap_entradas
+        WHERE fecha::date >= $1 AND fecha::date <= $2
+        GROUP BY numeroentrada, numerofactura, nombreproveedor, fecha
+        ORDER BY fecha DESC
+      `;
+      const pgRes = await pool.query(query, [startDate, endDate]);
+      data = pgRes.rows;
+    }
+
+    if (searchSupplier) {
+      data = data.filter(r => String(r['Nombre proveedor'] || r['nombreproveedor'] || '').toLowerCase().includes(searchSupplier));
+    }
+    if (searchInvoice) {
+      data = data.filter(r => 
+        String(r['Numero de factura'] || r['numerofactura'] || '').toLowerCase().includes(searchInvoice) ||
+        String(r['Numero de entrada'] || r['numeroentrada'] || '').toLowerCase().includes(searchInvoice)
+      );
+    }
+
+    res.json({ ok: true, data });
   } catch (err) {
     console.error('[Entradas Error]', err.message);
     res.status(500).json({ ok: false, error: 'Error al generar Entradas' });
@@ -367,8 +409,8 @@ const executeSapQueryViaSL = async (queryName, sqlText, params) => {
     }
   }
 
-  const response = await sapService.get(`/SQLQueries('${queryName}')/List?${qs.toString()}`);
-  return response.data?.value || [];
+  const list = await sapService.fetchAllPages(`/SQLQueries('${queryName}')/List?${qs.toString()}`, {}, 5000);
+  return list || [];
 };
 
 /**
@@ -647,28 +689,69 @@ router.get('/reportes/detalle/entradas/:numFactura', authenticate, authorize(['A
     let { numFactura } = req.params;
     numFactura = String(numFactura).trim();
 
-    const pgResEntrada = await pool.query(`
-      SELECT fecha AS "Fecha", numeroentrada AS "NumeroEntrada", numerofactura AS "NumeroFactura", nombreproveedor AS "NombreProveedor" 
-      FROM dw_sap_entradas 
-      WHERE numerofactura LIKE $1 OR numeroentrada LIKE $1 
-      LIMIT 1
-    `, [`%${numFactura}%`]);
-    const entrada = pgResEntrada.rows[0] || null;
-    
-    const pgResPartidas = await pool.query(`
-      SELECT 
-        codigo AS "Código",
-        descripcion AS "Descripción Insumo",
-        almacenreceptor AS "Almacén Receptor",
-        cantidadarticulos AS "Cantidad Recibida",
-        preciounitario AS "Precio Unitario",
-        importefactura AS "Importe Total"
-      FROM dw_sap_entradas
-      WHERE numerofactura LIKE $1 OR numeroentrada LIKE $1
-      ORDER BY identrada ASC
-    `, [`%${numFactura}%`]);
+    const sapService = require('../services/sap.service');
+    let entrada = null;
+    let movimientos = [];
 
-    res.json({ ok: true, entrada: entrada || {}, movimientos: pgResPartidas.rows });
+    try {
+      let filter = '';
+      if (/^\d+$/.test(numFactura)) {
+        filter = `DocNum eq ${numFactura} or NumAtCard eq '${numFactura}'`;
+      } else {
+        filter = `NumAtCard eq '${numFactura}'`;
+      }
+
+      const sapRes = await sapService.get(`/PurchaseDeliveryNotes?$filter=${encodeURIComponent(filter)}&$select=DocNum,DocDate,NumAtCard,CardName,DocTotal,DocumentLines`);
+      const docs = sapRes.data?.value || [];
+      if (docs.length > 0) {
+        const doc = docs[0];
+        entrada = {
+          Fecha: doc.DocDate,
+          NumeroEntrada: doc.DocNum,
+          NumeroFactura: doc.NumAtCard,
+          NombreProveedor: doc.CardName,
+          ImporteFactura: doc.DocTotal
+        };
+        movimientos = (doc.DocumentLines || []).map(l => ({
+          'Código': l.ItemCode,
+          'Descripción Insumo': l.ItemDescription,
+          'Almacén Receptor': l.WarehouseCode || 'ALG',
+          'Cantidad Recibida': l.Quantity,
+          'Precio Unitario': l.UnitPrice || l.Price,
+          'Importe Total': l.LineTotal || ((l.Quantity || 0) * (l.UnitPrice || l.Price || 0))
+        }));
+      }
+    } catch (sapErr) {
+      console.warn('[Detalle Entradas SAP Warning, falling back to PG]:', sapErr.message);
+    }
+
+    if (!entrada || movimientos.length === 0) {
+      const pgResEntrada = await pool.query(`
+        SELECT fecha AS "Fecha", numeroentrada AS "NumeroEntrada", numerofactura AS "NumeroFactura", nombreproveedor AS "NombreProveedor" 
+        FROM dw_sap_entradas 
+        WHERE numerofactura LIKE $1 OR numeroentrada LIKE $1 
+        LIMIT 1
+      `, [`%${numFactura}%`]);
+      entrada = pgResEntrada.rows[0] || entrada || {};
+      
+      const pgResPartidas = await pool.query(`
+        SELECT 
+          codigo AS "Código",
+          descripcion AS "Descripción Insumo",
+          almacenreceptor AS "Almacén Receptor",
+          cantidadarticulos AS "Cantidad Recibida",
+          preciounitario AS "Precio Unitario",
+          importefactura AS "Importe Total"
+        FROM dw_sap_entradas
+        WHERE numerofactura LIKE $1 OR numeroentrada LIKE $1
+        ORDER BY identrada ASC
+      `, [`%${numFactura}%`]);
+      if (pgResPartidas.rows.length > 0) {
+        movimientos = pgResPartidas.rows;
+      }
+    }
+
+    res.json({ ok: true, entrada: entrada || {}, movimientos });
   } catch (err) {
     console.error('[Detalle Entradas Error]', err);
     res.status(500).json({ ok: false, error: 'Error al obtener detalle de la entrada' });

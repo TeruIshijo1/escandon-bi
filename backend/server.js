@@ -54,8 +54,27 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
+/* ── Configuración CORS dinámica (Intranet, Tailscale y Localhost) ── */
+const configuredOrigins = (process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
+
 app.use(cors({
-  origin:      process.env.CORS_ORIGIN || 'http://localhost:5173', // Solo orígenes configurados
+  origin: (origin, callback) => {
+    // Permitir peticiones sin origen (same-origin, herramientas de consola, scripts internos)
+    if (!origin) return callback(null, true);
+
+    // Permitir orígenes explícitamente configurados o comodín '*'
+    if (configuredOrigins.includes('*') || configuredOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Permitir localhost, 127.0.0.1, rangos de IP privadas (192.168.x.x, 10.x.x.x, 172.16-31.x.x) y Tailscale (100.x.x.x)
+    const isAllowedHost = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|100\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)(:\d+)?$/i.test(origin);
+    if (isAllowedHost || configuredOrigins.length === 0) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Bloqueado por política CORS: ${origin}`));
+  },
   credentials: true,
   methods:     ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
@@ -134,6 +153,7 @@ const sapRoutes = require('./routes/sap.routes');
 const almacenRoutes = require('./routes/almacen.routes');
 const finanzasRoutes = require('./routes/finanzas.routes');
 const cexRoutes = require('./routes/cex.routes');
+const sapQueryBuilderRoutes = require('./routes/sapQueryBuilder.routes');
 
 app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/dashboard',     dashboardRoutes);
@@ -148,6 +168,7 @@ app.use('/api/data-quality',  dataQualityRoutes);
 app.use('/api/pharmacy',      pharmacyRoutes);
 app.use('/api/almacen',       almacenRoutes);
 app.use('/api/sap',           sapRoutes);
+app.use('/api/sap-query',     sapQueryBuilderRoutes);
 app.use('/api/finanzas',      finanzasRoutes);
 app.use('/api/cex',           cexRoutes);
 app.use('/api/files', authenticate, express.static(path.join(__dirname, 'uploads')));

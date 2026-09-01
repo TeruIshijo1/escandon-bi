@@ -43,16 +43,75 @@ router.get('/master-outputs', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
 
 const sapInventoryService = require('../services/sapInventory.service');
 
+const STOCK_LOCATIONS = {
+  FAR: 'Farmacia',
+  QX: 'Quirófano',
+  QXCR: 'Carro Rojo'
+};
+
+const STOCK_LOCATION_CODES = Object.keys(STOCK_LOCATIONS);
+
+function normalizeWarehouseFilter(value) {
+  const warehouse = String(value || 'FAR').trim().toUpperCase();
+  if (warehouse === 'FAR_QX' || warehouse === 'FAR_QX_QXCR' || warehouse === 'MEDICAMENTOS') {
+    return STOCK_LOCATION_CODES;
+  }
+  if (warehouse === 'ALL') return null;
+  return [warehouse];
+}
+
+function getStockLocations(itemCode) {
+  const rows = sapInventoryService.getInventoryCache()
+    .filter(item => item.ItemCode === itemCode && STOCK_LOCATION_CODES.includes(item.WhsCode));
+
+  const totals = rows.reduce((acc, item) => {
+    const code = item.WhsCode;
+    acc[code] = (acc[code] || 0) + Number(item.QuantityOnStock || item.OnHand || 0);
+    return acc;
+  }, {});
+
+  const locations = STOCK_LOCATION_CODES
+    .map(code => ({
+      WhsCode: code,
+      WarehouseName: STOCK_LOCATIONS[code],
+      QuantityOnStock: totals[code] || 0
+    }))
+    .filter(location => location.QuantityOnStock > 0);
+
+  return {
+    stock_farmacia: totals.FAR || 0,
+    stock_quirofano: totals.QX || 0,
+    stock_carro_rojo: totals.QXCR || 0,
+    stock_ubicaciones: locations,
+    stock_fuente: locations.map(location => location.WhsCode).join(', ') || 'SIN_STOCK'
+  };
+}
+
+function enrichWithStockLocations(row, itemCode = row.itemcode || row.ItemCode) {
+  return {
+    ...row,
+    ...getStockLocations(itemCode)
+  };
+}
+
 router.get('/inventario', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
-    const warehouseCode = req.query.warehouse || 'FAR';
+    const requestedWarehouses = normalizeWarehouseFilter(req.query.warehouse || 'FAR');
 
-    // Si el caché está vacío (ej. servidor recién prendido), forzamos una carga
-    // (SAP en vivo; si no responde, se usa el snapshot persistido en PostgreSQL)
-    await sapInventoryService.ensureInventoryData();
+    if (req.query.refresh === 'true' || req.query.refresh === true) {
+      await sapInventoryService.syncInventoryCache();
+    } else {
+      await sapInventoryService.ensureInventoryData();
+    }
     
     // Filtrar únicamente los items que pertenecen al almacén solicitado
-    const warehouseItems = sapInventoryService.getInventoryCache().filter(item => item.WhsCode === warehouseCode);
+    const warehouseItems = sapInventoryService.getInventoryCache()
+      .filter(item => !requestedWarehouses || requestedWarehouses.includes(item.WhsCode))
+      .map(item => ({
+        ...item,
+        WarehouseName: STOCK_LOCATIONS[item.WhsCode] || item.WhsCode,
+        ...getStockLocations(item.ItemCode)
+      }));
     
     res.json({ ok: true, data: warehouseItems });
   } catch (err) {
@@ -64,12 +123,19 @@ router.get('/inventario', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
 router.get('/lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   const itemCode = req.query.itemCode;
   try {
-    const warehouseCode = req.query.warehouse || 'FAR';
+    const requestedWarehouses = normalizeWarehouseFilter(req.query.warehouse || 'FAR');
     
     if (!itemCode) return res.status(400).json({ ok: false, error: 'ItemCode requerido' });
 
+    await sapInventoryService.ensureInventoryData();
+
     // Filtrar desde la memoria directamente (0 ms de latencia!)
-    const itemBatches = sapInventoryService.getBatchesCache().filter(b => b.ItemCode === itemCode && b.WhsCode === warehouseCode);
+    const itemBatches = sapInventoryService.getBatchesCache()
+      .filter(b => b.ItemCode === itemCode && (!requestedWarehouses || requestedWarehouses.includes(b.WhsCode)))
+      .map(b => ({
+        ...b,
+        WarehouseName: STOCK_LOCATIONS[b.WhsCode] || b.WhsCode
+      }));
     
     res.json({ ok: true, data: itemBatches });
   } catch (err) {
@@ -134,12 +200,15 @@ router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
   const itemCode = req.query.itemCode;
   if (!itemCode) return res.status(400).json({ ok: false, error: 'ItemCode requerido' });
   
+  await sapInventoryService.ensureInventoryData();
+
   if (sapInventoryService.getInventoryCache().length > 0) {
     // Buscar en el caché global en qué almacenes hay stock de este ItemCode
     let locations = sapInventoryService.getInventoryCache()
       .filter(item => item.ItemCode === itemCode && item.QuantityOnStock > 0)
       .map(item => ({
         WhsCode: item.WhsCode,
+        WarehouseName: STOCK_LOCATIONS[item.WhsCode] || item.WhsCode,
         QuantityOnStock: item.QuantityOnStock
       }));
     
@@ -254,14 +323,80 @@ router.get('/salidas-farmacia', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
 router.get('/controlled-ledger', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), handleSalidasFarmacia);
 
 /**
+ * Clasifica y valida si un insumo es un medicamento que requiere receta médica (Grupo IV, Antibióticos o Controlados)
+ */
+function resolvePrescriptionDrugType(itemCode, itemName, clasiObj, sapItem) {
+  const name = String(sapItem?.ItemName || clasiObj?.ItemName || itemName || '').toUpperCase().trim();
+  const c1 = String(clasiObj?.MedicalClassification || sapItem?.MedicalClassification || '').toUpperCase().trim();
+  const c2 = String(clasiObj?.SecondaryClassification || sapItem?.SecondaryClassification || '').toUpperCase().trim();
+
+  // 1. Controlados (Grupo I, II, III - Psicotrópicos y Estupefacientes)
+  if (c1 === 'CON' || c2 === 'CON' || clasiObj?.isControlled) {
+    return { isRx: true, rxCategory: 'CONTROLADO', label: '💊 CONTROLADO', color: '#DC2626', bg: '#FEE2E2', border: '#FECACA' };
+  }
+
+  // 2. Antibióticos
+  if (c1 === 'ANTI' || c2 === 'ANTI' || clasiObj?.isAntibiotic) {
+    return { isRx: true, rxCategory: 'ANTIBIOTICO', label: '💉 ANTIBIÓTICO', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
+  }
+
+  // 3. Grupo IV explícito
+  if (c1 === 'G4' || c2 === 'G4' || c1 === 'IV' || c2 === 'IV' || c1 === 'RECETA' || c2 === 'RECETA') {
+    return { isRx: true, rxCategory: 'GRUPO_IV', label: '📋 GRUPO IV', color: '#0D9488', bg: '#F0FDFA', border: '#99F6E4' };
+  }
+
+  // 4. Exclusiones explícitas de no-medicamentos (material de curación, equipo, insumos, suplementos, bebidas)
+  const nonMedPatterns = [
+    /\bMEDIAS\b/, /\bANTIEMB[OÓ]LIC/, /\bJERINGA\b/, /\bGUANTE\b/, /\bGASA\b/, /\bCATETER\b/, /\bCAT[EÉ]TER\b/,
+    /\bVENOCLISIS\b/, /\bEQUIPO\b/, /\bAGUJA\b/, /\bSONDA\b/, /\bCINTA\b/, /\bAPOSITO\b/, /\bAP[OÓ]SITO\b/,
+    /\bALGODON\b/, /\bALGOD[OÓ]N\b/, /\bTORUNDA\b/, /\bTIRAS\b/, /\bBOMBA\b/, /\bTERMOMETRO\b/, /\bTERM[OÓ]METRO\b/,
+    /\bBOLSA\b/, /\bCIRCUITO\b/, /\bELECTRODO\b/, /\bTUBULADURA\b/, /\bMASCARILLA\b/, /\bCANULA\b/, /\bC[AÁ]NULA\b/,
+    /\bJABON\b/, /\bJAB[OÓ]N\b/, /\bCEPILLO\b/, /\bBISTURI\b/, /\bBISTUR[IÍ]\b/, /\bHOJA\b/, /\bSUTURA\b/,
+    /\bCUBREBOCA\b/, /\bBATA\b/, /\bPA[NÑ]AL\b/, /\bBRACETE\b/, /\bLANCETA\b/, /\bFRASCO\b/, /\bTUBO\b/,
+    /\bLLAVE\b/, /\bTORNIQUETE\b/, /\bPUNZOCAT\b/, /\bTEGADERM\b/, /\bVENOPACK\b/, /\bMICROGOTERO\b/,
+    /\bNORMOGOTERO\b/, /\bAGUA\b/, /\bLEVITE\b/, /\bELECTROLIT\b/, /\bGATORADE\b/, /\bJUGO\b/, /\bREFRESCO\b/,
+    /\bSUPLEMENTO\b/, /\bALIMENTO\b/, /\bFRESUBIN\b/, /\bENSURE\b/, /\bPEDIASURE\b/, /\bFORMULA\b/, /\bF[OÓ]RMULA\b/
+  ];
+
+  if (nonMedPatterns.some(p => p.test(name))) {
+    return { isRx: false };
+  }
+
+  // Descartar placeholders genéricos sin información
+  if (!name || name === 'MATERIAL/MEDICAMENTO' || name === 'UNDEFINED') {
+    return { isRx: false };
+  }
+
+  // 5. Clasificaciones hospitalarias médicas que corresponden a medicamentos de prescripción
+  if (['REFRI', 'AR', 'LASA', 'ALTOD', 'REDFRIA'].includes(c1) || ['REFRI', 'AR', 'LASA', 'ALTOD', 'REDFRIA'].includes(c2)) {
+    return { isRx: true, rxCategory: 'GRUPO_IV', label: '📋 GRUPO IV', color: '#0D9488', bg: '#F0FDFA', border: '#99F6E4' };
+  }
+
+  // 6. Formas farmacéuticas o concentraciones de prescripción médica (Grupo IV)
+  const rxPharmaPatterns = [
+    /\bMG\b/, /\bMCG\b/, /\bMG\/ML\b/, /\bMG\/[0-9]/, /\bSLIY\b/, /\bTABL\b/, /\bCAPS\b/, /\bSLOF\b/,
+    /\bCREM\b/, /\bSUSP\b/, /\bINY\b/, /\bAMP\b/, /\bAMPOYETA\b/, /\bFCO\b/, /\bSOLUCI[OÓ]N INYECTABLE\b/,
+    /\bTABLETAS\b/, /\bC[AÁ]PSULAS\b/, /\bJARABE\b/, /\bCOMPRIMIDOS\b/, /\bUNGUENTO\b/, /\bUNG[UÜ]ENTO\b/,
+    /\bG SLIY\b/, /\bP SLIY\b/, /\bG TABL\b/, /\bP TABL\b/, /\bG CAPS\b/, /\bP CAPS\b/
+  ];
+
+  if (rxPharmaPatterns.some(p => p.test(name))) {
+    return { isRx: true, rxCategory: 'GRUPO_IV', label: '📋 GRUPO IV', color: '#0D9488', bg: '#F0FDFA', border: '#99F6E4' };
+  }
+
+  return { isRx: false };
+}
+
+/**
  * GET /api/pharmacy/pending-prescriptions
- * Monitor de Recetas Pendientes (Cola de despacho)
+ * Monitor de Recetas Pendientes (Cola de despacho exclusiva para medicamentos con receta: Grupo IV, Antibióticos y Controlados)
  */
 router.get('/pending-prescriptions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
+    await sapInventoryService.ensureInventoryData();
     const pool = await connectRemoteDB();
     const dbRes = await pool.request().query(`
-      SELECT TOP 100
+      SELECT TOP 200
         i.PCPRITNum AS Id,
         p.PCPRNum AS Requisicion,
         c.PCNum AS Cuenta,
@@ -294,24 +429,33 @@ router.get('/pending-prescriptions', authenticate, authorize(['ADMIN', 'DIRECTOR
 
     let enrichedData = [];
     const inventoryMap = sapInventoryService.getInventoryMap();
+    const clasiMap = sapInventoryService.getMedicalClassificationMap();
     const batchesCache = sapInventoryService.getBatchesCache() || [];
 
     for (const row of dbRes.recordset) {
       if (!hiddenIds.has(String(row.Id))) {
-        const sapItem = inventoryMap.get(row.Codigo);
+        const sapItem = inventoryMap ? inventoryMap.get(row.Codigo) : null;
+        const clasiObj = clasiMap ? clasiMap.get(row.Codigo) : null;
+        
+        // Filtrar SOLO medicamentos que requieren receta (Grupo IV, Antibióticos y Controlados)
+        const rxCheck = resolvePrescriptionDrugType(row.Codigo, row.Medicamento, clasiObj, sapItem);
+        if (!rxCheck.isRx) continue;
+
         const sapBatches = batchesCache.filter(b => b.ItemCode === row.Codigo && (b.WhsCode === 'FAR' || !b.WhsCode) && b.Quantity > 0);
         const stockActual = sapItem ? (sapItem.QuantityOnStock ?? sapItem.OnHand ?? 0) : 0;
 
         enrichedData.push({ 
           ...row, 
-          Medicamento: sapItem ? sapItem.ItemName : row.Medicamento,
+          Medicamento: sapItem ? sapItem.ItemName : (clasiObj?.ItemName || row.Medicamento),
           StockActual: stockActual,
+          RxCategory: rxCheck.rxCategory,
+          RxBadge: { label: rxCheck.label, color: rxCheck.color, bg: rxCheck.bg, border: rxCheck.border },
           LotesDisponibles: sapBatches.map(b => ({ lote: b.Batch || b.BatchNum, exp: b.ExpirationDate || b.ExpDate, cant: b.Quantity }))
         });
       }
     }
 
-    res.json({ ok: true, data: enrichedData.slice(0, 50) });
+    res.json({ ok: true, data: enrichedData.slice(0, 100) });
   } catch (err) {
     console.error('Error en pending-prescriptions:', err);
     res.status(500).json({ ok: false, error: 'Error interno' });
@@ -511,6 +655,7 @@ router.get('/doctor-variations', authenticate, authorize(['ADMIN', 'DIRECTOR', '
 router.get('/quirofano-inventory', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const sapInventoryService = require('../services/sapInventory.service');
+    await sapInventoryService.ensureInventoryData();
     const cache = sapInventoryService.getInventoryCache();
     
     // Filtrar solo insumos con presencia en almacenes QX y QXCR
@@ -911,7 +1056,8 @@ router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
  */
 router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
-    const pgRes = await pool.query(`
+    await sapInventoryService.ensureInventoryData();
+    let pgRes = await pool.query(`
       SELECT 
         itemcode AS "itemcode",
         itemdescription AS "itemdescription",
@@ -939,19 +1085,42 @@ router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
         dias_stock_restante ASC,
         itemcode ASC
     `);
-    
-      // FILTRO EXCLUSIVO FARMACIA:
-      const sapInventoryService = require('../services/sapInventory.service');
-      const allCache = sapInventoryService.getInventoryCache();
-      const farItems = new Set();
-      if (allCache && Array.isArray(allCache)) {
-        allCache.forEach(i => {
-          if (i.WhsCode === 'FAR') farItems.add(i.ItemCode);
-        });
-      }
-      
-      const filteredData = pgRes.rows.filter(r => farItems.has(r.itemcode));
-      res.json({ ok: true, data: filteredData, count: filteredData.length });
+
+    if (pgRes.rows.length === 0) {
+      const { syncMLDataset } = require('../services/mlDataset.service');
+      await syncMLDataset();
+      pgRes = await pool.query(`
+        SELECT 
+          itemcode AS "itemcode",
+          itemdescription AS "itemdescription",
+          stock_actual AS "stock_actual",
+          consumo_7d AS "consumo_7d",
+          consumo_15d AS "consumo_15d",
+          consumo_30d AS "consumo_30d",
+          consumo_promedio_diario AS "consumo_promedio_diario",
+          variabilidad_consumo AS "variabilidad_consumo",
+          minstock AS "minstock",
+          maxstock AS "maxstock",
+          pedidos_abiertos AS "pedidos_abiertos",
+          fecha_ultimo_movimiento AS "fecha_ultimo_movimiento",
+          dias_stock_restante AS "dias_stock_restante",
+          riesgo_base AS "riesgo_base",
+          fecha_calculo AS "fecha_calculo"
+        FROM ml_dataset_reorden_sku
+        ORDER BY 
+          CASE riesgo_base 
+            WHEN 'CRITICO' THEN 1
+            WHEN 'ALTO' THEN 2
+            WHEN 'MEDIO' THEN 3
+            ELSE 4 
+          END, 
+          dias_stock_restante ASC,
+          itemcode ASC
+      `);
+    }
+
+    const filteredData = pgRes.rows.map(row => enrichWithStockLocations(row));
+    res.json({ ok: true, data: filteredData, count: filteredData.length });
 
   } catch (err) {
     console.error('[GET ML Dataset Error]', err);
@@ -982,6 +1151,7 @@ router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
  */
 router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
+    await sapInventoryService.ensureInventoryData();
     const pgRes = await pool.query(`
       SELECT 
         snapshot_date AS "snapshot_date",
@@ -1006,19 +1176,8 @@ router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
       FROM ml_dataset_reorden_sku_history
       ORDER BY snapshot_date DESC, itemcode ASC
     `);
-    
-      // FILTRO EXCLUSIVO FARMACIA:
-      const sapInventoryService = require('../services/sapInventory.service');
-      const allCache = sapInventoryService.getInventoryCache();
-      const farItems = new Set();
-      if (allCache && Array.isArray(allCache)) {
-        allCache.forEach(i => {
-          if (i.WhsCode === 'FAR') farItems.add(i.ItemCode);
-        });
-      }
-      
-      const filteredData = pgRes.rows.filter(r => farItems.has(r.itemcode));
-      res.json({ ok: true, data: filteredData, count: filteredData.length });
+    const filteredData = pgRes.rows.map(row => enrichWithStockLocations(row));
+    res.json({ ok: true, data: filteredData, count: filteredData.length });
 
   } catch (err) {
     console.error('[GET ML History Error]', err);
@@ -1088,6 +1247,7 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
  */
 router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
+    await sapInventoryService.ensureInventoryData();
     const pgRes = await pool.query(`
       SELECT 
         itemcode AS "itemcode",
@@ -1106,19 +1266,8 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
       FROM ml_predictions_reorden_sku
       ORDER BY prob_desabasto_7d DESC, itemcode ASC
     `);
-    
-      // FILTRO EXCLUSIVO FARMACIA:
-      const sapInventoryService = require('../services/sapInventory.service');
-      const allCache = sapInventoryService.getInventoryCache();
-      const farItems = new Set();
-      if (allCache && Array.isArray(allCache)) {
-        allCache.forEach(i => {
-          if (i.WhsCode === 'FAR') farItems.add(i.ItemCode);
-        });
-      }
-      
-      const filteredData = pgRes.rows.filter(r => farItems.has(r.itemcode));
-      res.json({ ok: true, data: filteredData, count: filteredData.length });
+    const filteredData = pgRes.rows.map(row => enrichWithStockLocations(row));
+    res.json({ ok: true, data: filteredData, count: filteredData.length });
 
   } catch (err) {
     console.error('[GET ML Predictions Error]', err);
@@ -1345,4 +1494,3 @@ router.post('/config-dinamica/upload', authenticate, authorize(['ADMIN', 'DIRECT
 });
 
 module.exports = router;
-

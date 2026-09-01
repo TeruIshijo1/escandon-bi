@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { authHeaders } from '../../api/auth';
@@ -14,6 +14,10 @@ export default function ReportesAlmacen() {
   const [endDate, setEndDate] = useState(today);
   const [itemCode, setItemCode] = useState('');
   
+  // Entradas de Factura filters
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+
   // Custom SAP reports state
   const [customReport, setCustomReport] = useState('cuentas-hospitalarias');
   const [docNum, setDocNum] = useState('');
@@ -70,6 +74,11 @@ export default function ReportesAlmacen() {
           query.append('docNum', docNum);
         }
         endpoint = `${API_BASE}/almacen/reportes/custom-sap?${query.toString()}`;
+      } else if (activeTab === 'entradas') {
+        const query = new URLSearchParams({ startDate, endDate });
+        if (supplierSearch.trim()) query.append('supplierName', supplierSearch.trim());
+        if (invoiceSearch.trim()) query.append('invoiceNum', invoiceSearch.trim());
+        endpoint = `${API_BASE}/almacen/reportes/entradas?${query.toString()}`;
       } else {
         const query = new URLSearchParams({ startDate, endDate });
         if (itemCode) query.append('itemCode', itemCode);
@@ -194,20 +203,82 @@ export default function ReportesAlmacen() {
     return String(val);
   };
 
+  // Filtrado reactivo en memoria sobre los datos cargados
+  const filteredData = useMemo(() => {
+    if (!Array.isArray(data)) return [];
+    if (activeTab !== 'entradas') return data;
+    
+    let list = data;
+    if (supplierSearch.trim()) {
+      const q = supplierSearch.toLowerCase().trim();
+      list = list.filter(r => String(r['Nombre proveedor'] || r['nombreproveedor'] || '').toLowerCase().includes(q));
+    }
+    if (invoiceSearch.trim()) {
+      const q = invoiceSearch.toLowerCase().trim();
+      list = list.filter(r => 
+        String(r['Numero de factura'] || r['numerofactura'] || '').toLowerCase().includes(q) ||
+        String(r['Numero de entrada'] || r['numeroentrada'] || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [data, activeTab, supplierSearch, invoiceSearch]);
+
   const exportToExcel = () => {
-    if (data.length === 0) return;
-    const formattedData = data.map(row => {
+    const exportRows = filteredData;
+    if (exportRows.length === 0) return;
+    const formattedData = exportRows.map(row => {
       const newRow = {};
       Object.keys(row).forEach(key => {
         newRow[key] = formatCellValue(key, row[key]);
       });
       return newRow;
     });
+
     const ws = XLSX.utils.json_to_sheet(formattedData);
+
+    // Encabezado que refleja el filtro aplicado, para que el Excel respete exactamente lo filtrado
+    const reportTitle = isInterconsultas
+      ? 'Interconsultas y Jornadas Especiales (SER*)'
+      : isPreciosArticulos
+        ? 'Lista de Precios de Artículos (SAP)'
+        : activeTab === 'entradas'
+          ? 'Reporte de Entradas de Factura (SAP)'
+          : `Reporte Almacén - ${activeTab === 'custom-sap' ? customReport : activeTab}`;
+
+    const usesDateFilter = (activeTab !== 'custom-sap' || customReport !== 'precios-articulos');
+    const filterLine = usesDateFilter && startDate && endDate
+      ? `Filtro de fechas aplicado: ${startDate} hasta ${endDate}`
+      : (activeTab === 'custom-sap' && customReport === 'precios-articulos'
+          ? 'Reporte sin filtro de fechas (catálogo de precios)'
+          : 'Sin filtro de fechas');
+
+    const headerRows = [[reportTitle], [filterLine]];
+
+    if (activeTab === 'entradas') {
+      if (supplierSearch.trim()) headerRows.push([`Filtro Proveedor: ${supplierSearch.trim()}`]);
+      if (invoiceSearch.trim()) headerRows.push([`Filtro Factura / Entrada: ${invoiceSearch.trim()}`]);
+    } else if (activeTab === 'custom-sap' && customReport === 'detalles-salida' && docNum) {
+      headerRows.push([`Número de documento: ${docNum}`]);
+    } else if (itemCode) {
+      headerRows.push([`Código de artículo: ${itemCode}`]);
+    }
+
+    headerRows.push([]);
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+    const finalAoa = headerRows.concat(aoa);
+    const wsFinal = XLSX.utils.aoa_to_sheet(finalAoa);
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
-    const filenamePrefix = isInterconsultas ? 'Interconsultas_Jornadas' : isPreciosArticulos ? 'Precios_Articulos' : `Almacen_${activeTab}`;
-    XLSX.writeFile(wb, `Reporte_${filenamePrefix}_${today}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, wsFinal, 'Reporte');
+
+    const filenamePrefix = isInterconsultas
+      ? 'Interconsultas_Jornadas'
+      : isPreciosArticulos
+        ? 'Precios_Articulos'
+        : `Almacen_${activeTab}`;
+    const rangeSuffix = usesDateFilter && startDate && endDate ? `_${startDate}_a_${endDate}` : '';
+    const supplierSuffix = activeTab === 'entradas' && supplierSearch.trim() ? `_${supplierSearch.trim().replace(/\s+/g, '_')}` : '';
+    XLSX.writeFile(wb, `Reporte_${filenamePrefix}${rangeSuffix}${supplierSuffix}_${today}.xlsx`);
   };
 
   return (
@@ -285,7 +356,6 @@ export default function ReportesAlmacen() {
           {isDedicatedView ? 'Parámetros de Consulta' : 'Filtros de Búsqueda'}
         </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-end' }}>
-          
           {(activeTab === 'kardex' || activeTab === 'consumo') && (
             <div style={{ flex: '1 1 250px' }}>
               <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Código Artículo (Opcional)</label>
@@ -297,6 +367,36 @@ export default function ReportesAlmacen() {
                 style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', transition: 'border-color 0.2s' }} 
               />
             </div>
+          )}
+
+          {activeTab === 'entradas' && (
+            <>
+              <div style={{ flex: '1 1 220px' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>
+                  Nombre Proveedor (Opcional)
+                </label>
+                <input 
+                  type="text" 
+                  value={supplierSearch} 
+                  onChange={e => setSupplierSearch(e.target.value)} 
+                  placeholder="Ej. PHARMA PLUS o laboratorios..."
+                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', transition: 'border-color 0.2s' }} 
+                />
+              </div>
+
+              <div style={{ flex: '1 1 220px' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>
+                  No. Factura o Entrada (Opcional)
+                </label>
+                <input 
+                  type="text" 
+                  value={invoiceSearch} 
+                  onChange={e => setInvoiceSearch(e.target.value)} 
+                  placeholder="Ej. 3093251352 o 3605"
+                  style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none', transition: 'border-color 0.2s' }} 
+                />
+              </div>
+            </>
           )}
 
           {activeTab === 'custom-sap' && !isDedicatedView && (
@@ -389,14 +489,14 @@ export default function ReportesAlmacen() {
             <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a', fontWeight: 'bold' }}>
               Resultados de Búsqueda
             </h2>
-            {data.length > 0 && (
+            {filteredData.length > 0 && (
               <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#0284c7', fontWeight: '600' }}>
                 💡 Haz clic en cualquier fila para ver la trazabilidad y desglose detallado
               </p>
             )}
           </div>
           <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 'bold' }}>
-            {data.length} registros
+            {filteredData.length} registros
           </span>
         </div>
 
@@ -420,8 +520,8 @@ export default function ReportesAlmacen() {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px', display: loading ? 'none' : 'table' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
               <tr style={{ background: '#f1f5f9', color: '#475569', fontSize: '0.85rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                {data.length > 0 ? (
-                  Object.keys(data[0]).map(key => (
+                {filteredData.length > 0 ? (
+                  Object.keys(filteredData[0]).map(key => (
                     <th key={key} style={{ padding: '1.25rem 1rem', borderBottom: '2px solid #cbd5e1', fontWeight: '700' }}>
                       {key}
                     </th>
@@ -432,8 +532,8 @@ export default function ReportesAlmacen() {
               </tr>
             </thead>
             <tbody>
-              {data.length > 0 ? (
-                data.map((row, idx) => (
+              {filteredData.length > 0 ? (
+                filteredData.map((row, idx) => (
                   <tr 
                     key={idx} 
                     onClick={() => handleRowClick(row)}

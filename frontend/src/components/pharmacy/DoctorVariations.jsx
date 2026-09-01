@@ -130,6 +130,65 @@ export default function DoctorVariations() {
     return rows.sort((a,b) => b.Diff - a.Diff);
   }, [selectedProcedure, doctorsList, currentDoctorsData, hospitalKit]);
 
+  const exportVariationsToExcel = () => {
+    if (!differencesMatrix || differencesMatrix.length === 0) {
+      alert('No hay datos de variaciones para exportar.');
+      return;
+    }
+
+    const fechaReporte = new Date().toLocaleString('es-MX');
+    const cols = [
+      { header: 'Código SAP', width: 110, align: 'center' },
+      { header: 'Insumo / Medicamento', width: 280, align: 'left' },
+      { header: 'Kit Hospital (Promedio)', width: 140, align: 'center' },
+      ...doctorsList.map(d => ({ header: `Dr(a). ${d}`, width: 160, align: 'center' })),
+      { header: 'Diferencia Máx.', width: 120, align: 'center' }
+    ];
+
+    const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse;width:100%}
+  .title-bar{background:#004687;color:#fff;font-size:16pt;font-weight:bold;padding:12px 16px}
+  .subtitle-bar{background:#0088C9;color:#fff;font-size:10pt;padding:6px 16px}
+  .info-row td{font-size:9pt;color:#475569;padding:4px 16px}
+  th{background:#004687;color:#fff;font-weight:bold;font-size:10pt;padding:10px 8px;border:1px solid #003366;text-align:center}
+  td{padding:7px 8px;font-size:9pt;border:1px solid #D1D5DB;color:#1E293B}
+  .even{background:#F4F6F9}.odd{background:#FFF}
+  .high-var{background:#FEE2E2;color:#DC2626;font-weight:bold;text-align:center}
+</style></head><body>
+<table>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Matriz de Variaciones de Insumos por Cirujano</td></tr>
+  <tr class="info-row"><td colspan="${cols.length}">Procedimiento: ${selectedProcedure} &nbsp;|&nbsp; Período: Últimos ${months} meses &nbsp;|&nbsp; Cirujanos analizados: ${doctorsList.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
+  <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
+  <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
+  ${differencesMatrix.map((r, i) => {
+    return `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">
+      <td style="text-align:center;font-weight:bold;color:#005FA9">${r.Codigo}</td>
+      <td>${String(r.Medicamento || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td style="text-align:center;font-weight:bold">${r.HospitalKitAvg > 0 ? `${r.HospitalKitAvg} pza(s)` : '—'}</td>
+      ${doctorsList.map(d => {
+        const val = r.DoctorConsumptions[d];
+        return `<td style="text-align:center">${val !== undefined ? `${val} pza(s)` : '0'}</td>`;
+      }).join('')}
+      <td class="${r.HasHighVariation ? 'high-var' : ''}" style="text-align:center">${r.Diff > 0 ? `±${r.Diff}` : '0'}</td>
+    </tr>`;
+  }).join('')}
+</table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Variaciones_Cirujanos_${selectedProcedure.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{ background: 'var(--card-bg, #ffffff)', borderRadius: '16px', padding: '2rem', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)', border: '1px solid var(--border-color, #e2e8f0)' }}>
       
@@ -145,7 +204,27 @@ export default function DoctorVariations() {
         </div>
 
         {!loading && !error && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={exportVariationsToExcel}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.55rem 1rem',
+                background: '#00974A',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 151, 74, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              📥 Exportar Excel
+            </button>
             <button
               onClick={() => setViewMode('cards')}
               style={{
@@ -302,7 +381,7 @@ export default function DoctorVariations() {
 
                               <div style={{ textAlign: 'center', background: 'rgba(99, 102, 241, 0.1)', padding: '0.35rem 0.6rem', borderRadius: '8px', minWidth: '50px' }}>
                                 <div style={{ fontSize: '1.05rem', fontWeight: '800', color: '#4f46e5', lineHeight: 1 }}>
-                                  {item.PromedioPiezas.toFixed(1)}
+                                  {Number(item.PromedioPiezas || 0).toFixed(1)}
                                 </div>
                                 <div style={{ fontSize: '0.55rem', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', fontWeight: 'bold' }}>Piezas</div>
                               </div>
@@ -366,7 +445,7 @@ export default function DoctorVariations() {
                             const qty = row.DoctorConsumptions[doc];
                             return (
                               <td key={dIdx} style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: qty ? 'bold' : 'normal', color: qty ? 'var(--text-main, #0f172a)' : '#94a3b8', fontSize: '0.95rem' }}>
-                                {qty !== undefined ? `${qty.toFixed(1)} pz` : '0 pz'}
+                                {qty !== undefined ? `${Number(qty || 0).toFixed(1)} pz` : '0 pz'}
                               </td>
                             );
                           })}
@@ -379,7 +458,7 @@ export default function DoctorVariations() {
                               background: row.HasHighVariation ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
                               color: row.HasHighVariation ? '#dc2626' : '#16a34a'
                             }}>
-                              Δ {row.Diff.toFixed(1)} pz
+                              Δ {Number(row.Diff || 0).toFixed(1)} pz
                             </span>
                           </td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>

@@ -109,7 +109,7 @@ export default function ResumenMaestro() {
     return rows.filter(row => {
       return Object.entries(colFilters).every(([key, val]) => {
         if (!val) return true;
-        return row[key] == val;
+        return String(row[key] ?? '').trim().toLowerCase() === String(val).trim().toLowerCase();
       });
     });
   }, [rows, colFilters]);
@@ -288,7 +288,7 @@ export default function ResumenMaestro() {
               <div style={{ width: '1px', height: '32px', background: '#e2e8f0' }} />
               <div>
                 <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', fontWeight: 600 }}>Monto Total</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#15803d' }}>$${totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#15803d' }}>${totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
               </div>
             </div>
             {Object.keys(colFilters).length > 0 && (
@@ -370,7 +370,7 @@ export default function ResumenMaestro() {
                         ) : <span style={{ color: '#cbd5e1' }}>—</span>}
                       </td>
                       <td style={{ padding: '12px 10px', textAlign: 'right' }}>
-                        <span style={{ fontWeight: '700', color: '#15803d', fontSize: '0.88rem' }}>$${(r.MontoTotal || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                        <span style={{ fontWeight: '700', color: '#15803d', fontSize: '0.88rem' }}>${(r.MontoTotal || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
                       </td>
                       <td style={{ padding: '12px 10px', textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>
                         {r.FechaMovimiento ? new Date(r.FechaMovimiento).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—'}

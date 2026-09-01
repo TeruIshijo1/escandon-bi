@@ -65,9 +65,12 @@ export default function AlmacenQuirofano() {
 
   // Filtered Stock List
   const filteredStock = useMemo(() => {
+    const q = (searchQuery || '').toLowerCase().trim();
     return stockItems.filter(item => {
-      const matchSearch = (item.ItemCode || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (item.ItemName || '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = !q ||
+                          (item.ItemCode || '').toLowerCase().includes(q) ||
+                          (item.ItemName || '').toLowerCase().includes(q) ||
+                          (item.ItemGroupName || '').toLowerCase().includes(q);
       const matchWhs = warehouseFilter === 'ALL' || item.WhsCode === warehouseFilter;
       return matchSearch && matchWhs;
     });
@@ -75,19 +78,180 @@ export default function AlmacenQuirofano() {
 
   // Filtered Movements List
   const filteredMovements = useMemo(() => {
+    const q = (searchQuery || '').toLowerCase().trim();
     return movements.filter(m => {
-      const matchSearch = !searchQuery ||
-                          (m.Codigo || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (m.Medicamento || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (m.Paciente || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (m.Procedimiento || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (m.Medicos || '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = !q ||
+                          (m.Codigo || '').toLowerCase().includes(q) ||
+                          (m.Medicamento || '').toLowerCase().includes(q) ||
+                          (m.Paciente || '').toLowerCase().includes(q) ||
+                          (m.Procedimiento || '').toLowerCase().includes(q) ||
+                          (m.Medicos || '').toLowerCase().includes(q) ||
+                          String(m.PCFRNum || '').includes(q) ||
+                          String(m.PCNum || '').includes(q);
       const matchWhs = warehouseFilter === 'ALL' || 
                        m.Almacen === warehouseFilter || 
                        (warehouseFilter === 'QX' && (m.Almacen === 'CQX' || m.Almacen === 'QX'));
       return matchSearch && matchWhs;
     });
   }, [movements, searchQuery, warehouseFilter]);
+
+  const exportToExcel = () => {
+    const fechaReporte = new Date().toLocaleString('es-MX');
+    const whsLabel = warehouseFilter === 'ALL' ? 'Todos los Almacenes QX (QX / QXCR)' : warehouseFilter === 'QXCR' ? 'Quirófano Carro Rojo (QXCR)' : 'Quirófano General (QX)';
+
+    if (subTab === 'inventory') {
+      if (filteredStock.length === 0) {
+        alert('No hay registros de inventario para exportar con los filtros seleccionados.');
+        return;
+      }
+
+      const totalPiezas = filteredStock.reduce((acc, item) => acc + (Number(item.QuantityOnStock) || 0), 0);
+      const totalValor = filteredStock.reduce((acc, item) => acc + ((Number(item.QuantityOnStock) || 0) * (Number(item.SalesPrice) || 0)), 0);
+
+      const cols = [
+        { header: 'Código SAP', key: 'ItemCode', width: 110, align: 'left' },
+        { header: 'Descripción / Insumo', key: 'ItemName', width: 320, align: 'left' },
+        { header: 'Almacén', key: 'WhsCode', width: 130, align: 'center' },
+        { header: 'Stock Físico', key: 'QuantityOnStock', width: 100, align: 'right', type: 'num' },
+        { header: 'Precio Unitario ($)', key: 'SalesPrice', width: 130, align: 'right', type: 'money' },
+        { header: 'Valor Total ($)', key: 'ValorTotal', width: 140, align: 'right', type: 'money' },
+        { header: 'Grupo SAP', key: 'ItemGroupName', width: 160, align: 'left' }
+      ];
+
+      const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse;width:100%}
+  .title-bar{background:#004687;color:#fff;font-size:16pt;font-weight:bold;padding:12px 16px}
+  .subtitle-bar{background:#0088C9;color:#fff;font-size:10pt;padding:6px 16px}
+  .info-row td{font-size:9pt;color:#475569;padding:4px 16px}
+  th{background:#004687;color:#fff;font-weight:bold;font-size:10pt;padding:10px 8px;border:1px solid #003366;text-align:center}
+  td{padding:7px 8px;font-size:9pt;border:1px solid #D1D5DB;color:#1E293B}
+  .even{background:#F4F6F9}.odd{background:#FFF}
+  .money{color:#15803D;font-weight:bold;text-align:right}
+  .code{color:#005FA9;font-weight:bold}
+  .qxcr{background:#FEE2E2;color:#DC2626;font-weight:bold}
+  .qx{background:#EFF6FF;color:#1D4ED8;font-weight:bold}
+  .total-row td{background:#E0EAF4;font-weight:bold;color:#004687;border-top:2px solid #004687;font-size:10pt;padding:10px 8px}
+</style></head><body>
+<table>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte de Existencias — Almacén Quirófano (${whsLabel})</td></tr>
+  <tr class="info-row"><td colspan="${cols.length}">Almacén: ${whsLabel} &nbsp;|&nbsp; Búsqueda: ${searchQuery ? `"${searchQuery}"` : 'TODOS'} &nbsp;|&nbsp; Registros: ${filteredStock.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
+  <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
+  <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
+  ${filteredStock.map((row, i) => {
+    const stock = Number(row.QuantityOnStock) || 0;
+    const price = Number(row.SalesPrice) || 0;
+    const totalVal = stock * price;
+    const whsText = row.WhsCode === 'QXCR' ? 'QXCR (Carro Rojo)' : 'QX (General)';
+    return `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">
+      <td class="code">${row.ItemCode || ''}</td>
+      <td>${String(row.ItemName || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td style="text-align:center" class="${row.WhsCode === 'QXCR' ? 'qxcr' : 'qx'}">${whsText}</td>
+      <td style="text-align:right;font-weight:bold">${stock.toLocaleString('es-MX')}</td>
+      <td class="money">$${price.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td class="money">$${totalVal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td>${row.ItemGroupName || 'General'}</td>
+    </tr>`;
+  }).join('')}
+  <tr class="total-row">
+    <td colspan="3" style="text-align:right">TOTALES</td>
+    <td style="text-align:right">${totalPiezas.toLocaleString('es-MX')}</td>
+    <td></td>
+    <td style="text-align:right">$${totalValor.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+    <td></td>
+  </tr>
+</table></body></html>`;
+
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Stock_Almacen_Quirofano_${warehouseFilter}_${new Date().toISOString().slice(0, 10)}.xls`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } else {
+      if (filteredMovements.length === 0) {
+        alert('No hay registros de movimientos para exportar con los filtros seleccionados.');
+        return;
+      }
+
+      const tipoTabTitle = subTab === 'salidas' ? 'Salidas a Pacientes' : 'Devoluciones y Retornos QX';
+      const totalPiezasMov = filteredMovements.reduce((acc, m) => acc + (Number(m.Cantidad) || 0), 0);
+
+      const cols = [
+        { header: 'Fecha', key: 'Fecha', width: 140 },
+        { header: 'Folio Quirófano', key: 'Folio', width: 120, align: 'center' },
+        { header: 'Paciente', key: 'Paciente', width: 220 },
+        { header: 'Procedimiento', key: 'Procedimiento', width: 240 },
+        { header: 'Médico / Equipo', key: 'Medicos', width: 200 },
+        { header: 'Código', key: 'Codigo', width: 110, align: 'center' },
+        { header: 'Insumo', key: 'Medicamento', width: 260 },
+        { header: 'Almacén', key: 'Almacen', width: 100, align: 'center' },
+        { header: 'Tipo', key: 'TipoMovimiento', width: 130, align: 'center' },
+        { header: 'Cantidad', key: 'Cantidad', width: 100, align: 'right', type: 'num' }
+      ];
+
+      const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse;width:100%}
+  .title-bar{background:#004687;color:#fff;font-size:16pt;font-weight:bold;padding:12px 16px}
+  .subtitle-bar{background:#0088C9;color:#fff;font-size:10pt;padding:6px 16px}
+  .info-row td{font-size:9pt;color:#475569;padding:4px 16px}
+  th{background:#004687;color:#fff;font-weight:bold;font-size:10pt;padding:10px 8px;border:1px solid #003366;text-align:center}
+  td{padding:7px 8px;font-size:9pt;border:1px solid #D1D5DB;color:#1E293B}
+  .even{background:#F4F6F9}.odd{background:#FFF}
+  .salida{color:#15803D;font-weight:bold;text-align:right}
+  .devolucion{color:#DC2626;font-weight:bold;text-align:right}
+  .code{color:#005FA9;font-weight:bold;text-align:center}
+  .total-row td{background:#E0EAF4;font-weight:bold;color:#004687;border-top:2px solid #004687;font-size:10pt;padding:10px 8px}
+</style></head><body>
+<table>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte de Movimientos — Almacén Quirófano (${tipoTabTitle})</td></tr>
+  <tr class="info-row"><td colspan="${cols.length}">Período: Últimos ${daysFilter} días &nbsp;|&nbsp; Almacén: ${whsLabel} &nbsp;|&nbsp; Búsqueda: ${searchQuery ? `"${searchQuery}"` : 'TODOS'} &nbsp;|&nbsp; Registros: ${filteredMovements.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
+  <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
+  <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
+  ${filteredMovements.map((m, i) => {
+    const fechaStr = m.Fecha ? new Date(m.Fecha).toLocaleString('es-MX') : '';
+    const folioStr = `Folio #${m.PCFRNum || m.PCNum || ''}`;
+    const esDevolucion = m.Cantidad < 0;
+    return `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">
+      <td style="white-space:nowrap">${fechaStr}</td>
+      <td style="text-align:center;font-weight:bold;color:#005FA9">${folioStr}</td>
+      <td style="font-weight:bold">${String(m.Paciente || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td>${String(m.Procedimiento || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td>${String(m.Medicos || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td class="code">${m.Codigo || ''}</td>
+      <td>${String(m.Medicamento || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+      <td style="text-align:center">${m.Almacen || 'QX'}</td>
+      <td style="text-align:center;font-weight:bold;color:${esDevolucion ? '#DC2626' : '#15803D'}">${esDevolucion ? 'DEVOLUCIÓN' : 'SALIDA CARGO'}</td>
+      <td class="${esDevolucion ? 'devolucion' : 'salida'}">${m.Cantidad > 0 ? `+${m.Cantidad}` : m.Cantidad}</td>
+    </tr>`;
+  }).join('')}
+  <tr class="total-row">
+    <td colspan="9" style="text-align:right">TOTAL PIEZAS</td>
+    <td style="text-align:right;font-weight:bold;color:${totalPiezasMov < 0 ? '#DC2626' : '#15803D'}">${totalPiezasMov > 0 ? `+${totalPiezasMov}` : totalPiezasMov}</td>
+  </tr>
+</table></body></html>`;
+
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Movimientos_Almacen_Quirofano_${subTab}_${new Date().toISOString().slice(0, 10)}.xls`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -114,7 +278,27 @@ export default function AlmacenQuirofano() {
         </div>
 
         {/* Action buttons */}
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={exportToExcel}
+            style={{
+              padding: '0.65rem 1.25rem',
+              background: '#00974A',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 2px 8px rgba(0, 151, 74, 0.3)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            📥 Exportar Excel
+          </button>
           <button
             onClick={() => subTab === 'inventory' ? fetchStock() : fetchMovements()}
             style={{

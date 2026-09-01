@@ -31,6 +31,8 @@ const OcupacionCamas      = lazy(() => import('./pages/OcupacionCamas'));
 const DashboardArea       = lazy(() => import('./pages/DashboardArea'));
 const AuditoriaInventarios = lazy(() => import('./components/audit/InventarioVsCargos'));
 const AuditoriaCargos     = lazy(() => import('./pages/AuditoriaCargos'));
+const CargosReversasPaciente = lazy(() => import('./components/audit/CargosReversasPaciente'));
+const ConsultaServiceLayer = lazy(() => import('./components/mi-area/ConsultaServiceLayer'));
 const DevolucionesFarmacia = lazy(() => import('./components/pharmacy/DevolucionesFarmacia'));
 const InventarioFarmacia   = lazy(() => import('./components/pharmacy/InventarioFarmacia'));
 const QuirofanoPage        = lazy(() => import('./pages/QuirofanoPage'));
@@ -184,6 +186,14 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="mi-area/consultas-service-layer"
+                element={
+                  <ProtectedRoute allowedRoles={Object.values(ROLES)}>
+                    <ConsultaServiceLayer />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Auditoría — ADMIN + DIRECTOR */}
               <Route
@@ -199,6 +209,14 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR]}>
                     <AuditoriaCargos />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="auditoria/cargos-reversas"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA]}>
+                    <CargosReversasPaciente />
                   </ProtectedRoute>
                 }
               />

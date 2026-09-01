@@ -99,6 +99,68 @@ export default function SurgicalKits() {
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const exportKitsToExcel = () => {
+    if (filteredKits.length === 0) {
+      alert('No hay kits quirúrgicos para exportar con los filtros seleccionados.');
+      return;
+    }
+
+    const fechaReporte = new Date().toLocaleString('es-MX');
+    const cols = [
+      { header: 'Procedimiento / Cirugía', width: 280, align: 'left' },
+      { header: 'Muestra Cirugías', width: 130, align: 'center' },
+      { header: 'Total Insumos en Kit', width: 140, align: 'center' },
+      { header: 'Código Insumo', width: 120, align: 'center' },
+      { header: 'Insumo / Medicamento', width: 280, align: 'left' },
+      { header: 'Promedio Piezas Sugeridas', width: 160, align: 'center' }
+    ];
+
+    let rowsHtml = '';
+    filteredKits.forEach((kit, ki) => {
+      (kit.Items || []).forEach((item, ii) => {
+        rowsHtml += `<tr class="${ki % 2 === 0 ? 'even' : 'odd'}">
+          ${ii === 0 ? `<td rowSpan="${kit.Items.length}" style="font-weight:bold;vertical-align:top;background:#F8FAFC">${kit.Cirugia}</td>` : ''}
+          ${ii === 0 ? `<td rowSpan="${kit.Items.length}" style="text-align:center;vertical-align:top;background:#F8FAFC">${kit.NumCirugias || 1}</td>` : ''}
+          ${ii === 0 ? `<td rowSpan="${kit.Items.length}" style="text-align:center;font-weight:bold;vertical-align:top;background:#F8FAFC">${kit.ItemsCount || kit.Items.length}</td>` : ''}
+          <td style="text-align:center;color:#005FA9;font-weight:bold">${item.Codigo}</td>
+          <td>${String(item.Medicamento || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+          <td style="text-align:center;font-weight:bold">${item.PromedioPiezas} pza(s)</td>
+        </tr>`;
+      });
+    });
+
+    const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse;width:100%}
+  .title-bar{background:#004687;color:#fff;font-size:16pt;font-weight:bold;padding:12px 16px}
+  .subtitle-bar{background:#0088C9;color:#fff;font-size:10pt;padding:6px 16px}
+  .info-row td{font-size:9pt;color:#475569;padding:4px 16px}
+  th{background:#004687;color:#fff;font-weight:bold;font-size:10pt;padding:10px 8px;border:1px solid #003366;text-align:center}
+  td{padding:7px 8px;font-size:9pt;border:1px solid #D1D5DB;color:#1E293B}
+  .even{background:#F4F6F9}.odd{background:#FFF}
+</style></head><body>
+<table>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Calculadora de Kits Quirúrgicos Estadísticos (Consumo Real QX)</td></tr>
+  <tr class="info-row"><td colspan="${cols.length}">Ventana: Últimos ${months} meses &nbsp;|&nbsp; Búsqueda: ${searchTerm ? `"${searchTerm}"` : 'TODOS'} &nbsp;|&nbsp; Kits Coincidentes: ${filteredKits.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
+  <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
+  <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
+  ${rowsHtml}
+</table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Kits_Quirurgicos_Escandon_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{ background: 'var(--card-bg, #ffffff)', borderRadius: '16px', padding: '2rem', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', border: '1px solid var(--border-color, #e2e8f0)' }}>
       {/* Header & Stats Banner */}
@@ -114,7 +176,27 @@ export default function SurgicalKits() {
 
         {/* Stats Pills */}
         {!loading && !error && (
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              onClick={exportKitsToExcel}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.55rem 1rem',
+                background: '#00974A',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 151, 74, 0.3)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              📥 Exportar Excel
+            </button>
             <div style={{ background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '0.5rem 1rem', borderRadius: '12px', textAlign: 'center' }}>
               <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#6366f1' }}>{data.length}</div>
               <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', fontWeight: 'bold' }}>Kits Totales</div>

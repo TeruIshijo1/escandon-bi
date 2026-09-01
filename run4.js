@@ -1,1 +1,0 @@
-﻿require('./backend/node_modules/dotenv').config({path: './backend/.env'}); const sapService = require('./backend/services/sap.service'); sapService._ensureSession().then(()=>sapService.get('/SQLQueries(\'VidasSalvChoqueDet\')/List?startDate=\'2026-04-01\'&\=1000')).then(r=>{ console.log(r.data.value.length); process.exit(0)}).catch(e=>{console.error(e);process.exit(1)});

@@ -39,6 +39,39 @@ function formatSapDate(dateStr) {
   return `${dateStr.substring(0,4)}-${dateStr.substring(4,6)}-${dateStr.substring(6,8)}T00:00:00Z`;
 }
 
+/**
+ * Determina la clasificación comercial / tipo de medicamento o insumo (Patente, Genérico o General).
+ * Analiza el fabricante registrado en SAP y los prefijos/sufijos estandarizados de SAP B1 (P / G / marcas comerciales).
+ */
+function resolveDrugClassification(itemName, firmCode, manufacturersMap = {}) {
+  const mfg = manufacturersMap[firmCode];
+  if (mfg && mfg !== '- Ningún fabricante -' && mfg !== '- Ninguna Marca -') {
+    return mfg;
+  }
+
+  if (!itemName) return 'General';
+
+  const clean = String(itemName).trim().toUpperCase();
+
+  // Patrones para Patente (P): ' P ', ' P.', ' P/', ' P$', 'PATENTE'
+  const isPatente = /\sP\s|\sP$|\sP\/|\sP\.|\bPATENTE\b/i.test(clean);
+
+  // Patrones para Genérico (G): ' G ', ' G.', ' G/', ' G$', 'GENERICO', 'GEN'
+  const isGenerico = /\sG\s|\sG$|\sG\/|\sG\.|\bGENERICO\b|\bGEN\b/i.test(clean);
+
+  if (isPatente && !isGenerico) {
+    return 'Patente';
+  }
+  if (isGenerico && !isPatente) {
+    return 'Genérico';
+  }
+  if (isPatente && isGenerico) {
+    return 'Patente';
+  }
+
+  return 'General';
+}
+
 async function syncInventoryCache() {
   if (syncPromise) return syncPromise;
   
@@ -49,8 +82,10 @@ async function syncInventoryCache() {
     await sapService._ensureSession();
     
     // 1. Preparar consultas SQL Nativas (para todos los almacenes con stock)
-    const sqlInv = `SELECT T0.ItemCode, T0.ItemName, T0.ItmsGrpCod, T0.FirmCode, T0.U_CLASI_MED_1 AS MedicalClassification, T0.U_CLASI_MED_2 AS SecondaryClassification, T1.WhsCode, T1.OnHand AS QuantityOnStock, T1.AvgPrice AS PurchaseCost, T2.Price AS SalesPrice FROM OITM T0 INNER JOIN OITW T1 ON T0.ItemCode = T1.ItemCode LEFT JOIN ITM1 T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 1 WHERE T0.InvntItem = 'Y' AND T1.OnHand > 0`;
-    const sqlBat = `SELECT T0.ItemCode, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber WHERE T1.Quantity > 0`;
+    // En SAP B1: ListNum 1 = '2PUBLICO GENERAL' (PricePG), ListNum 2 = '1HOSPITALIZACION' (PriceHos)
+    // Costo: Último precio de compra en SAP (T0.LastPurPrc), con fallback a costo promedio (T1.AvgPrice)
+    const sqlInv = `SELECT T0.ItemCode, T0.ItemName, T0.ItmsGrpCod, T0.FirmCode, T0.U_CLASI_MED_1 AS MedicalClassification, T0.U_CLASI_MED_2 AS SecondaryClassification, T1.WhsCode, T1.OnHand AS QuantityOnStock, T0.LastPurPrc AS PurchaseCost, T1.AvgPrice AS AvgCost, T2.Price AS PricePG, T3.Price AS PriceHos FROM OITM T0 INNER JOIN OITW T1 ON T0.ItemCode = T1.ItemCode LEFT JOIN ITM1 T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 1 LEFT JOIN ITM1 T3 ON T0.ItemCode = T3.ItemCode AND T3.PriceList = 2 WHERE T0.InvntItem = 'Y' AND T1.OnHand > 0`;
+    const sqlBat = `SELECT T0.ItemCode, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber WHERE T1.Quantity > 0`;
     const sqlClasi = `SELECT ItemCode, ItemName, U_CLASI_MED_1, U_CLASI_MED_2 FROM OITM WHERE U_CLASI_MED_1 IS NOT NULL OR U_CLASI_MED_2 IS NOT NULL`;
     
     await ensureSqlQuery('sq_inv_all', sqlInv);
@@ -131,25 +166,33 @@ async function syncInventoryCache() {
     // 4. Formatear y guardar en memoria
     if (invItems.length > 0) {
       globalInventoryCache = invItems.map(item => {
-        const cost = item.PurchaseCost || 0;
-        const price = item.SalesPrice || 0;
-        const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
+        const cost = Number((item.PurchaseCost > 0 ? item.PurchaseCost : item.AvgCost) || 0);
+        const pricePG = Number(item.PricePG != null ? item.PricePG : (item.SalesPrice || 0));
+        const priceHos = Number(item.PriceHos || 0);
+        const margin = pricePG > 0 ? ((pricePG - cost) / pricePG) * 100 : 0;
         const medClass = globalMedicalClassificationMap.get(item.ItemCode);
+        const quantity = Number(item.QuantityOnStock || 0);
         
         return {
           ...item,
+          QuantityOnStock: quantity,
+          PurchaseCost: cost,
+          PricePG: pricePG,
+          PriceHos: priceHos,
+          SalesPrice: pricePG, // Compatibilidad hacia atrás
           MedicalClassification: medClass?.MedicalClassification || item.MedicalClassification || null,
           SecondaryClassification: medClass?.SecondaryClassification || item.SecondaryClassification || null,
-          ItemGroupName: globalItemGroups[item.ItmsGrpCod] || 'General',
-          ManufacturerName: globalManufacturers[item.FirmCode] && globalManufacturers[item.FirmCode] !== '- Ningún fabricante -' ? globalManufacturers[item.FirmCode] : 'Genérico',
+          ItemGroupName: globalItemGroups[item.ItmsGrpCod] || (item.ItemCode?.startsWith('FAR') ? 'FARMACIA' : 'General'),
+          ManufacturerName: resolveDrugClassification(item.ItemName, item.FirmCode, globalManufacturers),
           ProfitMargin: margin,
-          ExpectedUtility: (price - cost) * (item.QuantityOnStock || 0)
+          ExpectedUtility: (pricePG - cost) * quantity
         };
       });
       globalInventoryMap = new Map(globalInventoryCache.map(i => [i.ItemCode, i]));
       // Formatear fechas de los lotes para que el frontend no falle
       globalBatchesCache = batItems.map(b => ({
         ...b,
+        Quantity: Number(b.Quantity || 0),
         AdmissionDate: formatSapDate(b.AdmissionDate),
         ExpirationDate: formatSapDate(b.ExpirationDate)
       }));
@@ -184,22 +227,24 @@ async function persistInventorySnapshot() {
       const values = [];
       const params = [];
       batch.forEach((item, idx) => {
-        const base = idx * 9;
-        values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9})`);
+        const base = idx * 11;
+        values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11})`);
         params.push(
           String(item.ItemCode || ''),
           item.ItemName || null,
           String(item.WhsCode || ''),
           Number(item.QuantityOnStock || 0),
           Number(item.PurchaseCost || 0),
-          Number(item.SalesPrice || 0),
+          Number(item.SalesPrice || item.PricePG || 0),
+          Number(item.PricePG != null ? item.PricePG : (item.SalesPrice || 0)),
+          Number(item.PriceHos || 0),
           item.MedicalClassification || null,
           item.SecondaryClassification || null,
           new Date()
         );
       });
       await client.query(`
-        INSERT INTO dw_sap_inventory_cache (itemcode, itemname, whscode, quantity, avgprice, salesprice, medicalclassification, secondaryclassification, lastsync)
+        INSERT INTO dw_sap_inventory_cache (itemcode, itemname, whscode, quantity, avgprice, salesprice, price_pg, price_hos, medicalclassification, secondaryclassification, lastsync)
         VALUES ${values.join(',')}
       `, params);
     }
@@ -243,6 +288,8 @@ async function loadSnapshotFromTable() {
   const res = await pool.query(`
       SELECT itemcode AS "ItemCode", itemname AS "ItemName", whscode AS "WhsCode",
              quantity AS "QuantityOnStock", avgprice AS "PurchaseCost", salesprice AS "SalesPrice",
+             COALESCE(price_pg, salesprice, 0) AS "PricePG",
+             COALESCE(price_hos, 0) AS "PriceHos",
              medicalclassification AS "MedicalClassification", secondaryclassification AS "SecondaryClassification",
              lastsync AS "LastSync"
       FROM dw_sap_inventory_cache
@@ -278,6 +325,8 @@ async function loadFromKardex() {
       QuantityOnStock: Number(r.QuantityOnStock || 0),
       PurchaseCost: 0,
       SalesPrice: 0,
+      PricePG: 0,
+      PriceHos: 0,
       MedicalClassification: null,
       SecondaryClassification: null,
       LastSync: r.LastSync
@@ -289,14 +338,21 @@ async function loadFromKardex() {
 
 function applyInventoryRows(rows, lastSync) {
   globalInventoryCache = rows.map(item => {
-    const cost = item.PurchaseCost || 0;
-    const price = item.SalesPrice || 0;
+    const cost = Number(item.PurchaseCost || 0);
+    const pricePG = Number(item.PricePG != null ? item.PricePG : (item.SalesPrice || 0));
+    const priceHos = Number(item.PriceHos || 0);
+    const quantity = Number(item.QuantityOnStock || 0);
     return {
       ...item,
-      ItemGroupName: 'General',
-      ManufacturerName: 'Genérico',
-      ProfitMargin: price > 0 ? ((price - cost) / price) * 100 : 0,
-      ExpectedUtility: (price - cost) * (item.QuantityOnStock || 0)
+      QuantityOnStock: quantity,
+      PurchaseCost: cost,
+      PricePG: pricePG,
+      PriceHos: priceHos,
+      SalesPrice: pricePG,
+      ItemGroupName: item.ItemGroupName || (item.ItemCode?.startsWith('FAR') ? 'FARMACIA' : 'General'),
+      ManufacturerName: resolveDrugClassification(item.ItemName, item.FirmCode, globalManufacturers),
+      ProfitMargin: pricePG > 0 ? ((pricePG - cost) / pricePG) * 100 : 0,
+      ExpectedUtility: (pricePG - cost) * quantity
     };
   });
   globalInventoryMap = new Map(globalInventoryCache.map(i => [i.ItemCode, i]));
@@ -326,7 +382,13 @@ function applyInventoryRows(rows, lastSync) {
  * Garantiza que haya datos de inventario disponibles (SAP en vivo → fallback PostgreSQL).
  */
 async function ensureInventoryData() {
-  if (globalInventoryCache.length > 0) return true;
+  if (globalInventoryCache.length > 0) {
+    const itemWithPrice = globalInventoryCache.find(i => (i.SalesPrice > 0 || i.PricePG > 0));
+    if (itemWithPrice && itemWithPrice.PriceHos === undefined) {
+      await syncInventoryCache().catch(() => {});
+    }
+    return true;
+  }
   try {
     await syncInventoryCache();
   } catch (e) {

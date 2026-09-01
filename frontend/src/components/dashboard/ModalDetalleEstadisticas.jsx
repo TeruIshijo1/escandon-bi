@@ -60,6 +60,7 @@ const COLUMN_LABELS = {
   HorasSalaChoque: 'Horas Sala Choque',
   OrdenesDeVenta: 'Órdenes de Venta',
   TotalCobrado: 'Total Cobrado',
+  TotalCargosServicio: 'Total Cargos / Eventos',
   TotalCuenta: 'Total Cuenta',
   TotalMonto: 'Total Importe',
   Saldo: 'Saldo',

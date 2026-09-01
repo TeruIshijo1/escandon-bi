@@ -226,6 +226,86 @@ export default function DashboardQuirofanoNativo({ data }) {
     setSelectedStatus('Todos');
   };
 
+  const exportFilteredSurgeriesToExcel = () => {
+    if (filteredData.length === 0) {
+      alert('No hay cirugías para exportar con los filtros seleccionados.');
+      return;
+    }
+
+    const fechaReporte = new Date().toLocaleString('es-MX');
+    const cols = [
+      { header: 'Quirófano', width: 140, align: 'center' },
+      { header: 'Procedimiento', width: 280, align: 'left' },
+      { header: 'Médicos', width: 220, align: 'left' },
+      { header: 'Fecha Inicio', width: 150, align: 'center' },
+      { header: 'Fecha Fin', width: 150, align: 'center' },
+      { header: 'Duración (Min)', width: 120, align: 'right' },
+      { header: 'Estado (SAP)', width: 150, align: 'center' }
+    ];
+
+    let totalMinutos = 0;
+    const rowsHtml = filteredData.map((row, i) => {
+      const start = new Date(row.FechaInicio);
+      const end = new Date(row.FechaFin);
+      let durVal = '';
+      if (!isNaN(start) && !isNaN(end) && start < end) {
+        const m = Math.round((end - start) / 60000);
+        durVal = m;
+        totalMinutos += m;
+      }
+      const startDate = !isNaN(start) ? start.toLocaleString('es-MX') : (row.FechaInicio || '');
+      const endDate = !isNaN(end) ? end.toLocaleString('es-MX') : (row.FechaFin || '');
+      const esRegistrada = row.Notas === 'Cirugía Registrada';
+
+      return `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">
+        <td style="text-align:center;font-weight:bold">${row.Quirofano || ''}</td>
+        <td>${String(row.Procedimientos || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+        <td>${String(row.Medicos || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+        <td style="text-align:center">${startDate}</td>
+        <td style="text-align:center">${endDate}</td>
+        <td style="text-align:right;font-weight:bold">${durVal}</td>
+        <td style="text-align:center;font-weight:bold;color:${esRegistrada ? '#10B981' : '#EF4444'}">${row.Notas || ''}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+  body{font-family:Calibri,Arial,sans-serif}table{border-collapse:collapse;width:100%}
+  .title-bar{background:#004687;color:#fff;font-size:16pt;font-weight:bold;padding:12px 16px}
+  .subtitle-bar{background:#0088C9;color:#fff;font-size:10pt;padding:6px 16px}
+  .info-row td{font-size:9pt;color:#475569;padding:4px 16px}
+  th{background:#004687;color:#fff;font-weight:bold;font-size:10pt;padding:10px 8px;border:1px solid #003366;text-align:center}
+  td{padding:7px 8px;font-size:9pt;border:1px solid #D1D5DB;color:#1E293B}
+  .even{background:#F4F6F9}.odd{background:#FFF}
+  .total-row td{background:#E0EAF4;font-weight:bold;color:#004687;border-top:2px solid #004687;font-size:10pt;padding:10px 8px}
+</style></head><body>
+<table>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Detalle y Bitácora de Cirugías en Quirófanos</td></tr>
+  <tr class="info-row"><td colspan="${cols.length}">Filtros: Quirófano (${selectedRoom}) &nbsp;|&nbsp; Estado (${selectedStatus}) &nbsp;|&nbsp; Año (${selectedYear}) &nbsp;|&nbsp; Mes (${selectedMonth}) &nbsp;|&nbsp; Cirujano (${selectedMedico}) &nbsp;|&nbsp; Registros: ${filteredData.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
+  <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
+  <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
+  ${rowsHtml}
+  <tr class="total-row">
+    <td colspan="5" style="text-align:right">TOTAL CIRUGÍAS: ${filteredData.length} &nbsp;|&nbsp; DURACIÓN TOTAL</td>
+    <td style="text-align:right">${totalMinutos.toLocaleString('es-MX')} min</td>
+    <td></td>
+  </tr>
+</table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Bitacora_Cirugias_Quirofano_${selectedRoom}_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{ marginTop: '1rem', fontFamily: 'var(--font-body)' }} id="dashboard-quirofano-nativo">
       
@@ -546,6 +626,26 @@ export default function DashboardQuirofanoNativo({ data }) {
           
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', color: '#8A97A8' }}>{filteredData.length} registros</span>
+            <button
+              onClick={exportFilteredSurgeriesToExcel}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.45rem 0.9rem',
+                background: '#00974A',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0, 151, 74, 0.25)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              📥 Exportar Excel
+            </button>
           </div>
         </div>
         

@@ -1,3 +1,4 @@
+/* @refresh reset */
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
@@ -20,6 +21,7 @@ export default function PuntoReordenFarmacia() {
   const [loadingML, setLoadingML] = useState(false);
   const [syncingML, setSyncingML] = useState(false);
   const [mlRiskFilter, setMlRiskFilter] = useState('ALL'); // ALL | CRITICO | ALTO | MEDIO | BAJO
+  const [mlStockFilter, setMlStockFilter] = useState('ALL'); // ALL | FAR | QX | QXCR | SIN_STOCK
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -223,7 +225,7 @@ export default function PuntoReordenFarmacia() {
   const exportPredictionsToCSV = () => {
     if (mlPredictions.length === 0) return;
     const headers = [
-      'itemcode', 'itemdescription', 'stock_actual', 'consumo_promedio_diario', 
+      'itemcode', 'itemdescription', 'stock_actual', 'stock_farmacia', 'stock_quirofano', 'stock_carro_rojo', 'stock_fuente', 'consumo_promedio_diario', 
       'dias_stock_restante', 'riesgo_base', 'prob_desabasto_7d', 'riesgo_ml', 
       'modelo_version', 'fecha_estimada_agotamiento', 'fecha_desabasto', 'fecha_prediccion'
     ];
@@ -394,10 +396,10 @@ export default function PuntoReordenFarmacia() {
   };
 
   const exportConfigToCSV = () => {
-    if (!configData?.rows?.length) return;
+    if (!filteredConfigRows?.length) return;
     const headers = ['PRODUCTO', 'CONSUMO TOTAL', 'CONSUMO MENSUAL', 'CONSUMO DIARIO', 'PUNTO MIN (7 DIAS)', 'PUNTO REORDEN (10.5 DIAS)', 'PUNTO MAX (14 DIAS)', 'CODIGO SAP', 'TIPO VINCULO'];
     const csvRows = [headers.join(',')];
-    configData.rows.forEach(row => {
+    filteredConfigRows.forEach(row => {
       const values = [
         row.producto, row.consumoTotal, row.consumoMensualPromedio, row.consumoDiario,
         row.puntoMin, row.puntoReorden, row.puntoMax, row.itemcode || '', row.matchType || 'SIN_VINCULAR'
@@ -419,7 +421,7 @@ export default function PuntoReordenFarmacia() {
   const exportToCSV = () => {
     if (mlDataset.length === 0) return;
     const headers = [
-      'itemcode', 'itemdescription', 'stock_actual', 'consumo_7d', 'consumo_15d', 
+      'itemcode', 'itemdescription', 'stock_actual', 'stock_farmacia', 'stock_quirofano', 'stock_carro_rojo', 'stock_fuente', 'consumo_7d', 'consumo_15d', 
       'consumo_30d', 'consumo_promedio_diario', 'variabilidad_consumo', 'minstock', 
       'maxstock', 'pedidos_abiertos', 'fecha_ultimo_movimiento', 'dias_stock_restante', 
       'riesgo_base', 'fecha_calculo'
@@ -552,6 +554,14 @@ export default function PuntoReordenFarmacia() {
     }
   };
 
+  const renderStockBadges = (row) => (
+    <div style={{ display: 'inline-flex', gap: '0.35rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <span style={{ background: Number(row.stock_farmacia || 0) > 0 ? '#dbeafe' : '#f1f5f9', color: Number(row.stock_farmacia || 0) > 0 ? '#1d4ed8' : '#94a3b8', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700' }}>FAR {Math.round(row.stock_farmacia || 0)}</span>
+      <span style={{ background: Number(row.stock_quirofano || 0) > 0 ? '#dcfce7' : '#f1f5f9', color: Number(row.stock_quirofano || 0) > 0 ? '#166534' : '#94a3b8', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700' }}>QX {Math.round(row.stock_quirofano || 0)}</span>
+      <span style={{ background: Number(row.stock_carro_rojo || 0) > 0 ? '#fee2e2' : '#f1f5f9', color: Number(row.stock_carro_rojo || 0) > 0 ? '#991b1b' : '#94a3b8', padding: '0.2rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '700' }}>QXCR {Math.round(row.stock_carro_rojo || 0)}</span>
+    </div>
+  );
+
   // Filtrado de items
   const filteredItems = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
@@ -603,10 +613,17 @@ export default function PuntoReordenFarmacia() {
       const matchesRisk = 
         mlRiskFilter === 'ALL' || 
         item.riesgo_base === mlRiskFilter;
+
+      const matchesStock =
+        mlStockFilter === 'ALL' ||
+        (mlStockFilter === 'FAR' && Number(item.stock_farmacia || 0) > 0) ||
+        (mlStockFilter === 'QX' && Number(item.stock_quirofano || 0) > 0) ||
+        (mlStockFilter === 'QXCR' && Number(item.stock_carro_rojo || 0) > 0) ||
+        (mlStockFilter === 'SIN_STOCK' && Number(item.stock_farmacia || 0) + Number(item.stock_quirofano || 0) + Number(item.stock_carro_rojo || 0) <= 0);
         
-      return matchesSearch && matchesRisk;
+      return matchesSearch && matchesRisk && matchesStock;
     });
-  }, [mlDataset, searchTerm, mlRiskFilter]);
+  }, [mlDataset, searchTerm, mlRiskFilter, mlStockFilter]);
 
   // Filtrado de ML History
   const filteredMLHistory = useMemo(() => {
@@ -618,10 +635,17 @@ export default function PuntoReordenFarmacia() {
       const matchesRisk = 
         mlRiskFilter === 'ALL' || 
         item.riesgo_base === mlRiskFilter;
+
+      const matchesStock =
+        mlStockFilter === 'ALL' ||
+        (mlStockFilter === 'FAR' && Number(item.stock_farmacia || 0) > 0) ||
+        (mlStockFilter === 'QX' && Number(item.stock_quirofano || 0) > 0) ||
+        (mlStockFilter === 'QXCR' && Number(item.stock_carro_rojo || 0) > 0) ||
+        (mlStockFilter === 'SIN_STOCK' && Number(item.stock_farmacia || 0) + Number(item.stock_quirofano || 0) + Number(item.stock_carro_rojo || 0) <= 0);
         
-      return matchesSearch && matchesRisk;
+      return matchesSearch && matchesRisk && matchesStock;
     });
-  }, [mlHistory, searchTerm, mlRiskFilter]);
+  }, [mlHistory, searchTerm, mlRiskFilter, mlStockFilter]);
 
   // Filtrado de ML Predictions
   const filteredMLPredictions = useMemo(() => {
@@ -633,10 +657,17 @@ export default function PuntoReordenFarmacia() {
       const matchesRisk = 
         mlRiskFilter === 'ALL' || 
         item.riesgo_ml === mlRiskFilter;
+
+      const matchesStock =
+        mlStockFilter === 'ALL' ||
+        (mlStockFilter === 'FAR' && Number(item.stock_farmacia || 0) > 0) ||
+        (mlStockFilter === 'QX' && Number(item.stock_quirofano || 0) > 0) ||
+        (mlStockFilter === 'QXCR' && Number(item.stock_carro_rojo || 0) > 0) ||
+        (mlStockFilter === 'SIN_STOCK' && Number(item.stock_farmacia || 0) + Number(item.stock_quirofano || 0) + Number(item.stock_carro_rojo || 0) <= 0);
         
-      return matchesSearch && matchesRisk;
+      return matchesSearch && matchesRisk && matchesStock;
     });
-  }, [mlPredictions, searchTerm, mlRiskFilter]);
+  }, [mlPredictions, searchTerm, mlRiskFilter, mlStockFilter]);
 
   // Filtrado de Configuración Dinámica (Excel)
   const filteredConfigRows = useMemo(() => {
@@ -658,10 +689,19 @@ export default function PuntoReordenFarmacia() {
 
   
   const exportPedidosToExcel = () => {
+    const term = searchTerm.toLowerCase().trim();
     const csvRows = ['Folio,Tipo,Fecha,Proveedor,Usuario,Estatus,Total'];
     const filteredPedidos = pedidos.filter((p) => {
       if (startDate && p.fecha < startDate) return false;
       if (endDate && p.fecha > endDate) return false;
+      if (term) {
+        const matches = (String(p.folio || '')).toLowerCase().includes(term) ||
+                        (String(p.proveedor || '')).toLowerCase().includes(term) ||
+                        (String(p.usuario || '')).toLowerCase().includes(term) ||
+                        (String(p.tipo || '')).toLowerCase().includes(term) ||
+                        (String(p.estatus || '')).toLowerCase().includes(term);
+        if (!matches) return false;
+      }
       return true;
     });
     filteredPedidos.forEach(p => {
@@ -671,7 +711,7 @@ export default function PuntoReordenFarmacia() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'pedidos_sap_farmacia.csv';
+    link.download = `pedidos_sap_farmacia_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   };
 
@@ -1547,6 +1587,20 @@ onClick={() => fetchPedidosData(true)}
                 <option value="BAJO">🟢 BAJO</option>
               </select>
             </div>
+            <div style={{ width: '220px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary, #475569)', marginBottom: '0.35rem' }}>Filtrar por Stock</label>
+              <select
+                value={mlStockFilter}
+                onChange={(e) => setMlStockFilter(e.target.value)}
+                style={{ width: '100%', padding: '0.55rem 0.75rem', border: '1px solid var(--border-color, #cbd5e1)', borderRadius: '8px', outline: 'none', fontSize: '0.9rem', background: 'var(--color-bg-white, white)', color: 'var(--text-primary, #0f172a)' }}
+              >
+                <option value="ALL">Todos los stocks</option>
+                <option value="FAR">Farmacia (FAR)</option>
+                <option value="QX">Quirófano (QX)</option>
+                <option value="QXCR">Carro Rojo (QXCR)</option>
+                <option value="SIN_STOCK">Sin stock operativo</option>
+              </select>
+            </div>
           </div>
 
           {loadingML ? (
@@ -1568,6 +1622,7 @@ onClick={() => fetchPedidosData(true)}
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Código</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Descripción</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Disponible</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Ubicación Stock</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Mín / Máx</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Pedido en Camino</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo (7d / 15d / 30d)</th>
@@ -1593,6 +1648,9 @@ onClick={() => fetchPedidosData(true)}
                           <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary, #334155)' }}>{row.itemdescription}</td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: row.stock_actual === 0 ? '#ef4444' : 'var(--text-primary, #0f172a)' }}>
                             {Math.round(row.stock_actual)}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-secondary, #475569)' }}>
+                            {renderStockBadges(row)}
                           </td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted, #64748b)' }}>
                             {row.minstock} / {row.maxstock}
@@ -1653,6 +1711,7 @@ onClick={() => fetchPedidosData(true)}
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Código</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Descripción</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock en la Fecha</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Ubicación Actual</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo 30 días</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock</th>
@@ -1679,6 +1738,9 @@ onClick={() => fetchPedidosData(true)}
                           <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary, #334155)' }}>{row.itemdescription}</td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: row.stock_actual === 0 ? '#ef4444' : 'var(--text-primary, #0f172a)' }}>
                             {Math.round(row.stock_actual)}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                            {renderStockBadges(row)}
                           </td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-secondary, #334155)' }}>
                             {Math.round(row.consumo_30d)}
@@ -1755,6 +1817,7 @@ onClick={() => fetchPedidosData(true)}
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Código</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Descripción</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Disponible</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Ubicación Stock</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock Restante</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo Base por Stock</th>
@@ -1803,6 +1866,9 @@ onClick={() => fetchPedidosData(true)}
                           <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary, #334155)' }}>{row.itemdescription}</td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 'bold', color: row.stock_actual === 0 ? '#ef4444' : 'var(--text-primary, #0f172a)' }}>
                             {Math.round(row.stock_actual)}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                            {renderStockBadges(row)}
                           </td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
                             {Number(row.consumo_promedio_diario).toFixed(2)}
@@ -1879,8 +1945,8 @@ onClick={() => fetchPedidosData(true)}
                   const headers = ['CÓDIGO SAP', 'DESCRIPCIÓN', 'CONSUMO MENSUAL', 'CONSUMO DIARIO', 'PUNTO MIN (7 DÍAS)', 'PUNTO REORDEN (10.5 DÍAS)', 'PUNTO MAX (14 DÍAS)'];
                   const rows = [headers.join(',')];
                   mlDataset.forEach(row => {
-                    const consDiario = row.consumo_promedio_diario || 0;
-                    rows.push(`"${row.itemcode}","${row.itemdescription}",${row.consumo_30d},${consDiario.toFixed(2)},${Math.ceil(consDiario * 7)},${Math.ceil(consDiario * 10.5)},${Math.ceil(consDiario * 14)}`);
+                    const consDiario = Number(row.consumo_promedio_diario) || 0;
+                    rows.push(`"${row.itemcode}","${row.itemdescription}",${Number(row.consumo_30d) || 0},${consDiario.toFixed(2)},${Math.ceil(consDiario * 7)},${Math.ceil(consDiario * 10.5)},${Math.ceil(consDiario * 14)}`);
                   });
                   const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
                   const url = URL.createObjectURL(blob);
@@ -1932,7 +1998,7 @@ onClick={() => fetchPedidosData(true)}
                   {mlDataset
                     .filter(item => (item.itemcode?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (item.itemdescription?.toLowerCase() || '').includes(searchTerm.toLowerCase()))
                     .map((row, i) => {
-                    const consDiario = row.consumo_promedio_diario || 0;
+                    const consDiario = Number(row.consumo_promedio_diario) || 0;
                     const min7 = Math.ceil(consDiario * 7);
                     const reo10 = Math.ceil(consDiario * 10.5);
                     const max14 = Math.ceil(consDiario * 14);
