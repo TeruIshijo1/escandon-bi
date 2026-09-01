@@ -17,12 +17,8 @@ const pool = new Pool({
   host:     process.env.PGHOST     || 'localhost',
   database: process.env.PGDATABASE || 'escandon_bi',
   port:     parseInt(process.env.PGPORT || '5432', 10),
+  options:  "-c timezone=America/Mexico_City",
   ...(process.env.PGPASSWORD ? { password: process.env.PGPASSWORD } : {}),
-});
-
-// Hora local del hospital para date()/CURRENT_DATE y defaults consistentes
-pool.on('connect', (client) => {
-  client.query("SET TIME ZONE 'America/Mexico_City'").catch(() => {});
 });
 
 pool.on('error', (err) => {
