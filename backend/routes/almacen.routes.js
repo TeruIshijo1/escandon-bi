@@ -431,24 +431,34 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
 
     switch (reportName) {
       case 'cuentas-hospitalarias': {
-        const query = `/Orders?$select=U_PCNum,DocNum,DocumentStatus,TaxDate,DocDate,DocDueDate,U_PT_Id,U_PCType,U_PTName,U_PTNum,CardName,DocTotal,U_UserName&$filter=DocDate ge '${startDate}' and DocDate le '${endDate}'`;
+        const query = `/Orders?$select=U_PCNum,U_SONum,DocNum,DocumentStatus,TaxDate,DocDate,DocDueDate,U_PT_Id,U_PCType,U_PTName,U_PTNum,CardName,DocTotal,U_UserName&$filter=DocDate ge '${startDate}' and DocDate le '${endDate}'`;
         const orders = await sapService.fetchAllPages(query);
         
-        data = orders.map(o => ({
-          'Folio de Atencion Medica': o.U_PCNum,
-          'Folio Orden Venta (SAP)': o.DocNum,
-          'Status de Documento (SAP)': formatStatus(o.DocumentStatus),
-          'Fecha de Documento (SAP)': o.TaxDate,
-          'Fecha de Contabilizacion (SAP)': o.DocDate,
-          'Fecha de Vencimiento (SAP)': o.DocDueDate,
-          'CURP': o.U_PT_Id,
-          'Tipo de Atencion Medica': formatType(o.U_PCType),
-          'Nombre de Paciente': o.U_PTName,
-          'Numero de Paciente': o.U_PTNum,
-          'Nombre de Cliente o Proveedor (SAP)': o.CardName,
-          'Total del Documento (SAP)': o.DocTotal,
-          'Usuario': o.U_UserName
-        })).sort((a, b) => new Date(a['Fecha de Contabilizacion (SAP)']) - new Date(b['Fecha de Contabilizacion (SAP)']));
+        data = orders.map(o => {
+          const folio = o.U_PCNum || o.U_SONum || '';
+          let tipo = '';
+          if (o.U_PCType === 'IP') tipo = 'Hospitalizacion';
+          else if (o.U_PCType === 'ER') tipo = 'Urgencias';
+          else if (o.U_PCType) tipo = o.U_PCType;
+          else if (o.U_SONum) tipo = 'Consulta Médica';
+          else tipo = 'Venta General / Otro';
+
+          return {
+            'Folio de Atencion Medica': folio,
+            'Folio Orden Venta (SAP)': o.DocNum,
+            'Status de Documento (SAP)': formatStatus(o.DocumentStatus),
+            'Fecha de Documento (SAP)': o.TaxDate,
+            'Fecha de Contabilizacion (SAP)': o.DocDate,
+            'Fecha de Vencimiento (SAP)': o.DocDueDate,
+            'CURP': o.U_PT_Id,
+            'Tipo de Atencion Medica': tipo,
+            'Nombre de Paciente': o.U_PTName,
+            'Numero de Paciente': o.U_PTNum,
+            'Nombre de Cliente o Proveedor (SAP)': o.CardName,
+            'Total del Documento (SAP)': o.DocTotal,
+            'Usuario': o.U_UserName
+          };
+        }).sort((a, b) => new Date(a['Fecha de Contabilizacion (SAP)']) - new Date(b['Fecha de Contabilizacion (SAP)']));
         break;
       }
       
