@@ -11,6 +11,7 @@ const ExcelJS     = require('exceljs');
 const fs          = require('fs');
 const path        = require('path');
 const { getDb }   = require('../config/db');
+const { authenticate, authorize, authorizeCapability } = require('../middleware/auth.middleware');
 const { getInventariosVsCargos, getDevolucionesFarmacia, getCargosFarmaciaSAP } = require('../services/etl.service');
 const auditMovementService = require('../services/auditMovement.service');
 
