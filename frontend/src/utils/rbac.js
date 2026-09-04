@@ -374,7 +374,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     {
       section: 'Mi Área',
       icon:    '🔌',
-      label:   'Consultas SAP (Service Layer)',
+      label:   'Crear Reporte Personalizado',
       path:    '/mi-area/consultas-service-layer',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL, ROLES.CONSULTA_EXTERNA],
     },

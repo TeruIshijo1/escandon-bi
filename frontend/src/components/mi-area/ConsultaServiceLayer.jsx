@@ -438,7 +438,7 @@ export default function ConsultaServiceLayer() {
             <span style={{ fontSize: '2.2rem' }}>🔌</span>
             <div>
               <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#004687', margin: 0, letterSpacing: '-0.02em' }}>
-                Consultas SAP (Service Layer)
+                Crear Reporte Personalizado
               </h1>
               <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.875rem' }}>
                 Constructor visual de reportes a la medida sobre SAP Business One con nombres hospitalarios claros y exportación instantánea.
