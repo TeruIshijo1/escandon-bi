@@ -461,6 +461,25 @@ async function ensureSapQuery(sqlCode, sqlText) {
 }
 
 /**
+ * Asegura la creación/actualización de una SQLQuery en SAP Service Layer y obtiene los registros.
+ * Si SAP devuelve 404 / -2028 (sin registros que coincidan con la fecha/filtro), retorna [] limpiamente.
+ */
+async function executeSapSqlList(sqlCode, sqlText) {
+  await ensureSapQuery(sqlCode, sqlText);
+  try {
+    const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
+    return res.data?.value || [];
+  } catch (err) {
+    const errMsg = (err.message || '').toLowerCase();
+    const isNoRecords = err.status === 404 || err.code === -2028 || errMsg.includes('no matching records found') || errMsg.includes('-2028');
+    if (isNoRecords) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+/**
  * Ejecuta una consulta dinámica en Service Layer validando filtros obligatorios
  */
 async function executeQuery({
@@ -537,9 +556,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_batches';
       const sqlText = `SELECT T0.ItemCode, T2.ItemName, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber LEFT JOIN OITM T2 ON T0.ItemCode = T2.ItemCode WHERE T1.Quantity > 0 AND T0.ExpDate >= '${dDesdeSap}' AND T0.ExpDate <= '${dHastaSap}'`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
       const now = new Date();
 
       rawRows = items.map(b => {
@@ -573,9 +590,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_pinv';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPCH T0 INNER JOIN PCH1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(p => ({
         ...p,
@@ -594,9 +609,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_por';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM OPOR T0 INNER JOIN POR1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(p => ({
         ...p,
@@ -616,9 +629,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_grpo';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPDN T0 INNER JOIN PDN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(p => ({
         ...p,
@@ -636,9 +647,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_gret';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM ORPD T0 INNER JOIN RPD1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(p => ({
         ...p,
@@ -655,9 +664,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_transfers';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.Filler, T0.ToWhsCode, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OWTR T0 INNER JOIN WTR1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(t => ({
         ...t,
@@ -673,9 +680,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_wtq';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DueDate, T0.Filler, T0.ToWhsCode, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T0.Comments FROM OWTQ T0 INNER JOIN WTQ1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(t => ({
         ...t,
@@ -694,9 +699,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_giss';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGE T0 INNER JOIN IGE1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(p => ({
         ...p,
@@ -712,9 +715,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_grec_inv';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGN T0 INNER JOIN IGN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(p => ({
         ...p,
@@ -730,9 +731,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_prq';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.ReqDate, T0.Requester, T0.Department, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OPRQ T0 INNER JOIN PRQ1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(r => ({
         ...r,
@@ -748,9 +747,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_sinv';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.U_PRName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(p => ({
         ...p,
@@ -769,9 +766,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_scrm';
       const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM ORIN T0 INNER JOIN RIN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(p => ({
         ...p,
@@ -788,9 +783,7 @@ async function executeQuery({
       const sqlCode = 'sq_qb_bp';
       const sqlText = `SELECT TOP ${limit} T0.CardCode, T0.CardName, T0.CardType, T0.LicTradNum, T0.Phone1, T0.E_Mail, T0.Balance, T1.GroupName, T0.CreateDate FROM OCRD T0 LEFT JOIN OCRG T1 ON T0.GroupCode = T1.GroupCode WHERE T0.CardType IN ('S', 'C') ORDER BY T0.CardName ASC`;
       
-      await ensureSapQuery(sqlCode, sqlText);
-      const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
-      const items = res.data?.value || [];
+      const items = await executeSapSqlList(sqlCode, sqlText);
 
       rawRows = items.map(b => ({
         ...b,
