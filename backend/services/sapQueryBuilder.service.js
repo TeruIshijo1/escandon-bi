@@ -438,40 +438,110 @@ function formatSapDateStr(val) {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   DEFINICIÓN DE CONSULTAS SQL PARAMETRIZADAS ESTÁTICAS (SAP SL)
+══════════════════════════════════════════════════════════════ */
+const STATIC_SQL_QUERIES = {
+  sq_qb_batches: `SELECT TOP 5000 T0.ItemCode, T2.ItemName, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 WITH (NOLOCK) INNER JOIN OBTQ T1 WITH (NOLOCK) ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber LEFT JOIN OITM T2 WITH (NOLOCK) ON T0.ItemCode = T2.ItemCode WHERE T1.Quantity > 0 AND T0.ExpDate >= :startDate AND T0.ExpDate <= :endDate`,
+  
+  sq_qb_pinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPCH T0 WITH (NOLOCK) INNER JOIN PCH1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_por: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM OPOR T0 WITH (NOLOCK) INNER JOIN POR1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_grpo: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPDN T0 WITH (NOLOCK) INNER JOIN PDN1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_gret: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM ORPD T0 WITH (NOLOCK) INNER JOIN RPD1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_transfers: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.Filler, T0.ToWhsCode, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OWTR T0 WITH (NOLOCK) INNER JOIN WTR1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_wtq: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DueDate, T0.Filler, T0.ToWhsCode, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T0.Comments FROM OWTQ T0 WITH (NOLOCK) INNER JOIN WTQ1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_giss: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGE T0 WITH (NOLOCK) INNER JOIN IGE1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_grec_inv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGN T0 WITH (NOLOCK) INNER JOIN IGN1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_prq: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.ReqDate, T0.Requester, T0.Department, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OPRQ T0 WITH (NOLOCK) INNER JOIN PRQ1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_sinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.U_PRName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OINV T0 WITH (NOLOCK) INNER JOIN INV1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_scrm: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM ORIN T0 WITH (NOLOCK) INNER JOIN RIN1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  
+  sq_qb_bp: `SELECT TOP 5000 T0.CardCode, T0.CardName, T0.CardType, T0.LicTradNum, T0.Phone1, T0.E_Mail, T0.Balance, T1.GroupName, T0.CreateDate FROM OCRD T0 WITH (NOLOCK) LEFT JOIN OCRG T1 WITH (NOLOCK) ON T0.GroupCode = T1.GroupCode WHERE T0.CardType IN ('S', 'C') ORDER BY T0.CardName ASC`
+};
+
+const registeredQueriesCache = new Set();
+const queryResultsCache = new Map();
+const QUERY_CACHE_TTL_MS = 60 * 1000; // 60 segundos de caché en memoria
+
 /**
- * Asegura la creación de una SQLQuery en SAP Service Layer
+ * Asegura la creación de una SQLQuery en SAP Service Layer una sola vez.
  */
 async function ensureSapQuery(sqlCode, sqlText) {
+  if (registeredQueriesCache.has(sqlCode)) {
+    return;
+  }
   try {
     await sapService.post('/SQLQueries', {
       SqlCode: sqlCode,
       SqlName: sqlCode,
       SqlText: sqlText
     });
+    registeredQueriesCache.add(sqlCode);
   } catch (e) {
     try {
       await sapService.patch(`/SQLQueries('${sqlCode}')`, {
         SqlName: sqlCode,
         SqlText: sqlText
       });
+      registeredQueriesCache.add(sqlCode);
     } catch (err) {
-      // Ya existe o sin cambios
+      registeredQueriesCache.add(sqlCode);
     }
   }
 }
 
 /**
- * Asegura la creación/actualización de una SQLQuery en SAP Service Layer y obtiene los registros.
- * Si SAP devuelve 404 / -2028 (sin registros que coincidan con la fecha/filtro), retorna [] limpiamente.
+ * Registra todas las SQLQueries estáticas en segundo plano al iniciar
  */
-async function executeSapSqlList(sqlCode, sqlText) {
-  await ensureSapQuery(sqlCode, sqlText);
+async function initSapQueryBuilderQueries() {
   try {
-    const res = await sapService.get(`/SQLQueries('${sqlCode}')/List`, { 'Prefer': 'odata.maxpagesize=5000' });
+    await sapService._ensureSession();
+    for (const [code, sqlText] of Object.entries(STATIC_SQL_QUERIES)) {
+      await ensureSapQuery(code, sqlText);
+    }
+    console.log('[SAP Query Builder] Consultas parametrizadas estáticas registradas exitosamente.');
+  } catch (err) {
+    console.warn('[SAP Query Builder] Registro inicial de queries:', err.message);
+  }
+}
+
+// Ejecutar inicialización no bloqueante
+if (process.env.NODE_ENV !== 'test') {
+  setTimeout(initSapQueryBuilderQueries, 6000);
+}
+
+/**
+ * Ejecuta una consulta estática en SAP Service Layer pasando parámetros de fecha.
+ * Si SAP devuelve 404 / -2028 (0 registros encontrados), retorna [] de forma silenciosa y segura.
+ */
+async function executeSapSqlList(sqlCode, queryParams = {}) {
+  const sqlText = STATIC_SQL_QUERIES[sqlCode];
+  if (sqlText) {
+    await ensureSapQuery(sqlCode, sqlText);
+  }
+
+  let paramStr = '';
+  const entries = Object.entries(queryParams);
+  if (entries.length > 0) {
+    paramStr = '?' + entries.map(([k, v]) => `${k}='${encodeURIComponent(v)}'`).join('&');
+  }
+
+  try {
+    const res = await sapService.get(`/SQLQueries('${sqlCode}')/List${paramStr}`, { 'Prefer': 'odata.maxpagesize=5000' });
     return res.data?.value || [];
   } catch (err) {
     const errMsg = (err.message || '').toLowerCase();
-    const isNoRecords = err.status === 404 || err.code === -2028 || errMsg.includes('no matching records found') || errMsg.includes('-2028');
+    const isNoRecords = err.status === 404 || String(err.code) === '-2028' || errMsg.includes('no matching records') || errMsg.includes('-2028');
     if (isNoRecords) {
       return [];
     }
@@ -502,7 +572,7 @@ async function executeQuery({
   // 1. Validar filtro obligatorio de fechas
   if (entityDef.requiresDateFilter) {
     if (!fechaDesde || !fechaHasta) {
-      throw new Error(`Para evitar sobrecarga en SAP Service Layer, la entidad '${entityDef.title}' requiere obligatoriamente un rango de fechas (Fecha Desde y Fecha Hasta).`);
+      throw new Error(`Para evitar sobrecarga en SAP Service Layer, el módulo '${entityDef.title}' requiere obligatoriamente un rango de fechas (Fecha Desde y Fecha Hasta).`);
     }
 
     const d1 = new Date(fechaDesde);
@@ -521,13 +591,30 @@ async function executeQuery({
     }
   }
 
-  // Formato fechas para SAP SQL (YYYYMMDD o YYYY-MM-DD)
+  // Clave de caché para evitar consultas idénticas concurrentes a SAP
+  const cacheKey = `${entity}_${fechaDesde || ''}_${fechaHasta || ''}_${almacen || 'ALL'}_${estatusDoc || 'ALL'}_${clasificacionMedica || 'ALL'}_${limit}`;
+  const cached = queryResultsCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < QUERY_CACHE_TTL_MS)) {
+    let data = cached.data;
+    if (busqueda && busqueda.trim()) {
+      const q = busqueda.toLowerCase().trim();
+      data = data.filter(r => Object.values(r).some(val => val != null && String(val).toLowerCase().includes(q)));
+    }
+    return {
+      ...cached.resultMeta,
+      totalRegistros: data.length,
+      data
+    };
+  }
+
+  // Formato fechas para SAP SQL (YYYYMMDD)
   const dDesdeSap = fechaDesde ? fechaDesde.replace(/-/g, '') : '';
   const dHastaSap = fechaHasta ? fechaHasta.replace(/-/g, '') : '';
+  const dateParams = (dDesdeSap && dHastaSap) ? { startDate: dDesdeSap, endDate: dHastaSap } : {};
 
   let rawRows = [];
 
-  // 2. Ejecutar según el módulo seleccionado
+  // 2. Ejecutar según el módulo seleccionado con WITH (NOLOCK)
   switch (entity) {
     case 'inventory':
     case 'item_prices':
@@ -553,10 +640,7 @@ async function executeQuery({
     }
 
     case 'batches': {
-      const sqlCode = 'sq_qb_batches';
-      const sqlText = `SELECT T0.ItemCode, T2.ItemName, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber LEFT JOIN OITM T2 ON T0.ItemCode = T2.ItemCode WHERE T1.Quantity > 0 AND T0.ExpDate >= '${dDesdeSap}' AND T0.ExpDate <= '${dHastaSap}'`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
+      const items = await executeSapSqlList('sq_qb_batches', dateParams);
       const now = new Date();
 
       rawRows = items.map(b => {
@@ -587,11 +671,7 @@ async function executeQuery({
     }
 
     case 'purchase_invoices': {
-      const sqlCode = 'sq_qb_pinv';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPCH T0 INNER JOIN PCH1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_pinv', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -606,11 +686,7 @@ async function executeQuery({
     }
 
     case 'purchase_orders': {
-      const sqlCode = 'sq_qb_por';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM OPOR T0 INNER JOIN POR1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_por', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -626,11 +702,7 @@ async function executeQuery({
     }
 
     case 'goods_receipts_po': {
-      const sqlCode = 'sq_qb_grpo';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPDN T0 INNER JOIN PDN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_grpo', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -644,11 +716,7 @@ async function executeQuery({
     }
 
     case 'goods_returns': {
-      const sqlCode = 'sq_qb_gret';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM ORPD T0 INNER JOIN RPD1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_gret', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -661,11 +729,7 @@ async function executeQuery({
     }
 
     case 'stock_transfers': {
-      const sqlCode = 'sq_qb_transfers';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.Filler, T0.ToWhsCode, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OWTR T0 INNER JOIN WTR1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_transfers', dateParams);
       rawRows = items.map(t => ({
         ...t,
         DocDate: formatSapDateStr(t.DocDate),
@@ -677,11 +741,7 @@ async function executeQuery({
     }
 
     case 'transfer_requests': {
-      const sqlCode = 'sq_qb_wtq';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DueDate, T0.Filler, T0.ToWhsCode, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T0.Comments FROM OWTQ T0 INNER JOIN WTQ1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_wtq', dateParams);
       rawRows = items.map(t => ({
         ...t,
         DocDate: formatSapDateStr(t.DocDate),
@@ -696,11 +756,7 @@ async function executeQuery({
     }
 
     case 'goods_issues': {
-      const sqlCode = 'sq_qb_giss';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGE T0 INNER JOIN IGE1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_giss', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -712,11 +768,7 @@ async function executeQuery({
     }
 
     case 'goods_receipts_inv': {
-      const sqlCode = 'sq_qb_grec_inv';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGN T0 INNER JOIN IGN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_grec_inv', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -728,11 +780,7 @@ async function executeQuery({
     }
 
     case 'purchase_requests': {
-      const sqlCode = 'sq_qb_prq';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.ReqDate, T0.Requester, T0.Department, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OPRQ T0 INNER JOIN PRQ1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_prq', dateParams);
       rawRows = items.map(r => ({
         ...r,
         DocDate: formatSapDateStr(r.DocDate),
@@ -744,11 +792,7 @@ async function executeQuery({
     }
 
     case 'sales_invoices': {
-      const sqlCode = 'sq_qb_sinv';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.U_PRName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_sinv', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -763,11 +807,7 @@ async function executeQuery({
     }
 
     case 'credit_memos': {
-      const sqlCode = 'sq_qb_scrm';
-      const sqlText = `SELECT TOP ${limit} T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM ORIN T0 INNER JOIN RIN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= '${dDesdeSap}' AND T0.DocDate <= '${dHastaSap}' ORDER BY T0.DocDate DESC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_scrm', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -780,11 +820,7 @@ async function executeQuery({
     }
 
     case 'business_partners': {
-      const sqlCode = 'sq_qb_bp';
-      const sqlText = `SELECT TOP ${limit} T0.CardCode, T0.CardName, T0.CardType, T0.LicTradNum, T0.Phone1, T0.E_Mail, T0.Balance, T1.GroupName, T0.CreateDate FROM OCRD T0 LEFT JOIN OCRG T1 ON T0.GroupCode = T1.GroupCode WHERE T0.CardType IN ('S', 'C') ORDER BY T0.CardName ASC`;
-      
-      const items = await executeSapSqlList(sqlCode, sqlText);
-
+      const items = await executeSapSqlList('sq_qb_bp');
       rawRows = items.map(b => ({
         ...b,
         CardType: b.CardType === 'S' ? 'Proveedor' : 'Cliente',
@@ -800,7 +836,13 @@ async function executeQuery({
 
   // 3. Aplicar filtros en memoria
   if (almacen && almacen !== 'ALL') {
-    rawRows = rawRows.filter(r => (r.WhsCode === almacen || r.Filler === almacen || r.ToWhsCode === almacen));
+    rawRows = rawRows.filter(r => (
+      r.WhsCode === almacen || 
+      r.Filler === almacen || 
+      r.ToWhsCode === almacen ||
+      (r.Filler && r.Filler.includes(almacen)) ||
+      (r.ToWhsCode && r.ToWhsCode.includes(almacen))
+    ));
   }
   if (estatusDoc && estatusDoc !== 'ALL') {
     rawRows = rawRows.filter(r => {
@@ -894,7 +936,7 @@ async function executeQuery({
   const activeFields = (selectedFields.length > 0 ? selectedFields : entityDef.defaultFields);
   const activeColsDef = entityDef.fields.filter(f => activeFields.includes(f.key));
 
-  const projectedData = rawRows.map(row => {
+  const projectedData = rawRows.slice(0, limit).map(row => {
     const out = {};
     for (const f of activeColsDef) {
       out[f.key] = row[f.key] ?? null;
@@ -902,7 +944,7 @@ async function executeQuery({
     return out;
   });
 
-  return {
+  const finalResult = {
     entity: entityDef.id,
     entityTitle: entityDef.title,
     ejecutadoEn: new Date().toISOString(),
@@ -911,6 +953,21 @@ async function executeQuery({
     columnas: activeColsDef,
     data: projectedData
   };
+
+  // Guardar en caché en memoria por 60 segundos
+  queryResultsCache.set(cacheKey, {
+    timestamp: Date.now(),
+    data: projectedData,
+    resultMeta: {
+      entity: entityDef.id,
+      entityTitle: entityDef.title,
+      ejecutadoEn: finalResult.ejecutadoEn,
+      kpis,
+      columnas: activeColsDef
+    }
+  });
+
+  return finalResult;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -923,16 +980,16 @@ async function getSavedQueries(user) {
   let res;
   if (isAdmin) {
     res = await pool.query(`
-      SELECT QueryId, UserId, Username, Titulo, Descripcion, Entidad, CamposSeleccionados, FiltrosAplicados, EsPublico, FechaCreacion, FechaModificacion
-      FROM UserSapQueries
-      ORDER BY FechaCreacion DESC
+      SELECT queryid, userid, username, titulo, descripcion, entidad, camposseleccionados, filtrosaplicados, espublico, fechacreacion, fechamodificacion
+      FROM usersapqueries
+      ORDER BY fechacreacion DESC
     `);
   } else {
     res = await pool.query(`
-      SELECT QueryId, UserId, Username, Titulo, Descripcion, Entidad, CamposSeleccionados, FiltrosAplicados, EsPublico, FechaCreacion, FechaModificacion
-      FROM UserSapQueries
-      WHERE Username = $1 OR EsPublico = 1
-      ORDER BY FechaCreacion DESC
+      SELECT queryid, userid, username, titulo, descripcion, entidad, camposseleccionados, filtrosaplicados, espublico, fechacreacion, fechamodificacion
+      FROM usersapqueries
+      WHERE username = $1 OR espublico = 1
+      ORDER BY fechacreacion DESC
     `, [user.username]);
   }
 
@@ -943,8 +1000,8 @@ async function getSavedQueries(user) {
     title: r.titulo,
     description: r.descripcion,
     entity: r.entidad,
-    selectedFields: JSON.parse(r.camposseleccionados || '[]'),
-    filters: JSON.parse(r.filtrosaplicados || '{}'),
+    selectedFields: typeof r.camposseleccionados === 'string' ? JSON.parse(r.camposseleccionados || '[]') : (r.camposseleccionados || []),
+    filters: typeof r.filtrosaplicados === 'string' ? JSON.parse(r.filtrosaplicados || '{}') : (r.filtrosaplicados || {}),
     isPublic: Boolean(r.espublico),
     createdAt: r.fechacreacion,
     isOwner: r.username === user.username
@@ -957,9 +1014,9 @@ async function saveQuery(user, { title, description, entity, selectedFields, fil
   }
 
   const res = await pool.query(`
-    INSERT INTO UserSapQueries (UserId, Username, Titulo, Descripcion, Entidad, CamposSeleccionados, FiltrosAplicados, EsPublico, FechaCreacion)
+    INSERT INTO usersapqueries (userid, username, titulo, descripcion, entidad, camposseleccionados, filtrosaplicados, espublico, fechacreacion)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
-    RETURNING QueryId, Titulo, FechaCreacion
+    RETURNING queryid, titulo, fechacreacion
   `, [
     user.id || null,
     user.username,
@@ -979,9 +1036,9 @@ async function deleteQuery(user, queryId) {
   
   let res;
   if (isAdmin) {
-    res = await pool.query(`DELETE FROM UserSapQueries WHERE QueryId = $1 RETURNING QueryId`, [queryId]);
+    res = await pool.query(`DELETE FROM usersapqueries WHERE queryid = $1 RETURNING queryid`, [queryId]);
   } else {
-    res = await pool.query(`DELETE FROM UserSapQueries WHERE QueryId = $1 AND Username = $2 RETURNING QueryId`, [queryId, user.username]);
+    res = await pool.query(`DELETE FROM usersapqueries WHERE queryid = $1 AND username = $2 RETURNING queryid`, [queryId, user.username]);
   }
 
   if (res.rowCount === 0) {
@@ -994,8 +1051,10 @@ async function deleteQuery(user, queryId) {
 module.exports = {
   getEntityCatalog: () => Object.values(ENTITY_CATALOG),
   getEntityDefinition: (id) => ENTITY_CATALOG[id],
+  initSapQueryBuilderQueries,
   executeQuery,
   getSavedQueries,
   saveQuery,
   deleteQuery
 };
+

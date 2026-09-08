@@ -677,6 +677,24 @@ async function initPostgresDW() {
     await pool.query(`ALTER TABLE dw_sap_pedidos ALTER COLUMN cardname TYPE TEXT;`).catch(() => {});
     await pool.query(`ALTER TABLE dw_sap_pedidos ALTER COLUMN usuarionombre TYPE TEXT;`).catch(() => {});
 
+    // Tabla para Plantillas de Consultas Personalizadas SAP (UserSapQueries)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usersapqueries (
+        queryid SERIAL PRIMARY KEY,
+        userid INT,
+        username VARCHAR(100) NOT NULL,
+        titulo VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        entidad VARCHAR(100) NOT NULL,
+        camposseleccionados JSONB DEFAULT '[]',
+        filtrosaplicados JSONB DEFAULT '{}',
+        espublico SMALLINT DEFAULT 0,
+        fechacreacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        fechamodificacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_usersapqueries_user ON usersapqueries (username);
+    `);
+
     // Corrección de error de Excel en el código SAP del guante 8.5
     await pool.query(`UPDATE dw_sap_reorder_settings SET itemcode = 'ALG0065' WHERE itemcode = '#REF!';`).catch(() => {});
 

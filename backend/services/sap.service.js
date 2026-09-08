@@ -67,14 +67,13 @@ class SapService {
             const sapCode = json?.error?.code;
 
             // Si SAP devuelve 404 / -2028 "No matching records found" en una consulta SQLQueries(...)/List
-            if (res.statusCode === 404 && (sapCode === -2028 || String(sapMsg).includes('No matching records found') || String(sapMsg).includes('-2028'))) {
-              if (endpoint.includes('/SQLQueries') || endpoint.includes('/List')) {
-                return resolve({
-                  status: 200,
-                  headers: res.headers,
-                  data: { value: [] }
-                });
-              }
+            const isNoMatch = res.statusCode === 404 || String(sapCode) === '-2028' || String(sapMsg).toLowerCase().includes('no matching records') || String(sapMsg).includes('-2028');
+            if (isNoMatch && (endpoint.includes('/SQLQueries') || endpoint.includes('/List'))) {
+              return resolve({
+                status: 200,
+                headers: res.headers,
+                data: { value: [] }
+              });
             }
 
             const err = new Error(`[SAP ${res.statusCode}] ${sapMsg || 'Error en Service Layer'}`);
