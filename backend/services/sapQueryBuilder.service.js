@@ -439,34 +439,26 @@ function formatSapDateStr(val) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   DEFINICIÓN DE CONSULTAS SQL PARAMETRIZADAS ESTÁTICAS (SAP SL v4)
+   DEFINICIÓN DE CONSULTAS SQL PARAMETRIZADAS ESTÁTICAS (SAP SL v5)
 ══════════════════════════════════════════════════════════════ */
 const STATIC_SQL_QUERIES = {
-  sq_v4_batches: `SELECT TOP 5000 T0.ItemCode, T2.ItemName, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 WITH (NOLOCK) INNER JOIN OBTQ T1 WITH (NOLOCK) ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber LEFT JOIN OITM T2 WITH (NOLOCK) ON T0.ItemCode = T2.ItemCode WHERE T1.Quantity > 0 AND T0.ExpDate >= :startDate AND T0.ExpDate < DATEADD(day, 1, :endDate)`,
+  sq_v5_batches: `SELECT TOP 5000 T0.ItemCode, T2.ItemName, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber LEFT JOIN OITM T2 ON T0.ItemCode = T2.ItemCode WHERE T1.Quantity > 0 AND T0.ExpDate >= :startDate AND T0.ExpDate <= :endDate`,
   
-  sq_v4_pinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPCH T0 WITH (NOLOCK) INNER JOIN PCH1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
+  sq_v5_pinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPCH T0 INNER JOIN PCH1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v4_por: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM OPOR T0 WITH (NOLOCK) INNER JOIN POR1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
+  sq_v5_por: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM OPOR T0 INNER JOIN POR1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v4_grpo: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPDN T0 WITH (NOLOCK) INNER JOIN PDN1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
+  sq_v5_grpo: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPDN T0 INNER JOIN PDN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v4_gret: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM ORPD T0 WITH (NOLOCK) INNER JOIN RPD1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
+  sq_v5_gret: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM ORPD T0 INNER JOIN RPD1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v4_transfers: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.Filler, T0.ToWhsCode, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OWTR T0 WITH (NOLOCK) INNER JOIN WTR1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
+  sq_v5_prq: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.ReqDate, T0.Requester, T0.Department, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OPRQ T0 INNER JOIN PRQ1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v4_wtq: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DueDate, T0.Filler, T0.ToWhsCode, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T0.Comments FROM OWTQ T0 WITH (NOLOCK) INNER JOIN WTQ1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
+  sq_v5_sinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.U_PRName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v4_giss: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGE T0 WITH (NOLOCK) INNER JOIN IGE1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
+  sq_v5_scrm: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM ORIN T0 INNER JOIN RIN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v4_grec_inv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.WhsCode, T0.Comments FROM OIGN T0 WITH (NOLOCK) INNER JOIN IGN1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
-  
-  sq_v4_prq: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.ReqDate, T0.Requester, T0.Department, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OPRQ T0 WITH (NOLOCK) INNER JOIN PRQ1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
-  
-  sq_v4_sinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.U_PRName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OINV T0 WITH (NOLOCK) INNER JOIN INV1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
-  
-  sq_v4_scrm: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM ORIN T0 WITH (NOLOCK) INNER JOIN RIN1 T1 WITH (NOLOCK) ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate < DATEADD(day, 1, :endDate) ORDER BY T0.DocDate DESC`,
-  
-  sq_v4_bp: `SELECT TOP 5000 T0.CardCode, T0.CardName, T0.CardType, T0.LicTradNum, T0.Phone1, T0.E_Mail, T0.Balance, T1.GroupName, T0.CreateDate FROM OCRD T0 WITH (NOLOCK) LEFT JOIN OCRG T1 WITH (NOLOCK) ON T0.GroupCode = T1.GroupCode WHERE T0.CardType IN ('S', 'C') ORDER BY T0.CardName ASC`
+  sq_v5_bp: `SELECT TOP 5000 T0.CardCode, T0.CardName, T0.CardType, T0.LicTradNum, T0.Phone1, T0.E_Mail, T0.Balance, T0.CreateDate FROM OCRD T0 WHERE T0.CardType IN ('S', 'C') ORDER BY T0.CardName ASC`
 };
 
 const registeredQueriesCache = new Set();
@@ -511,7 +503,7 @@ async function initSapQueryBuilderQueries() {
     for (const [code, sqlText] of Object.entries(STATIC_SQL_QUERIES)) {
       await ensureSapQuery(code, sqlText);
     }
-    console.log('[SAP Query Builder] Consultas parametrizadas estáticas v4 registradas exitosamente.');
+    console.log('[SAP Query Builder] Consultas parametrizadas estáticas v5 registradas exitosamente.');
   } catch (err) {
     console.warn('[SAP Query Builder] Registro inicial de queries:', err.message);
   }
@@ -594,7 +586,10 @@ async function executeQuery({
   }
 
   // Clave de caché para evitar consultas idénticas concurrentes a SAP
-  const cacheKey = `${entity}_${fechaDesde || ''}_${fechaHasta || ''}_${almacen || 'ALL'}_${estatusDoc || 'ALL'}_${clasificacionMedica || 'ALL'}_${limit}`;
+  const fieldsKey = (selectedFields || []).slice().sort().join(',');
+  const searchKey = (busqueda || '').trim().toLowerCase();
+  const effectiveLimit = ['inventory', 'item_prices', 'item_master_data'].includes(entity) ? 10000 : (limit || 2000);
+  const cacheKey = `${entity}_${fechaDesde || ''}_${fechaHasta || ''}_${almacen || 'ALL'}_${estatusDoc || 'ALL'}_${clasificacionMedica || 'ALL'}_${fieldsKey}_${searchKey}_${effectiveLimit}`;
   const cached = queryResultsCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < QUERY_CACHE_TTL_MS)) {
     let data = cached.data;
@@ -609,14 +604,11 @@ async function executeQuery({
     };
   }
 
-  // Formato fechas para SAP SQL (YYYYMMDD)
-  const dDesdeSap = fechaDesde ? fechaDesde.replace(/-/g, '') : '';
-  const dHastaSap = fechaHasta ? fechaHasta.replace(/-/g, '') : '';
-  const dateParams = (dDesdeSap && dHastaSap) ? { startDate: dDesdeSap, endDate: dHastaSap } : {};
+  const dateParams = (fechaDesde && fechaHasta) ? { startDate: fechaDesde, endDate: fechaHasta } : {};
 
   let rawRows = [];
 
-  // 2. Ejecutar según el módulo seleccionado con WITH (NOLOCK)
+  // 2. Ejecutar según el módulo seleccionado
   switch (entity) {
     case 'inventory':
     case 'item_prices':
@@ -642,7 +634,7 @@ async function executeQuery({
     }
 
     case 'batches': {
-      const items = await executeSapSqlList('sq_v4_batches', dateParams);
+      const items = await executeSapSqlList('sq_v5_batches', dateParams);
       const now = new Date();
 
       rawRows = items.map(b => {
@@ -673,7 +665,7 @@ async function executeQuery({
     }
 
     case 'purchase_invoices': {
-      const items = await executeSapSqlList('sq_v4_pinv', dateParams);
+      const items = await executeSapSqlList('sq_v5_pinv', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -688,7 +680,7 @@ async function executeQuery({
     }
 
     case 'purchase_orders': {
-      const items = await executeSapSqlList('sq_v4_por', dateParams);
+      const items = await executeSapSqlList('sq_v5_por', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -704,7 +696,7 @@ async function executeQuery({
     }
 
     case 'goods_receipts_po': {
-      const items = await executeSapSqlList('sq_v4_grpo', dateParams);
+      const items = await executeSapSqlList('sq_v5_grpo', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -718,7 +710,7 @@ async function executeQuery({
     }
 
     case 'goods_returns': {
-      const items = await executeSapSqlList('sq_v4_gret', dateParams);
+      const items = await executeSapSqlList('sq_v5_gret', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -731,62 +723,148 @@ async function executeQuery({
     }
 
     case 'stock_transfers': {
-      const items = await executeSapSqlList('sq_v4_transfers', dateParams);
-      rawRows = items.map(t => ({
-        ...t,
-        DocDate: formatSapDateStr(t.DocDate),
-        FillerCode: t.Filler,
-        ToWhsCodeRaw: t.ToWhsCode,
-        Filler: WAREHOUSE_NAMES[t.Filler] ? `${WAREHOUSE_NAMES[t.Filler]} (${t.Filler})` : t.Filler,
-        ToWhsCode: WAREHOUSE_NAMES[t.ToWhsCode] ? `${WAREHOUSE_NAMES[t.ToWhsCode]} (${t.ToWhsCode})` : t.ToWhsCode,
-        Quantity: Number(t.Quantity || 0)
-      }));
+      const topNum = Math.min(limit || 2000, 2000);
+      const url = `/StockTransfers?$filter=DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'&$orderby=DocDate desc&$top=${topNum}`;
+      let transfers = [];
+      try {
+        const res = await sapService.get(url);
+        transfers = res.data?.value || [];
+      } catch (err) {
+        const errMsg = (err.message || '').toLowerCase();
+        if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) transfers = [];
+        else throw err;
+      }
+
+      rawRows = [];
+      for (const doc of transfers) {
+        const lines = doc.StockTransferLines || [{}];
+        for (const line of lines) {
+          const fromCode = doc.FromWarehouse || line.FromWarehouse || '';
+          const toCode = doc.ToWarehouse || line.WarehouseCode || '';
+          rawRows.push({
+            DocNum: doc.DocNum,
+            DocDate: doc.DocDate ? doc.DocDate.slice(0, 10) : '',
+            FillerCode: fromCode,
+            ToWhsCodeRaw: toCode,
+            Filler: WAREHOUSE_NAMES[fromCode] ? `${WAREHOUSE_NAMES[fromCode]} (${fromCode})` : fromCode,
+            ToWhsCode: WAREHOUSE_NAMES[toCode] ? `${WAREHOUSE_NAMES[toCode]} (${toCode})` : toCode,
+            ItemCode: line.ItemCode,
+            Dscription: line.ItemDescription,
+            Quantity: Number(line.Quantity || 0),
+            Comments: doc.Comments
+          });
+        }
+      }
       break;
     }
 
     case 'transfer_requests': {
-      const items = await executeSapSqlList('sq_v4_wtq', dateParams);
-      rawRows = items.map(t => ({
-        ...t,
-        DocDate: formatSapDateStr(t.DocDate),
-        DueDate: formatSapDateStr(t.DueDate),
-        FillerCode: t.Filler,
-        ToWhsCodeRaw: t.ToWhsCode,
-        Filler: WAREHOUSE_NAMES[t.Filler] ? `${WAREHOUSE_NAMES[t.Filler]} (${t.Filler})` : t.Filler,
-        ToWhsCode: WAREHOUSE_NAMES[t.ToWhsCode] ? `${WAREHOUSE_NAMES[t.ToWhsCode]} (${t.ToWhsCode})` : t.ToWhsCode,
-        DocStatus: t.DocStatus === 'O' ? 'Abierta' : t.DocStatus === 'C' ? 'Cerrada' : t.DocStatus,
-        Quantity: Number(t.Quantity || 0),
-        OpenQty: Number(t.OpenQty || 0)
-      }));
+      const topNum = Math.min(limit || 2000, 2000);
+      const url = `/InventoryTransferRequests?$filter=DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'&$orderby=DocDate desc&$top=${topNum}`;
+      let requests = [];
+      try {
+        const res = await sapService.get(url);
+        requests = res.data?.value || [];
+      } catch (err) {
+        const errMsg = (err.message || '').toLowerCase();
+        if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) requests = [];
+        else throw err;
+      }
+
+      rawRows = [];
+      for (const doc of requests) {
+        const lines = doc.StockTransferLines || [{}];
+        for (const line of lines) {
+          const fromCode = doc.FromWarehouse || line.FromWarehouse || '';
+          const toCode = doc.ToWarehouse || line.WarehouseCode || '';
+          rawRows.push({
+            DocNum: doc.DocNum,
+            DocDate: doc.DocDate ? doc.DocDate.slice(0, 10) : '',
+            DueDate: doc.DueDate ? doc.DueDate.slice(0, 10) : '',
+            FillerCode: fromCode,
+            ToWhsCodeRaw: toCode,
+            Filler: WAREHOUSE_NAMES[fromCode] ? `${WAREHOUSE_NAMES[fromCode]} (${fromCode})` : fromCode,
+            ToWhsCode: WAREHOUSE_NAMES[toCode] ? `${WAREHOUSE_NAMES[toCode]} (${toCode})` : toCode,
+            DocStatus: doc.DocumentStatus === 'bost_Open' ? 'Abierta' : 'Cerrada',
+            ItemCode: line.ItemCode,
+            Dscription: line.ItemDescription,
+            Quantity: Number(line.Quantity || 0),
+            OpenQty: Number(line.RemainingOpenQuantity || 0),
+            Comments: doc.Comments
+          });
+        }
+      }
       break;
     }
 
     case 'goods_issues': {
-      const items = await executeSapSqlList('sq_v4_giss', dateParams);
-      rawRows = items.map(p => ({
-        ...p,
-        DocDate: formatSapDateStr(p.DocDate),
-        Quantity: Number(p.Quantity || 0),
-        Price: Number(p.Price || 0),
-        LineTotal: Number(p.LineTotal || 0)
-      }));
+      const topNum = Math.min(limit || 2000, 2000);
+      const url = `/InventoryGenExits?$filter=DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'&$orderby=DocDate desc&$top=${topNum}`;
+      let exits = [];
+      try {
+        const res = await sapService.get(url);
+        exits = res.data?.value || [];
+      } catch (err) {
+        const errMsg = (err.message || '').toLowerCase();
+        if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) exits = [];
+        else throw err;
+      }
+
+      rawRows = [];
+      for (const doc of exits) {
+        const lines = doc.DocumentLines || [{}];
+        for (const line of lines) {
+          rawRows.push({
+            DocNum: doc.DocNum,
+            DocDate: doc.DocDate ? doc.DocDate.slice(0, 10) : '',
+            ItemCode: line.ItemCode,
+            Dscription: line.ItemDescription,
+            Quantity: Number(line.Quantity || 0),
+            Price: Number(line.Price || line.UnitPrice || 0),
+            LineTotal: Number(line.LineTotal || (Number(line.Quantity || 0) * Number(line.Price || 0))),
+            WhsCode: line.WarehouseCode,
+            Comments: doc.Comments
+          });
+        }
+      }
       break;
     }
 
     case 'goods_receipts_inv': {
-      const items = await executeSapSqlList('sq_v4_grec_inv', dateParams);
-      rawRows = items.map(p => ({
-        ...p,
-        DocDate: formatSapDateStr(p.DocDate),
-        Quantity: Number(p.Quantity || 0),
-        Price: Number(p.Price || 0),
-        LineTotal: Number(p.LineTotal || 0)
-      }));
+      const topNum = Math.min(limit || 2000, 2000);
+      const url = `/InventoryGenEntries?$filter=DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'&$orderby=DocDate desc&$top=${topNum}`;
+      let entries = [];
+      try {
+        const res = await sapService.get(url);
+        entries = res.data?.value || [];
+      } catch (err) {
+        const errMsg = (err.message || '').toLowerCase();
+        if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) entries = [];
+        else throw err;
+      }
+
+      rawRows = [];
+      for (const doc of entries) {
+        const lines = doc.DocumentLines || [{}];
+        for (const line of lines) {
+          rawRows.push({
+            DocNum: doc.DocNum,
+            DocDate: doc.DocDate ? doc.DocDate.slice(0, 10) : '',
+            ItemCode: line.ItemCode,
+            Dscription: line.ItemDescription,
+            Quantity: Number(line.Quantity || 0),
+            Price: Number(line.Price || line.UnitPrice || 0),
+            LineTotal: Number(line.LineTotal || (Number(line.Quantity || 0) * Number(line.Price || 0))),
+            WhsCode: line.WarehouseCode,
+            Comments: doc.Comments
+          });
+        }
+      }
       break;
     }
 
     case 'purchase_requests': {
-      const items = await executeSapSqlList('sq_v4_prq', dateParams);
+      const items = await executeSapSqlList('sq_v5_prq', dateParams);
       rawRows = items.map(r => ({
         ...r,
         DocDate: formatSapDateStr(r.DocDate),
@@ -798,7 +876,7 @@ async function executeQuery({
     }
 
     case 'sales_invoices': {
-      const items = await executeSapSqlList('sq_v4_sinv', dateParams);
+      const items = await executeSapSqlList('sq_v5_sinv', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -813,7 +891,7 @@ async function executeQuery({
     }
 
     case 'credit_memos': {
-      const items = await executeSapSqlList('sq_v4_scrm', dateParams);
+      const items = await executeSapSqlList('sq_v5_scrm', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -826,7 +904,7 @@ async function executeQuery({
     }
 
     case 'business_partners': {
-      const items = await executeSapSqlList('sq_v4_bp');
+      const items = await executeSapSqlList('sq_v5_bp');
       rawRows = items.map(b => ({
         ...b,
         CardType: b.CardType === 'S' ? 'Proveedor' : 'Cliente',
@@ -940,16 +1018,13 @@ async function executeQuery({
     });
   }
 
-  // 5. Filtrar únicamente las columnas seleccionadas
+  // 5. Definición de columnas activas según selección (o default)
   const activeFields = (selectedFields.length > 0 ? selectedFields : entityDef.defaultFields);
   const activeColsDef = entityDef.fields.filter(f => activeFields.includes(f.key));
 
-  const projectedData = rawRows.slice(0, limit).map(row => {
-    const out = {};
-    for (const f of activeColsDef) {
-      out[f.key] = row[f.key] ?? null;
-    }
-    return out;
+  // Preservar todos los campos del registro para que el frontend pueda activar/desactivar columnas al instante
+  const projectedData = rawRows.slice(0, effectiveLimit).map(row => {
+    return { ...row };
   });
 
   const finalResult = {

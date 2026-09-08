@@ -7,7 +7,12 @@ import { hasSapModulePermission } from '../../utils/rbac';
 
 const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align = 'left', maxWidth }) => {
   const uniqueVals = useMemo(() => {
-    return Array.from(new Set(data.map(item => item[columnKey]))).filter(val => val !== null && val !== undefined && val !== '').sort();
+    const raw = Array.from(new Set(data.map(item => item[columnKey])))
+      .filter(val => val !== null && val !== undefined && val !== '');
+    return raw.sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') return a - b;
+      return String(a).localeCompare(String(b), 'es', { numeric: true });
+    });
   }, [data, columnKey]);
 
   const val = colFilters[columnKey] || '';
@@ -17,15 +22,48 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
     <th style={{
       textAlign: align,
       maxWidth: maxWidth || 'none',
-      padding: '12px 10px',
+      padding: '10px 8px',
       background: '#004687',
       borderBottom: '3px solid #0088C9',
       whiteSpace: 'nowrap'
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', letterSpacing: '0.04em', fontWeight: '700' }}>
-          {label}
-        </span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
+          <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', letterSpacing: '0.04em', fontWeight: '700' }}>
+            {label}
+          </span>
+          {isActive && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setColFilters(prev => {
+                  const next = { ...prev };
+                  delete next[columnKey];
+                  return next;
+                });
+              }}
+              title="Quitar filtro de columna"
+              style={{
+                background: '#ef4444',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: '14px',
+                height: '14px',
+                fontSize: '9px',
+                lineHeight: '14px',
+                cursor: 'pointer',
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'bold'
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <select
           value={val}
           onChange={(e) => setColFilters(prev => ({ ...prev, [columnKey]: e.target.value }))}
@@ -33,8 +71,8 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
             fontSize: '0.7rem',
             padding: '3px 6px',
             borderRadius: '4px',
-            border: isActive ? '1.5px solid #38bdf8' : '1px solid rgba(255,255,255,0.25)',
-            background: isActive ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.12)',
+            border: isActive ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.25)',
+            background: isActive ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.12)',
             color: '#fff',
             outline: 'none',
             maxWidth: maxWidth || '100%',
@@ -354,23 +392,94 @@ export default function ConsultaServiceLayer() {
   }, [queryResult]);
 
   const rows = queryResult?.data || [];
-  const columns = queryResult?.columnas || [];
 
-  // Filtrado de cliente sobre las columnas
+  // Columnas dinámicas activas según los checkboxes seleccionados por el usuario
+  const columns = useMemo(() => {
+    if (!currentEntityDef) return queryResult?.columnas || [];
+    const activeKeys = (selectedFields && selectedFields.length > 0)
+      ? selectedFields
+      : (queryResult?.columnas ? queryResult.columnas.map(c => c.key) : currentEntityDef.fields.map(f => f.key));
+    
+    // Obtener las definiciones completas de las columnas seleccionadas
+    const activeDefs = currentEntityDef.fields.filter(f => activeKeys.includes(f.key));
+    return activeDefs.length > 0 ? activeDefs : (queryResult?.columnas || currentEntityDef.fields);
+  }, [currentEntityDef, selectedFields, queryResult]);
+
+  // Filtrado reactivo en tiempo real (Búsqueda general, almacén, estatus, clasificación sanitaria y filtros de columna)
   const filteredRows = useMemo(() => {
-    return rows.filter(row => {
+    const rawList = queryResult?.data || [];
+    if (!rawList || rawList.length === 0) return [];
+
+    return rawList.filter(row => {
+      // 1. Filtro de búsqueda general de texto (en todas las propiedades del objeto)
+      if (busqueda && busqueda.trim()) {
+        const q = busqueda.trim().toLowerCase();
+        const matchesSearch = Object.values(row).some(val => 
+          val != null && String(val).toLowerCase().includes(q)
+        );
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Filtro de almacén
+      if (almacen && almacen !== 'ALL') {
+        const alm = almacen.trim().toUpperCase();
+        const rowWhs = String(row.WhsCode || row.FillerCode || row.ToWhsCodeRaw || '').toUpperCase();
+        const rowWhsName = String(row.WhsName || row.Filler || row.ToWhsCode || '').toUpperCase();
+        const matchesWhs = rowWhs === alm || rowWhsName.includes(alm) || rowWhsName.includes(`(${alm})`);
+        if (!matchesWhs) return false;
+      }
+
+      // 3. Filtro de estatus de documento
+      if (estatusDoc && estatusDoc !== 'ALL') {
+        const s = String(row.DocStatus || row.Status || '').toUpperCase();
+        if (estatusDoc === 'OPEN') {
+          const isOpen = s.includes('ABIERTA') || s.includes('ACTIVO') || s.includes('PRÓXIMO') || s === 'O';
+          if (!isOpen) return false;
+        } else if (estatusDoc === 'CLOSED') {
+          const isClosed = s.includes('CERRADA') || s.includes('VENCIDO') || s === 'C';
+          if (!isClosed) return false;
+        }
+      }
+
+      // 4. Filtro de clasificación sanitaria (CON / ANTI / REFRI)
+      if (clasificacionMedica && clasificacionMedica !== 'ALL') {
+        const c = String(row.MedicalClassification || '').toUpperCase();
+        if (clasificacionMedica === 'CON' && !(c.includes('CON') || c.includes('CONTROL'))) return false;
+        if (clasificacionMedica === 'ANTI' && !(c.includes('ANTI') || c.includes('ANTIBIOT'))) return false;
+        if (clasificacionMedica === 'REFRI' && !(c.includes('REFRI') || c.includes('FRIO'))) return false;
+      }
+
+      // 5. Filtros por encabezado de columna individual
       return Object.entries(colFilters).every(([key, val]) => {
         if (!val) return true;
         return String(row[key] ?? '').trim().toLowerCase() === String(val).trim().toLowerCase();
       });
     });
-  }, [rows, colFilters]);
+  }, [queryResult, busqueda, almacen, estatusDoc, clasificacionMedica, colFilters]);
+
+  // Resetear página a 1 cuando cambie cualquier filtro
+  useEffect(() => {
+    setPage(1);
+  }, [busqueda, almacen, estatusDoc, clasificacionMedica, colFilters, selectedFields]);
+
+  const hasActiveFilters = Boolean(
+    busqueda || (almacen && almacen !== 'ALL') || (estatusDoc && estatusDoc !== 'ALL') || 
+    (clasificacionMedica && clasificacionMedica !== 'ALL') || Object.values(colFilters).some(Boolean)
+  );
+
+  const handleClearFilters = () => {
+    setBusqueda('');
+    setAlmacen('ALL');
+    setEstatusDoc('ALL');
+    setClasificacionMedica('ALL');
+    setColFilters({});
+  };
 
   const paginatedRows = useMemo(() => {
     return filteredRows.slice((page - 1) * PER_PAGE, page * PER_PAGE);
   }, [filteredRows, page]);
 
-  const totalPages = Math.ceil(filteredRows.length / PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PER_PAGE));
 
   // Totales para exportación y resumen
   const exportExcel = () => {
@@ -811,14 +920,28 @@ export default function ConsultaServiceLayer() {
           }}>
             <div>
               <div style={{ fontWeight: 800, color: '#004687', fontSize: '1.05rem' }}>
-                {queryResult.entityTitle} ({filteredRows.length.toLocaleString('es-MX')} registros)
+                {queryResult.entityTitle} ({filteredRows.length.toLocaleString('es-MX')} registros{filteredRows.length !== rows.length ? ` filtrados de ${rows.length.toLocaleString('es-MX')}` : ''})
               </div>
               <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                Consulta ejecutada en tiempo real contra SAP Service Layer
+                Consulta ejecutada en tiempo real contra SAP Service Layer • {columns.length} columnas visibles
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              {hasActiveFilters && (
+                <button
+                  onClick={handleClearFilters}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                    padding: '0.55rem 1rem', background: '#FEE2E2', border: '1px solid #FCA5A5',
+                    borderRadius: 8, color: '#B91C1C', fontWeight: 700, fontSize: '0.82rem',
+                    cursor: 'pointer', transition: 'all 0.15s ease'
+                  }}
+                  title="Restablecer todos los filtros aplicados"
+                >
+                  🧹 Limpiar Filtros
+                </button>
+              )}
               <button
                 onClick={exportExcel}
                 disabled={filteredRows.length === 0}
