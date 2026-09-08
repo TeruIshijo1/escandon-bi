@@ -125,6 +125,9 @@ export default function ConsultaServiceLayer() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   };
+  const getYearStartStr = () => {
+    return `${new Date().getFullYear()}-01-01`;
+  };
 
   // Filtros
   const [activeCategory, setActiveCategory] = useState('ALL');
@@ -215,6 +218,14 @@ export default function ConsultaServiceLayer() {
     setPage(1);
     setQueryResult(null);
     setError(null);
+    // Limpiar clasificación médica si la nueva entidad no la maneja
+    if (def && !def.fields.some(f => f.key === 'MedicalClassification')) {
+      setClasificacionMedica('ALL');
+    }
+    // Si la entidad no tiene almacén, resetear almacén
+    if (def && !def.fields.some(f => f.key === 'WhsCode' || f.key === 'Filler' || f.key === 'ToWhsCode')) {
+      setAlmacen('ALL');
+    }
   };
 
   const toggleField = (fieldKey) => {
@@ -718,45 +729,60 @@ export default function ConsultaServiceLayer() {
               </div>
 
               {/* Rango de Fechas */}
-              <div style={{
-                background: currentEntityDef.requiresDateFilter ? '#FFFBEB' : '#F8FAFC',
-                border: currentEntityDef.requiresDateFilter ? '1px solid #FDE68A' : '1px solid #E2E8F0',
-                borderRadius: '8px', padding: '0.85rem', marginBottom: '0.85rem'
-              }}>
-                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div style={{ flex: 1, minWidth: '130px' }}>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                      Fecha Desde
-                    </label>
-                    <input
-                      type="date"
-                      value={fechaDesde}
-                      onChange={(e) => setFechaDesde(e.target.value)}
-                      style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
-                    />
+              {currentEntityDef.requiresDateFilter ? (
+                <div style={{
+                  background: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  borderRadius: '8px', padding: '0.85rem', marginBottom: '0.85rem'
+                }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ flex: 1, minWidth: '130px' }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                        Fecha Desde
+                      </label>
+                      <input
+                        type="date"
+                        value={fechaDesde}
+                        onChange={(e) => setFechaDesde(e.target.value)}
+                        style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div style={{ flex: 1, minWidth: '130px' }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                        Fecha Hasta
+                      </label>
+                      <input
+                        type="date"
+                        value={fechaHasta}
+                        onChange={(e) => setFechaHasta(e.target.value)}
+                        style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                      />
+                    </div>
                   </div>
-                  <div style={{ flex: 1, minWidth: '130px' }}>
-                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                      Fecha Hasta
-                    </label>
-                    <input
-                      type="date"
-                      value={fechaHasta}
-                      onChange={(e) => setFechaHasta(e.target.value)}
-                      style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
-                    />
-                  </div>
-                </div>
 
-                {/* Atajos Rápidos de Fecha */}
-                <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-                  <button onClick={() => { setFechaDesde(getTodayStr()); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>Hoy</button>
-                  <button onClick={() => { setFechaDesde(getDaysAgoStr(7)); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>7 Días</button>
-                  <button onClick={() => { setFechaDesde(getMonthStartStr()); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>Este Mes</button>
-                  <button onClick={() => { setFechaDesde(getDaysAgoStr(30)); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>30 Días</button>
-                  <button onClick={() => { setFechaDesde(getDaysAgoStr(90)); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>90 Días</button>
+                  {/* Atajos Rápidos de Fecha */}
+                  <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+                    <button onClick={() => { setFechaDesde(getTodayStr()); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>Hoy</button>
+                    <button onClick={() => { setFechaDesde(getDaysAgoStr(7)); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>7 Días</button>
+                    <button onClick={() => { setFechaDesde(getMonthStartStr()); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>Este Mes</button>
+                    <button onClick={() => { setFechaDesde(getDaysAgoStr(30)); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>30 Días</button>
+                    <button onClick={() => { setFechaDesde(getDaysAgoStr(90)); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>90 Días</button>
+                    <button onClick={() => { setFechaDesde(getYearStartStr()); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #0088C9', background: '#E0F2FE', color: '#0369A1', cursor: 'pointer', fontWeight: 700 }}>📅 Todo el Año ({new Date().getFullYear()})</button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div style={{
+                  background: '#F0FDF4',
+                  border: '1px solid #BBF7D0',
+                  borderRadius: '8px', padding: '0.75rem', marginBottom: '0.85rem',
+                  display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#166534'
+                }}>
+                  <span style={{ fontSize: '1.2rem' }}>⚡</span>
+                  <div>
+                    <strong>Catálogo en Vivo:</strong> Muestra las existencias y datos actualizados en tiempo real sin requerir rango de fechas.
+                  </div>
+                </div>
+              )}
 
               {/* Filtros de Almacén, Estatus, Clasificación y Búsqueda */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>

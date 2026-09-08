@@ -442,23 +442,23 @@ function formatSapDateStr(val) {
    DEFINICIÓN DE CONSULTAS SQL PARAMETRIZADAS ESTÁTICAS (SAP SL v5)
 ══════════════════════════════════════════════════════════════ */
 const STATIC_SQL_QUERIES = {
-  sq_v5_batches: `SELECT TOP 5000 T0.ItemCode, T2.ItemName, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber LEFT JOIN OITM T2 ON T0.ItemCode = T2.ItemCode WHERE T1.Quantity > 0 AND T0.ExpDate >= :startDate AND T0.ExpDate <= :endDate`,
+  sq_v6_batches: `SELECT TOP 5000 T0.ItemCode, T2.ItemName, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber LEFT JOIN OITM T2 ON T0.ItemCode = T2.ItemCode WHERE T1.Quantity > 0 AND T0.ExpDate >= :startDate AND T0.ExpDate <= :endDate`,
   
-  sq_v5_pinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPCH T0 INNER JOIN PCH1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  sq_v6_pinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPCH T0 INNER JOIN PCH1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v5_por: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM OPOR T0 INNER JOIN POR1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  sq_v6_por: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.OpenQty, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPOR T0 INNER JOIN POR1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v5_grpo: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPDN T0 INNER JOIN PDN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  sq_v6_grpo: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM OPDN T0 INNER JOIN PDN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v5_gret: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM ORPD T0 INNER JOIN RPD1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  sq_v6_gret: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM ORPD T0 INNER JOIN RPD1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v5_prq: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.ReqDate, T0.Requester, T0.Department, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T0.Comments FROM OPRQ T0 INNER JOIN PRQ1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  sq_v6_prq: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.ReqDate, T0.Requester, T0.Department, T0.DocStatus, T1.ItemCode, T1.Dscription, T1.Quantity, T1.WhsCode, T0.Comments FROM OPRQ T0 INNER JOIN PRQ1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v5_sinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.U_PRName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  sq_v6_sinv: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, T0.U_PRName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T1.VatSum, T0.DocTotal, T1.WhsCode, T0.Comments FROM OINV T0 INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v5_scrm: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T0.Comments FROM ORIN T0 INNER JOIN RIN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
+  sq_v6_scrm: `SELECT TOP 5000 T0.DocNum, T0.DocDate, T0.CardCode, T0.CardName, T1.ItemCode, T1.Dscription, T1.Quantity, T1.Price, T1.LineTotal, T0.DocTotal, T1.WhsCode, T0.Comments FROM ORIN T0 INNER JOIN RIN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :startDate AND T0.DocDate <= :endDate ORDER BY T0.DocDate DESC`,
   
-  sq_v5_bp: `SELECT TOP 5000 T0.CardCode, T0.CardName, T0.CardType, T0.LicTradNum, T0.Phone1, T0.E_Mail, T0.Balance, T0.CreateDate FROM OCRD T0 WHERE T0.CardType IN ('S', 'C') ORDER BY T0.CardName ASC`
+  sq_v6_bp: `SELECT TOP 5000 T0.CardCode, T0.CardName, T0.CardType, T0.LicTradNum, T0.Phone1, T0.E_Mail, T0.Balance, T0.CreateDate FROM OCRD T0 WHERE T0.CardType IN ('S', 'C') ORDER BY T0.CardName ASC`
 };
 
 const registeredQueriesCache = new Set();
@@ -634,7 +634,7 @@ async function executeQuery({
     }
 
     case 'batches': {
-      const items = await executeSapSqlList('sq_v5_batches', dateParams);
+      const items = await executeSapSqlList('sq_v6_batches', dateParams);
       const now = new Date();
 
       rawRows = items.map(b => {
@@ -665,7 +665,7 @@ async function executeQuery({
     }
 
     case 'purchase_invoices': {
-      const items = await executeSapSqlList('sq_v5_pinv', dateParams);
+      const items = await executeSapSqlList('sq_v6_pinv', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -680,12 +680,12 @@ async function executeQuery({
     }
 
     case 'purchase_orders': {
-      const items = await executeSapSqlList('sq_v5_por', dateParams);
+      const items = await executeSapSqlList('sq_v6_por', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
         DocDueDate: formatSapDateStr(p.DocDueDate),
-        DocStatus: p.DocStatus === 'O' ? 'Abierta' : p.DocStatus === 'C' ? 'Cerrada' : p.DocStatus,
+        DocStatus: p.DocStatus === 'O' || p.DocStatus === 'bost_Open' ? 'Abierta' : 'Cerrada',
         Quantity: Number(p.Quantity || 0),
         OpenQty: Number(p.OpenQty || 0),
         Price: Number(p.Price || 0),
@@ -696,7 +696,7 @@ async function executeQuery({
     }
 
     case 'goods_receipts_po': {
-      const items = await executeSapSqlList('sq_v5_grpo', dateParams);
+      const items = await executeSapSqlList('sq_v6_grpo', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -710,7 +710,7 @@ async function executeQuery({
     }
 
     case 'goods_returns': {
-      const items = await executeSapSqlList('sq_v5_gret', dateParams);
+      const items = await executeSapSqlList('sq_v6_gret', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -864,19 +864,19 @@ async function executeQuery({
     }
 
     case 'purchase_requests': {
-      const items = await executeSapSqlList('sq_v5_prq', dateParams);
+      const items = await executeSapSqlList('sq_v6_prq', dateParams);
       rawRows = items.map(r => ({
         ...r,
         DocDate: formatSapDateStr(r.DocDate),
         ReqDate: formatSapDateStr(r.ReqDate),
-        DocStatus: r.DocStatus === 'O' ? 'Abierta' : r.DocStatus === 'C' ? 'Cerrada' : r.DocStatus,
+        DocStatus: r.DocStatus === 'O' || r.DocStatus === 'bost_Open' ? 'Abierta' : 'Cerrada',
         Quantity: Number(r.Quantity || 0)
       }));
       break;
     }
 
     case 'sales_invoices': {
-      const items = await executeSapSqlList('sq_v5_sinv', dateParams);
+      const items = await executeSapSqlList('sq_v6_sinv', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -891,7 +891,7 @@ async function executeQuery({
     }
 
     case 'credit_memos': {
-      const items = await executeSapSqlList('sq_v5_scrm', dateParams);
+      const items = await executeSapSqlList('sq_v6_scrm', dateParams);
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -904,7 +904,7 @@ async function executeQuery({
     }
 
     case 'business_partners': {
-      const items = await executeSapSqlList('sq_v5_bp');
+      const items = await executeSapSqlList('sq_v6_bp');
       rawRows = items.map(b => ({
         ...b,
         CardType: b.CardType === 'S' ? 'Proveedor' : 'Cliente',
@@ -918,8 +918,9 @@ async function executeQuery({
       throw new Error(`Módulo '${entity}' no configurado.`);
   }
 
-  // 3. Aplicar filtros en memoria
-  if (almacen && almacen !== 'ALL') {
+  // 3. Aplicar filtros en memoria de forma segura (sin descartar entidades que no tienen el campo)
+  const hasWhsField = rawRows.length > 0 && ('WhsCode' in rawRows[0] || 'FillerCode' in rawRows[0] || 'Filler' in rawRows[0] || 'ToWhsCode' in rawRows[0]);
+  if (almacen && almacen !== 'ALL' && hasWhsField) {
     rawRows = rawRows.filter(r => (
       r.WhsCode === almacen || 
       r.FillerCode === almacen || 
@@ -927,19 +928,28 @@ async function executeQuery({
       r.Filler === almacen || 
       r.ToWhsCode === almacen ||
       String(r.Filler || '').includes(`(${almacen})`) ||
-      String(r.ToWhsCode || '').includes(`(${almacen})`)
+      String(r.ToWhsCode || '').includes(`(${almacen})`) ||
+      String(r.WhsName || '').includes(`(${almacen})`)
     ));
   }
-  if (estatusDoc && estatusDoc !== 'ALL') {
+
+  const hasStatusField = rawRows.length > 0 && ('DocStatus' in rawRows[0] || 'Status' in rawRows[0]);
+  if (estatusDoc && estatusDoc !== 'ALL' && hasStatusField) {
     rawRows = rawRows.filter(r => {
       if (!r.DocStatus && !r.Status) return true;
       const s = String(r.DocStatus || r.Status).toUpperCase();
-      if (estatusDoc === 'OPEN') return s.includes('ABIERTA') || s.includes('ACTIVO') || s.includes('PRÓXIMO');
-      if (estatusDoc === 'CLOSED') return s.includes('CERRADA') || s.includes('VENCIDO');
+      if (estatusDoc === 'OPEN') {
+        return s.includes('ABIERTA') || s.includes('ACTIVO') || s.includes('PRÓXIMO') || s === 'O' || s === 'OPEN' || s === 'BOST_OPEN' || s === 'Y';
+      }
+      if (estatusDoc === 'CLOSED') {
+        return s.includes('CERRADA') || s.includes('VENCIDO') || s === 'C' || s === 'CLOSED' || s === 'BOST_CLOSE' || s === 'N';
+      }
       return true;
     });
   }
-  if (clasificacionMedica && clasificacionMedica !== 'ALL') {
+
+  const hasMedClassField = rawRows.length > 0 && ('MedicalClassification' in rawRows[0]);
+  if (clasificacionMedica && clasificacionMedica !== 'ALL' && hasMedClassField) {
     rawRows = rawRows.filter(r => {
       const c = String(r.MedicalClassification || '').toUpperCase();
       if (clasificacionMedica === 'CON') return c.includes('CON') || c.includes('CONTROL');
