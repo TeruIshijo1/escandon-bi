@@ -72,6 +72,7 @@ async function initPostgresDW() {
         profit DECIMAL(18,4) DEFAULT 0,
         subtotalcost DECIMAL(18,4) DEFAULT 0,
         balance DECIMAL(18,4) DEFAULT 0,
+        downpayments DECIMAL(18,4) DEFAULT 0,
         ptnum INT,
         bpcode VARCHAR(50),
         pctype VARCHAR(10),
@@ -79,6 +80,8 @@ async function initPostgresDW() {
         prnum INT,
         sync_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE dw_vertical_pc ADD COLUMN IF NOT EXISTS downpayments DECIMAL(18,4) DEFAULT 0;
+
     `);
 
     // Tabla PT (Pacientes y su última habitación)

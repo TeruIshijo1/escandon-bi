@@ -47,8 +47,8 @@ const ENTITY_CATALOG = {
     icon: '⏳',
     category: 'Control de Caducidades',
     description: 'Números de lote activos, fechas de caducidad, días restantes para vencimiento y almacén.',
-    requiresDateFilter: true,
-    dateFieldLabel: 'Fecha de Caducidad / Vencimiento',
+    requiresDateFilter: false,
+    dateField: null,
     defaultFields: ['ItemCode', 'ItemName', 'Batch', 'WhsCode', 'Quantity', 'ExpirationDate', 'DaysToExpiry', 'Status'],
     fields: [
       { key: 'ItemCode', label: 'Código del Artículo', type: 'string', width: 120 },
@@ -544,6 +544,36 @@ async function executeSapSqlList(sqlCode, queryParams = {}) {
 }
 
 /**
+ * Recupera documentos OData paginados de SAP Service Layer siguiendo @odata.nextLink
+ * y utilizando Prefer: odata.maxpagesize=500 para máximo rendimiento y volumen completo
+ */
+async function fetchAllODataDocs(endpoint, filterStr, selectFields = '', maxDocs = 1500) {
+  let allDocs = [];
+  const selectParam = selectFields ? `&$select=${selectFields}` : '';
+  let nextUrl = `${endpoint}?$filter=${filterStr}${selectParam}&$orderby=DocDate desc`;
+  
+  while (nextUrl && allDocs.length < maxDocs) {
+    const cleanUrl = nextUrl.startsWith('/') ? nextUrl : '/' + nextUrl.replace(/^.*\/b1s\/v1\//, '');
+    try {
+      const res = await sapService.get(cleanUrl, { 'Prefer': 'odata.maxpagesize=500' });
+      const batch = res.data?.value || [];
+      allDocs.push(...batch);
+      nextUrl = res.data['@odata.nextLink'] || res.data['odata.nextLink'];
+      if (!nextUrl || batch.length === 0) break;
+      // Pausa cooperativa de 35ms para no saturar el Service Layer de otros usuarios concurrentes
+      await new Promise(r => setTimeout(r, 35));
+    } catch (err) {
+      const errMsg = (err.message || '').toLowerCase();
+      if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) {
+        break;
+      }
+      throw err;
+    }
+  }
+  return allDocs;
+}
+
+/**
  * Ejecuta una consulta dinámica en Service Layer validando filtros obligatorios
  */
 async function executeQuery({
@@ -556,7 +586,7 @@ async function executeQuery({
   busqueda,
   estatusDoc,
   clasificacionMedica,
-  limit = 2000
+  limit = 10000
 }) {
   const entityDef = ENTITY_CATALOG[entity];
   if (!entityDef) {
@@ -588,7 +618,7 @@ async function executeQuery({
   // Clave de caché para evitar consultas idénticas concurrentes a SAP
   const fieldsKey = (selectedFields || []).slice().sort().join(',');
   const searchKey = (busqueda || '').trim().toLowerCase();
-  const effectiveLimit = ['inventory', 'item_prices', 'item_master_data'].includes(entity) ? 10000 : (limit || 2000);
+  const effectiveLimit = ['inventory', 'item_prices', 'item_master_data', 'batches'].includes(entity) ? 10000 : Math.max(limit || 5000, 10000);
   const cacheKey = `${entity}_${fechaDesde || ''}_${fechaHasta || ''}_${almacen || 'ALL'}_${estatusDoc || 'ALL'}_${clasificacionMedica || 'ALL'}_${fieldsKey}_${searchKey}_${effectiveLimit}`;
   const cached = queryResultsCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < QUERY_CACHE_TTL_MS)) {
@@ -634,10 +664,11 @@ async function executeQuery({
     }
 
     case 'batches': {
-      const items = await executeSapSqlList('sq_v6_batches', dateParams);
+      await sapInventoryService.ensureInventoryData();
+      const allBatches = sapInventoryService.getBatchesCache() || [];
       const now = new Date();
 
-      rawRows = items.map(b => {
+      rawRows = allBatches.map(b => {
         const exp = formatSapDateStr(b.ExpirationDate);
         const adm = formatSapDateStr(b.AdmissionDate);
         let daysToExpiry = null;
@@ -723,17 +754,13 @@ async function executeQuery({
     }
 
     case 'stock_transfers': {
-      const topNum = Math.min(limit || 2000, 2000);
-      const url = `/StockTransfers?$filter=DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'&$orderby=DocDate desc&$top=${topNum}`;
-      let transfers = [];
-      try {
-        const res = await sapService.get(url);
-        transfers = res.data?.value || [];
-      } catch (err) {
-        const errMsg = (err.message || '').toLowerCase();
-        if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) transfers = [];
-        else throw err;
-      }
+      const filterStr = `DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'`;
+      const transfers = await fetchAllODataDocs(
+        '/StockTransfers',
+        filterStr,
+        'DocEntry,DocNum,DocDate,FromWarehouse,ToWarehouse,Comments,StockTransferLines',
+        1500
+      );
 
       rawRows = [];
       for (const doc of transfers) {
@@ -759,17 +786,13 @@ async function executeQuery({
     }
 
     case 'transfer_requests': {
-      const topNum = Math.min(limit || 2000, 2000);
-      const url = `/InventoryTransferRequests?$filter=DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'&$orderby=DocDate desc&$top=${topNum}`;
-      let requests = [];
-      try {
-        const res = await sapService.get(url);
-        requests = res.data?.value || [];
-      } catch (err) {
-        const errMsg = (err.message || '').toLowerCase();
-        if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) requests = [];
-        else throw err;
-      }
+      const filterStr = `DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'`;
+      const requests = await fetchAllODataDocs(
+        '/InventoryTransferRequests',
+        filterStr,
+        'DocEntry,DocNum,DocDate,DueDate,FromWarehouse,ToWarehouse,DocumentStatus,Comments,StockTransferLines',
+        1500
+      );
 
       rawRows = [];
       for (const doc of requests) {
@@ -798,17 +821,13 @@ async function executeQuery({
     }
 
     case 'goods_issues': {
-      const topNum = Math.min(limit || 2000, 2000);
-      const url = `/InventoryGenExits?$filter=DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'&$orderby=DocDate desc&$top=${topNum}`;
-      let exits = [];
-      try {
-        const res = await sapService.get(url);
-        exits = res.data?.value || [];
-      } catch (err) {
-        const errMsg = (err.message || '').toLowerCase();
-        if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) exits = [];
-        else throw err;
-      }
+      const filterStr = `DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'`;
+      const exits = await fetchAllODataDocs(
+        '/InventoryGenExits',
+        filterStr,
+        'DocEntry,DocNum,DocDate,Comments,DocumentLines',
+        1500
+      );
 
       rawRows = [];
       for (const doc of exits) {
@@ -831,17 +850,13 @@ async function executeQuery({
     }
 
     case 'goods_receipts_inv': {
-      const topNum = Math.min(limit || 2000, 2000);
-      const url = `/InventoryGenEntries?$filter=DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'&$orderby=DocDate desc&$top=${topNum}`;
-      let entries = [];
-      try {
-        const res = await sapService.get(url);
-        entries = res.data?.value || [];
-      } catch (err) {
-        const errMsg = (err.message || '').toLowerCase();
-        if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) entries = [];
-        else throw err;
-      }
+      const filterStr = `DocDate ge '${fechaDesde}' and DocDate le '${fechaHasta}'`;
+      const entries = await fetchAllODataDocs(
+        '/InventoryGenEntries',
+        filterStr,
+        'DocEntry,DocNum,DocDate,Comments,DocumentLines',
+        1500
+      );
 
       rawRows = [];
       for (const doc of entries) {

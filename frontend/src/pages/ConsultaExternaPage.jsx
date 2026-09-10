@@ -86,7 +86,8 @@ export default function ConsultaExternaPage() {
     const matchesSearch = 
       c.nombrepaciente?.toLowerCase().includes(search.toLowerCase()) || 
       c.medico?.toLowerCase().includes(search.toLowerCase()) ||
-      c.noexpediente?.toLowerCase().includes(search.toLowerCase());
+      c.noexpediente?.toLowerCase().includes(search.toLowerCase()) ||
+      c.convenio?.toLowerCase().includes(search.toLowerCase());
       
     const matchesEspecialidad = selectedEspecialidad === '' || c.especialidad === selectedEspecialidad;
     
@@ -250,7 +251,7 @@ export default function ConsultaExternaPage() {
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 2 }}>
           <span style={{ position: 'absolute', left: '0.875rem', color: 'var(--text-muted)' }}>🔍</span>
           <input
-            placeholder="Buscar por nombre, expediente o médico..."
+            placeholder="Buscar por nombre, expediente, médico o convenio..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="search-input-field"
@@ -353,10 +354,27 @@ export default function ConsultaExternaPage() {
                     <td style={{ padding:'0.75rem 1rem', color:'var(--text-secondary)' }}>{cita.especialidad}</td>
                     <td style={{ padding:'0.75rem 1rem', color:'var(--text-secondary)', fontSize: '0.75rem' }}>
                       {cita.convenio ? (
-                        <span style={{ background: 'rgba(128,128,128,0.1)', padding: '0.2rem 0.5rem', borderRadius: '6px', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={cita.convenio}>
+                        <span 
+                          style={{ 
+                            background: 'rgba(0,136,201,0.08)', 
+                            color: 'var(--color-azul-fuerte)', 
+                            border: '1px solid rgba(0,136,201,0.18)',
+                            padding: '0.2rem 0.55rem', 
+                            borderRadius: '6px', 
+                            whiteSpace: 'nowrap', 
+                            display: 'inline-block', 
+                            maxWidth: '180px', 
+                            overflow: 'hidden', 
+                            textOverflow: 'ellipsis',
+                            fontWeight: 600
+                          }} 
+                          title={cita.convenio}
+                        >
                           {cita.convenio}
                         </span>
-                      ) : '-'}
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
+                      )}
                     </td>
                     <td style={{ padding:'0.75rem 1rem', fontFamily:'var(--font-mono)', fontWeight:800, color:'var(--color-azul-fuerte)' }}>
                       {cita.tipoconsulta || '-'}

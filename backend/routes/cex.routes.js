@@ -17,8 +17,22 @@ router.use(authenticate);
  */
 router.post('/sync', authorizeCapability('gestionCEX'), async (req, res, next) => {
   try {
+    // 1. Sincronizar desde SQL Server Remoto (VERTICAL) hacia dw_vertical_consultas_prog
+    try {
+      const { connectRemoteDB } = require('../config/remote-db');
+      const { syncConsultasProg } = require('../services/dashboardSync.service');
+      const remotePool = await connectRemoteDB();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 15);
+      const startDateStr = startDate.toISOString().split('T')[0];
+      await syncConsultasProg(remotePool, startDateStr);
+    } catch (remoteErr) {
+      console.warn('⚠️ No se pudo sincronizar directamente desde SQL Server remoto:', remoteErr.message);
+    }
+
+    // 2. Replicar a cex_citas y cex_pacientes
     const result = await syncCexFromDW();
-    res.json({ ok: true, message: 'Sincronización completada', result });
+    res.json({ ok: true, message: 'Sincronización completada exitosamente con VERTICAL', result });
   } catch (error) {
     next(error);
   }
@@ -33,6 +47,15 @@ router.get('/agenda', authorizeCapability('verCEX'), async (req, res, next) => {
     let { start, end, live } = req.query;
 
     if (live === '1') {
+      try {
+        const { connectRemoteDB } = require('../config/remote-db');
+        const { syncConsultasProg } = require('../services/dashboardSync.service');
+        const remotePool = await connectRemoteDB();
+        const startFilter = (start || new Date().toISOString().split('T')[0]).split(' ')[0];
+        await syncConsultasProg(remotePool, startFilter);
+      } catch (remoteErr) {
+        console.warn('Sync remoto en vivo falló:', remoteErr.message);
+      }
       await syncCexFromDW().catch(e => console.warn('Sync en vivo falló', e));
     }
 

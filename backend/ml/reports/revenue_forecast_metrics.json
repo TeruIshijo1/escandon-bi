@@ -1,10 +1,10 @@
 {
   "model_name": "RandomForestRegressor",
   "model_version": "1.1.0",
-  "training_date": "2026-08-21T10:00:06.435332",
-  "evaluation_mode": "Out-of-Sample Holdout Validation (Mes: 2026-08)",
-  "train_samples": 41,
-  "test_samples": 14,
+  "training_date": "2026-09-10T13:06:15.658392",
+  "evaluation_mode": "Out-of-Sample Holdout Validation (Mes: 2026-09)",
+  "train_samples": 56,
+  "test_samples": 13,
   "features": [
     "area_encoded",
     "servicio_encoded",
@@ -15,32 +15,32 @@
     "crecimiento_mensual_anterior"
   ],
   "performance_out_of_sample": {
-    "mae": 799626.92,
-    "rmse": 2036156.2,
-    "r2": 0.1081,
+    "mae": 1355523.87,
+    "rmse": 2071551.62,
+    "r2": -5.0786,
     "note": "Metrica principal de desempeno predictivo real para toma de decisiones"
   },
   "training_set_fit_diagnostics": {
-    "train_mae": 283906.6,
-    "train_rmse": 781251.34,
-    "train_r2": 0.6099,
+    "train_mae": 501054.48,
+    "train_rmse": 1388154.51,
+    "train_r2": 0.4074,
     "note": "Metrica interna de ajuste sobre datos de entrenamiento (no representa error fuera de muestra)"
   },
   "candidate_evaluations": {
-    "GradientBoostingRegressor": {
-      "mae": 887691.0393161594,
-      "rmse": 2102709.965568839,
-      "r2": 0.04879617793298752
+    "HistGradientBoostingRegressor": {
+      "mae": 1378061.7368427264,
+      "rmse": 1615936.5200877772,
+      "r2": -2.6987944751525785
     },
     "RandomForestRegressor": {
-      "mae": 799626.9205684095,
-      "rmse": 2036156.1973342015,
-      "r2": 0.10805716400864063
+      "mae": 1355523.8747086672,
+      "rmse": 2071551.6234239147,
+      "r2": -5.078593887108415
     },
-    "ExtraTreesRegressor": {
-      "mae": 807925.0408115534,
-      "rmse": 1984856.0200653526,
-      "r2": 0.1524353043416301
+    "GradientBoostingRegressor": {
+      "mae": 1688549.48833931,
+      "rmse": 3207566.230639192,
+      "r2": -13.573466708134804
     }
   }
 }

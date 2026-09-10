@@ -45,6 +45,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
       let url = `${API_BASE}/dashboard/finanzas-nativo?`;
       if (globalFilters?.startDate) url += `startDate=${globalFilters.startDate}&`;
       if (globalFilters?.endDate) url += `endDate=${globalFilters.endDate}&`;
+      if (globalFilters?.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
 
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const json = await res.json();

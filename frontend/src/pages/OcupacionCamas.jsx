@@ -1,12 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../api/config';
 import PremiumLoader from '../components/shared/PremiumLoader';
+import './OcupacionCamas.css';
 
 export default function OcupacionCamas() {
   const [bedsData, setBedsData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [filtro, setFiltro] = useState('todas'); // todas | libres | ocupadas
+
+  const handleChipClick = (next) => {
+    setFiltro((prev) => (prev === next ? 'todas' : next));
+  };
 
   useEffect(() => {
     fetchData();
@@ -51,6 +57,9 @@ export default function OcupacionCamas() {
     };
 
     bedsData.camas.forEach(cama => {
+      const isOcupada = cama.Estado === 'OCUPADA';
+      if (filtro === 'libres' && isOcupada) return;
+      if (filtro === 'ocupadas' && !isOcupada) return;
       const name = (cama.RoomName || '').toUpperCase();
       let category = 'Otras Áreas';
       
@@ -71,13 +80,13 @@ export default function OcupacionCamas() {
       groups[category].push(cama);
     });
 
-    // Remove empty groups (except maybe we want them anyway? We'll remove empty to be clean)
+    // Remove empty groups
     Object.keys(groups).forEach(key => {
       if (groups[key].length === 0) delete groups[key];
     });
 
     return groups;
-  }, [bedsData]);
+  }, [bedsData, filtro]);
 
   if (loading) {
     return <PremiumLoader text="Cargando Censo de Camas..." style={{ height: '300px' }} />;
@@ -88,6 +97,8 @@ export default function OcupacionCamas() {
   }
 
   const { resumen } = bedsData;
+  const pctLibres = resumen.total > 0 ? Math.round((resumen.libres / resumen.total) * 100) : 0;
+  const pctOcupadas = resumen.total > 0 ? Math.round((resumen.ocupadas / resumen.total) * 100) : 0;
 
   // Render order for categories
   const categoryOrder = [
@@ -95,32 +106,116 @@ export default function OcupacionCamas() {
     'PPA (Planta Alta)', 
     'Urgencias 1', 
     'Urgencias 2', 
-    'Terapia Intensiva',
+    'Terapia Intensiva', 
     'Otras Áreas', 
     'Camas Virtuales'
   ];
 
   return (
-    <div style={{ padding: 'max(1rem, 5vw)' }}>
+    <div className="censo-page-container">
       
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <div>
-          <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.75rem)', color: '#0D1B2A', margin: '0 0 0.5rem 0' }}>Ocupación de Camas</h1>
-          <p style={{ color: '#64748B', margin: 0, fontSize: '0.9rem' }}>
-            Fuente: V_MRPT & PC &nbsp;•&nbsp;
-            <span style={{ color: '#166534', fontWeight: 600 }}>● Auto-refresh 30s</span>
+      <div className="censo-header">
+        <div className="censo-hero">
+          <div className="censo-live-badge">
+            <span className="live-dot" />
+            <span>Monitoreo en vivo</span>
+          </div>
+          <h1 className="censo-title">Ocupación <span className="title-accent">de Camas</span></h1>
+          <div className="censo-meta">
+            <span className="meta-pill meta-live">
+              <svg className="spin-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></svg>
+              Auto-refresh 30s
+            </span>
             {lastUpdate && (
-              <span style={{ marginLeft: 8, color: '#94A3B8' }}>
-                · Actualizado: {lastUpdate.toLocaleTimeString('es-MX')}
-              </span>
+              <>
+                <span className="meta-divider" />
+                <span className="meta-pill meta-time">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+                  {lastUpdate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              </>
             )}
-          </p>
+          </div>
         </div>
         
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <Badge label="Total" value={resumen.total} bg="#E2E8F0" color="#334155" />
-          <Badge label="Libres" value={resumen.libres} bg="#DCFCE7" color="#166534" />
-          <Badge label="Ocupadas" value={resumen.ocupadas} bg="#FEE2E2" color="#991B1B" />
+        <div className="censo-badges-group" role="group" aria-label="Filtrar camas por estado">
+          <KpiChip 
+            label="Total" 
+            sublabel="camas registradas"
+            value={resumen.total} 
+            variant="total"
+            filterKey="todas"
+            active={filtro === 'todas'}
+            onClick={() => handleChipClick('todas')}
+            hint="Ver todas"
+            icon={
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9" />
+              </svg>
+            }
+          />
+          <KpiChip 
+            label="Libres" 
+            sublabel="disponibles · clic para filtrar"
+            value={resumen.libres} 
+            percentage={pctLibres}
+            variant="libres"
+            barValue={pctLibres}
+            filterKey="libres"
+            active={filtro === 'libres'}
+            onClick={() => handleChipClick('libres')}
+            hint="Ver libres"
+            icon={
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            }
+          />
+          <KpiChip 
+            label="Ocupadas" 
+            sublabel="en uso · clic para filtrar"
+            value={resumen.ocupadas} 
+            percentage={pctOcupadas}
+            variant="ocupadas"
+            barValue={pctOcupadas}
+            filterKey="ocupadas"
+            active={filtro === 'ocupadas'}
+            onClick={() => handleChipClick('ocupadas')}
+            hint="Ver ocupadas"
+            icon={
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            }
+          />
+        </div>
+
+        {filtro !== 'todas' && (
+          <div className={`censo-filter-bar filter-${filtro}`}>
+            <span className="filter-text">
+              Mostrando <strong>{Object.values(categorizedBeds).flat().length}</strong>{' '}
+              {filtro === 'libres' ? 'camas libres' : 'camas ocupadas'}
+            </span>
+            <button type="button" className="filter-clear" onClick={() => setFiltro('todas')}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              Ver todas
+            </button>
+          </div>
+        )}
+
+        <div className="censo-occupancy-bar">
+          <div className="occ-labels">
+            <span>Ocupación general</span>
+            <strong>{pctOcupadas}%</strong>
+          </div>
+          <div className="occ-track">
+            <div className="occ-fill" style={{ width: `${pctOcupadas}%` }} />
+          </div>
+          <div className="occ-legend">
+            <span><i className="dot dot-free" /> {resumen.libres} libres</span>
+            <span><i className="dot dot-busy" /> {resumen.ocupadas} ocupadas</span>
+          </div>
         </div>
       </div>
 
@@ -129,14 +224,11 @@ export default function OcupacionCamas() {
         if (!beds) return null;
 
         return (
-          <div key={cat} style={{ marginBottom: '2.5rem' }}>
-            <h2 style={{ 
-              fontSize: '1.25rem', color: '#0F172A', marginBottom: '1rem', 
-              paddingBottom: '0.5rem', borderBottom: '2px solid #E2E8F0' 
-            }}>
-              {cat} ({beds.length})
+          <div key={cat} className="censo-category-section">
+            <h2 className="censo-category-title">
+              {cat} <span className="cat-count">({beds.length})</span>
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+            <div className="censo-beds-grid">
               {beds.map(cama => (
                 <BedCard key={cama.RoomCode} cama={cama} />
               ))}
@@ -144,56 +236,89 @@ export default function OcupacionCamas() {
           </div>
         );
       })}
+
+      {Object.keys(categorizedBeds).length === 0 && (
+        <div className="censo-empty">
+          <span className="empty-icon">{filtro === 'libres' ? '🎉' : '🛏️'}</span>
+          <p>
+            {filtro === 'libres'
+              ? 'No hay camas libres en este momento.'
+              : filtro === 'ocupadas'
+                ? 'No hay camas ocupadas en este momento.'
+                : 'No hay camas para mostrar.'}
+          </p>
+          {filtro !== 'todas' && (
+            <button type="button" className="filter-clear" onClick={() => setFiltro('todas')}>
+              Ver todas las camas
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function Badge({ label, value, bg, color }) {
+function KpiChip({ label, sublabel, value, percentage, icon, variant, barValue, active, onClick, hint }) {
   return (
-    <div style={{ background: bg, color: color, padding: '0.5rem 1rem', borderRadius: 24, fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-      {label}: {value}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={hint || `Filtrar: ${label}`}
+      className={`censo-kpi-chip chip-${variant}${active ? ' chip-active' : ''}`}
+    >
+      <span className="chip-glow" aria-hidden="true" />
+      {active && (
+        <span className="chip-check" aria-hidden="true">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+        </span>
+      )}
+      <div className="chip-icon-box">
+        {icon}
+      </div>
+      <div className="chip-data">
+        <span className="chip-label">{label}</span>
+        <span className="chip-row">
+          <span className="chip-value">{value}</span>
+          {percentage !== undefined && (
+            <span className="chip-percent">{percentage}%</span>
+          )}
+        </span>
+        {sublabel && <span className="chip-sub">{sublabel}</span>}
+      </div>
+      {barValue !== undefined && (
+        <span className="chip-track"><span className="chip-fill" style={{ width: `${barValue}%` }} /></span>
+      )}
+    </button>
   );
 }
 
 function BedCard({ cama }) {
   const isOcupada = cama.Estado === 'OCUPADA';
   return (
-    <div style={{ 
-      background: 'white', 
-      border: `1px solid ${isOcupada ? '#FECACA' : '#BBF7D0'}`, 
-      borderTop: `5px solid ${isOcupada ? '#EF4444' : '#22C55E'}`,
-      borderRadius: 10, 
-      padding: '1.25rem', 
-      boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
-      display: 'flex',
-      flexDirection: 'column',
-      minHeight: '130px'
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <strong style={{ color: '#0F172A', fontSize: '1.05rem' }}>{cama.RoomName}</strong>
-        <span style={{ 
-          background: isOcupada ? '#FEE2E2' : '#DCFCE7', 
-          color: isOcupada ? '#991B1B' : '#166534',
-          fontSize: '0.75rem', fontWeight: 800, padding: '4px 8px', borderRadius: 6
-        }}>
+    <div className={`bed-card ${isOcupada ? 'card-ocupada' : 'card-libre'}`}>
+      <div className="bed-header">
+        <span className="bed-name">{cama.RoomName}</span>
+        <span className={`bed-pill ${isOcupada ? 'pill-ocupada' : 'pill-libre'}`}>
           {cama.Estado}
         </span>
       </div>
       
       {isOcupada ? (
-        <div style={{ marginTop: 'auto', fontSize: '0.9rem' }}>
-          <div style={{ color: '#334155', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>👤</span> <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cama.Paciente}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: 'auto' }}>
+          <div className="bed-info-row">
+            <span>👤</span>
+            <span className="text-truncate" title={cama.Paciente}>{cama.Paciente}</span>
           </div>
           {cama.Medico && (
-            <div style={{ color: '#64748B', marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem' }}>
-              <span>⚕️</span> <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cama.Medico}</span>
+            <div className="bed-info-sub">
+              <span>⚕️</span>
+              <span className="text-truncate" title={cama.Medico}>{cama.Medico}</span>
             </div>
           )}
         </div>
       ) : (
-        <div style={{ marginTop: 'auto', color: '#166534', fontSize: '0.9rem', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="bed-available-text">
           <span>✅</span> Disponible para ingreso
         </div>
       )}

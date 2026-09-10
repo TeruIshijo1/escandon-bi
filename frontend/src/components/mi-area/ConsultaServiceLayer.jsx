@@ -6,30 +6,45 @@ import { useAuth } from '../../context/AuthContext';
 import { hasSapModulePermission } from '../../utils/rbac';
 
 const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align = 'left', maxWidth }) => {
+  const val = colFilters[columnKey] || '';
+  const isActive = val !== '';
+
+  // Determinar si la columna tiene pocos valores discretos (<= 25). Si tiene muchos, usar input de búsqueda directo para evitar saturar el DOM.
+  const isDiscreteSelect = useMemo(() => {
+    if (!data || data.length === 0) return false;
+    const sample = new Set();
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i][columnKey];
+      if (v != null && v !== '') {
+        sample.add(v);
+        if (sample.size > 25) return false;
+      }
+    }
+    return sample.size <= 25 && sample.size > 0;
+  }, [data, columnKey]);
+
   const uniqueVals = useMemo(() => {
+    if (!isDiscreteSelect) return [];
     const raw = Array.from(new Set(data.map(item => item[columnKey])))
       .filter(val => val !== null && val !== undefined && val !== '');
     return raw.sort((a, b) => {
       if (typeof a === 'number' && typeof b === 'number') return a - b;
       return String(a).localeCompare(String(b), 'es', { numeric: true });
     });
-  }, [data, columnKey]);
-
-  const val = colFilters[columnKey] || '';
-  const isActive = val !== '';
+  }, [data, columnKey, isDiscreteSelect]);
 
   return (
     <th style={{
       textAlign: align,
       maxWidth: maxWidth || 'none',
-      padding: '10px 8px',
+      padding: '8px 6px',
       background: '#004687',
       borderBottom: '3px solid #0088C9',
       whiteSpace: 'nowrap'
     }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-          <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', letterSpacing: '0.04em', fontWeight: '700' }}>
+          <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.9)', letterSpacing: '0.04em', fontWeight: '700' }}>
             {label}
           </span>
           {isActive && (
@@ -64,26 +79,46 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
             </button>
           )}
         </div>
-        <select
-          value={val}
-          onChange={(e) => setColFilters(prev => ({ ...prev, [columnKey]: e.target.value }))}
-          style={{
-            fontSize: '0.7rem',
-            padding: '3px 6px',
-            borderRadius: '4px',
-            border: isActive ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.25)',
-            background: isActive ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.12)',
-            color: '#fff',
-            outline: 'none',
-            maxWidth: maxWidth || '100%',
-            textOverflow: 'ellipsis'
-          }}
-        >
-          <option value="" style={{ color: '#1e293b' }}>Todos ({uniqueVals.length})</option>
-          {uniqueVals.map((v, i) => (
-            <option key={i} value={v} style={{ color: '#1e293b' }}>{String(v)}</option>
-          ))}
-        </select>
+        {isDiscreteSelect ? (
+          <select
+            value={val}
+            onChange={(e) => setColFilters(prev => ({ ...prev, [columnKey]: e.target.value }))}
+            style={{
+              fontSize: '0.7rem',
+              padding: '2px 4px',
+              borderRadius: '4px',
+              border: isActive ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.25)',
+              background: isActive ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.12)',
+              color: '#fff',
+              outline: 'none',
+              maxWidth: maxWidth || '100%',
+              textOverflow: 'ellipsis'
+            }}
+          >
+            <option value="" style={{ color: '#1e293b' }}>Todos ({uniqueVals.length})</option>
+            {uniqueVals.map((v, i) => (
+              <option key={i} value={v} style={{ color: '#1e293b' }}>{String(v)}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            placeholder="Filtrar..."
+            value={val}
+            onChange={(e) => setColFilters(prev => ({ ...prev, [columnKey]: e.target.value }))}
+            style={{
+              fontSize: '0.7rem',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              border: isActive ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.25)',
+              background: isActive ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.15)',
+              color: '#fff',
+              outline: 'none',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          />
+        )}
       </div>
     </th>
   );
@@ -190,6 +225,18 @@ export default function ConsultaServiceLayer() {
     return userAllowedCatalog.find(c => c.id === selectedEntityId) || null;
   }, [userAllowedCatalog, selectedEntityId]);
 
+  const hasStatusField = useMemo(() => {
+    return Boolean(currentEntityDef?.fields?.some(f => f.key === 'DocStatus' || f.key === 'Status'));
+  }, [currentEntityDef]);
+
+  const hasWhsField = useMemo(() => {
+    return Boolean(currentEntityDef?.fields?.some(f => f.key === 'WhsCode' || f.key === 'Filler' || f.key === 'ToWhsCode'));
+  }, [currentEntityDef]);
+
+  const hasMedClassField = useMemo(() => {
+    return Boolean(currentEntityDef?.fields?.some(f => f.key === 'MedicalClassification'));
+  }, [currentEntityDef]);
+
   const filteredCatalog = useMemo(() => {
     if (activeCategory === 'ALL') return userAllowedCatalog;
     return userAllowedCatalog.filter(c => c.category === activeCategory);
@@ -207,7 +254,7 @@ export default function ConsultaServiceLayer() {
     }
   }, [userAllowedCatalog, selectedEntityId]);
 
-  // Al cambiar de entidad, preseleccionar sus campos default
+  // Al cambiar de entidad, preseleccionar sus campos default y limpiar filtros no aplicables
   const handleSelectEntity = (entId) => {
     setSelectedEntityId(entId);
     const def = catalog.find(c => c.id === entId);
@@ -215,9 +262,14 @@ export default function ConsultaServiceLayer() {
       setSelectedFields(def.defaultFields || def.fields.map(f => f.key));
     }
     setColFilters({});
+    setBusqueda('');
     setPage(1);
     setQueryResult(null);
     setError(null);
+    // Limpiar estatus si la nueva entidad no lo maneja
+    if (def && !def.fields.some(f => f.key === 'DocStatus' || f.key === 'Status')) {
+      setEstatusDoc('ALL');
+    }
     // Limpiar clasificación médica si la nueva entidad no la maneja
     if (def && !def.fields.some(f => f.key === 'MedicalClassification')) {
       setClasificacionMedica('ALL');
@@ -440,30 +492,37 @@ export default function ConsultaServiceLayer() {
         if (!matchesWhs) return false;
       }
 
-      // 3. Filtro de estatus de documento
+      // 3. Filtro de estatus de documento (solo si la fila realmente contiene estatus)
       if (estatusDoc && estatusDoc !== 'ALL') {
-        const s = String(row.DocStatus || row.Status || '').toUpperCase();
-        if (estatusDoc === 'OPEN') {
-          const isOpen = s.includes('ABIERTA') || s.includes('ACTIVO') || s.includes('PRÓXIMO') || s === 'O';
-          if (!isOpen) return false;
-        } else if (estatusDoc === 'CLOSED') {
-          const isClosed = s.includes('CERRADA') || s.includes('VENCIDO') || s === 'C';
-          if (!isClosed) return false;
+        const hasStatus = row.DocStatus != null || row.Status != null;
+        if (hasStatus) {
+          const s = String(row.DocStatus || row.Status || '').toUpperCase();
+          if (estatusDoc === 'OPEN') {
+            const isOpen = s.includes('ABIERTA') || s.includes('ACTIVO') || s.includes('PRÓXIMO') || s === 'O' || s === 'OPEN' || s === 'BOST_OPEN' || s === 'Y';
+            if (!isOpen) return false;
+          } else if (estatusDoc === 'CLOSED') {
+            const isClosed = s.includes('CERRADA') || s.includes('VENCIDO') || s === 'C' || s === 'CLOSED' || s === 'BOST_CLOSE' || s === 'N';
+            if (!isClosed) return false;
+          }
         }
       }
 
-      // 4. Filtro de clasificación sanitaria (CON / ANTI / REFRI)
+      // 4. Filtro de clasificación sanitaria (solo si la fila la contiene)
       if (clasificacionMedica && clasificacionMedica !== 'ALL') {
-        const c = String(row.MedicalClassification || '').toUpperCase();
-        if (clasificacionMedica === 'CON' && !(c.includes('CON') || c.includes('CONTROL'))) return false;
-        if (clasificacionMedica === 'ANTI' && !(c.includes('ANTI') || c.includes('ANTIBIOT'))) return false;
-        if (clasificacionMedica === 'REFRI' && !(c.includes('REFRI') || c.includes('FRIO'))) return false;
+        if (row.MedicalClassification != null) {
+          const c = String(row.MedicalClassification || '').toUpperCase();
+          if (clasificacionMedica === 'CON' && !(c.includes('CON') || c.includes('CONTROL'))) return false;
+          if (clasificacionMedica === 'ANTI' && !(c.includes('ANTI') || c.includes('ANTIBIOT'))) return false;
+          if (clasificacionMedica === 'REFRI' && !(c.includes('REFRI') || c.includes('FRIO'))) return false;
+        }
       }
 
-      // 5. Filtros por encabezado de columna individual
+      // 5. Filtros por encabezado de columna individual (búsqueda parcial insensible a mayúsculas)
       return Object.entries(colFilters).every(([key, val]) => {
-        if (!val) return true;
-        return String(row[key] ?? '').trim().toLowerCase() === String(val).trim().toLowerCase();
+        if (!val || !val.trim()) return true;
+        const needle = val.trim().toLowerCase();
+        const hay = String(row[key] ?? '').trim().toLowerCase();
+        return hay.includes(needle);
       });
     });
   }, [queryResult, busqueda, almacen, estatusDoc, clasificacionMedica, colFilters]);
@@ -788,58 +847,97 @@ export default function ConsultaServiceLayer() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                    Almacén
+                    Almacén {!hasWhsField && <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>(N/A)</span>}
                   </label>
                   <select
-                    value={almacen}
+                    disabled={!hasWhsField}
+                    value={hasWhsField ? almacen : 'ALL'}
                     onChange={(e) => setAlmacen(e.target.value)}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                    style={{
+                      width: '100%', padding: '0.45rem', borderRadius: '6px',
+                      border: '1px solid #cbd5e1', fontSize: '0.82rem',
+                      background: !hasWhsField ? '#F8FAFC' : '#fff',
+                      color: !hasWhsField ? '#94A3B8' : '#1e293b',
+                      cursor: !hasWhsField ? 'not-allowed' : 'pointer'
+                    }}
                   >
-                    <option value="ALL">Todos los Almacenes</option>
-                    <option value="FAR">Farmacia Central (FAR)</option>
-                    <option value="QX">Quirófano General (QX)</option>
-                    <option value="QXCR">Quirófano Carro Rojo (QXCR)</option>
-                    <option value="QXRCR">Recuperación Carro Rojo (QXRCR)</option>
-                    <option value="TERACR">Terapia Intensiva Carro Rojo (TERACR)</option>
-                    <option value="PPBCR">Privados PB Carro Rojo (PPBCR)</option>
-                    <option value="PPACR">Privados PA Carro Rojo (PPACR)</option>
-                    <option value="IMAGCR">Imagen Carro Rojo (IMAGCR)</option>
-                    <option value="CARDIOCR">Cardio Carro Rojo (CARDIOCR)</option>
-                    <option value="CUNACR">Cunas Carro Rojo (CUNACR)</option>
-                    <option value="QXCM">Quirófano Código Mater (QXCM)</option>
-                    <option value="URG1CM">Urgencias 1 Código Mater (URG1CM)</option>
-                    <option value="ALG">Almacén General (ALG)</option>
+                    {!hasWhsField ? (
+                      <option value="ALL">No aplica a este módulo</option>
+                    ) : (
+                      <>
+                        <option value="ALL">Todos los Almacenes</option>
+                        <option value="FAR">Farmacia Central (FAR)</option>
+                        <option value="QX">Quirófano General (QX)</option>
+                        <option value="QXCR">Quirófano Carro Rojo (QXCR)</option>
+                        <option value="QXRCR">Recuperación Carro Rojo (QXRCR)</option>
+                        <option value="TERACR">Terapia Intensiva Carro Rojo (TERACR)</option>
+                        <option value="PPBCR">Privados PB Carro Rojo (PPBCR)</option>
+                        <option value="PPACR">Privados PA Carro Rojo (PPACR)</option>
+                        <option value="IMAGCR">Imagen Carro Rojo (IMAGCR)</option>
+                        <option value="CARDIOCR">Cardio Carro Rojo (CARDIOCR)</option>
+                        <option value="CUNACR">Cunas Carro Rojo (CUNACR)</option>
+                        <option value="QXCM">Quirófano Código Mater (QXCM)</option>
+                        <option value="URG1CM">Urgencias 1 Código Mater (URG1CM)</option>
+                        <option value="ALG">Almacén General (ALG)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                    Estatus Documento
+                    Estatus Documento {!hasStatusField && <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>(N/A)</span>}
                   </label>
                   <select
-                    value={estatusDoc}
+                    disabled={!hasStatusField}
+                    value={hasStatusField ? estatusDoc : 'ALL'}
                     onChange={(e) => setEstatusDoc(e.target.value)}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                    style={{
+                      width: '100%', padding: '0.45rem', borderRadius: '6px',
+                      border: '1px solid #cbd5e1', fontSize: '0.82rem',
+                      background: !hasStatusField ? '#F8FAFC' : '#fff',
+                      color: !hasStatusField ? '#94A3B8' : '#1e293b',
+                      cursor: !hasStatusField ? 'not-allowed' : 'pointer'
+                    }}
                   >
-                    <option value="ALL">Todos los Estatus</option>
-                    <option value="OPEN">Solo Abiertos / Pendientes / Activos</option>
-                    <option value="CLOSED">Solo Cerrados / Vencidos</option>
+                    {!hasStatusField ? (
+                      <option value="ALL">No aplica a este módulo</option>
+                    ) : (
+                      <>
+                        <option value="ALL">Todos los Estatus</option>
+                        <option value="OPEN">Solo Abiertos / Pendientes / Activos</option>
+                        <option value="CLOSED">Solo Cerrados / Vencidos</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                    Clasificación Sanitaria
+                    Clasificación Sanitaria {!hasMedClassField && <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>(N/A)</span>}
                   </label>
                   <select
-                    value={clasificacionMedica}
+                    disabled={!hasMedClassField}
+                    value={hasMedClassField ? clasificacionMedica : 'ALL'}
                     onChange={(e) => setClasificacionMedica(e.target.value)}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                    style={{
+                      width: '100%', padding: '0.45rem', borderRadius: '6px',
+                      border: '1px solid #cbd5e1', fontSize: '0.82rem',
+                      background: !hasMedClassField ? '#F8FAFC' : '#fff',
+                      color: !hasMedClassField ? '#94A3B8' : '#1e293b',
+                      cursor: !hasMedClassField ? 'not-allowed' : 'pointer'
+                    }}
                   >
-                    <option value="ALL">Todas las Clasificaciones</option>
-                    <option value="CON">Controlados (Grupo I, II, III)</option>
-                    <option value="ANTI">Antibióticos (Grupo IV)</option>
-                    <option value="REFRI">Red Fría / Refrigerados</option>
+                    {!hasMedClassField ? (
+                      <option value="ALL">No aplica a este módulo</option>
+                    ) : (
+                      <>
+                        <option value="ALL">Todas las Clasificaciones</option>
+                        <option value="CON">Controlados (Grupo I, II, III)</option>
+                        <option value="ANTI">Antibióticos (Grupo IV)</option>
+                        <option value="REFRI">Red Fría / Refrigerados</option>
+                      </>
+                    )}
                   </select>
                 </div>
 

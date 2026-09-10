@@ -21,21 +21,31 @@ async function queryCensoCamas() {
     const occupiedResult = await pool.request().query(`
       WITH CTE AS (
         SELECT 
-          V.RoomCode AS Cama, 
-          V.RoomName AS Area,
-          V.FullName AS Paciente, 
+          V.FRCode AS Cama, 
+          V.FRName AS Area,
+          PT.FullName AS Paciente, 
           PR.FullName AS Medico,
-          ROW_NUMBER() OVER(PARTITION BY V.RoomCode ORDER BY PC.Date DESC) as rn
+          ROW_NUMBER() OVER(PARTITION BY V.FRCode ORDER BY PC.Date DESC) as rn
         FROM PC
-        JOIN V_MRPT V ON PC.PTNum = V.PTNum
+        INNER JOIN PT ON PC.PTNum = PT.PTNum
         LEFT JOIN PR ON PC.PRNum = PR.PRNum
+        OUTER APPLY (
+          SELECT TOP 1 
+            pcfr.FRCode,
+            pcfr.FRName
+          FROM PCFR pcfr
+          WHERE pcfr.PCNum = PC.PCNum
+            AND pcfr.PCFR_ST = 'AS'
+            AND pcfr.ExitDate IS NULL
+          ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
+        ) V
         WHERE PC.PC_ST = 'OP' 
           AND PC.PCType IN ('IP', 'ER')
           AND PC.MedicalDischargeDate IS NULL
-          AND V.RoomCode IS NOT NULL
-          AND V.RoomName NOT LIKE '%VIRTUAL%'
-          AND V.RoomName NOT LIKE '%VIRT%'
-          AND V.RoomCode NOT LIKE '%VIRT%'
+          AND V.FRCode IS NOT NULL
+          AND V.FRName NOT LIKE '%VIRTUAL%'
+          AND V.FRName NOT LIKE '%VIRT%'
+          AND V.FRCode NOT LIKE '%VIRT%'
       )
       SELECT Cama, Area, Paciente, Medico
       FROM CTE WHERE rn = 1

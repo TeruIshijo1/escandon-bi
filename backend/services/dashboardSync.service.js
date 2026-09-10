@@ -22,7 +22,7 @@ async function syncPC(remotePool, startDateStr) {
   const res = await remotePool.request()
     .input('startDate', startDateStr)
     .query(`
-      SELECT PCNum, PC_ST, MedicalDischargeDate, Date, Total, Profit, SubtotalCost, Balance, PTNum, BPCode, PCType, CreatedOn, PRNum 
+      SELECT PCNum, PC_ST, MedicalDischargeDate, Date, Total, Profit, SubtotalCost, Balance, Downpayments, PTNum, BPCode, PCType, CreatedOn, PRNum 
       FROM PC 
       WHERE Date >= @startDate OR CreatedOn >= @startDate
     `);
@@ -33,8 +33,8 @@ async function syncPC(remotePool, startDateStr) {
   for (const r of records) {
     await pool.query(`
       INSERT INTO dw_vertical_pc 
-        (pcnum, pc_st, medicaldischargedate, entrydate, total, profit, subtotalcost, balance, ptnum, bpcode, pctype, createdon, prnum, sync_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP)
+        (pcnum, pc_st, medicaldischargedate, entrydate, total, profit, subtotalcost, balance, downpayments, ptnum, bpcode, pctype, createdon, prnum, sync_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
       ON CONFLICT (pcnum) DO UPDATE SET
         pc_st = EXCLUDED.pc_st,
         medicaldischargedate = EXCLUDED.medicaldischargedate,
@@ -43,6 +43,7 @@ async function syncPC(remotePool, startDateStr) {
         profit = EXCLUDED.profit,
         subtotalcost = EXCLUDED.subtotalcost,
         balance = EXCLUDED.balance,
+        downpayments = EXCLUDED.downpayments,
         ptnum = EXCLUDED.ptnum,
         bpcode = EXCLUDED.bpcode,
         pctype = EXCLUDED.pctype,
@@ -51,7 +52,7 @@ async function syncPC(remotePool, startDateStr) {
         sync_date = CURRENT_TIMESTAMP;
     `, [
       r.PCNum, r.PC_ST, r.MedicalDischargeDate, r.Date, r.Total || 0, r.Profit || 0,
-      r.SubtotalCost || 0, r.Balance || 0, r.PTNum, r.BPCode, r.PCType, r.CreatedOn, r.PRNum
+      r.SubtotalCost || 0, r.Balance || 0, r.Downpayments || 0, r.PTNum, r.BPCode, r.PCType, r.CreatedOn, r.PRNum
     ]);
     count++;
   }
@@ -448,10 +449,22 @@ async function syncConsultasProg(remotePool, startDateStr) {
         c.Edad_Mes,
         c.Genero,
         c.ConsultasPreviasEjecutadas,
-        p.Convenio
+        COALESCE(
+          NULLIF(RTRIM(LTRIM(so.UDF_convenio_so)), ''),
+          NULLIF(NULLIF(RTRIM(LTRIM(p.Convenio)), ''), 'N/A')
+        ) AS Convenio
       FROM UDR_CD c
-      LEFT JOIN UDR_BI_PACIENTES p ON c.Numero_Paciente = p.NoPaciente
+      LEFT JOIN PCAP pcap ON c.Numero_Cita = pcap.PCAPNum
+      LEFT JOIN SO so ON pcap.SONum = so.SONum
       LEFT JOIN UDR_CONSULTAS_PROG prog ON c.Numero_Cita = prog.No_Cita
+      OUTER APPLY (
+        SELECT TOP 1 bp.Convenio 
+        FROM UDR_BI_PACIENTES bp
+        WHERE bp.NoPaciente = c.Numero_Paciente 
+          AND bp.Convenio IS NOT NULL 
+          AND RTRIM(LTRIM(bp.Convenio)) NOT IN ('', 'N/A')
+        ORDER BY bp.AtencionMedica DESC
+      ) p
       WHERE c.Fecha >= @startDate
     `);
 
@@ -601,5 +614,6 @@ function initDashboardCron() {
 
 module.exports = {
   syncAllDashboards,
-  initDashboardCron
+  initDashboardCron,
+  syncConsultasProg
 };

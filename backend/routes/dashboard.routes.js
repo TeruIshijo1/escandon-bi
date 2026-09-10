@@ -1312,6 +1312,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
           c.profit as "Profit",
           c.subtotalcost as "SubtotalCost",
           c.balance as "Balance",
+          c.downpayments as "Downpayments",
           p.fullname as "FullName"
         FROM dw_vertical_pc c
         LEFT JOIN dw_vertical_pt p ON c.ptnum = p.ptnum
@@ -1323,10 +1324,11 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
         PC_ST: row.PC_ST,
         MedicalDischargeDate: row.MedicalDischargeDate,
         EntryDate: row.EntryDate,
-        Total: Number(row.Total),
-        Profit: Number(row.Profit),
-        SubtotalCost: Number(row.SubtotalCost),
-        Balance: Number(row.Balance),
+        Total: Number(row.Total || 0),
+        Profit: Number(row.Profit || 0),
+        SubtotalCost: Number(row.SubtotalCost || 0),
+        Balance: Number(row.Balance || 0),
+        Downpayments: Number(row.Downpayments || 0),
         FullName: row.FullName
       })));
     }
@@ -1355,6 +1357,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
           PC.Profit,
           PC.SubtotalCost,
           PC.Balance,
+          PC.Downpayments,
           PT.FullName
         FROM PC
         LEFT JOIN PT ON PC.PTNum = PT.PTNum
@@ -1362,7 +1365,18 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       `;
       
       const result = await request.query(queryStr);
-      rawData = rawData.concat(result.recordset);
+      rawData = rawData.concat(result.recordset.map(row => ({
+        PCNum: Number(row.PCNum),
+        PC_ST: row.PC_ST,
+        MedicalDischargeDate: row.MedicalDischargeDate,
+        EntryDate: row.EntryDate,
+        Total: Number(row.Total || 0),
+        Profit: Number(row.Profit || 0),
+        SubtotalCost: Number(row.SubtotalCost || 0),
+        Balance: Number(row.Balance || 0),
+        Downpayments: Number(row.Downpayments || 0),
+        FullName: row.FullName
+      })));
     }
     const audit = {
       totalCrudo: rawData.length,
@@ -1382,7 +1396,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
     rawData.forEach(row => {
       const isTest = row.FullName && (row.FullName.toUpperCase().includes('TEST') || row.FullName.toUpperCase().includes('PRUEBA'));
       const isClosed = row.PC_ST === 'CL'; // Finalizada
-      const isPositive = (row.Total > 0);
+      const isPositive = (Number(row.Balance) > 0); // En Cirrus, Balance es el Total Facturado de la cuenta
       const isDateValid = row.MedicalDischargeDate && new Date(row.MedicalDischargeDate) >= new Date(row.EntryDate) && new Date(row.MedicalDischargeDate) <= new Date();
 
       if (isTest) {
@@ -1394,8 +1408,20 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       } else if (!isDateValid) {
         audit.motivos.fechasIncoherentes++;
       } else {
-        // CORRECCIÓN: El campo Profit de Cirrus tiene inconsistencias, lo calculamos matemáticamente
-        row.Profit = row.Total - (row.SubtotalCost || 0);
+        const totalAccount = Number(row.Balance);
+        const cost = Number(row.SubtotalCost || 0);
+        const profit = totalAccount - cost;
+        const pendingBalance = Math.max(0, Number(row.Total || 0));
+        const paid = Math.max(0, totalAccount - pendingBalance);
+        const profitMargin = totalAccount > 0 ? (profit / totalAccount) * 100 : 0;
+
+        row.TotalAccount = totalAccount;
+        row.SubtotalCost = cost;
+        row.Profit = profit;
+        row.ProfitMargin = profitMargin;
+        row.Paid = paid;
+        row.PendingBalance = pendingBalance;
+
         validRecords.push(row);
       }
     });
@@ -1409,14 +1435,14 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       let month = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       
       if (!dataByMonth[month]) {
-        dataByMonth[month] = { records: [], Ingresos: 0, Utilidad: 0, Costos: 0, Balance: 0, outliersCount: 0 };
+        dataByMonth[month] = { records: [], Ingresos: 0, Utilidad: 0, Costos: 0, Balance: 0, Cobrado: 0, outliersCount: 0 };
       }
       dataByMonth[month].records.push(row);
     });
 
     Object.keys(dataByMonth).forEach(month => {
       const mData = dataByMonth[month];
-      const totals = mData.records.map(r => r.Total).sort((a,b) => a-b);
+      const totals = mData.records.map(r => r.TotalAccount).sort((a,b) => a-b);
       
       // Calcular IQR
       if (totals.length >= 4) {
@@ -1426,7 +1452,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
         const upperLimit = q3 + 1.5 * iqr;
         
         mData.records.forEach(r => {
-          if (r.Total > upperLimit) mData.outliersCount++;
+          if (r.TotalAccount > upperLimit) mData.outliersCount++;
         });
       }
 
@@ -1434,10 +1460,11 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
 
       // Sumarizadores
       mData.records.forEach(r => {
-        mData.Ingresos += r.Total || 0;
+        mData.Ingresos += r.TotalAccount || 0;
         mData.Utilidad += r.Profit || 0;
         mData.Costos += r.SubtotalCost || 0;
-        mData.Balance += r.Balance || 0;
+        mData.Balance += r.PendingBalance || 0;
+        mData.Cobrado += r.Paid || 0;
       });
     });
 
@@ -1516,12 +1543,13 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
     }
 
     // KPIs Generales Acumulados
-    let totalIng = 0, totalUt = 0, totalCuentas = 0, totalCostos = 0;
+    let totalIng = 0, totalUt = 0, totalCuentas = 0, totalCostos = 0, totalCobrado = 0;
     Object.keys(dataByMonth).forEach(m => {
       totalIng += dataByMonth[m].Ingresos;
       totalUt += dataByMonth[m].Utilidad;
       totalCuentas += dataByMonth[m].Balance;
       totalCostos += dataByMonth[m].Costos;
+      totalCobrado += dataByMonth[m].Cobrado;
     });
 
     // 4. Cartera de Cobranza (Aging)
@@ -1540,7 +1568,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
 
     const now = Date.now();
     validRecords.forEach(row => {
-      if (row.Balance > 0) {
+      if (row.PendingBalance > 0) {
         const dateToUse = row.MedicalDischargeDate ? new Date(row.MedicalDischargeDate) : new Date(row.EntryDate);
         const diffDays = Math.floor((now - dateToUse.getTime()) / (1000 * 60 * 60 * 24));
         
@@ -1549,14 +1577,14 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
         else if (diffDays <= 60) bucket = '31-60 días';
         else if (diffDays <= 90) bucket = '61-90 días';
 
-        carteraCobranza[bucket] += row.Balance;
+        carteraCobranza[bucket] += row.PendingBalance;
         carteraCobranzaDetalle[bucket].push(row);
       }
     });
 
-    // Ordenar por balance descendente y limitar a 50 para no saturar frontend
+    // Ordenar por balance pendiente descendente y limitar a 50 para no saturar frontend
     Object.keys(carteraCobranzaDetalle).forEach(bucket => {
-      carteraCobranzaDetalle[bucket].sort((a,b) => b.Balance - a.Balance);
+      carteraCobranzaDetalle[bucket].sort((a,b) => b.PendingBalance - a.PendingBalance);
       carteraCobranzaDetalle[bucket] = carteraCobranzaDetalle[bucket].slice(0, 50);
     });
 
@@ -1577,6 +1605,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
           costosAcumulados: totalCostos,
           utilidadAcumulada: totalUt,
           cuentasPorCobrar: totalCuentas,
+          cobranzaRealizada: totalCobrado,
           margenPromedio: totalIng > 0 ? (totalUt / totalIng) * 100 : 0
         },
         audit
@@ -1698,7 +1727,7 @@ router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
     `);
     const allBeds = bedsResult.rows;
 
-    // 2. Obtener camas ocupadas actualmente (en vivo de SQL Server con join indexado rápido)
+    // 2. Obtener camas ocupadas actualmente (en vivo de SQL Server con cama activa de PCFR)
     const mssqlPool = await connectRemoteDB();
     const occupiedResult = await mssqlPool.request().query(`
       SELECT 
@@ -1707,8 +1736,17 @@ router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
         pr.FullName AS Medico
       FROM PC pc
       INNER JOIN PT pt ON pc.PTNum = pt.PTNum
-      LEFT JOIN V_MRPT v ON pt.PTNum = v.PTNum
       LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
+      OUTER APPLY (
+        SELECT TOP 1 
+          pcfr.FRCode AS RoomCode,
+          pcfr.FRName AS RoomName
+        FROM PCFR pcfr
+        WHERE pcfr.PCNum = pc.PCNum
+          AND pcfr.PCFR_ST = 'AS'
+          AND pcfr.ExitDate IS NULL
+        ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
+      ) v
       WHERE pc.PC_ST = 'OP' 
         AND pc.PCType IN ('IP', 'ER')
         AND pc.MedicalDischargeDate IS NULL
@@ -1983,8 +2021,17 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
           pc.PCNum AS PCNum
         FROM PC pc
         INNER JOIN PT pt ON pc.PTNum = pt.PTNum
-        LEFT JOIN V_MRPT v ON pt.PTNum = v.PTNum
         LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
+        OUTER APPLY (
+          SELECT TOP 1 
+            pcfr.FRCode AS RoomCode,
+            pcfr.FRName AS RoomName
+          FROM PCFR pcfr
+          WHERE pcfr.PCNum = pc.PCNum
+            AND pcfr.PCFR_ST = 'AS'
+            AND pcfr.ExitDate IS NULL
+          ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
+        ) v
         WHERE pc.PC_ST = 'OP' 
           AND pc.PCType = 'ER'
           AND pc.MedicalDischargeDate IS NULL
@@ -2608,32 +2655,96 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
     const request = pool.request();
     
     let query = '';
-    let columns = [];
     let sheetName = 'Exportación';
+    let rows = [];
 
     // 1. Construir query según el dashboard
-    if (dashboard === 'financiero') {
-      sheetName = 'Cuentas_Financiero';
-      let whereClauses = ["1=1"];
-      if (startDate) { whereClauses.push("PC.Date >= @startDate"); request.input('startDate', startDate); }
-      if (endDate) { whereClauses.push("PC.Date <= @endDate"); request.input('endDate', endDate); }
-      if (search) { 
-        whereClauses.push("(PC.PCNum LIKE @search OR PT.FullName LIKE @search)"); 
-        request.input('search', `%${search}%`); 
+    if (dashboard === 'finanzas') {
+      sheetName = 'Ingresos_Egresos_SAP';
+      const cleanStart = (startDate || '2026-04-01').split(' ')[0];
+      const cleanEnd = (endDate || new Date().toISOString().split('T')[0]).split(' ')[0];
+      
+      let inWhere = ["DocDate >= $1", "DocDate <= $2", "Canceled = 'N'"];
+      let inParams = [cleanStart, cleanEnd];
+      let outWhere = ["DocDate >= $1", "DocDate <= $2", "Canceled = 'N'"];
+      let outParams = [cleanStart, cleanEnd];
+
+      if (search) {
+        inWhere.push("(CardName ILIKE $3 OR CardCode ILIKE $3 OR CAST(DocNum AS VARCHAR) ILIKE $3 OR CounterReference ILIKE $3)");
+        inParams.push(`%${search}%`);
+        outWhere.push("(CardName ILIKE $3 OR CardCode ILIKE $3 OR CAST(DocNum AS VARCHAR) ILIKE $3)");
+        outParams.push(`%${search}%`);
       }
-      query = `
-        SELECT TOP 500
-          CONVERT(varchar(10), PC.MedicalDischargeDate, 120) AS 'Alta Médica',
-          PC.PCNum AS 'Cuenta',
-          PT.FullName AS 'Paciente',
-          PC.Total AS 'Ingresos',
-          PC.Profit AS 'Utilidad',
-          PC.Balance AS 'Saldo'
-        FROM PC
-        LEFT JOIN PT ON PC.PTNum = PT.PTNum
-        WHERE ${whereClauses.join(' AND ')}
-        ORDER BY PC.Total DESC
-      `;
+
+      const resIn = await pgPool.query(`
+        SELECT 
+          'INGRESO' AS "Tipo",
+          TO_CHAR(DocDate, 'YYYY-MM-DD') AS "Fecha",
+          CONCAT('REC-', DocNum) AS "Folio / Documento",
+          COALESCE(CounterReference, CardCode) AS "No. Cuenta / BP",
+          COALESCE(CardName, 'Venta General') AS "Paciente / Proveedor",
+          CASE 
+            WHEN CreditSum > 0 THEN 'Tarjeta de Débito / Crédito'
+            WHEN TrsfrSum > 0 THEN 'Transferencia'
+            WHEN CheckSum > 0 THEN 'Cheque'
+            ELSE 'Efectivo'
+          END AS "Método de Pago",
+          DocTotal AS "Monto ($)"
+        FROM sap_incoming_payments
+        WHERE ${inWhere.join(' AND ')}
+        ORDER BY DocDate DESC
+        LIMIT 5000
+      `, inParams);
+
+      const resOut = await pgPool.query(`
+        SELECT 
+          'EGRESO' AS "Tipo",
+          TO_CHAR(DocDate, 'YYYY-MM-DD') AS "Fecha",
+          CONCAT('FAC-', DocNum) AS "Folio / Documento",
+          CardCode AS "No. Cuenta / BP",
+          COALESCE(CardName, 'Proveedor') AS "Paciente / Proveedor",
+          'Factura Proveedor' AS "Método de Pago",
+          DocTotal AS "Monto ($)"
+        FROM sap_purchase_invoices
+        WHERE ${outWhere.join(' AND ')}
+        ORDER BY DocDate DESC
+        LIMIT 5000
+      `, outParams);
+
+      rows = resIn.rows.concat(resOut.rows);
+      rows.sort((a,b) => String(b.Fecha || '').localeCompare(String(a.Fecha || '')));
+    } else if (dashboard === 'financiero') {
+      sheetName = 'Cuentas_Financiero';
+      const cleanStart = (startDate || '2026-04-01').split(' ')[0];
+      const cleanEnd = (endDate || new Date().toISOString().split('T')[0]).split(' ')[0];
+      
+      let pgWhere = ["c.entrydate >= $1", "c.entrydate <= $2", "c.pc_st = 'CL'", "c.balance > 0"];
+      let params = [cleanStart, cleanEnd + ' 23:59:59'];
+      
+      if (search) {
+        pgWhere.push("(p.fullname ILIKE $3 OR CAST(c.pcnum AS VARCHAR) ILIKE $3)");
+        params.push(`%${search}%`);
+      }
+
+      const resPg = await pgPool.query(`
+        SELECT 
+          TO_CHAR(COALESCE(c.medicaldischargedate, c.entrydate), 'YYYY-MM-DD') AS "Alta Médica",
+          c.pcnum AS "Cuenta",
+          COALESCE(p.fullname, 'Sin Nombre') AS "Paciente",
+          c.balance AS "Total Facturado",
+          COALESCE(c.subtotalcost, 0) AS "Costo Insumos",
+          (c.balance - COALESCE(c.subtotalcost, 0)) AS "Utilidad Bruta",
+          ROUND(CASE WHEN c.balance > 0 THEN ((c.balance - COALESCE(c.subtotalcost, 0)) / c.balance) * 100 ELSE 0 END, 1) AS "Margen %",
+          COALESCE(c.downpayments, (c.balance - CASE WHEN c.total > 0 THEN c.total ELSE 0 END)) AS "Pagado",
+          CASE WHEN c.total > 0 THEN c.total ELSE 0 END AS "Saldo Pendiente"
+        FROM dw_vertical_pc c
+        LEFT JOIN dw_vertical_pt p ON c.ptnum = p.ptnum
+        WHERE ${pgWhere.join(' AND ')}
+        ORDER BY c.medicaldischargedate DESC NULLS LAST
+        LIMIT 5000
+      `, params);
+
+      rows = resPg.rows;
     } else if (dashboard === 'eficacia') {
       sheetName = 'Consultas_Eficacia';
       let whereCons = ["1=1"];
@@ -2660,6 +2771,8 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
         WHERE ${whereCons.join(' AND ')}
         ORDER BY Fecha DESC, Hora DESC
       `;
+      const result = await request.query(query);
+      rows = result.recordset;
     } else if (dashboard === 'eficiencia') {
       sheetName = 'Censo_Eficiencia';
       let whereClauses = ["1=1"];
@@ -2682,6 +2795,8 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
         WHERE ${whereClauses.join(' AND ')}
         ORDER BY FechaPeriodo DESC
       `;
+      const result = await request.query(query);
+      rows = result.recordset;
     } else if (dashboard === 'urgencias') {
       sheetName = 'Pacientes_Urgencias';
       let whereClauses = ["PC.PCType = 'ER'"];
@@ -2711,6 +2826,8 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
         WHERE ${whereClauses.join(' AND ')}
         ORDER BY PC.Date DESC
       `;
+      const result = await request.query(query);
+      rows = result.recordset;
     } else if (dashboard === 'quirofano') {
       sheetName = 'Cirugias_Quirofano';
       let whereClauses = ["1=1"];
@@ -2735,12 +2852,11 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
         WHERE ${whereClauses.join(' AND ')}
         ORDER BY FechaInicio DESC
       `;
+      const result = await request.query(query);
+      rows = result.recordset;
     } else {
       return res.status(400).json({ error: 'Dashboard no reconocido para exportar' });
     }
-
-    const result = await request.query(query);
-    const rows = result.recordset;
 
     // 2. Generar Excel
     const workbook = new ExcelJS.Workbook();
@@ -3294,8 +3410,17 @@ router.get('/uci-nativo', authenticate, async (req, res, next) => {
           pc.PCNum AS PCNum
         FROM PC pc
         INNER JOIN PT pt ON pc.PTNum = pt.PTNum
-        LEFT JOIN V_MRPT v ON pt.PTNum = v.PTNum
         LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
+        OUTER APPLY (
+          SELECT TOP 1 
+            pcfr.FRCode AS RoomCode,
+            pcfr.FRName AS RoomName
+          FROM PCFR pcfr
+          WHERE pcfr.PCNum = pc.PCNum
+            AND pcfr.PCFR_ST = 'AS'
+            AND pcfr.ExitDate IS NULL
+          ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
+        ) v
         WHERE pc.PC_ST = 'OP' 
           AND pc.PCType IN ('IP', 'ER')
           AND pc.MedicalDischargeDate IS NULL
@@ -4010,26 +4135,44 @@ router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR',
  */
 router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
-    let { startDate, endDate } = req.query;
+    let { startDate, endDate, search } = req.query;
 
-    if (!startDate && !endDate) {
-      const now = new Date();
-      startDate = `${now.getFullYear()}-01-01`;
-      endDate = now.toISOString().split('T')[0];
-    }
-    // Regla de negocio: Datos válidos a partir del 1 de abril de 2026
-    const minDate = new Date('2026-04-01T00:00:00');
-    if (new Date(startDate) < minDate) {
+    if (!startDate || startDate === 'undefined' || startDate === 'null' || startDate.trim() === '') {
       startDate = '2026-04-01';
     }
+    if (!endDate || endDate === 'undefined' || endDate === 'null' || endDate.trim() === '') {
+      endDate = new Date().toISOString().split('T')[0];
+    }
     
-    if (endDate && endDate.length === 10) endDate += ' 23:59:59';
+    // Regla de negocio: Datos válidos a partir del 1 de abril de 2026
+    if (startDate < '2026-04-01') {
+      startDate = '2026-04-01';
+    }
 
-    const sapStartDate = startDate.split(' ')[0];
-    const sapEndDate = endDate.split(' ')[0];
+    let sapStartDate = startDate.split(' ')[0];
+    let sapEndDate = endDate.split(' ')[0];
+
+    // Si fecha inicio es mayor que fecha fin, ordenarlas cronológicamente
+    if (sapStartDate > sapEndDate) {
+      const tmp = sapStartDate;
+      sapStartDate = sapEndDate;
+      sapEndDate = tmp;
+    }
 
     // Conexión a PostgreSQL DW
     const { pool } = require('../config/pg-db');
+
+    let inWhere = ["DocDate >= $1", "DocDate <= $2", "Canceled = 'N'"];
+    let inParams = [sapStartDate, sapEndDate];
+    let outWhere = ["DocDate >= $1", "DocDate <= $2", "Canceled = 'N'"];
+    let outParams = [sapStartDate, sapEndDate];
+
+    if (search && search.trim() !== '') {
+      inWhere.push("(CardName ILIKE $3 OR CardCode ILIKE $3 OR CAST(DocNum AS VARCHAR) ILIKE $3 OR CounterReference ILIKE $3)");
+      inParams.push(`%${search.trim()}%`);
+      outWhere.push("(CardName ILIKE $3 OR CardCode ILIKE $3 OR CAST(DocNum AS VARCHAR) ILIKE $3)");
+      outParams.push(`%${search.trim()}%`);
+    }
 
     let kpiData = {
       DocTotalIngresos: 0, CashSum: 0, CreditSum: 0, CheckSum: 0, TrsfrSum: 0, DocTotalEgresos: 0
@@ -4044,8 +4187,8 @@ router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
           SUM(CheckSum) as "CheckSum", 
           SUM(TrsfrSum) as "TrsfrSum" 
         FROM sap_incoming_payments 
-        WHERE DocDate >= $1 AND DocDate <= $2 AND Canceled = 'N'
-      `, [sapStartDate, sapEndDate]);
+        WHERE ${inWhere.join(' AND ')}
+      `, inParams);
       
       if (resKpiIngresos.rows.length > 0) {
         kpiData = { ...kpiData, ...resKpiIngresos.rows[0] };
@@ -4054,8 +4197,8 @@ router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
       const resKpiEgresos = await pool.query(`
         SELECT SUM(DocTotal) as "DocTotalEgresos" 
         FROM sap_purchase_invoices 
-        WHERE DocDate >= $1 AND DocDate <= $2 AND Canceled = 'N'
-      `, [sapStartDate, sapEndDate]);
+        WHERE ${outWhere.join(' AND ')}
+      `, outParams);
       
       if (resKpiEgresos.rows.length > 0) {
         kpiData.DocTotalEgresos = resKpiEgresos.rows[0].DocTotalEgresos || 0;
@@ -4073,17 +4216,9 @@ router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
     const totalCheques = Number(kpiData.CheckSum || 0);
     const totalTarjetas = Number(kpiData.CreditSum || 0);
 
-    const cards = [
-      { title: 'Ingresos Totales (Cobrado)', value: totalIngresos, type: 'currency', color: 'green' },
-      { title: 'Egresos Totales (Pagado)', value: totalEgresos, type: 'currency', color: 'red' },
-      { title: 'Balance General', value: balance, type: 'currency', color: balance >= 0 ? 'blue' : 'orange' }
-    ];
-
-    // El cálculo de metodosData se realizará después de poblar transacciones
-
     const transacciones = [];
 
-    // INGRESOS DESDE POSTGRESQL (Límite 150 para la UI)
+    // INGRESOS DESDE POSTGRESQL (Límite 300 para la UI)
     try {
       const resSapIn = await pool.query(`
         SELECT 
@@ -4092,10 +4227,10 @@ router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
           CreditSum as "CreditSum", CheckSum as "CheckSum", DocTotal as "DocTotal", 
           CounterReference as "CounterReference"
         FROM sap_incoming_payments
-        WHERE DocDate >= $1 AND DocDate <= $2 AND Canceled = 'N'
+        WHERE ${inWhere.join(' AND ')}
         ORDER BY DocDate DESC
-        LIMIT 150
-      `, [sapStartDate, sapEndDate]);
+        LIMIT 300
+      `, inParams);
       
       const allPayments = resSapIn.rows;
 
@@ -4128,17 +4263,17 @@ router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
       console.error("[PostgreSQL Error - Finanzas] Error fetching IncomingPayments:", e.message);
     }
 
-    // EGRESOS DESDE POSTGRESQL (Límite 150 para la UI)
+    // EGRESOS DESDE POSTGRESQL (Límite 300 para la UI)
     try {
       const resSap = await pool.query(`
         SELECT 
           DocEntry as "DocEntry", DocNum as "DocNum", DocDate as "DocDate", 
           CardCode as "CardCode", CardName as "CardName", DocTotal as "DocTotal"
         FROM sap_purchase_invoices
-        WHERE DocDate >= $1 AND DocDate <= $2 AND Canceled = 'N'
+        WHERE ${outWhere.join(' AND ')}
         ORDER BY DocDate DESC
-        LIMIT 150
-      `, [sapStartDate, sapEndDate]);
+        LIMIT 300
+      `, outParams);
       
       const sapData = resSap.rows;
       sapData.forEach(inv => {
@@ -4338,8 +4473,17 @@ router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
           pc.PCNum AS PCNum
         FROM PC pc
         INNER JOIN PT pt ON pc.PTNum = pt.PTNum
-        LEFT JOIN V_MRPT v ON pt.PTNum = v.PTNum
         LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
+        OUTER APPLY (
+          SELECT TOP 1 
+            pcfr.FRCode AS RoomCode,
+            pcfr.FRName AS RoomName
+          FROM PCFR pcfr
+          WHERE pcfr.PCNum = pc.PCNum
+            AND pcfr.PCFR_ST = 'AS'
+            AND pcfr.ExitDate IS NULL
+          ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
+        ) v
         WHERE pc.PC_ST = 'OP' 
           AND pc.PCType = 'IP'
           AND pc.MedicalDischargeDate IS NULL
