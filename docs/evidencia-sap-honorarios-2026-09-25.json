@@ -1,0 +1,429 @@
+{
+  "generatedAt": "2026-09-25T19:55:51.554Z",
+  "period": {
+    "postingFrom": "2026-09-01",
+    "postingThrough": "2026-09-25",
+    "servicePeriodNotAssumed": true
+  },
+  "readOnly": {
+    "businessReads": 30,
+    "authenticationRequests": 8,
+    "businessWrites": 0
+  },
+  "suppliers": {
+    "count": 678,
+    "rfcPopulated": 678,
+    "fiscalRegimePopulated": 0,
+    "groups": [
+      {
+        "code": 101,
+        "name": "Proveedores",
+        "count": 12
+      },
+      {
+        "code": 102,
+        "name": "GENERAL",
+        "count": 421
+      },
+      {
+        "code": 103,
+        "name": "HMEDRES",
+        "count": 100
+      },
+      {
+        "code": 104,
+        "name": "HONMED",
+        "count": 99
+      },
+      {
+        "code": 105,
+        "name": "RESICO",
+        "count": 12
+      },
+      {
+        "code": 106,
+        "name": "HONRESICO",
+        "count": 8
+      },
+      {
+        "code": 107,
+        "name": "TRANSPORTE",
+        "count": 1
+      },
+      {
+        "code": 108,
+        "name": "HONORARIOS",
+        "count": 25
+      }
+    ]
+  },
+  "providerCandidates": {
+    "verticalCount": 89,
+    "uniqueNameTokenMatches": 77,
+    "ambiguous": 0,
+    "unmatched": 12,
+    "identityConfirmed": false,
+    "companyPrivateValues": [
+      "cCompany"
+    ],
+    "rfcLength13": 77
+  },
+  "taxDisagreements": [
+    {
+      "sapCardCode": "P00329",
+      "khRate": 0,
+      "sapConfiguredRate": 0.0125,
+      "status": "Identity and effective regime pending validation"
+    },
+    {
+      "sapCardCode": "P00299",
+      "khRate": 0.1,
+      "sapConfiguredRate": 0.0125,
+      "status": "Identity and effective regime pending validation"
+    },
+    {
+      "sapCardCode": "P00511",
+      "khRate": 0,
+      "sapConfiguredRate": 0.0125,
+      "status": "Identity and effective regime pending validation"
+    },
+    {
+      "sapCardCode": "P00316",
+      "khRate": 0,
+      "sapConfiguredRate": 0.0125,
+      "status": "Identity and effective regime pending validation"
+    },
+    {
+      "sapCardCode": "P00664",
+      "khRate": 0,
+      "sapConfiguredRate": 0.0125,
+      "status": "Identity and effective regime pending validation"
+    }
+  ],
+  "withholdingCodes": [
+    {
+      "code": "1I",
+      "name": "Retención de ISR",
+      "rate": 10,
+      "baseType": "wtcbt_Net",
+      "type": "wt_IncomeTaxWithholding",
+      "account": "216-04-001"
+    },
+    {
+      "code": "1V",
+      "name": "Retención de IVA, 2/3",
+      "rate": 66.66,
+      "baseType": "wtcbt_VAT",
+      "type": "wt_VatWithholding",
+      "account": "216-10-002"
+    },
+    {
+      "code": "RES",
+      "name": "Retencion de ISR RESICO",
+      "rate": 1.25,
+      "baseType": "wtcbt_Net",
+      "type": "wt_VatWithholding",
+      "account": "216-04-001"
+    },
+    {
+      "code": "SER",
+      "name": "Retención de ISR Servicios Profesionales",
+      "rate": 10,
+      "baseType": "wtcbt_Net",
+      "type": "wt_VatWithholding",
+      "account": "216-04-001"
+    },
+    {
+      "code": "SERI",
+      "name": "Retención de IVA Servicios Profesionales",
+      "rate": 10.66,
+      "baseType": "wtcbt_Net",
+      "type": "wt_VatWithholding",
+      "account": "216-10-002"
+    }
+  ],
+  "invoices": {
+    "headersInPeriod": 570,
+    "relevantRead": 104,
+    "candidateMatched": 70,
+    "candidateProvidersWithInvoices": 60,
+    "withRetentions": 103,
+    "taxCodes": [
+      "CE"
+    ],
+    "vatSumPositive": 0,
+    "uuidFound": 0,
+    "attachmentsFound": 0,
+    "verticalReferenceFound": 0,
+    "approvalFieldFound": 0,
+    "mathConsistent": 104,
+    "retentionBaseRateDisagreements": 23,
+    "documentsWithPositiveRetentionAndZeroDeclaredBase": 12
+  },
+  "payments": {
+    "readInPeriod": 478,
+    "candidateMatched": 9,
+    "invoiceLinks": 9,
+    "example": {
+      "invoiceDocEntry": 7748,
+      "paymentDocEntry": 6458,
+      "date": "2026-09-04T00:00:00Z",
+      "amount": 9875,
+      "cardMatches": true
+    }
+  },
+  "example": {
+    "sapCardCode": "P00460",
+    "sapInvoiceDocEntry": 8041,
+    "postingDate": "2026-09-18",
+    "serviceMonthFromComments": "2026-08",
+    "supplierInvoiceReference": "F-517",
+    "postedExpense": 64206,
+    "postedVat": 0,
+    "retentionSER": 5535,
+    "retentionSERI": 5904.02,
+    "documentTotal": 52766.98,
+    "paidToDate": 0,
+    "inferredBaseFrom10PercentISR": 55350,
+    "inferredVatFromExpenseDifference": 8856,
+    "khAugust": {
+      "filas": 233,
+      "cantidad": 233,
+      "base": 52425,
+      "iva": 8388,
+      "isrMin": 0.1,
+      "isrMax": 0.1
+    },
+    "sameServicesConfirmed": false
+  },
+  "requests": [
+    {
+      "method": "POST",
+      "endpoint": "Login",
+      "status": 200,
+      "at": "2026-09-25T19:51:50.704Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/$metadata",
+      "status": 200,
+      "at": "2026-09-25T19:51:50.884Z"
+    },
+    {
+      "method": "POST",
+      "endpoint": "Logout",
+      "status": 204,
+      "at": "2026-09-25T19:51:50.922Z"
+    },
+    {
+      "method": "POST",
+      "endpoint": "Login",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.165Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/BusinessPartnerGroups",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.180Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/WithholdingTaxCodes",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.229Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/VatGroups?$select=Code,Name,Category,Inactive,VatGroups_Lines",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.241Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/BusinessPartners?$filter=[redacted]&$select=CardCode,CardName,CardType,GroupCode,FederalTaxID,CompanyPrivate,U_B1SYS_FiscRegime,U_B1SYS_SubjToTax,SubjectToWithholdingTax,BPWithholdingTaxCollection,VatLiable,VatGroup,VatGroupLatinAmerica,Valid,Frozen,AttachmentEntry&$orderby=CardCode",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.381Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/BusinessPartners?$filter=[redacted]&$select=CardCode,CardName,CardType,GroupCode,FederalTaxID,CompanyPrivate,U_B1SYS_FiscRegime,U_B1SYS_SubjToTax,SubjectToWithholdingTax,BPWithholdingTaxCollection,VatLiable,VatGroup,VatGroupLatinAmerica,Valid,Frozen,AttachmentEntry&$orderby=CardCode&$skip=200",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.524Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/BusinessPartners?$filter=[redacted]&$select=CardCode,CardName,CardType,GroupCode,FederalTaxID,CompanyPrivate,U_B1SYS_FiscRegime,U_B1SYS_SubjToTax,SubjectToWithholdingTax,BPWithholdingTaxCollection,VatLiable,VatGroup,VatGroupLatinAmerica,Valid,Frozen,AttachmentEntry&$orderby=CardCode&$skip=400",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.657Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/BusinessPartners?$filter=[redacted]&$select=CardCode,CardName,CardType,GroupCode,FederalTaxID,CompanyPrivate,U_B1SYS_FiscRegime,U_B1SYS_SubjToTax,SubjectToWithholdingTax,BPWithholdingTaxCollection,VatLiable,VatGroup,VatGroupLatinAmerica,Valid,Frozen,AttachmentEntry&$orderby=CardCode&$skip=600",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.716Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocType,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,U_PRNum,U_PR_Id,U_PCNum,U_SONum,AttachmentEntry&$orderby=DocEntry",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.833Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocType,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,U_PRNum,U_PR_Id,U_PCNum,U_SONum,AttachmentEntry&$orderby=DocEntry&$skip=200",
+      "status": 200,
+      "at": "2026-09-25T19:52:37.947Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocType,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,U_PRNum,U_PR_Id,U_PCNum,U_SONum,AttachmentEntry&$orderby=DocEntry&$skip=400",
+      "status": 200,
+      "at": "2026-09-25T19:52:38.047Z"
+    },
+    {
+      "method": "POST",
+      "endpoint": "Logout",
+      "status": 204,
+      "at": "2026-09-25T19:52:38.179Z"
+    },
+    {
+      "method": "POST",
+      "endpoint": "Login",
+      "status": 200,
+      "at": "2026-09-25T19:53:37.462Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocType,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,NumAtCard,FiscalDocNum,DocumentTaxID,FederalTaxID,EDocNum,EDocStatus,Comments,U_Pagado,U_PRNum,U_PR_Id,U_PCNum,U_SONum,U_VrtclTransactionCode,AttachmentEntry,DocumentLines,WithholdingTaxDataCollection,WithholdingTaxDataWTXCollection,DocumentInstallments,DocumentAdditionalExpenses,TotalDiscount,RoundingDiffAmount,U_MX_Mensaje,U_MX_FTimbre,U_SPM_AUTORIZADOR_N1,U_SPM_AUTORIZADOR_N2,U_SPM_DATETIME_AUTH_N1,U_SPM_DATETIME_AUTH_N2",
+      "status": 200,
+      "at": "2026-09-25T19:53:37.665Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocType,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,NumAtCard,FiscalDocNum,DocumentTaxID,FederalTaxID,EDocNum,EDocStatus,Comments,U_Pagado,U_PRNum,U_PR_Id,U_PCNum,U_SONum,U_VrtclTransactionCode,AttachmentEntry,DocumentLines,WithholdingTaxDataCollection,WithholdingTaxDataWTXCollection,DocumentInstallments,DocumentAdditionalExpenses,TotalDiscount,RoundingDiffAmount,U_MX_Mensaje,U_MX_FTimbre,U_SPM_AUTORIZADOR_N1,U_SPM_AUTORIZADOR_N2,U_SPM_DATETIME_AUTH_N1,U_SPM_DATETIME_AUTH_N2",
+      "status": 200,
+      "at": "2026-09-25T19:53:37.825Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocType,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,NumAtCard,FiscalDocNum,DocumentTaxID,FederalTaxID,EDocNum,EDocStatus,Comments,U_Pagado,U_PRNum,U_PR_Id,U_PCNum,U_SONum,U_VrtclTransactionCode,AttachmentEntry,DocumentLines,WithholdingTaxDataCollection,WithholdingTaxDataWTXCollection,DocumentInstallments,DocumentAdditionalExpenses,TotalDiscount,RoundingDiffAmount,U_MX_Mensaje,U_MX_FTimbre,U_SPM_AUTORIZADOR_N1,U_SPM_AUTORIZADOR_N2,U_SPM_DATETIME_AUTH_N1,U_SPM_DATETIME_AUTH_N2",
+      "status": 200,
+      "at": "2026-09-25T19:53:37.989Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocType,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,NumAtCard,FiscalDocNum,DocumentTaxID,FederalTaxID,EDocNum,EDocStatus,Comments,U_Pagado,U_PRNum,U_PR_Id,U_PCNum,U_SONum,U_VrtclTransactionCode,AttachmentEntry,DocumentLines,WithholdingTaxDataCollection,WithholdingTaxDataWTXCollection,DocumentInstallments,DocumentAdditionalExpenses,TotalDiscount,RoundingDiffAmount,U_MX_Mensaje,U_MX_FTimbre,U_SPM_AUTORIZADOR_N1,U_SPM_AUTORIZADOR_N2,U_SPM_DATETIME_AUTH_N1,U_SPM_DATETIME_AUTH_N2",
+      "status": 200,
+      "at": "2026-09-25T19:53:38.146Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocType,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,NumAtCard,FiscalDocNum,DocumentTaxID,FederalTaxID,EDocNum,EDocStatus,Comments,U_Pagado,U_PRNum,U_PR_Id,U_PCNum,U_SONum,U_VrtclTransactionCode,AttachmentEntry,DocumentLines,WithholdingTaxDataCollection,WithholdingTaxDataWTXCollection,DocumentInstallments,DocumentAdditionalExpenses,TotalDiscount,RoundingDiffAmount,U_MX_Mensaje,U_MX_FTimbre,U_SPM_AUTORIZADOR_N1,U_SPM_AUTORIZADOR_N2,U_SPM_DATETIME_AUTH_N1,U_SPM_DATETIME_AUTH_N2",
+      "status": 200,
+      "at": "2026-09-25T19:53:38.332Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocType,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,NumAtCard,FiscalDocNum,DocumentTaxID,FederalTaxID,EDocNum,EDocStatus,Comments,U_Pagado,U_PRNum,U_PR_Id,U_PCNum,U_SONum,U_VrtclTransactionCode,AttachmentEntry,DocumentLines,WithholdingTaxDataCollection,WithholdingTaxDataWTXCollection,DocumentInstallments,DocumentAdditionalExpenses,TotalDiscount,RoundingDiffAmount,U_MX_Mensaje,U_MX_FTimbre,U_SPM_AUTORIZADOR_N1,U_SPM_AUTORIZADOR_N2,U_SPM_DATETIME_AUTH_N1,U_SPM_DATETIME_AUTH_N2",
+      "status": 200,
+      "at": "2026-09-25T19:53:38.517Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocType,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,NumAtCard,FiscalDocNum,DocumentTaxID,FederalTaxID,EDocNum,EDocStatus,Comments,U_Pagado,U_PRNum,U_PR_Id,U_PCNum,U_SONum,U_VrtclTransactionCode,AttachmentEntry,DocumentLines,WithholdingTaxDataCollection,WithholdingTaxDataWTXCollection,DocumentInstallments,DocumentAdditionalExpenses,TotalDiscount,RoundingDiffAmount,U_MX_Mensaje,U_MX_FTimbre,U_SPM_AUTORIZADOR_N1,U_SPM_AUTORIZADOR_N2,U_SPM_DATETIME_AUTH_N1,U_SPM_DATETIME_AUTH_N2",
+      "status": 200,
+      "at": "2026-09-25T19:53:38.693Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocType,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,NumAtCard,FiscalDocNum,DocumentTaxID,FederalTaxID,EDocNum,EDocStatus,Comments,U_Pagado,U_PRNum,U_PR_Id,U_PCNum,U_SONum,U_VrtclTransactionCode,AttachmentEntry,DocumentLines,WithholdingTaxDataCollection,WithholdingTaxDataWTXCollection,DocumentInstallments,DocumentAdditionalExpenses,TotalDiscount,RoundingDiffAmount,U_MX_Mensaje,U_MX_FTimbre,U_SPM_AUTORIZADOR_N1,U_SPM_AUTORIZADOR_N2,U_SPM_DATETIME_AUTH_N1,U_SPM_DATETIME_AUTH_N2",
+      "status": 200,
+      "at": "2026-09-25T19:53:38.860Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocType,DocDate,TaxDate,DocDueDate,CardCode,CardName,DocCurrency,DocTotal,VatSum,PaidToDate,DocumentStatus,Cancelled,U_UDF_UUID,NumAtCard,FiscalDocNum,DocumentTaxID,FederalTaxID,EDocNum,EDocStatus,Comments,U_Pagado,U_PRNum,U_PR_Id,U_PCNum,U_SONum,U_VrtclTransactionCode,AttachmentEntry,DocumentLines,WithholdingTaxDataCollection,WithholdingTaxDataWTXCollection,DocumentInstallments,DocumentAdditionalExpenses,TotalDiscount,RoundingDiffAmount,U_MX_Mensaje,U_MX_FTimbre,U_SPM_AUTORIZADOR_N1,U_SPM_AUTORIZADOR_N2,U_SPM_DATETIME_AUTH_N1,U_SPM_DATETIME_AUTH_N2",
+      "status": 200,
+      "at": "2026-09-25T19:53:38.962Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/VendorPayments?$filter=[redacted]&$select=DocEntry,DocNum,DocDate,TaxDate,CardCode,CardName,DocCurrency,Cancelled,TransferSum,CashSum,TransferDate,PaymentInvoices,WithholdingTaxDataWTXCollection,PaymentAccounts,U_UDF_UUID,AttachmentEntry",
+      "status": 200,
+      "at": "2026-09-25T19:53:39.351Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/VendorPayments?$filter=[redacted]&$select=DocEntry,DocNum,DocDate,TaxDate,CardCode,CardName,DocCurrency,Cancelled,TransferSum,CashSum,TransferDate,PaymentInvoices,WithholdingTaxDataWTXCollection,PaymentAccounts,U_UDF_UUID,AttachmentEntry&$skip=200",
+      "status": 200,
+      "at": "2026-09-25T19:53:39.740Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/VendorPayments?$filter=[redacted]&$select=DocEntry,DocNum,DocDate,TaxDate,CardCode,CardName,DocCurrency,Cancelled,TransferSum,CashSum,TransferDate,PaymentInvoices,WithholdingTaxDataWTXCollection,PaymentAccounts,U_UDF_UUID,AttachmentEntry&$skip=400",
+      "status": 200,
+      "at": "2026-09-25T19:53:39.893Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseCreditNotes?$filter=[redacted]&$select=DocEntry,DocNum,DocDate,CardCode,DocTotal,Cancelled",
+      "status": 200,
+      "at": "2026-09-25T19:53:39.916Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/SalesTaxCodes",
+      "status": 200,
+      "at": "2026-09-25T19:53:39.930Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/UserFieldsMD?$filter=[redacted]&$select=Name,Description,DefaultValue,ValidValuesMD",
+      "status": 200,
+      "at": "2026-09-25T19:53:39.945Z"
+    },
+    {
+      "method": "POST",
+      "endpoint": "Logout",
+      "status": 204,
+      "at": "2026-09-25T19:53:39.987Z"
+    },
+    {
+      "method": "POST",
+      "endpoint": "Login",
+      "status": 200,
+      "at": "2026-09-25T19:54:42.587Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/ChartOfAccounts?$filter=[redacted]&$select=Code,Name",
+      "status": 200,
+      "at": "2026-09-25T19:54:42.602Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/PurchaseInvoices?$filter=[redacted]&$select=DocEntry,DocNum,DocDate,TaxDate,TransNum,JournalMemo",
+      "status": 200,
+      "at": "2026-09-25T19:54:42.613Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/JournalEntries(180727)?$select=JdtNum,ReferenceDate,TaxDate,Memo,TransactionCode,OriginalJournal,JournalEntryLines",
+      "status": 200,
+      "at": "2026-09-25T19:54:42.630Z"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/b1s/v1/JournalEntries(185894)?$select=JdtNum,ReferenceDate,TaxDate,Memo,TransactionCode,OriginalJournal,JournalEntryLines",
+      "status": 200,
+      "at": "2026-09-25T19:54:42.643Z"
+    },
+    {
+      "method": "POST",
+      "endpoint": "Logout",
+      "status": 204,
+      "at": "2026-09-25T19:54:42.681Z"
+    }
+  ]
+}

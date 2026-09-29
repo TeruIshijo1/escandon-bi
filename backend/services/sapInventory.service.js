@@ -200,7 +200,7 @@ async function syncInventoryCache() {
       usingDBFallback = false;
       console.log(`[SAP Cache SQL] Sincronización exitosa: ${globalInventoryCache.length} artículos, ${globalBatchesCache.length} lotes y ${globalMedicalClassificationMap.size} clasificaciones médicas en memoria.`);
       // Persistir snapshot en PostgreSQL para operar si SAP llega a caerse
-      persistInventorySnapshot();
+      await persistInventorySnapshot();
     }
     } catch (error) {
       console.error(`[SAP Cache SQL] Error al sincronizar inventario:`, error.message || error);
@@ -217,8 +217,9 @@ async function syncInventoryCache() {
  */
 async function persistInventorySnapshot() {
   if (!globalInventoryCache || globalInventoryCache.length === 0) return;
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
     await client.query('DELETE FROM dw_sap_inventory_cache');
     const batchSize = 500;
@@ -251,10 +252,10 @@ async function persistInventorySnapshot() {
     await client.query('COMMIT');
     console.log(`[SAP Cache SQL] Snapshot de inventario persistido en PostgreSQL (${globalInventoryCache.length} registros).`);
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.warn('[SAP Cache SQL] No se pudo persistir el snapshot de inventario:', err.message);
   } finally {
-    client.release();
+    client?.release();
   }
 }
 

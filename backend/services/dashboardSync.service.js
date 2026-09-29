@@ -294,13 +294,15 @@ async function syncProductividadMedicos(remotePool, startDateStr) {
  * 7. Sincronizar Consulta del Día
  */
 async function syncConsultaDia(remotePool, startDateStr) {
+  await pool.query(`ALTER TABLE dw_vertical_consulta_dia ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;`).catch(() => {});
   console.log(`[Sync Consulta] Sincronizando consultas del día desde ${startDateStr}...`);
   const res = await remotePool.request()
     .input('startDate', startDateStr)
     .query(`
-      SELECT Numero_Cita, Folio_Medico, Medico, MSDescription_ES, Fecha, Hora, Numero_Paciente, Paciente, Edad_Anios, Telefono_1, Celular_2, Estatus_Orden_Venta, Articulo 
-      FROM V_UDR_CONSULTA_DIA 
-      WHERE Fecha >= @startDate
+      SELECT v.Numero_Cita, v.Folio_Medico, v.Medico, v.MSDescription_ES, v.Fecha, v.Hora, v.Numero_Paciente, v.Paciente, v.Edad_Anios, v.Telefono_1, v.Celular_2, v.Estatus_Orden_Venta, v.Articulo, p.CreatedOn AS FechaCreacion 
+      FROM V_UDR_CONSULTA_DIA v
+      LEFT JOIN PCAP p ON v.Numero_Cita = p.PCAPNum
+      WHERE v.Fecha >= @startDate OR p.CreatedOn >= @startDate
     `);
 
   const records = res.recordset || [];
@@ -317,8 +319,8 @@ async function syncConsultaDia(remotePool, startDateStr) {
 
     await pool.query(`
       INSERT INTO dw_vertical_consulta_dia 
-        (numero_cita, folio_medico, medico, msdescription_es, fecha, hora, numero_paciente, paciente, edad_anios, telefono_1, celular_2, estatus_orden_venta, articulo, sync_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP)
+        (numero_cita, folio_medico, medico, msdescription_es, fecha, hora, numero_paciente, paciente, edad_anios, telefono_1, celular_2, estatus_orden_venta, articulo, fechacreacion, sync_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
       ON CONFLICT (numero_cita) DO UPDATE SET
         folio_medico = EXCLUDED.folio_medico,
         medico = EXCLUDED.medico,
@@ -332,10 +334,12 @@ async function syncConsultaDia(remotePool, startDateStr) {
         celular_2 = EXCLUDED.celular_2,
         estatus_orden_venta = EXCLUDED.estatus_orden_venta,
         articulo = EXCLUDED.articulo,
+        fechacreacion = COALESCE(EXCLUDED.fechacreacion, dw_vertical_consulta_dia.fechacreacion),
         sync_date = CURRENT_TIMESTAMP;
     `, [
       r.Numero_Cita, r.Folio_Medico, r.Medico, r.MSDescription_ES, r.Fecha, horaStr,
-      r.Numero_Paciente, r.Paciente, r.Edad_Anios, r.Telefono_1, r.Celular_2, r.Estatus_Orden_Venta, r.Articulo
+      r.Numero_Paciente, r.Paciente, r.Edad_Anios, r.Telefono_1, r.Celular_2, r.Estatus_Orden_Venta, r.Articulo,
+      r.FechaCreacion
     ]);
     count++;
   }
@@ -424,6 +428,7 @@ async function syncPayIma(remotePool, startDateStr) {
  * 10. Sincronizar Consultas Programadas (CEX)
  */
 async function syncConsultasProg(remotePool, startDateStr) {
+  await pool.query(`ALTER TABLE dw_vertical_consultas_prog ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;`).catch(() => {});
   console.log(`[Sync CEX Prog] Sincronizando agenda programada desde ${startDateStr}...`);
   const res = await remotePool.request()
     .input('startDate', startDateStr)
@@ -449,6 +454,7 @@ async function syncConsultasProg(remotePool, startDateStr) {
         c.Edad_Mes,
         c.Genero,
         c.ConsultasPreviasEjecutadas,
+        pcap.CreatedOn AS FechaCreacion,
         COALESCE(
           NULLIF(RTRIM(LTRIM(so.UDF_convenio_so)), ''),
           NULLIF(NULLIF(RTRIM(LTRIM(p.Convenio)), ''), 'N/A')
@@ -465,7 +471,7 @@ async function syncConsultasProg(remotePool, startDateStr) {
           AND RTRIM(LTRIM(bp.Convenio)) NOT IN ('', 'N/A')
         ORDER BY bp.AtencionMedica DESC
       ) p
-      WHERE c.Fecha >= @startDate
+      WHERE c.Fecha >= @startDate OR pcap.CreatedOn >= @startDate
     `);
 
   const records = res.recordset || [];
@@ -474,8 +480,8 @@ async function syncConsultasProg(remotePool, startDateStr) {
   for (const r of records) {
     await pool.query(`
       INSERT INTO dw_vertical_consultas_prog 
-        (no_cita, no_medico, medico, especialidad, nopaciente, paciente, desdefecha, hastafecha, pcap_st_descripcion, ps, dx_description_es, comentarios, telefono_1, celular_2, articulo, edad_anios, edad_mes, genero, consultas_previas, convenio, sync_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP)
+        (no_cita, no_medico, medico, especialidad, nopaciente, paciente, desdefecha, hastafecha, pcap_st_descripcion, ps, dx_description_es, comentarios, telefono_1, celular_2, articulo, edad_anios, edad_mes, genero, consultas_previas, convenio, fechacreacion, sync_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CURRENT_TIMESTAMP)
       ON CONFLICT (no_cita) DO UPDATE SET
         no_medico = EXCLUDED.no_medico,
         medico = EXCLUDED.medico,
@@ -496,9 +502,11 @@ async function syncConsultasProg(remotePool, startDateStr) {
         genero = EXCLUDED.genero,
         consultas_previas = EXCLUDED.consultas_previas,
         convenio = EXCLUDED.convenio,
+        fechacreacion = COALESCE(EXCLUDED.fechacreacion, dw_vertical_consultas_prog.fechacreacion),
         sync_date = CURRENT_TIMESTAMP;
     `, [
-      r.No_Cita, r.No_Medico, r.Medico, r.Especialidad, r.NoPaciente, r.Paciente, r.DesdeFecha, r.HastaFecha, r.PCAP_ST_Descripcion, r.PS, r.DXDescription_ES, r.Comentarios, r.Telefono_1, r.Celular_2, r.Articulo, r.Edad_Anios, r.Edad_Mes, r.Genero, r.ConsultasPreviasEjecutadas, r.Convenio
+      r.No_Cita, r.No_Medico, r.Medico, r.Especialidad, r.NoPaciente, r.Paciente, r.DesdeFecha, r.HastaFecha, r.PCAP_ST_Descripcion, r.PS, r.DXDescription_ES, r.Comentarios, r.Telefono_1, r.Celular_2, r.Articulo, r.Edad_Anios, r.Edad_Mes, r.Genero, r.ConsultasPreviasEjecutadas, r.Convenio,
+      r.FechaCreacion
     ]);
     count++;
   }
@@ -615,5 +623,6 @@ function initDashboardCron() {
 module.exports = {
   syncAllDashboards,
   initDashboardCron,
-  syncConsultasProg
+  syncConsultasProg,
+  syncConsultaDia
 };

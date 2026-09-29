@@ -213,6 +213,7 @@ async function initPostgresDW() {
         celular_2 VARCHAR(50),
         estatus_orden_venta VARCHAR(100),
         articulo VARCHAR(255),
+        fechacreacion TIMESTAMP WITH TIME ZONE,
         sync_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -270,6 +271,7 @@ async function initPostgresDW() {
         genero VARCHAR(10),
         consultas_previas INT,
         convenio VARCHAR(255),
+        fechacreacion TIMESTAMP WITH TIME ZONE,
         sync_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -679,6 +681,11 @@ async function initPostgresDW() {
     await pool.query(`ALTER TABLE dw_sap_reorder_settings ALTER COLUMN itemdescription TYPE TEXT;`).catch(() => {});
     await pool.query(`ALTER TABLE dw_sap_pedidos ALTER COLUMN cardname TYPE TEXT;`).catch(() => {});
     await pool.query(`ALTER TABLE dw_sap_pedidos ALTER COLUMN usuarionombre TYPE TEXT;`).catch(() => {});
+
+    // Migraciones para fecha de creación en CEX
+    await pool.query(`ALTER TABLE dw_vertical_consultas_prog ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;`).catch(() => {});
+    await pool.query(`ALTER TABLE dw_vertical_consulta_dia ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;`).catch(() => {});
+    await pool.query(`ALTER TABLE cex_citas ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;`).catch(() => {});
 
     // Tabla para Plantillas de Consultas Personalizadas SAP (UserSapQueries)
     await pool.query(`

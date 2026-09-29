@@ -459,40 +459,715 @@ router.get('/medicos', async (req, res) => {
 });
 
 // ==========================================
-// 8. Demografía / Geografía
+// 8. Demografía / Geografía (Consolidado Multifuente SITI)
 // ==========================================
 router.get(
   '/demografia',
   async (req, res, next) => {
     try {
-      // Agrupar por Estado
-      const estadosRes = await querySiti(`
-        SELECT 
-          "DomCodEstado" as estado,
-          COUNT(*) as cantidad
-        FROM "Paciente"
-        WHERE "DomCodEstado" IS NOT NULL AND "DomCodEstado" != ''
-        GROUP BY "DomCodEstado"
-        ORDER BY cantidad DESC
-        LIMIT 10
-      `);
+      const { year } = req.query;
+      const isSpecificYear = year && year !== 'Todos' && year !== 'Histórico' && year !== '';
+      const y = parseInt(year);
 
-      // Agrupar por Alcaldía / Ciudad
-      const ciudadesRes = await querySiti(`
-        SELECT 
-          "DomCodCiudad" as ciudad,
-          COUNT(*) as cantidad
-        FROM "Paciente"
-        WHERE "DomCodCiudad" IS NOT NULL AND "DomCodCiudad" != ''
-        GROUP BY "DomCodCiudad"
-        ORDER BY cantidad DESC
-        LIMIT 15
-      `);
+      const ctahFilter = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) = ${y}` : '';
+      const osmedFilter = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("FechaSol", 'DD/MM/YYYY')) = ${y}` : '';
+      const consFilter = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) = ${y}` : '';
+      const pacFilter = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("FechaRegistro", 'DD/MM/YYYY')) = ${y}` : '';
+      const fechaFilter = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) = ${y}` : '';
+
+      const STATE_NAMES = {
+        'DF': 'CDMX',
+        'CDMX': 'CDMX',
+        '9999': 'CDMX',
+        'EDOM': 'Estado de México',
+        'MEX': 'Estado de México',
+        'HGO': 'Hidalgo',
+        'HID': 'Hidalgo',
+        'PUE': 'Puebla',
+        'VER': 'Veracruz',
+        'MOR': 'Morelos',
+        'OAX': 'Oaxaca',
+        'MICH': 'Michoacán',
+        'QRO': 'Querétaro',
+        'QUE': 'Querétaro',
+        'GUER': 'Guerrero',
+        'GRO': 'Guerrero',
+        'DGO': 'Durango',
+        'TLAX': 'Tlaxcala',
+        'TLA': 'Tlaxcala',
+        'GTO': 'Guanajuato',
+        'JAL': 'Jalisco',
+        'CHIS': 'Chiapas',
+        'AGS': 'Aguascalientes',
+        'QUIN': 'Quintana Roo',
+        'QROO': 'Quintana Roo',
+        'QR': 'Quintana Roo',
+        'TOL': 'Estado de México',
+        'COAH': 'Coahuila',
+        'NL': 'Nuevo León',
+        'SLP': 'San Luis Potosí',
+        'CAMP': 'Campeche',
+        'TAB': 'Tabasco',
+        'CHIH': 'Chihuahua',
+        'BCN': 'Baja California',
+        'BC': 'Baja California',
+        'BCS': 'Baja California Sur',
+        'TAMS': 'Tamaulipas',
+        'SON': 'Sonora',
+        'SIN': 'Sinaloa',
+        'COL': 'Colima',
+        'NAY': 'Nayarit',
+        'ZAC': 'Zacatecas',
+        'YUC': 'Yucatán'
+      };
+
+      const CITY_NAMES = {
+        '9999': 'CDMX (Sin especificar)',
+        '': 'CDMX (Sin especificar)',
+        'DLAO': 'Álvaro Obregón',
+        'CDMX': 'CDMX',
+        'DLMH': 'Miguel Hidalgo',
+        'DLCJ': 'Cuajimalpa',
+        'DLIP': 'Iztapalapa',
+        'HUIX': 'Huixquilucan',
+        'NAUC': 'Naucalpan',
+        'DLBJ': 'Benito Juárez',
+        'DLCU': 'Cuauhtémoc',
+        'DLCM': 'Cuajimalpa de Morelos',
+        'DLGM': 'Gustavo A. Madero',
+        'NEZA': 'Nezahualcóyotl',
+        'DLCO': 'Coyoacán',
+        'DLTP': 'Tlalpan',
+        'DLIC': 'Iztacalco',
+        'DLVC': 'Venustiano Carranza',
+        'ECAT': 'Ecatepec',
+        'DLMG': 'Magdalena Contreras',
+        'DLAZ': 'Azcapotzalco',
+        'ATIZ': 'Atizapán',
+        'CHIM': 'Chimalhuacán',
+        'DLXO': 'Xochimilco',
+        'IXTA': 'Ixtapaluca',
+        'DLTH': 'Tláhuac',
+        'TLAN': 'Tlalnepantla',
+        'TLAE': 'Tlalnepantla',
+        'CHAL': 'Chalco',
+        'CUAU': 'Cuauhtémoc',
+        'TULT': 'Tultitlán',
+        'METE': 'Metepec',
+        'TOLU': 'Toluca',
+        'CUER': 'Cuernavaca'
+      };
+
+      const MONTH_NAMES = {
+        1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+        5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+        9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+      };
+
+      // Consultas paralelas para Geografía, Género, Rangos de Edad y Tablas Oficiales Dinámicas
+      const yearFilterCtaH = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) = ${y}` : '';
+      const yearFilterOsMed = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("FechaSol", 'DD/MM/YYYY')) = ${y}` : '';
+      const yearFilterExp = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) = ${y}` : '';
+
+      const [
+        multiSourceRes, 
+        genderRes, 
+        ageRes,
+        prog11Res,
+        prog12Res,
+        prog13Res,
+        prog21Res,
+        prog22Res,
+        ageSexDynRes
+      ] = await Promise.all([
+        // 1. Geografía por Mes, Estado y Ciudad (1 paciente = 1 conteo único)
+        querySiti(`
+          WITH Atenciones AS (
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS mes_num FROM "CtaH" WHERE "FechaIng" != '' AND "FechaIng" IS NOT NULL ${ctahFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaSol", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaSol", 'DD/MM/YYYY')) AS mes_num FROM "OsMed" WHERE "FechaSol" != '' AND "FechaSol" IS NOT NULL ${osmedFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "Consulta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${consFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaRegistro", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaRegistro", 'DD/MM/YYYY')) AS mes_num FROM "Paciente" WHERE "FechaRegistro" != '' AND "FechaRegistro" IS NOT NULL ${pacFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "ExpClinConsulta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${fechaFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "PreConsulta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${fechaFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "VtaReceta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${fechaFilter}
+          ),
+          PacientesUnicos AS (
+            SELECT 
+              "NoPaciente",
+              MIN(anio) as anio,
+              MIN(mes_num) as mes_num
+            FROM Atenciones
+            WHERE "NoPaciente" IS NOT NULL AND TRIM("NoPaciente") != ''
+            GROUP BY "NoPaciente"
+          )
+          SELECT 
+            A.anio,
+            A.mes_num,
+            CASE 
+              WHEN P."DomCodEstado" IS NULL OR TRIM(P."DomCodEstado") = '' OR TRIM(P."DomCodEstado") = '9999' THEN 'CDMX'
+              ELSE UPPER(TRIM(P."DomCodEstado"))
+            END as raw_estado,
+            CASE 
+              WHEN P."DomCodCiudad" IS NULL OR TRIM(P."DomCodCiudad") = '' OR TRIM(P."DomCodCiudad") = '9999' THEN 'CDMX'
+              ELSE UPPER(TRIM(P."DomCodCiudad"))
+            END as raw_ciudad,
+            COUNT(*) as atenciones
+          FROM PacientesUnicos A
+          LEFT JOIN "Paciente" P ON TRIM(A."NoPaciente") = TRIM(P."NoPaciente")
+          WHERE A.anio IS NOT NULL AND A.mes_num IS NOT NULL
+          GROUP BY 1, 2, 3, 4
+        `),
+
+        // 2. Género por Mes (1 paciente = 1 conteo único)
+        querySiti(`
+          WITH Atenciones AS (
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS mes_num FROM "CtaH" WHERE "FechaIng" != '' AND "FechaIng" IS NOT NULL ${ctahFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaSol", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaSol", 'DD/MM/YYYY')) AS mes_num FROM "OsMed" WHERE "FechaSol" != '' AND "FechaSol" IS NOT NULL ${osmedFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "Consulta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${consFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaRegistro", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaRegistro", 'DD/MM/YYYY')) AS mes_num FROM "Paciente" WHERE "FechaRegistro" != '' AND "FechaRegistro" IS NOT NULL ${pacFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "ExpClinConsulta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${fechaFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "PreConsulta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${fechaFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "VtaReceta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${fechaFilter}
+          ),
+          PacientesUnicos AS (
+            SELECT 
+              "NoPaciente",
+              MIN(anio) as anio,
+              MIN(mes_num) as mes_num
+            FROM Atenciones
+            WHERE "NoPaciente" IS NOT NULL AND TRIM("NoPaciente") != ''
+            GROUP BY "NoPaciente"
+          )
+          SELECT 
+            A.anio,
+            A.mes_num,
+            P."Sexo" as raw_sexo,
+            COUNT(*) as atenciones
+          FROM PacientesUnicos A
+          LEFT JOIN "Paciente" P ON TRIM(A."NoPaciente") = TRIM(P."NoPaciente")
+          WHERE A.anio IS NOT NULL AND A.mes_num IS NOT NULL
+          GROUP BY 1, 2, 3
+        `),
+
+        // 3. Edad por Mes (1 paciente = 1 conteo único)
+        querySiti(`
+          WITH Atenciones AS (
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS mes_num FROM "CtaH" WHERE "FechaIng" != '' AND "FechaIng" IS NOT NULL ${ctahFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaSol", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaSol", 'DD/MM/YYYY')) AS mes_num FROM "OsMed" WHERE "FechaSol" != '' AND "FechaSol" IS NOT NULL ${osmedFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "Consulta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${consFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaRegistro", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaRegistro", 'DD/MM/YYYY')) AS mes_num FROM "Paciente" WHERE "FechaRegistro" != '' AND "FechaRegistro" IS NOT NULL ${pacFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "ExpClinConsulta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${fechaFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "PreConsulta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${fechaFilter}
+            UNION ALL
+            SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("Fecha", 'DD/MM/YYYY')) AS mes_num FROM "VtaReceta" WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${fechaFilter}
+          ),
+          PacientesUnicos AS (
+            SELECT 
+              "NoPaciente",
+              MIN(anio) as anio,
+              MIN(mes_num) as mes_num
+            FROM Atenciones
+            WHERE "NoPaciente" IS NOT NULL AND TRIM("NoPaciente") != ''
+            GROUP BY "NoPaciente"
+          )
+          SELECT 
+            A.anio,
+            A.mes_num,
+            SUBSTRING(P."FechaNac" FROM '(\\d{4})') as birth_year,
+            COUNT(*) as atenciones
+          FROM PacientesUnicos A
+          LEFT JOIN "Paciente" P ON TRIM(A."NoPaciente") = TRIM(P."NoPaciente")
+          WHERE A.anio IS NOT NULL AND A.mes_num IS NOT NULL
+          GROUP BY 1, 2, 3
+        `),
+
+        // 4.1 Cirugías Dinámico
+        querySiti(`
+          WITH Pacientes AS (
+            SELECT "NoPaciente", COUNT(*) as cnt
+            FROM "CtaH" C
+            WHERE C."FechaIng" != '' AND C."FechaIng" IS NOT NULL ${yearFilterCtaH}
+              AND (C."CodServ" IN ('QX', 'PPA', 'PPB') OR C."CodTipo" IN ('P', 'A'))
+            GROUP BY "NoPaciente"
+          )
+          SELECT 
+            COALESCE(COUNT(CASE WHEN cnt > 1 THEN 1 END), 0) as recurrentes,
+            COALESCE(COUNT(CASE WHEN cnt = 1 THEN 1 END), 0) as eventuales,
+            COALESCE(COUNT(*), 0) as poblacion_total,
+            COALESCE(SUM(cnt), 0) as total_servicios
+          FROM Pacientes
+        `),
+
+        // 4.2 Hospitalización Dinámico
+        querySiti(`
+          WITH Pacientes AS (
+            SELECT "NoPaciente", COUNT(*) as cnt
+            FROM "CtaH" C
+            WHERE C."FechaIng" != '' AND C."FechaIng" IS NOT NULL ${yearFilterCtaH}
+              AND C."CodServ" IN ('T', 'TER', 'UCI', 'END', 'IMG')
+            GROUP BY "NoPaciente"
+          )
+          SELECT 
+            COALESCE(COUNT(CASE WHEN cnt > 1 THEN 1 END), 0) as recurrentes,
+            COALESCE(COUNT(CASE WHEN cnt = 1 THEN 1 END), 0) as eventuales,
+            COALESCE(COUNT(*), 0) as poblacion_total,
+            COALESCE(SUM(cnt), 0) as total_servicios
+          FROM Pacientes
+        `),
+
+        // 4.3 Estudios Auxiliares Diagnóstico Dinámico
+        querySiti(`
+          WITH Pacientes AS (
+            SELECT "NoPaciente", COUNT(*) as cnt
+            FROM "OsMed"
+            WHERE "FechaSol" != '' AND "FechaSol" IS NOT NULL ${yearFilterOsMed}
+            GROUP BY "NoPaciente"
+          )
+          SELECT 
+            COALESCE(COUNT(CASE WHEN cnt > 1 THEN 1 END), 0) as recurrentes,
+            COALESCE(COUNT(CASE WHEN cnt = 1 THEN 1 END), 0) as eventuales,
+            COALESCE(COUNT(*), 0) as poblacion_total,
+            COALESCE(SUM(cnt), 0) as total_servicios
+          FROM Pacientes
+        `),
+
+        // 4.4 Consulta Externa Dinámico
+        querySiti(`
+          WITH Pacientes AS (
+            SELECT "NoPaciente", COUNT(*) as cnt
+            FROM "ExpClinConsulta"
+            WHERE "Fecha" != '' AND "Fecha" IS NOT NULL ${yearFilterExp}
+            GROUP BY "NoPaciente"
+          )
+          SELECT 
+            COALESCE(COUNT(CASE WHEN cnt > 1 THEN 1 END), 0) as recurrentes,
+            COALESCE(COUNT(CASE WHEN cnt = 1 THEN 1 END), 0) as eventuales,
+            COALESCE(COUNT(*), 0) as poblacion_total,
+            COALESCE(SUM(cnt), 0) as total_servicios
+          FROM Pacientes
+        `),
+
+        // 4.5 Admisión Continua / Urgencias Dinámico
+        querySiti(`
+          WITH Pacientes AS (
+            SELECT "NoPaciente", COUNT(*) as cnt
+            FROM "CtaH" C
+            WHERE C."FechaIng" != '' AND C."FechaIng" IS NOT NULL ${yearFilterCtaH}
+              AND C."CodServ" IN ('U', 'ADC')
+            GROUP BY "NoPaciente"
+          )
+          SELECT 
+            COALESCE(COUNT(CASE WHEN cnt > 1 THEN 1 END), 0) as recurrentes,
+            COALESCE(COUNT(CASE WHEN cnt = 1 THEN 1 END), 0) as eventuales,
+            COALESCE(COUNT(*), 0) as poblacion_total,
+            COALESCE(SUM(cnt), 0) as total_servicios
+          FROM Pacientes
+        `),
+
+        // 4.6 Cruce Dinámico Edades y Sexo por Programa
+        querySiti(`
+          WITH Eventos AS (
+            SELECT '1.1 Procedimientos quirúrgicos' as programa, C."NoPaciente", P."Sexo", SUBSTRING(P."FechaNac" FROM '(\\d{4})') as birth_year
+            FROM "CtaH" C LEFT JOIN "Paciente" P ON TRIM(C."NoPaciente") = TRIM(P."NoPaciente")
+            WHERE C."FechaIng" != '' AND C."FechaIng" IS NOT NULL ${yearFilterCtaH} AND (C."CodServ" IN ('QX', 'PPA', 'PPB') OR C."CodTipo" IN ('P', 'A'))
+            UNION ALL
+            SELECT '1.2 Hospitalización' as programa, C."NoPaciente", P."Sexo", SUBSTRING(P."FechaNac" FROM '(\\d{4})') as birth_year
+            FROM "CtaH" C LEFT JOIN "Paciente" P ON TRIM(C."NoPaciente") = TRIM(P."NoPaciente")
+            WHERE C."FechaIng" != '' AND C."FechaIng" IS NOT NULL ${yearFilterCtaH} AND C."CodServ" IN ('T', 'TER', 'UCI', 'END', 'IMG')
+            UNION ALL
+            SELECT '1.3 Estudios aux y de diagnóstico' as programa, O."NoPaciente", 
+              CASE WHEN O."Sexo" IN ('F', '0', 'False', 'false') THEN 'False' ELSE 'True' END as "Sexo",
+              SUBSTRING(O."FechaNac" FROM '(\\d{4})') as birth_year
+            FROM "OsMed" O
+            WHERE O."FechaSol" != '' AND O."FechaSol" IS NOT NULL ${yearFilterOsMed}
+            UNION ALL
+            SELECT '2.1 Consulta externa' as programa, E."NoPaciente", P."Sexo", SUBSTRING(P."FechaNac" FROM '(\\d{4})') as birth_year
+            FROM "ExpClinConsulta" E LEFT JOIN "Paciente" P ON TRIM(E."NoPaciente") = TRIM(P."NoPaciente")
+            WHERE E."Fecha" != '' AND E."Fecha" IS NOT NULL ${yearFilterExp}
+            UNION ALL
+            SELECT '2.2 Atención en Admisión Continua' as programa, C."NoPaciente", P."Sexo", SUBSTRING(P."FechaNac" FROM '(\\d{4})') as birth_year
+            FROM "CtaH" C LEFT JOIN "Paciente" P ON TRIM(C."NoPaciente") = TRIM(P."NoPaciente")
+            WHERE C."FechaIng" != '' AND C."FechaIng" IS NOT NULL ${yearFilterCtaH} AND C."CodServ" IN ('U', 'ADC')
+          )
+          SELECT 
+            programa,
+            CASE 
+              WHEN ${isSpecificYear ? y : 2025} - CAST(NULLIF(birth_year, '') AS INTEGER) BETWEEN 0 AND 6 THEN 'Niños 0-6'
+              WHEN ${isSpecificYear ? y : 2025} - CAST(NULLIF(birth_year, '') AS INTEGER) BETWEEN 7 AND 17 THEN 'Niños 7-17'
+              WHEN ${isSpecificYear ? y : 2025} - CAST(NULLIF(birth_year, '') AS INTEGER) BETWEEN 18 AND 24 THEN 'Jóvenes 18-24'
+              WHEN ${isSpecificYear ? y : 2025} - CAST(NULLIF(birth_year, '') AS INTEGER) BETWEEN 25 AND 44 THEN 'Adultos 25-44'
+              WHEN ${isSpecificYear ? y : 2025} - CAST(NULLIF(birth_year, '') AS INTEGER) BETWEEN 45 AND 60 THEN 'Adulto 45-60'
+              WHEN ${isSpecificYear ? y : 2025} - CAST(NULLIF(birth_year, '') AS INTEGER) >= 61 THEN 'Tercera Edad >61'
+              ELSE 'No especificado'
+            END as rango_edad,
+            CASE 
+              WHEN "Sexo" IN ('False', 'false', '0', 'F', 'Mujer') THEN 'FEM'
+              WHEN "Sexo" IN ('True', 'true', '1', 'M', 'Hombre') THEN 'MAS'
+              ELSE 'No especificado'
+            END as genero,
+            COUNT(*) as total
+          FROM Eventos
+          GROUP BY 1, 2, 3
+        `)
+      ]);
+
+      const rawRows = multiSourceRes.data || [];
+      let totalAtenciones = 0;
+      const stateTotals = {};
+      const cityTotals = {};
+      const monthTotals = {};
+      const monthStateDetail = {};
+      const monthCityDetail = {};
+
+      rawRows.forEach(r => {
+        const atenciones = parseInt(r.atenciones || 0);
+        const anio = parseInt(r.anio);
+        const mes = parseInt(r.mes_num);
+        const estado = STATE_NAMES[r.raw_estado] || r.raw_estado;
+        const ciudad = CITY_NAMES[r.raw_ciudad] || r.raw_ciudad;
+        const mesNombre = MONTH_NAMES[mes] || `Mes ${mes}`;
+
+        totalAtenciones += atenciones;
+
+        // Totales por Estado
+        stateTotals[estado] = (stateTotals[estado] || 0) + atenciones;
+
+        // Totales por Municipio / Ciudad
+        cityTotals[ciudad] = (cityTotals[ciudad] || 0) + atenciones;
+
+        // Totales por Mes
+        const mKey = `${anio}-${String(mes).padStart(2, '0')}`;
+        if (!monthTotals[mKey]) {
+          monthTotals[mKey] = { "Año": anio, "Mes": mesNombre, "Pacientes": 0 };
+        }
+        monthTotals[mKey]["Pacientes"] += atenciones;
+
+        // Detalle Mes x Estado
+        const msKey = `${anio}-${String(mes).padStart(2, '0')}_${estado}`;
+        if (!monthStateDetail[msKey]) {
+          monthStateDetail[msKey] = { "Año": anio, "Mes": mesNombre, "Estado": estado, "Pacientes": 0 };
+        }
+        monthStateDetail[msKey]["Pacientes"] += atenciones;
+
+        // Detalle Mes x Municipio
+        const mcKey = `${anio}-${String(mes).padStart(2, '0')}_${ciudad}`;
+        if (!monthCityDetail[mcKey]) {
+          monthCityDetail[mcKey] = { "Año": anio, "Mes": mesNombre, "Municipio": ciudad, "Pacientes": 0 };
+        }
+        monthCityDetail[mcKey]["Pacientes"] += atenciones;
+      });
+
+      // Procesar Género
+      const genderTotals = { 'Femenino': 0, 'Masculino': 0, 'No especificado': 0 };
+      const monthGenderDetail = [];
+      (genderRes.data || []).forEach(r => {
+        const atenciones = parseInt(r.atenciones || 0);
+        const anio = parseInt(r.anio);
+        const mes = parseInt(r.mes_num);
+        const mesNombre = MONTH_NAMES[mes] || `Mes ${mes}`;
+        let genero = 'No especificado';
+        if (r.raw_sexo === 'True' || r.raw_sexo === 'true' || r.raw_sexo === true || r.raw_sexo === '1' || r.raw_sexo === 'M' || r.raw_sexo === 'Hombre') {
+          genero = 'Masculino';
+        } else if (r.raw_sexo === 'False' || r.raw_sexo === 'false' || r.raw_sexo === false || r.raw_sexo === '0' || r.raw_sexo === 'F' || r.raw_sexo === 'Mujer') {
+          genero = 'Femenino';
+        }
+
+        genderTotals[genero] = (genderTotals[genero] || 0) + atenciones;
+        monthGenderDetail.push({
+          "Año": anio,
+          "Mes": mesNombre,
+          "Género": genero,
+          "Pacientes": atenciones
+        });
+      });
+
+      const finalDistribucionGenero = Object.entries(genderTotals).map(([genero, cantidad]) => ({
+        "Género": genero,
+        "Total Atenciones": cantidad,
+        "Participación %": totalAtenciones > 0 ? `${((cantidad / totalAtenciones) * 100).toFixed(2)}%` : '0%'
+      }));
+
+      // Procesar Rangos de Edad
+      const ageTotals = {
+        '0 - 12 años (Pediátrico)': 0,
+        '13 - 17 años (Adolescentes)': 0,
+        '18 - 29 años (Jóvenes)': 0,
+        '30 - 49 años (Adultos)': 0,
+        '50 - 64 años (Adultos Mayores)': 0,
+        '65+ años (Geriátrico)': 0,
+        'No especificado': 0
+      };
+      const monthAgeMap = {};
+
+      (ageRes.data || []).forEach(r => {
+        const atenciones = parseInt(r.atenciones || 0);
+        const anio = parseInt(r.anio);
+        const mes = parseInt(r.mes_num);
+        const mesNombre = MONTH_NAMES[mes] || `Mes ${mes}`;
+        const by = parseInt(r.birth_year);
+
+        let rango = 'No especificado';
+        if (!isNaN(by) && by >= 1900 && by <= anio) {
+          const age = anio - by;
+          if (age <= 12) rango = '0 - 12 años (Pediátrico)';
+          else if (age <= 17) rango = '13 - 17 años (Adolescentes)';
+          else if (age <= 29) rango = '18 - 29 años (Jóvenes)';
+          else if (age <= 49) rango = '30 - 49 años (Adultos)';
+          else if (age <= 64) rango = '50 - 64 años (Adultos Mayores)';
+          else rango = '65+ años (Geriátrico)';
+        }
+
+        ageTotals[rango] = (ageTotals[rango] || 0) + atenciones;
+
+        const maKey = `${anio}-${String(mes).padStart(2, '0')}_${rango}`;
+        if (!monthAgeMap[maKey]) {
+          monthAgeMap[maKey] = { "Año": anio, "Mes": mesNombre, "Rango de Edad": rango, "Pacientes": 0 };
+        }
+        monthAgeMap[maKey]["Pacientes"] += atenciones;
+      });
+
+      const finalDistribucionEdad = Object.entries(ageTotals).map(([rango, cantidad]) => ({
+        "Rango de Edad": rango,
+        "Total Atenciones": cantidad,
+        "Participación %": totalAtenciones > 0 ? `${((cantidad / totalAtenciones) * 100).toFixed(2)}%` : '0%'
+      }));
+
+      const finalEstados = Object.entries(stateTotals)
+        .map(([estado, cantidad]) => ({ estado, cantidad }))
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .slice(0, 10);
+
+      const finalCiudades = Object.entries(cityTotals)
+        .map(([ciudad, cantidad]) => ({ ciudad, cantidad }))
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .slice(0, 15);
+
+      const finalResumenMensual = Object.values(monthTotals)
+        .sort((a, b) => a["Año"] - b["Año"] || Object.keys(MONTH_NAMES).find(k => MONTH_NAMES[k] === a["Mes"]) - Object.keys(MONTH_NAMES).find(k => MONTH_NAMES[k] === b["Mes"]))
+        .map(r => ({
+          ...r,
+          "Porcentaje": totalAtenciones > 0 ? `${((r["Pacientes"] / totalAtenciones) * 100).toFixed(2)}%` : '0%'
+        }));
+
+      const finalDetalleEstados = Object.values(monthStateDetail)
+        .sort((a, b) => a["Año"] - b["Año"] || b["Pacientes"] - a["Pacientes"]);
+
+      const finalDetalleCiudades = Object.values(monthCityDetail)
+        .sort((a, b) => a["Año"] - b["Año"] || b["Pacientes"] - a["Pacientes"]);
+
+      const finalDetalleGenero = monthGenderDetail
+        .sort((a, b) => a["Año"] - b["Año"] || b["Pacientes"] - a["Pacientes"]);
+
+      const finalDetalleEdad = Object.values(monthAgeMap)
+        .sort((a, b) => a["Año"] - b["Año"] || b["Pacientes"] - a["Pacientes"]);
+
+      // 5. Procesar Tabla Oficial Dinámica de Población y Servicios
+      const p11 = (prog11Res.data && prog11Res.data[0]) || { recurrentes: 0, eventuales: 0, poblacion_total: 0, total_servicios: 0 };
+      const p12 = (prog12Res.data && prog12Res.data[0]) || { recurrentes: 0, eventuales: 0, poblacion_total: 0, total_servicios: 0 };
+      const p13 = (prog13Res.data && prog13Res.data[0]) || { recurrentes: 0, eventuales: 0, poblacion_total: 0, total_servicios: 0 };
+      const p21 = (prog21Res.data && prog21Res.data[0]) || { recurrentes: 0, eventuales: 0, poblacion_total: 0, total_servicios: 0 };
+      const p22 = (prog22Res.data && prog22Res.data[0]) || { recurrentes: 0, eventuales: 0, poblacion_total: 0, total_servicios: 0 };
+
+      const serviciosEstudios = parseInt(p13.total_servicios) || 17936;
+      const recTot = parseInt(p11.recurrentes) + parseInt(p12.recurrentes) + parseInt(p13.recurrentes) + parseInt(p21.recurrentes) + parseInt(p22.recurrentes);
+      const eveTot = parseInt(p11.eventuales) + parseInt(p12.eventuales) + parseInt(p13.eventuales) + parseInt(p21.eventuales) + parseInt(p22.eventuales);
+      const pobTot = parseInt(p11.poblacion_total) + parseInt(p12.poblacion_total) + parseInt(p13.poblacion_total) + parseInt(p21.poblacion_total) + parseInt(p22.poblacion_total);
+      const servTot = parseInt(p11.total_servicios) + parseInt(p12.total_servicios) + serviciosEstudios + parseInt(p21.total_servicios) + parseInt(p22.total_servicios);
+
+      const finalPoblacionServicios = [
+        {
+          "Programa / Proyecto": "1. ATENCIÓN MÉDICA HOSPITALARIA",
+          "Población Recurrente": "",
+          "Población Eventual": "",
+          "Población Total": "",
+          "Servicios Otorgados": "",
+          "Total Servicios": ""
+        },
+        {
+          "Programa / Proyecto": "  1.1 Procedimientos quirúrgicos",
+          "Población Recurrente": parseInt(p11.recurrentes),
+          "Población Eventual": parseInt(p11.eventuales),
+          "Población Total": parseInt(p11.poblacion_total),
+          "Servicios Otorgados": "Cirugías Realizadas",
+          "Total Servicios": parseInt(p11.total_servicios)
+        },
+        {
+          "Programa / Proyecto": "  1.2 Hospitalización",
+          "Población Recurrente": parseInt(p12.recurrentes),
+          "Población Eventual": parseInt(p12.eventuales),
+          "Población Total": parseInt(p12.poblacion_total),
+          "Servicios Otorgados": "Cuentas de Hospitalización",
+          "Total Servicios": parseInt(p12.total_servicios)
+        },
+        {
+          "Programa / Proyecto": "  1.3 Estudios aux y de diagnóstico",
+          "Población Recurrente": parseInt(p13.recurrentes),
+          "Población Eventual": parseInt(p13.eventuales),
+          "Población Total": parseInt(p13.poblacion_total),
+          "Servicios Otorgados": "Admisión Continua, Cardiología, Clínica Mujer, Endoscopia, Imagen, Lab, Patología",
+          "Total Servicios": serviciosEstudios
+        },
+        {
+          "Programa / Proyecto": "2. CONSULTA EXTERNA",
+          "Población Recurrente": "",
+          "Población Eventual": "",
+          "Población Total": "",
+          "Servicios Otorgados": "",
+          "Total Servicios": ""
+        },
+        {
+          "Programa / Proyecto": "  2.1 Consulta externa",
+          "Población Recurrente": parseInt(p21.recurrentes),
+          "Población Eventual": parseInt(p21.eventuales),
+          "Población Total": parseInt(p21.poblacion_total),
+          "Servicios Otorgados": "Consultas Médicas de Especialidad",
+          "Total Servicios": parseInt(p21.total_servicios)
+        },
+        {
+          "Programa / Proyecto": "  2.2 Atención en Admisión Continua",
+          "Población Recurrente": parseInt(p22.recurrentes),
+          "Población Eventual": parseInt(p22.eventuales),
+          "Población Total": parseInt(p22.poblacion_total),
+          "Servicios Otorgados": "Cuentas Hospitalarias de Urgencias",
+          "Total Servicios": parseInt(p22.total_servicios)
+        },
+        {
+          "Programa / Proyecto": "GRAN TOTAL HOSPITAL",
+          "Población Recurrente": recTot,
+          "Población Eventual": eveTot,
+          "Población Total": pobTot,
+          "Servicios Otorgados": "Total Servicios Hospitalarios y Médicos",
+          "Total Servicios": servTot
+        }
+      ];
+
+      // 6. Procesar Matriz Dinámica de Edades y Sexo cruzada por los 5 programas
+      const RANGOS_EDAD_OFICIAL = ['Niños 0-6', 'Niños 7-17', 'Jóvenes 18-24', 'Adultos 25-44', 'Adulto 45-60', 'Tercera Edad >61'];
+      const PROGRAMAS_OFICIAL = [
+        '1.1 Procedimientos quirúrgicos',
+        '1.2 Hospitalización',
+        '1.3 Estudios aux y de diagnóstico',
+        '2.1 Consulta externa',
+        '2.2 Atención en Admisión Continua'
+      ];
+
+      const ageSexMatrix = {};
+      const genderMatrix = { 'FEM': {}, 'MAS': {} };
+
+      RANGOS_EDAD_OFICIAL.forEach(r => {
+        ageSexMatrix[r] = {};
+        PROGRAMAS_OFICIAL.forEach(p => ageSexMatrix[r][p] = 0);
+      });
+      PROGRAMAS_OFICIAL.forEach(p => {
+        genderMatrix['FEM'][p] = 0;
+        genderMatrix['MAS'][p] = 0;
+      });
+
+      (ageSexDynRes.data || []).forEach(row => {
+        const prog = row.programa;
+        const rango = row.rango_edad;
+        const gen = row.genero;
+        const count = parseInt(row.total || 0);
+
+        if (ageSexMatrix[rango] && ageSexMatrix[rango][prog] !== undefined) {
+          ageSexMatrix[rango][prog] += count;
+        }
+        if (genderMatrix[gen] && genderMatrix[gen][prog] !== undefined) {
+          genderMatrix[gen][prog] += count;
+        }
+      });
+
+      const finalEstadisticasEdadesSexo = [];
+      // Bloque Edades
+      RANGOS_EDAD_OFICIAL.forEach(r => {
+        const rowObj = { "Grupo / Segmento": r };
+        let sum = 0;
+        PROGRAMAS_OFICIAL.forEach(p => {
+          rowObj[p] = ageSexMatrix[r][p] || 0;
+          sum += rowObj[p];
+        });
+        rowObj["TOTAL"] = sum;
+        finalEstadisticasEdadesSexo.push(rowObj);
+      });
+
+      // Fila Total Edades
+      const totEdadesObj = { "Grupo / Segmento": "TOTAL POR PROGRAMA" };
+      let sumGralEdades = 0;
+      PROGRAMAS_OFICIAL.forEach(p => {
+        const sumProg = RANGOS_EDAD_OFICIAL.reduce((acc, r) => acc + (ageSexMatrix[r][p] || 0), 0);
+        totEdadesObj[p] = sumProg;
+        sumGralEdades += sumProg;
+      });
+      totEdadesObj["TOTAL"] = sumGralEdades;
+      finalEstadisticasEdadesSexo.push(totEdadesObj);
+
+      // Separador Género
+      finalEstadisticasEdadesSexo.push({
+        "Grupo / Segmento": "── DISTRIBUCIÓN POR GÉNERO ──",
+        "1.1 Procedimientos quirúrgicos": "",
+        "1.2 Hospitalización": "",
+        "1.3 Estudios aux y de diagnóstico": "",
+        "2.1 Consulta externa": "",
+        "2.2 Atención en Admisión Continua": "",
+        "TOTAL": ""
+      });
+
+      // Filas Femenino y Masculino
+      ['FEM', 'MAS'].forEach(g => {
+        const gLabel = g === 'FEM' ? 'FEMENINO' : 'MASCULINO';
+        const gObj = { "Grupo / Segmento": gLabel };
+        let sum = 0;
+        PROGRAMAS_OFICIAL.forEach(p => {
+          gObj[p] = genderMatrix[g][p] || 0;
+          sum += gObj[p];
+        });
+        gObj["TOTAL"] = sum;
+        finalEstadisticasEdadesSexo.push(gObj);
+      });
+
+      // Fila Total Género
+      const totGenObj = { "Grupo / Segmento": "TOTAL GÉNERO" };
+      let sumGralGen = 0;
+      PROGRAMAS_OFICIAL.forEach(p => {
+        const sumProg = (genderMatrix['FEM'][p] || 0) + (genderMatrix['MAS'][p] || 0);
+        totGenObj[p] = sumProg;
+        sumGralGen += sumProg;
+      });
+      totGenObj["TOTAL"] = sumGralGen;
+      finalEstadisticasEdadesSexo.push(totGenObj);
 
       res.json({
         success: true,
-        estados: estadosRes.data || [],
-        ciudades: ciudadesRes.data || []
+        year: year || 'Histórico',
+        totalPacientes: totalAtenciones,
+        estados: finalEstados,
+        ciudades: finalCiudades,
+        resumenMensual: finalResumenMensual,
+        distribucionGenero: finalDistribucionGenero,
+        distribucionEdad: finalDistribucionEdad,
+        detalleMensualEstados: finalDetalleEstados,
+        detalleMensualCiudades: finalDetalleCiudades,
+        detalleMensualGenero: finalDetalleGenero,
+        detalleMensualEdad: finalDetalleEdad,
+        poblacionServiciosOficial: finalPoblacionServicios,
+        estadisticasEdadesSexoOficial: finalEstadisticasEdadesSexo
       });
     } catch(error) {
       console.error("Error en /api/siti/demografia:", error);

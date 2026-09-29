@@ -44,7 +44,7 @@ router.post('/sync', authorizeCapability('gestionCEX'), async (req, res, next) =
  */
 router.get('/agenda', authorizeCapability('verCEX'), async (req, res, next) => {
   try {
-    let { start, end, live } = req.query;
+    let { start, end, live, tipoFecha } = req.query;
 
     if (live === '1') {
       try {
@@ -65,6 +65,14 @@ router.get('/agenda', authorizeCapability('verCEX'), async (req, res, next) => {
     if (!end) end = today;
     if (end.length === 10) end += ' 23:59:59';
 
+    const isCreacion = tipoFecha === 'creacion';
+    const dateCondition = isCreacion
+      ? 'COALESCE(c.FechaCreacion, dw.fechacreacion, c.FechaHoraCita) >= $1 AND COALESCE(c.FechaCreacion, dw.fechacreacion, c.FechaHoraCita) <= $2'
+      : 'c.FechaHoraCita >= $1 AND c.FechaHoraCita <= $2';
+    const orderBy = isCreacion
+      ? 'ORDER BY COALESCE(c.FechaCreacion, dw.fechacreacion, c.FechaHoraCita) DESC'
+      : 'ORDER BY c.FechaHoraCita ASC';
+
     let query = `
       SELECT c.*, p.NombreCompleto as NombrePaciente, 
              COALESCE(NULLIF(TRIM(c.Consultorio), ''), dw.articulo) as consultoriofinal,
@@ -72,6 +80,7 @@ router.get('/agenda', authorizeCapability('verCEX'), async (req, res, next) => {
              COALESCE(NULLIF(TRIM(c.Notas), ''), dw.comentarios) as notasfinal,
              COALESCE(NULLIF(TRIM(p.Telefonos), ''), CONCAT_WS(' ', NULLIF(TRIM(dw.telefono_1), ''), NULLIF(TRIM(dw.celular_2), ''))) as telefonosfinal,
              c.TipoConsulta,
+             COALESCE(c.FechaCreacion, dw.fechacreacion) as fechacreacion,
              dw.edad_anios,
              dw.edad_mes,
              dw.genero,
@@ -81,11 +90,10 @@ router.get('/agenda', authorizeCapability('verCEX'), async (req, res, next) => {
       LEFT JOIN dw_vertical_consultas_prog dw ON c.CitaOrigenId = dw.no_cita::VARCHAR
       LEFT JOIN cex_pacientes p ON c.NoExpediente = p.NoExpediente
       LEFT JOIN cex_consultas cons ON c.CitaId = cons.CitaId
-      WHERE c.FechaHoraCita >= $1 AND c.FechaHoraCita <= $2
+      WHERE ${dateCondition}
+      ${orderBy}
     `;
     const values = [start, end];
-
-    query += ' ORDER BY c.FechaHoraCita ASC';
 
     const result = await pool.query(query, values);
     const data = result.rows.map(r => ({
@@ -94,6 +102,7 @@ router.get('/agenda', authorizeCapability('verCEX'), async (req, res, next) => {
       diagnostico: r.diagnosticofinal || r.diagnostico,
       notas: r.notasfinal || r.notas,
       telefonos: r.telefonosfinal || r.telefonos,
+      fechacreacion: r.fechacreacion,
       edad_anios: r.edad_anios,
       edad_mes: r.edad_mes,
       genero: r.genero,
@@ -286,6 +295,72 @@ router.get('/reportes', authorizeCapability('verCEX'), async (req, res, next) =>
       GROUP BY Estado
     `;
 
+    const result = await pool.query(query, [start, end]);
+    res.json({ ok: true, data: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/cex/consulta-dia
+ * Obtiene la información de la tabla dw_vertical_consulta_dia
+ */
+router.get('/consulta-dia', authorizeCapability('verCEX'), async (req, res, next) => {
+  try {
+    let { start, end, tipoFecha } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+    if (!start) start = today;
+    if (!end) end = today;
+    if (end.length === 10) end += ' 23:59:59';
+
+    const isCreacion = tipoFecha === 'creacion';
+    const dateCondition = isCreacion
+      ? 'COALESCE(fechacreacion, fecha::timestamp) >= $1 AND COALESCE(fechacreacion, fecha::timestamp) <= $2'
+      : 'fecha >= $1 AND fecha <= $2';
+    const orderBy = isCreacion
+      ? 'ORDER BY fechacreacion DESC, numero_cita DESC'
+      : 'ORDER BY fecha DESC, hora DESC';
+
+    const query = `
+      SELECT *
+      FROM dw_vertical_consulta_dia
+      WHERE ${dateCondition}
+      ${orderBy}
+    `;
+    const result = await pool.query(query, [start, end]);
+    res.json({ ok: true, data: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/cex/consultas-programadas
+ * Obtiene la información de la tabla dw_vertical_consultas_prog
+ */
+router.get('/consultas-programadas', authorizeCapability('verCEX'), async (req, res, next) => {
+  try {
+    let { start, end, tipoFecha } = req.query;
+    const today = new Date().toISOString().split('T')[0];
+    if (!start) start = today;
+    if (!end) end = today;
+    if (end.length === 10) end += ' 23:59:59';
+
+    const isCreacion = tipoFecha === 'creacion';
+    const dateCondition = isCreacion
+      ? 'COALESCE(fechacreacion, desdefecha) >= $1 AND COALESCE(fechacreacion, desdefecha) <= $2'
+      : 'desdefecha >= $1 AND desdefecha <= $2';
+    const orderBy = isCreacion
+      ? 'ORDER BY fechacreacion DESC, no_cita DESC'
+      : 'ORDER BY desdefecha ASC';
+
+    const query = `
+      SELECT *
+      FROM dw_vertical_consultas_prog
+      WHERE ${dateCondition}
+      ${orderBy}
+    `;
     const result = await pool.query(query, [start, end]);
     res.json({ ok: true, data: result.rows });
   } catch (error) {

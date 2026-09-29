@@ -703,12 +703,141 @@ async function resolveReportData(reportId, filters) {
         filas: data,
       };
     }
-    case 'consulta-externa': {
-      const { fechaDesde, fechaHasta, especialidad } = filters;
+    case 'consulta-dia': {
+      const { fechaDesde, fechaHasta, search, tipoFecha } = filters;
       const { pool } = require('../config/pg-db');
       const start = fechaDesde || new Date().toISOString().split('T')[0];
       const end = (fechaHasta || start) + ' 23:59:59';
       
+      const isCreacion = tipoFecha === 'creacion';
+      const dateCondition = isCreacion
+        ? 'COALESCE(fechacreacion, fecha::timestamp) >= $1 AND COALESCE(fechacreacion, fecha::timestamp) <= $2'
+        : 'fecha >= $1 AND fecha <= $2';
+      const orderBy = isCreacion
+        ? 'ORDER BY fechacreacion DESC, numero_cita DESC'
+        : 'ORDER BY fecha DESC, hora DESC';
+
+      let query = `
+        SELECT *
+        FROM dw_vertical_consulta_dia
+        WHERE ${dateCondition}
+        ${orderBy}
+      `;
+      const result = await pool.query(query, [start, end]);
+      let data = result.rows.map(r => ({
+        ...r,
+        fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-MX') : '-',
+        fechacreacion: r.fechacreacion ? new Date(r.fechacreacion).toLocaleString('es-MX') : '-'
+      }));
+      
+      if (search && search.trim() !== '') {
+        const s = search.toLowerCase();
+        data = data.filter(c => {
+           return (c.paciente && c.paciente.toLowerCase().includes(s)) ||
+                  (c.medico && c.medico.toLowerCase().includes(s)) ||
+                  (c.articulo && c.articulo.toLowerCase().includes(s)) ||
+                  String(c.numero_cita || '').toLowerCase().includes(s) ||
+                  String(c.numero_paciente || '').toLowerCase().includes(s);
+        });
+      }
+
+      return {
+        titulo: 'Consulta del Día',
+        resumen: { 'Total Consultas': data.length },
+        columnas: [
+          { header: 'No. Cita', key: 'numero_cita', width: 15 },
+          { header: 'Paciente', key: 'paciente', width: 35 },
+          { header: 'No. Paciente', key: 'numero_paciente', width: 15 },
+          { header: 'Médico', key: 'medico', width: 35 },
+          { header: 'Folio Médico', key: 'folio_medico', width: 15 },
+          { header: 'Artículo', key: 'articulo', width: 35 },
+          { header: 'Fecha Cita', key: 'fecha', width: 15 },
+          { header: 'Hora', key: 'hora', width: 15 },
+          { header: 'Fecha Creación', key: 'fechacreacion', width: 22 },
+          { header: 'Edad (Años)', key: 'edad_anios', width: 12 },
+          { header: 'Estatus Orden Venta', key: 'estatus_orden_venta', width: 25 },
+        ],
+        filas: data,
+      };
+    }
+    case 'consultas-programadas': {
+      const { fechaDesde, fechaHasta, search, estado, tipoFecha } = filters;
+      const { pool } = require('../config/pg-db');
+      const start = fechaDesde || new Date().toISOString().split('T')[0];
+      const end = (fechaHasta || start) + ' 23:59:59';
+      
+      const isCreacion = tipoFecha === 'creacion';
+      const dateCondition = isCreacion
+        ? 'COALESCE(fechacreacion, desdefecha) >= $1 AND COALESCE(fechacreacion, desdefecha) <= $2'
+        : 'desdefecha >= $1 AND desdefecha <= $2';
+      const orderBy = isCreacion
+        ? 'ORDER BY fechacreacion DESC, no_cita DESC'
+        : 'ORDER BY desdefecha ASC';
+
+      let query = `
+        SELECT *
+        FROM dw_vertical_consultas_prog
+        WHERE ${dateCondition}
+        ${orderBy}
+      `;
+      const result = await pool.query(query, [start, end]);
+      let data = result.rows.map(r => ({
+        ...r,
+        desdefecha: r.desdefecha ? new Date(r.desdefecha).toLocaleString('es-MX') : '-',
+        hastafecha: r.hastafecha ? new Date(r.hastafecha).toLocaleString('es-MX') : '-',
+        fechacreacion: r.fechacreacion ? new Date(r.fechacreacion).toLocaleString('es-MX') : '-'
+      }));
+
+      if (search && search.trim() !== '') {
+        const s = search.toLowerCase();
+        data = data.filter(c => {
+           return (c.paciente && c.paciente.toLowerCase().includes(s)) ||
+                  (c.medico && c.medico.toLowerCase().includes(s)) ||
+                  (c.convenio && c.convenio.toLowerCase().includes(s)) ||
+                  (c.especialidad && c.especialidad.toLowerCase().includes(s)) ||
+                  String(c.no_cita || '').toLowerCase().includes(s) ||
+                  String(c.nopaciente || '').toLowerCase().includes(s);
+        });
+      }
+      
+      if (estado && estado !== 'null' && estado !== 'undefined') {
+        data = data.filter(c => c.pcap_st_descripcion === estado);
+      }
+
+      return {
+        titulo: 'Consultas Programadas',
+        resumen: { 'Total Consultas': data.length },
+        columnas: [
+          { header: 'No. Cita', key: 'no_cita', width: 15 },
+          { header: 'Paciente', key: 'paciente', width: 35 },
+          { header: 'No. Paciente', key: 'nopaciente', width: 15 },
+          { header: 'Especialidad', key: 'especialidad', width: 25 },
+          { header: 'Médico', key: 'medico', width: 35 },
+          { header: 'No. Médico', key: 'no_medico', width: 15 },
+          { header: 'Fecha Cita', key: 'desdefecha', width: 22 },
+          { header: 'Fecha Fin', key: 'hastafecha', width: 22 },
+          { header: 'Fecha Creación', key: 'fechacreacion', width: 22 },
+          { header: 'Estado', key: 'pcap_st_descripcion', width: 20 },
+          { header: 'Convenio', key: 'convenio', width: 25 },
+          { header: 'Consultas Prev.', key: 'consultas_previas', width: 15 },
+        ],
+        filas: data,
+      };
+    }
+    case 'consulta-externa': {
+      const { fechaDesde, fechaHasta, especialidad, search, estado, tipoFecha } = filters;
+      const { pool } = require('../config/pg-db');
+      const start = fechaDesde || new Date().toISOString().split('T')[0];
+      const end = (fechaHasta || start) + ' 23:59:59';
+      
+      const isCreacion = tipoFecha === 'creacion';
+      const dateCondition = isCreacion
+        ? 'COALESCE(c.FechaCreacion, dw.fechacreacion, c.FechaHoraCita) >= $1 AND COALESCE(c.FechaCreacion, dw.fechacreacion, c.FechaHoraCita) <= $2'
+        : 'c.FechaHoraCita >= $1 AND c.FechaHoraCita <= $2';
+      const orderBy = isCreacion
+        ? 'ORDER BY COALESCE(c.FechaCreacion, dw.fechacreacion, c.FechaHoraCita) DESC'
+        : 'ORDER BY c.FechaHoraCita ASC';
+
       let query = `
         SELECT c.*, p.NombreCompleto as NombrePaciente, 
                c.Consultorio as ConsultorioFinal,
@@ -717,6 +846,7 @@ async function resolveReportData(reportId, filters) {
                COALESCE(NULLIF(TRIM(c.Notas), ''), dw.comentarios) as NotasFinal,
                COALESCE(NULLIF(TRIM(p.Telefonos), ''), CONCAT_WS(' ', NULLIF(TRIM(dw.telefono_1), ''), NULLIF(TRIM(dw.celular_2), ''))) as TelefonosFinal,
                c.TipoConsulta,
+               COALESCE(c.FechaCreacion, dw.fechacreacion) as fechacreacion,
                dw.edad_anios,
                dw.edad_mes,
                dw.genero,
@@ -726,7 +856,7 @@ async function resolveReportData(reportId, filters) {
         LEFT JOIN dw_vertical_consultas_prog dw ON c.CitaOrigenId = dw.no_cita::VARCHAR
         LEFT JOIN cex_pacientes p ON c.NoExpediente = p.NoExpediente
         LEFT JOIN cex_consultas cons ON c.CitaId = cons.CitaId
-        WHERE c.FechaHoraCita >= $1 AND c.FechaHoraCita <= $2
+        WHERE ${dateCondition}
       `;
       const queryParams = [start, end];
 
@@ -735,7 +865,7 @@ async function resolveReportData(reportId, filters) {
         query += ` AND c.Especialidad = $3`;
       }
       
-      query += ` ORDER BY c.FechaHoraCita ASC`;
+      query += ` ${orderBy}`;
       
       const result = await pool.query(query, queryParams);
       const data = result.rows.map(r => ({
@@ -744,7 +874,8 @@ async function resolveReportData(reportId, filters) {
         diagnostico: r.diagnosticofinal || r.diagnostico,
         notas: r.notasfinal || r.notas,
         telefonos: r.telefonosfinal || r.telefonos,
-        fechahoracita: new Date(r.fechahoracita).toLocaleString('es-MX', { hour12: false }),
+        fechahoracita: r.fechahoracita ? new Date(r.fechahoracita).toLocaleString('es-MX', { hour12: false }) : '-',
+        fechacreacion: r.fechacreacion ? new Date(r.fechacreacion).toLocaleString('es-MX', { hour12: false }) : '-',
         edad_anios: r.edad_anios,
         edad_mes: r.edad_mes,
         genero: r.genero,
@@ -753,18 +884,40 @@ async function resolveReportData(reportId, filters) {
         convenio: r.convenio
       }));
       const isPagada = (c) => {
-        const text = ((c.notas || '') + ' ' + (c.diagnostico || '')).toLowerCase();
-        return text.includes('confirmad') || text.includes('pago procesado');
+        const text = ((c.notas || '') + ' ' + (c.diagnostico || '') + ' ' + (c.estado || '')).toLowerCase();
+        return text.includes('pagada') || text.includes('pagado');
       };
+
+      let filteredData = data;
+      
+      if (search && search.trim() !== '') {
+        const s = search.toLowerCase();
+        filteredData = filteredData.filter(c => {
+           return (c.nombrepaciente && c.nombrepaciente.toLowerCase().includes(s)) ||
+                  (c.medico && c.medico.toLowerCase().includes(s)) ||
+                  (c.noexpediente && c.noexpediente.toLowerCase().includes(s)) ||
+                  (c.convenio && c.convenio.toLowerCase().includes(s)) ||
+                  String(c.citaid || '').toLowerCase().includes(s) ||
+                  String(c.citaorigenid || '').toLowerCase().includes(s);
+        });
+      }
+      
+      if (estado && estado !== 'null' && estado !== 'undefined') {
+         if (estado === 'PAGADA') {
+            filteredData = filteredData.filter(isPagada);
+         } else {
+            filteredData = filteredData.filter(c => c.estado === estado);
+         }
+      }
 
       return {
         titulo: 'Agenda de Consulta Externa',
         resumen: {
-          'Total Citas': data.length,
-          'Asistencias': data.filter(c => c.estado === 'ASISTIDA').length,
-          'Pagadas': data.filter(isPagada).length,
-          'No Asistió': data.filter(c => c.estado === 'NO_ASISTIO').length,
-          'Canceladas': data.filter(c => c.estado === 'CANCELADA').length,
+          'Total Citas': filteredData.length,
+          'Asistencias': filteredData.filter(c => c.estado === 'ASISTIDA').length,
+          'Pagadas': filteredData.filter(isPagada).length,
+          'No Asistió': filteredData.filter(c => c.estado === 'NO_ASISTIO').length,
+          'Canceladas': filteredData.filter(c => c.estado === 'CANCELADA').length,
         },
         columnas: [
           { header: 'Expediente', key: 'noexpediente', width: 14 },
@@ -785,7 +938,7 @@ async function resolveReportData(reportId, filters) {
           { header: 'Notas / Observaciones', key: 'notas', width: 50 },
           { header: 'Teléfonos', key: 'telefonos', width: 20 },
         ],
-        filas: data,
+        filas: filteredData,
       };
     }
     default:

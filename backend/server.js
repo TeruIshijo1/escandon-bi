@@ -162,6 +162,7 @@ const almacenRoutes = require('./routes/almacen.routes');
 const finanzasRoutes = require('./routes/finanzas.routes');
 const cexRoutes = require('./routes/cex.routes');
 const sapQueryBuilderRoutes = require('./routes/sapQueryBuilder.routes');
+const honorariosRoutes = require('./routes/honorarios.routes');
 
 app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/dashboard',     dashboardRoutes);
@@ -175,6 +176,7 @@ app.use('/api/audit',         auditRoutes);
 app.use('/api/data-quality',  dataQualityRoutes);
 app.use('/api/pharmacy',      pharmacyRoutes);
 app.use('/api/almacen',       almacenRoutes);
+app.use('/api/honorarios',    honorariosRoutes);
 app.use('/api/sap',           sapRoutes);
 app.use('/api/sap-query',     sapQueryBuilderRoutes);
 app.use('/api/finanzas',      finanzasRoutes);
@@ -271,7 +273,8 @@ if (process.env.NODE_ENV !== 'test') { (async () => {
     connectRemoteDB().catch(e => console.warn('⚠️ SQL Server Remoto no inicializado al arranque.'));
     
     // Inicializar PostgreSQL Data Warehouse y sincronización ETL
-    initPostgresDW().then(async () => {
+    const dwInitialization = initPostgresDW();
+    dwInitialization.then(async () => {
       initCronJobs();
       await initQuirofanoDW();
       initQuirofanoCron();
@@ -328,20 +331,25 @@ if (process.env.NODE_ENV !== 'test') { (async () => {
       }
     }).catch(e => console.warn('⚠️ Falló la inicialización de Postgres DW.'));
 
-    // Inicializar Sincronización de Data Warehouse Almacén/Cirrus a PostgreSQL
-    try {
-      const { runAlmacenSync } = require('./services/almacenSync.service');
-      runAlmacenSync().then(() => {
-        console.log('✅ Sincronización inicial de Almacén/Censo completada.');
-      }).catch(err => console.warn('⚠️ Sincronización inicial de Almacén incompleta:', err.message));
-      
-      // Ejecutar sincronización cada 15 minutos
-      setInterval(() => {
-        runAlmacenSync().catch(err => console.warn('⚠️ Sync background almacén error:', err.message));
-      }, 15 * 60 * 1000);
-    } catch(err) {
-      console.warn('⚠️ No se pudo iniciar el servicio de sync de Almacén.');
-    }
+    // El ETL de almacén requiere que las tablas del DW ya estén inicializadas.
+    // Esperar esta promesa evita que el sync de inicio compita con el DDL del DW.
+    dwInitialization.then(() => {
+      try {
+        const { runAlmacenSync } = require('./services/almacenSync.service');
+        runAlmacenSync().then(() => {
+          console.log('✅ Sincronización inicial de Almacén/Censo completada.');
+        }).catch(err => console.warn('⚠️ Sincronización inicial de Almacén incompleta:', err.message));
+
+        // Ejecutar sincronización cada 15 minutos; runAlmacenSync impide solapamientos.
+        setInterval(() => {
+          runAlmacenSync().catch(err => console.warn('⚠️ Sync background almacén error:', err.message));
+        }, 15 * 60 * 1000);
+      } catch(err) {
+        console.warn('⚠️ No se pudo iniciar el servicio de sync de Almacén:', err.message);
+      }
+    }).catch(() => {
+      console.warn('⚠️ No se inicia la sincronización de Almacén porque no quedó listo el DW.');
+    });
 
   } catch (err) {
     dbStatus = 'sin_conexion';

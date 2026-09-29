@@ -3654,20 +3654,24 @@ router.get('/cuenta-detalle/:folio', authenticate, async (req, res) => {
 router.get('/geografia', authenticate, async (req, res) => {
   try {
     const estadosQuery = await pgPool.query(`
-      SELECT statecode as "estado", COUNT(*)::int as "cantidad" 
+      SELECT 
+        COALESCE(NULLIF(TRIM(statecode), ''), 'CDMX') as "estado", 
+        COUNT(*)::int as "cantidad" 
       FROM dw_vertical_pt 
-      WHERE statecode IS NOT NULL 
-      GROUP BY statecode 
+      GROUP BY 1 
       ORDER BY cantidad DESC 
+      LIMIT 10
     `);
     const estados = estadosQuery.rows;
 
     const ciudadesQuery = await pgPool.query(`
-      SELECT city as "ciudad", COUNT(*)::int as "cantidad" 
+      SELECT 
+        COALESCE(NULLIF(TRIM(city), ''), 'CDMX') as "ciudad", 
+        COUNT(*)::int as "cantidad" 
       FROM dw_vertical_pt 
-      WHERE city IS NOT NULL 
-      GROUP BY city 
+      GROUP BY 1 
       ORDER BY cantidad DESC 
+      LIMIT 15
     `);
     const ciudades = ciudadesQuery.rows;
 

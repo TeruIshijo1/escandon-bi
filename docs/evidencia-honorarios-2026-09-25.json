@@ -1,0 +1,507 @@
+{
+  "timestamp": "2026-09-25T19:18:51.628Z",
+  "period": {
+    "start": "2026-09-01",
+    "end": "2026-09-25"
+  },
+  "kpis": {
+    "totalNeto": 595309.18,
+    "totalBase": 624018,
+    "totalISR": 43864.82,
+    "totalIVA": 15156,
+    "totalElegibles": 2498,
+    "totalExclusiones": 7175,
+    "totalOverridden": 0,
+    "totalMedicos": 89,
+    "totalPacientes": 1857,
+    "totalGeneral": 9673
+  },
+  "doctorTotals": {
+    "base": 624018,
+    "iva": 15156,
+    "isr": 42361.82,
+    "neto": 596812.18
+  },
+  "detailTotals": {
+    "isr": 42359.94,
+    "neto": 596814.06
+  },
+  "twoRepeatedAggregatesRemoved": {
+    "base": 623068,
+    "iva": 15156,
+    "isr": 42310.57,
+    "neto": 595913.43
+  },
+  "manualAmountProof": {
+    "originalBase": 100,
+    "newBase": 200,
+    "ivaKept": 16,
+    "isr": 20,
+    "actualNeto": 196,
+    "expectedNetoWithSame16PercentRate": 212
+  },
+  "zeroBaseProof": {
+    "rowNeto": 0,
+    "kpiNeto": 14.4,
+    "doctorNeto": 16
+  },
+  "keyCollisionProof": {
+    "services": 2,
+    "excludedWithOneOverride": 2
+  },
+  "filteredExportProof": {
+    "filteredRows": 193,
+    "detailBase": 43425,
+    "footerBase": 624018
+  },
+  "sourceHashes": {
+    "backend/routes/honorarios.routes.js": "64d0a82cd1eb285258821a613e845bff0a04b9244bf9019a1e54f04a1f579adf",
+    "frontend/src/components/honorarios/HonorariosAuditView.jsx": "402b48b3a424c6e31418d07c8432af5cd34c358f60dc02b4a5327a77d6c8f7df",
+    "frontend/src/utils/honorariosPdfGenerator.js": "d2736dc33699a68726121cac49ae378f0faeba98f77a586eaa4cacb68383777c"
+  },
+  "database": {
+    "capturedAt": "2026-09-25T19:16:33.436Z",
+    "metadata": [
+      {
+        "name": "UDR_HON_PAGO",
+        "encrypted": 0,
+        "viewDefinition": 0
+      },
+      {
+        "name": "UDR_HON_PAGO_Audit",
+        "encrypted": 0,
+        "viewDefinition": 0
+      }
+    ],
+    "audit": [
+      {
+        "filas": 9673,
+        "elegibles": 3346
+      }
+    ],
+    "duplicates": [
+      {
+        "vista": "audit",
+        "clavesDuplicadas": 421,
+        "filasExtra": 962
+      },
+      {
+        "vista": "pago",
+        "clavesDuplicadas": 0,
+        "filasExtra": null
+      }
+    ],
+    "tax": [
+      {
+        "tipo": null,
+        "isr": 0,
+        "tasaIva": 0,
+        "TaxCode": null,
+        "filas": 4,
+        "base": 0,
+        "iva": 0,
+        "difIva": 0
+      },
+      {
+        "tipo": null,
+        "isr": 0,
+        "tasaIva": 0,
+        "TaxCode": "V0",
+        "filas": 71,
+        "base": 6933,
+        "iva": 0,
+        "difIva": 0
+      },
+      {
+        "tipo": null,
+        "isr": 0.1,
+        "tasaIva": 0.16,
+        "TaxCode": "V0",
+        "filas": 89,
+        "base": 20025,
+        "iva": 3204,
+        "difIva": 0
+      },
+      {
+        "tipo": "HN",
+        "isr": 0,
+        "tasaIva": 0,
+        "TaxCode": null,
+        "filas": 1,
+        "base": 0,
+        "iva": 0,
+        "difIva": 0
+      },
+      {
+        "tipo": "HN",
+        "isr": 0,
+        "tasaIva": 0,
+        "TaxCode": "V0",
+        "filas": 43,
+        "base": 9675,
+        "iva": 0,
+        "difIva": 0
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.0125,
+        "tasaIva": 0,
+        "TaxCode": null,
+        "filas": 15,
+        "base": 0,
+        "iva": 0,
+        "difIva": 0
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.0125,
+        "tasaIva": 0,
+        "TaxCode": "V0",
+        "filas": 802,
+        "base": 194961,
+        "iva": 0,
+        "difIva": 0
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.0125,
+        "tasaIva": 0.16,
+        "TaxCode": "V0",
+        "filas": 3,
+        "base": 650,
+        "iva": 104,
+        "difIva": 0
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.1,
+        "tasaIva": 0,
+        "TaxCode": null,
+        "filas": 19,
+        "base": 0,
+        "iva": 0,
+        "difIva": 0
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.1,
+        "tasaIva": 0,
+        "TaxCode": "V0",
+        "filas": 1054,
+        "base": 301237,
+        "iva": 0,
+        "difIva": 0
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.1,
+        "tasaIva": 0.16,
+        "TaxCode": "V0",
+        "filas": 324,
+        "base": 72900,
+        "iva": 11664,
+        "difIva": 0
+      }
+    ],
+    "quality": [
+      {
+        "sinTabulador": 29,
+        "baseCero": 68,
+        "cantidadNoPositiva": 0,
+        "ambiguos": 0,
+        "pacienteNoCoincide": 2,
+        "medicoNoCoincide": 122,
+        "difBase": 4
+      }
+    ],
+    "pcMathTaxed": [
+      {
+        "ISRRateNorm": 0.0125,
+        "filas": 9,
+        "isrSobreBase": 0,
+        "isrSobreBruto": 3
+      },
+      {
+        "ISRRateNorm": 0.1,
+        "filas": 422,
+        "isrSobreBase": 0,
+        "isrSobreBruto": 422
+      }
+    ],
+    "eligibleDuplicates": [
+      {
+        "UDRKey": "CITA-20927",
+        "ItemCode": "SER0578",
+        "OrigenRenglon": "ORDEN_CITA_PCAP_SO",
+        "filas": 2,
+        "minCantidad": 1,
+        "maxCantidad": 1,
+        "minImporte": 225,
+        "maxImporte": 225
+      },
+      {
+        "UDRKey": "SO-38684",
+        "ItemCode": "SER0758",
+        "OrigenRenglon": "ORDEN_SIN_CITA",
+        "filas": 2,
+        "minCantidad": 1,
+        "maxCantidad": 1,
+        "minImporte": 250,
+        "maxImporte": 250
+      }
+    ],
+    "duplicateAmounts": [
+      {
+        "UDRKey": "CITA-20927",
+        "ItemCode": "SER0578",
+        "Quantity": 1,
+        "IMPORTE": 225,
+        "BaseImporte": 450,
+        "pagoQuantity": 2,
+        "OrigenRenglon": "ORDEN_CITA_PCAP_SO"
+      },
+      {
+        "UDRKey": "CITA-20927",
+        "ItemCode": "SER0578",
+        "Quantity": 1,
+        "IMPORTE": 225,
+        "BaseImporte": 450,
+        "pagoQuantity": 2,
+        "OrigenRenglon": "ORDEN_CITA_PCAP_SO"
+      },
+      {
+        "UDRKey": "SO-38684",
+        "ItemCode": "SER0758",
+        "Quantity": 1,
+        "IMPORTE": 250,
+        "BaseImporte": 500,
+        "pagoQuantity": 2,
+        "OrigenRenglon": "ORDEN_SIN_CITA"
+      },
+      {
+        "UDRKey": "SO-38684",
+        "ItemCode": "SER0758",
+        "Quantity": 1,
+        "IMPORTE": 250,
+        "BaseImporte": 500,
+        "pagoQuantity": 2,
+        "OrigenRenglon": "ORDEN_SIN_CITA"
+      }
+    ],
+    "baseDifferences": [
+      {
+        "PCNum": 37700,
+        "ItemCode": "SER1471",
+        "Quantity": 14,
+        "ImporteUnitario": 250,
+        "BaseImporte": 250,
+        "SinTabulador": 0
+      },
+      {
+        "PCNum": 31802,
+        "ItemCode": "SER0572",
+        "Quantity": 2,
+        "ImporteUnitario": 1600,
+        "BaseImporte": 1600,
+        "SinTabulador": 0
+      },
+      {
+        "PCNum": 37701,
+        "ItemCode": "SER1470",
+        "Quantity": 11,
+        "ImporteUnitario": 200,
+        "BaseImporte": 200,
+        "SinTabulador": 0
+      },
+      {
+        "PCNum": 37699,
+        "ItemCode": "SER1470",
+        "Quantity": 16,
+        "ImporteUnitario": 200,
+        "BaseImporte": 200,
+        "SinTabulador": 0
+      }
+    ],
+    "tabuladorDuplicates": [
+      {
+        "ITEMCODE": "SER0521",
+        "filas": 2,
+        "minimo": 1,
+        "maximo": 1500
+      },
+      {
+        "ITEMCODE": "SER0655",
+        "filas": 2,
+        "minimo": 1000,
+        "maximo": 1000
+      },
+      {
+        "ITEMCODE": "SER1277",
+        "filas": 2,
+        "minimo": 600,
+        "maximo": 1000
+      }
+    ],
+    "providerTax": [
+      {
+        "tipo": null,
+        "isr": null,
+        "iva": null,
+        "prestadores": 21
+      },
+      {
+        "tipo": null,
+        "isr": 0,
+        "iva": null,
+        "prestadores": 26
+      },
+      {
+        "tipo": null,
+        "isr": 0,
+        "iva": 0,
+        "prestadores": 1
+      },
+      {
+        "tipo": null,
+        "isr": 0.0125,
+        "iva": null,
+        "prestadores": 2
+      },
+      {
+        "tipo": null,
+        "isr": 0.1,
+        "iva": 16,
+        "prestadores": 1
+      },
+      {
+        "tipo": null,
+        "isr": 1,
+        "iva": null,
+        "prestadores": 8
+      },
+      {
+        "tipo": null,
+        "isr": 1.25,
+        "iva": null,
+        "prestadores": 3
+      },
+      {
+        "tipo": null,
+        "isr": 123,
+        "iva": null,
+        "prestadores": 1
+      },
+      {
+        "tipo": "AM",
+        "isr": 1,
+        "iva": null,
+        "prestadores": 1
+      },
+      {
+        "tipo": "HN",
+        "isr": 0,
+        "iva": null,
+        "prestadores": 25
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.0125,
+        "iva": null,
+        "prestadores": 42
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.0125,
+        "iva": 16,
+        "prestadores": 2
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.1,
+        "iva": null,
+        "prestadores": 41
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.1,
+        "iva": 0,
+        "prestadores": 1
+      },
+      {
+        "tipo": "HN",
+        "isr": 0.1,
+        "iva": 16,
+        "prestadores": 6
+      },
+      {
+        "tipo": "HN",
+        "isr": 1,
+        "iva": null,
+        "prestadores": 4
+      },
+      {
+        "tipo": "HN",
+        "isr": 1.25,
+        "iva": null,
+        "prestadores": 36
+      },
+      {
+        "tipo": "HN",
+        "isr": 1.25,
+        "iva": 0,
+        "prestadores": 1
+      },
+      {
+        "tipo": "HN",
+        "isr": 1.25,
+        "iva": 16,
+        "prestadores": 1
+      },
+      {
+        "tipo": "HN",
+        "isr": 10,
+        "iva": null,
+        "prestadores": 28
+      },
+      {
+        "tipo": "HN",
+        "isr": 10,
+        "iva": 16,
+        "prestadores": 4
+      },
+      {
+        "tipo": "NM",
+        "isr": 0,
+        "iva": null,
+        "prestadores": 2
+      },
+      {
+        "tipo": "NM",
+        "isr": 1,
+        "iva": null,
+        "prestadores": 2
+      }
+    ],
+    "profileCoverage": [
+      {
+        "prestadoresEnPeriodo": 87,
+        "sinCoincidenciaNombre": 0,
+        "sinBP": 87
+      }
+    ],
+    "mixedKey": [
+      {
+        "clavesConVariosServicios": 521
+      }
+    ]
+  },
+  "pdfChecks": {
+    "baselinePages": 1,
+    "mostConceptsPages": 1,
+    "syntheticConcepts": 35,
+    "syntheticPages": 1,
+    "syntheticMaximumYmm": 374,
+    "letterPageHeightMm": 279.4,
+    "excludedStillIncluded": true
+  }
+}

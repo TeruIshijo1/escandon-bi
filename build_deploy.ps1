@@ -238,6 +238,12 @@ if (Test-Path "$ProjectRoot\iniciar_produccion.bat") {
     Write-Host "  -> iniciar_produccion.bat sincronizado OK" -ForegroundColor Green
 }
 
+# Copiar regla opcional para permitir el acceso desde la red local
+if (Test-Path "$ProjectRoot\permitir_acceso_red.bat") {
+    Copy-Item -Path "$ProjectRoot\permitir_acceso_red.bat" -Destination "$DeployDir\permitir_acceso_red.bat" -Force
+    Write-Host "  -> permitir_acceso_red.bat sincronizado OK" -ForegroundColor Green
+}
+
 # Generar instalar.bat de producción
 $InstalarBatContent = @'
 @echo off
@@ -384,4 +390,3 @@ Write-Host "  Database: $dbFiles archivos" -ForegroundColor DarkGray
 Write-Host ""
 
 Set-Location -Path $ProjectRoot
-

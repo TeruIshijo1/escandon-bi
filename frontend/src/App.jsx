@@ -53,6 +53,7 @@ const DashboardComparativo= lazy(() => import('./components/dashboard/DashboardC
 const DataQualityDashboard= lazy(() => import('./pages/DataQualityDashboard'));
 const ConsultaExternaPage = lazy(() => import('./pages/ConsultaExternaPage'));
 const TraceOrder          = lazy(() => import('./pages/TraceOrder'));
+const HonorariosAuditView = lazy(() => import('./components/honorarios/HonorariosAuditView'));
 
 /* ── Fallback de carga ───────────────────────────────────────── */
 function PageLoader() {
@@ -337,7 +338,7 @@ export default function App() {
                 path="interconsultas-jornadas"
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.CONSULTA_EXTERNA, ROLES.ALMACEN_GENERAL]}>
-                    <ReportesAlmacen />
+                    <HonorariosAuditView />
                   </ProtectedRoute>
                 }
               />

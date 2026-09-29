@@ -19,8 +19,15 @@ El servidor de producción opera mediante un proceso Node.js integrado que entre
 
 ### 1.2 Arranque en Producción
 - **Script**: `iniciar_produccion.bat`
-- **Puerto**: `http://localhost:5173` o `http://192.168.254.249:5173` (Acceso Intranet)
+- **Puerto**: `http://localhost:5173` en el servidor. Para otros equipos usa `http://[dirección IPv4 del servidor]:5173`.
 - **Mecanismo**: Express sirve los archivos estáticos compilados de React (`frontend/dist`) y la API REST en el mismo puerto.
+
+### 1.3 Acceso desde otras computadoras
+1. En el servidor, abre `iniciar_produccion.bat` y déjalo abierto.
+2. En el servidor, confirma que BI abre en `http://localhost:5173`.
+3. En el servidor, abre la ventana de comandos y escribe `ipconfig`. Busca la dirección IPv4. Desde otra computadora conectada a la misma red del hospital, abre `http://DIRECCION-IP:5173` usando esa dirección. No uses `localhost` en las otras computadoras.
+4. Si BI abre en el servidor pero no en las otras computadoras, haz clic derecho en `permitir_acceso_red.bat` y elige **Ejecutar como administrador**. Esto permite el acceso al puerto de BI desde la red local.
+5. Si sigue sin abrir, confirma que ambos equipos estén conectados a la red del hospital y que la dirección IPv4 sea la actual.
 
 ---
 
@@ -114,4 +121,3 @@ node -e "require('dotenv').config(); const { syncAllDashboards } = require('./se
 <p align="center">
   🏥 <b>Hospital Escandón BI</b> · Manual de Producción v2.0
 </p>
-

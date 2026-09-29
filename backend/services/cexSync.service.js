@@ -10,22 +10,30 @@ const { pool } = require('../config/pg-db');
 async function syncCexFromDW() {
   const client = await pool.connect();
   try {
+    // Asegurar que las columnas existan en la BD
+    await client.query(`
+      ALTER TABLE dw_vertical_consultas_prog ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE dw_vertical_consulta_dia ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE cex_citas ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;
+    `).catch(() => {});
+
     await client.query('BEGIN');
     
-    // Obtener todas las citas cacheadas desde VERTICAL (ventana de 30 días para eficiencia)
+    // Obtener todas las citas cacheadas desde VERTICAL (ventana de 60 días para eficiencia)
     const res = await client.query(`
       SELECT 
         no_cita, 
         nopaciente, 
         paciente, 
         desdefecha, 
+        fechacreacion,
         medico, 
         especialidad, 
         pcap_st_descripcion,
         ps,
         comentarios
       FROM dw_vertical_consultas_prog
-      WHERE desdefecha >= CURRENT_TIMESTAMP - INTERVAL '30 days'
+      WHERE desdefecha >= CURRENT_TIMESTAMP - INTERVAL '60 days' OR fechacreacion >= CURRENT_TIMESTAMP - INTERVAL '60 days'
     `);
     
     let insertadosPacientes = 0;
@@ -69,16 +77,14 @@ async function syncCexFromDW() {
       }
       
       // 3. Upsert de Cita
-      // NOTA: Si el origen de la cita es LOCAL (creada manualmente en plataforma), 
-      // esto no debería interferir por el UNIQUE CitaOrigenId, ya que las locales 
-      // probablemente tengan CitaOrigenId nulo o un ID diferente.
       const citaRes = await client.query(`
         INSERT INTO cex_citas (
-          CitaOrigenId, NoExpediente, FechaHoraCita, Medico, Especialidad, Estado, Origen, ModificadoPor, TipoConsulta
+          CitaOrigenId, NoExpediente, FechaHoraCita, FechaCreacion, Medico, Especialidad, Estado, Origen, ModificadoPor, TipoConsulta
         )
-        VALUES ($1, $2, $3, $4, $5, $6, 'VERTICAL', 'SYSTEM_SYNC', $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'VERTICAL', 'SYSTEM_SYNC', $8)
         ON CONFLICT (CitaOrigenId) DO UPDATE SET
           FechaHoraCita = EXCLUDED.FechaHoraCita,
+          FechaCreacion = COALESCE(EXCLUDED.FechaCreacion, cex_citas.FechaCreacion),
           Medico = EXCLUDED.Medico,
           Especialidad = EXCLUDED.Especialidad,
           TipoConsulta = EXCLUDED.TipoConsulta,
@@ -88,6 +94,7 @@ async function syncCexFromDW() {
         citaOrigenId,
         noExpediente,
         row.desdefecha,
+        row.fechacreacion,
         row.medico,
         row.especialidad,
         estadoVertical,

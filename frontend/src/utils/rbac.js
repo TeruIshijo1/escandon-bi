@@ -367,9 +367,9 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     {
       section: 'Mi Área',
       icon:    '🩺',
-      label:   'Interconsultas y Jornadas Especiales',
+      label:   'Honorarios Médicos',
       path:    '/interconsultas-jornadas',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.CONSULTA_EXTERNA],
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.CONSULTA_EXTERNA, ROLES.ALMACEN_GENERAL],
     },
     {
       section: 'Mi Área',

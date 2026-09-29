@@ -478,20 +478,33 @@ async function syncPedidosSAP() {
   }
 }
 
-async function runAlmacenSync() {
-  await syncCenso();
-  await syncConsumo();
-  await syncEntradas();
-  await syncKardex();
-  await syncPedidosSAP();
+let almacenSyncPromise = null;
 
-  try {
-    console.log('[Sync] Sincronizando Dataset Analítico para Machine Learning...');
-    const { syncMLDataset } = require('./mlDataset.service');
-    await syncMLDataset();
-  } catch (mlErr) {
-    console.error('[Sync] Error al sincronizar el Dataset Analítico de ML:', mlErr.message);
+function runAlmacenSync() {
+  if (almacenSyncPromise) {
+    console.log('[Sync] Ya hay una sincronización de almacén en curso; se reutiliza esa ejecución.');
+    return almacenSyncPromise;
   }
+
+  almacenSyncPromise = (async () => {
+    await syncCenso();
+    await syncConsumo();
+    await syncEntradas();
+    await syncKardex();
+    await syncPedidosSAP();
+
+    try {
+      console.log('[Sync] Sincronizando Dataset Analítico para Machine Learning...');
+      const { syncMLDataset } = require('./mlDataset.service');
+      await syncMLDataset();
+    } catch (mlErr) {
+      console.error('[Sync] Error al sincronizar el Dataset Analítico de ML:', mlErr.message);
+    }
+  })().finally(() => {
+    almacenSyncPromise = null;
+  });
+
+  return almacenSyncPromise;
 }
 
 module.exports = {

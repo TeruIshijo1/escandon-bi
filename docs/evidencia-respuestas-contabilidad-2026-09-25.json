@@ -1,0 +1,337 @@
+{
+  "asOf": "2026-09-25T22:29:25.817Z",
+  "businessWrites": 0,
+  "groups": [
+    {
+      "code": 101,
+      "name": "Proveedores",
+      "count": 12
+    },
+    {
+      "code": 102,
+      "name": "GENERAL",
+      "count": 421
+    },
+    {
+      "code": 103,
+      "name": "HMEDRES",
+      "count": 100
+    },
+    {
+      "code": 104,
+      "name": "HONMED",
+      "count": 99
+    },
+    {
+      "code": 105,
+      "name": "RESICO",
+      "count": 12
+    },
+    {
+      "code": 106,
+      "name": "HONRESICO",
+      "count": 8
+    },
+    {
+      "code": 107,
+      "name": "TRANSPORTE",
+      "count": 1
+    },
+    {
+      "code": 108,
+      "name": "HONORARIOS",
+      "count": 25
+    }
+  ],
+  "suppliers": {
+    "count": 678,
+    "withRfc": 678,
+    "withFiscalRegime": 0
+  },
+  "medicalGroups": [
+    {
+      "code": 103,
+      "name": "HMEDRES",
+      "count": 100,
+      "withFiscalRegime": 0
+    },
+    {
+      "code": 104,
+      "name": "HONMED",
+      "count": 99,
+      "withFiscalRegime": 0
+    },
+    {
+      "code": 106,
+      "name": "HONRESICO",
+      "count": 8,
+      "withFiscalRegime": 0
+    },
+    {
+      "code": 108,
+      "name": "HONORARIOS",
+      "count": 25,
+      "withFiscalRegime": 0
+    }
+  ],
+  "calva": [
+    {
+      "cardCode": "P00062",
+      "cardName": "CALVA SANCHEZ MARIA ANTONIETA",
+      "group": 108,
+      "regime": null,
+      "companyPrivate": "cCompany",
+      "rfcMatchesSubmittedCfdi": true,
+      "withholdings": [
+        {
+          "WTCode": "SER",
+          "BPCode": "P00062"
+        },
+        {
+          "WTCode": "SERI",
+          "BPCode": "P00062"
+        }
+      ]
+    }
+  ],
+  "invoices": [
+    {
+      "docEntry": 7999,
+      "docNum": 7999,
+      "cardCode": "P00062",
+      "postingDate": "2026-09-16T00:00:00Z",
+      "taxDate": "2026-09-16T00:00:00Z",
+      "comments": "F-86B35 PSICOL Y CONSUL HSBC AGTO 26 MARIA ANTONIETA CALVA SANCHEZ",
+      "reference": "F-86B35",
+      "docTotal": 7769.66,
+      "vatSum": 0,
+      "paidToDate": 0,
+      "cancelled": "tNO",
+      "uuid": null,
+      "attachment": null,
+      "retentions": [
+        {
+          "WTCode": "SERI",
+          "WTAmount": 869.34,
+          "TaxableAmount": 9454,
+          "Rate": 10.66,
+          "GLAccount": "216-10-002"
+        },
+        {
+          "WTCode": "SER",
+          "WTAmount": 815,
+          "TaxableAmount": 0,
+          "Rate": 10,
+          "GLAccount": "216-04-001"
+        }
+      ],
+      "lines": [
+        {
+          "description": "PSICOLOGIA",
+          "lineTotal": 6264,
+          "account": "501-02-012",
+          "costCenter": null,
+          "taxCode": "CE"
+        },
+        {
+          "description": "CONSULTAS HSBC",
+          "lineTotal": 3190,
+          "account": "501-15-012",
+          "costCenter": null,
+          "taxCode": "CE"
+        }
+      ],
+      "electronicProtocolsCount": 0
+    }
+  ],
+  "withholdingCodes": [
+    {
+      "WTCode": "1I",
+      "WTName": "Retención de ISR",
+      "Rate": 10,
+      "BaseType": "wtcbt_Net",
+      "WithholdingType": "wt_IncomeTaxWithholding",
+      "Account": "216-04-001",
+      "EffectiveFrom": "2004-01-01T00:00:00Z"
+    },
+    {
+      "WTCode": "1V",
+      "WTName": "Retención de IVA, 2/3",
+      "Rate": 66.66,
+      "BaseType": "wtcbt_VAT",
+      "WithholdingType": "wt_VatWithholding",
+      "Account": "216-10-002",
+      "EffectiveFrom": "2004-01-01T00:00:00Z"
+    },
+    {
+      "WTCode": "RES",
+      "WTName": "Retencion de ISR RESICO",
+      "Rate": 1.25,
+      "BaseType": "wtcbt_Net",
+      "WithholdingType": "wt_VatWithholding",
+      "Account": "216-04-001",
+      "EffectiveFrom": "2025-12-26T00:00:00Z"
+    },
+    {
+      "WTCode": "SER",
+      "WTName": "Retención de ISR Servicios Profesionales",
+      "Rate": 10,
+      "BaseType": "wtcbt_Net",
+      "WithholdingType": "wt_VatWithholding",
+      "Account": "216-04-001",
+      "EffectiveFrom": "2025-12-26T00:00:00Z"
+    },
+    {
+      "WTCode": "SERI",
+      "WTName": "Retención de IVA Servicios Profesionales",
+      "Rate": 10.66,
+      "BaseType": "wtcbt_Net",
+      "WithholdingType": "wt_VatWithholding",
+      "Account": "216-10-002",
+      "EffectiveFrom": "2025-12-26T00:00:00Z"
+    }
+  ],
+  "requests": [
+    "/BusinessPartnerGroups",
+    "/BusinessPartners",
+    "/BusinessPartners",
+    "/BusinessPartners",
+    "/BusinessPartners",
+    "/WithholdingTaxCodes",
+    "/PurchaseInvoices"
+  ],
+  "note": "Regimen consultado: U_B1SYS_FiscRegime. Su ausencia no prueba inexistencia de documentos fiscales en otros repositorios.",
+  "clinicalSourceAugust": {
+    "units": 23,
+    "base": 5175,
+    "vat": 828,
+    "isrRates": [
+      0.1
+    ]
+  },
+  "clinicalAuditAugust": [
+    {
+      "ItemDescription": "CUOTA DE RECUPERACION CONSULTA PSICOLOGIA",
+      "GrupoCliente": "Otros clientes",
+      "Elegible": true,
+      "MotivoExclusion": "Incluido en V_HON_PAGO",
+      "Renglones": 23,
+      "Cantidad": 23,
+      "ImporteAuditoria": 5175
+    },
+    {
+      "ItemDescription": "CUOTA DE RECUPERACION CONSULTA PSICOLOGIA",
+      "GrupoCliente": "Otros clientes",
+      "Elegible": false,
+      "MotivoExclusion": "No entra: la orden ya tiene cita asociada en PCAP",
+      "Renglones": 24,
+      "Cantidad": 24,
+      "ImporteAuditoria": 5400
+    },
+    {
+      "ItemDescription": "CUOTA DE RECUPERACION CONSULTA PSICOLOGIA",
+      "GrupoCliente": "Otros clientes",
+      "Elegible": false,
+      "MotivoExclusion": "No entra: la cita no está en estado Llegó (SH)",
+      "Renglones": 2,
+      "Cantidad": 2,
+      "ImporteAuditoria": 450
+    },
+    {
+      "ItemDescription": null,
+      "GrupoCliente": "Otros clientes",
+      "Elegible": false,
+      "MotivoExclusion": "No entra: la cita no está en estado Llegó (SH)",
+      "Renglones": 1,
+      "Cantidad": null,
+      "ImporteAuditoria": null
+    },
+    {
+      "ItemDescription": null,
+      "GrupoCliente": "Otros clientes",
+      "Elegible": false,
+      "MotivoExclusion": "No entra: la orden de venta no tiene líneas en SOLN",
+      "Renglones": 1,
+      "Cantidad": null,
+      "ImporteAuditoria": null
+    }
+  ],
+  "submittedDocuments": {
+    "signedSheet": {
+      "unitsGeneral": 24,
+      "unitsHSBC": 11,
+      "base": 8150,
+      "vat": 1304,
+      "isr": 815,
+      "vatWithheld": 869.33,
+      "net": 7769.67
+    },
+    "cfdiPrint": {
+      "base": 8150,
+      "vat": 1304,
+      "isr": 815,
+      "vatWithheld": 869.34,
+      "net": 7769.66,
+      "xmlProvided": false,
+      "satStatusVerified": false
+    },
+    "oldSheet": {
+      "units": 23,
+      "base": 5175,
+      "vat": 828,
+      "isr": 600.3,
+      "vatWithheld": 552,
+      "net": 5402.7
+    }
+  },
+  "applicationValidation": {
+    "supplierCoverage": 678,
+    "fiscalRegimePopulated": 0,
+    "calvaInvoiceFound": 7999,
+    "silvaInvoiceFound": 8041,
+    "paginationRegressionTests": 3,
+    "remoteBusinessWrites": 0
+  },
+  "sapConfiguredWithholdingVerification": {
+    "asOf": "2026-09-25T22:46:38.100Z",
+    "coverage": {
+      "count": 678,
+      "withFiscalRegime": 0,
+      "complete": true
+    },
+    "calva": {
+      "subject": true,
+      "configuration": [
+        {
+          "description": "Retención de ISR Servicios Profesionales",
+          "rate": 10,
+          "calculationBase": "base neta definida en SAP",
+          "basePercentage": 100,
+          "appliesAt": "factura",
+          "codeEffectiveFrom": "2025-12-26T00:00:00Z",
+          "inactive": false
+        },
+        {
+          "description": "Retención de IVA Servicios Profesionales",
+          "rate": 10.66,
+          "calculationBase": "base neta definida en SAP",
+          "basePercentage": 100,
+          "appliesAt": "factura",
+          "codeEffectiveFrom": "2025-12-26T00:00:00Z",
+          "inactive": false
+        }
+      ]
+    },
+    "regressionTests": 4
+  },
+  "accountingOperationalVatSpecialties": {
+    "source": "User clarification from Accounting, 2026-09-25",
+    "specialties": [
+      "Rehabilitación",
+      "Psicología",
+      "Nutrición",
+      "Epidemiología"
+    ],
+    "legalTreatmentAutomaticallyValidated": false
+  }
+}

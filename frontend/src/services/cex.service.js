@@ -28,6 +28,18 @@ const cexService = {
     return handleResponse(res);
   },
   
+  getConsultaDia: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE}/consulta-dia?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+  
+  getConsultasProgramadas: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE}/consultas-programadas?${query}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+  
   createCita: async (citaData) => {
     const res = await fetch(`${API_BASE}/citas`, {
       method: 'POST',
