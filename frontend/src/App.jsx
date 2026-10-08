@@ -53,13 +53,14 @@ const DashboardComparativo= lazy(() => import('./components/dashboard/DashboardC
 const DataQualityDashboard= lazy(() => import('./pages/DataQualityDashboard'));
 const ConsultaExternaPage = lazy(() => import('./pages/ConsultaExternaPage'));
 const TraceOrder          = lazy(() => import('./pages/TraceOrder'));
+const AccountReopeningReview = lazy(() => import('./pages/AccountReopeningReview'));
 const HonorariosAuditView = lazy(() => import('./components/honorarios/HonorariosAuditView'));
 
 /* ── Fallback de carga ───────────────────────────────────────── */
 function PageLoader() {
   return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
-        <PremiumLoader text="Cargando módulo…" />
+        <PremiumLoader text="Cargando página…" />
       </div>
   );
 }
@@ -110,7 +111,7 @@ export default function App() {
       debugger; // eslint-disable-line no-debugger
       if (new Date() - start > 100) {
         // Si tarda más de 100ms, significa que el debugger se activó y pausó la ejecución
-        document.body.innerHTML = '<div style="display:flex;height:100vh;align-items:center;justify-content:center;font-family:sans-serif;color:#004687;font-weight:bold;">ACCESO DENEGADO - MODO DESARROLLADOR DETECTADO</div>';
+        document.body.innerHTML = '<div style="display:flex;height:100vh;align-items:center;justify-content:center;font-family:sans-serif;color:#004687;font-weight:bold;">No se puede continuar en esta pantalla. Cierra las herramientas del navegador y vuelve a cargar la página.</div>';
       }
     }, 2000);
 
@@ -355,6 +356,14 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO]}>
                     <TraceOrder />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="auditoria/reapertura-cuentas"
+                element={
+                  <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO]}>
+                    <AccountReopeningReview />
                   </ProtectedRoute>
                 }
               />

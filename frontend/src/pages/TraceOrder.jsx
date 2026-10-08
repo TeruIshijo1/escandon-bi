@@ -1,3 +1,4 @@
+import { userMessage } from '../utils/userMessages';
 import React, { useState } from 'react';
 import axios from 'axios';
 
@@ -21,7 +22,7 @@ const TraceOrder = () => {
       });
       setData(response.data.data);
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'Error al buscar la orden');
+      setError(userMessage(err.response?.data?.message || err.response?.data?.error || err.message || 'Error al buscar la orden'));
     } finally {
       setLoading(false);
     }
@@ -78,13 +79,13 @@ const TraceOrder = () => {
 
   /* ── Tabla de Stock ────────────────────────────────────── */
   const renderStockTable = (stock) => {
-    if (!stock || stock.length === 0) return <p style={emptyMsg}>No hay stock en ningún almacén.</p>;
+    if (!stock || stock.length === 0) return <p style={emptyMsg}>No hay existencias en ningún almacén.</p>;
     return (
       <div style={{ overflowX: 'auto', borderRadius: 'var(--radius-sm)', border: '1px solid var(--navbar-border)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
             <th style={thStyle}>Almacén</th>
-            <th style={{ ...thStyle, textAlign: 'right' }}>Stock Real</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>Existencias reales</th>
             <th style={{ ...thStyle, textAlign: 'right' }}>Comprometido</th>
           </tr></thead>
           <tbody>
@@ -226,7 +227,7 @@ const TraceOrder = () => {
         </div>
       )}
 
-      {error && <p style={{ color: 'var(--color-danger)', fontWeight: 600, marginBottom: '1rem' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--color-danger)', fontWeight: 600, marginBottom: '1rem' }}>{userMessage(error)}</p>}
 
       {data && (
         <>
@@ -246,7 +247,7 @@ const TraceOrder = () => {
                 <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{new Date(data.OrderInfo.DocDate).toLocaleDateString('es-MX')}</div>
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Estatus SAP</div>
+                <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Estado SAP</div>
                 <span style={{
                   display: 'inline-block',
                   padding: '0.3rem 0.9rem',

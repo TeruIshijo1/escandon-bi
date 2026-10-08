@@ -1,154 +1,66 @@
-# 🏥 Hospital Escandón — Plataforma BI (Manual de Producción & Pase a Producción)
+# Pase a producción — Hospital Escandón BI
 
-Este documento contiene los ajustes específicos realizados en el servidor productivo (`SERVIDORCALIDAD`), así como las **instrucciones obligatorias para cualquier Agente de IA o desarrollador** al generar la carpeta `pase_a_produccion`.
+Actualizado el **7 de octubre de 2026**. Este pase integra todo el estado actual del proyecto, incluidos archivos nuevos y cambios pendientes de guardar en Git. El servidor `SERVIDORCALIDAD` entrega API y frontend en el puerto **5173**.
 
----
+La revisión final incluye los estadísticos mensuales, la descarga completa de Excel por fechas y la corrección de tiempos de espera de SAP. Consulta [la revisión final del paquete](revision-pase-final-2026-10-07.md). Ejecuta `instalar.bat` antes del arranque: también prepara los dos archivos de referencia que utilizan los estadísticos, conservando el histórico existente.
 
-## 📌 1. Modificaciones Realizadas para el Entorno Productivo
+## Preparar el pase en desarrollo
 
-Respecto al entorno de desarrollo local, se realizaron las siguientes adaptaciones en el servidor de producción:
+Ejecuta `powershell -ExecutionPolicy Bypass -File .\build_deploy.ps1` desde el proyecto. El script valida Node, recompila todo el frontend, incluye el backend completo y verifica hashes, dependencias locales y recursos compilados. El pase anterior queda conservado en `tmp/pase-anterior-*`. Si falla el build o la auditoría previa, el pase anterior se conserva.
 
-### 1.1 Conexión a SQL Server / Tailscale VPN (`REMOTE_DB_SERVER`)
-- **Archivo**: `backend/.env`
-- **Cambio**: 
-  ```env
-  REMOTE_DB_SERVER=100.121.115.8
-  REMOTE_DB_PORT=1433
-  ```
-- **Motivo Técnico**: La arquitectura utiliza **Tailscale Mesh VPN**. La conexión hacia SQL Server (`KH_HE`) se realiza de forma directa y cifrada extremo a extremo a través de la IP privada fija `100.121.115.8` en el puerto estándar `1433`. Consulta `GUIA_CONEXION_PRODUCCION_TAILSCALE.md` para más información.
+El script usa el runtime de `.runtime/node.exe` preparado por `scripts/prepare-node-runtime.ps1`. El pase incluye Node **24.21.0** para Windows; no depende de la versión de Node que estuviera iniciando el servidor. Se necesita npm instalado para preparar las dependencias del backend. El instalador ejecuta también la herramienta npm con el runtime incluido, evitando que su lanzador seleccione otro Node.
 
-### 1.2 Mensajes de Diagnóstico en la Conexión Remota
-- **Archivo**: `backend/config/remote-db.js`
-- **Cambio**: Se añadieron sugerencias de diagnóstico automáticas para advertir al usuario en consola en caso de desconexión del túnel o errores de red.
+## Contenido del paquete
 
-### 1.3 Migración SQLite → PostgreSQL (Base de Datos Principal)
-- **Archivo**: `backend/migrate_to_pg.js`
-- **Cambio**: Toda la persistencia de la plataforma (usuarios/RBAC, auditoría, `ConfiguracionBI`, `KPIConfig`, `DataConnectors`, `MetricMappings`, `DataEntities`, calidad de datos, `interop_event_logs` y el legado clínico `Pacientes`/`AuditoriaInventarioCargos`) ahora vive en PostgreSQL (`escandon_bi`). SQLite se eliminó del runtime.
-- **Migración en producción (UNA sola vez)**:
-  1. Respaldo consistente: el script copia el archivo SQLite a `database/escandon_bi_backup_pre_pg.db` antes de migrar (conservar ese respaldo).
-  2. Ejecutar desde `backend/`: `node migrate_to_pg.js`
-  3. Requiere `better-sqlite3` instalado (sigue en `package.json` solo como herramienta de migración) y PostgreSQL alcanzable con las variables `PGUSER/PGHOST/PGPASSWORD/PGDATABASE/PGPORT`.
-  4. `npm run db:init` crea/actualiza esquema y seeds (idempotente).
+- `frontend/dist/`: aplicación completa recompilada; incluye todos los cambios de frontend, permisos, estilos, reportes y descargas. El servidor no necesita Vite ni las fuentes de React.
+- `frontend/public/`: recursos utilizados directamente por exportaciones del backend, incluido el logo institucional.
+- `backend/`: código activo completo, configuración de ejemplo, scripts, manifiesto de dependencias y `package-lock.json`.
+- `.runtime/node.exe`, `.nvmrc` y `scripts/prepare-node-runtime.ps1`: runtime y recuperación del runtime.
+- `database/*.sql`: esquemas y herramientas SQL; no se ejecutan en bloque ni se restaura una base durante una actualización.
+- `initial-data/`: historiales y modelos de referencia para instalaciones sin esos archivos. El instalador copia cada uno sólo cuando no existe; conserva los datos y modelos del servidor.
+- `instalar.bat`, `iniciar_produccion.bat`, `permitir_acceso_red.bat` y `verificar_pase.ps1`.
+- Documentación actualizada, `docs/revision-pase-2026-10-07.md` y `MANIFIESTO.json` con inventario, tamaños y hashes SHA256.
 
-### 1.4 Módulo Consulta Externa (CEX)
-- **Archivos**: `database/06_cex.sql`, `backend/routes/cex.routes.js`, `backend/services/cexSync.service.js`, `backend/scripts/migrate_cex.js`, `frontend/src/pages/ConsultaExternaPage.jsx`.
-- **Diseño**: VERTICAL (SQL Server KH_HE) sigue siendo **solo lectura**. La agenda se cachea en PostgreSQL (`dw_vertical_consultas_prog`) y un cron cada 15 min la replica a las tablas editables `cex_citas`/`cex_pacientes` (upsert por `CitaOrigenId`, respetando estados locales ya definidos: ASISTIDA/CANCELADA/NO_ASISTIO no se sobrescriben).
-- **Rol nuevo**: `CONSULTA_EXTERNA` con capabilities `verCEX` (lectura) y `gestionCEX` (crear/editar citas, registrar consultas). Admin puede crearlo desde Admin → Usuarios.
-- **Migración inicial en producción**: `node scripts/migrate_cex.js` desde `backend/` (puebla pacientes y citas desde la agenda ya sincronizada).
-- **Endpoints**: `GET /api/cex/agenda` (default hoy), `POST /api/cex/sync`, `POST /api/cex/citas`, `PATCH /api/cex/citas/:id/estado`, `POST /api/cex/consultas`, `GET /api/cex/pacientes`, `GET /api/cex/reportes`.
+No incluye `.env`, claves, `node_modules`, bases SQLite, dumps de PostgreSQL, cargas de usuarios, pruebas, logs, temporales ni backups de modelos. El instalador no restaura ni limpia PostgreSQL.
 
----
+## Aplicar esta actualización en SERVIDORCALIDAD
 
-## 🤖 2. Instrucciones para la IA (Generación de `pase_a_produccion`)
+1. Conserva un respaldo de la instalación y de PostgreSQL del servidor. Detén la instancia de esta plataforma desde su ventana o su servicio.
+2. Antes de copiar, ejecuta `powershell -ExecutionPolicy Bypass -File .\verificar_pase.ps1` dentro de la carpeta del pase. Debe confirmar que todos los archivos coinciden con el manifiesto.
+3. Copia **el contenido completo de `pase_a_produccion`**, incluida la carpeta `.runtime`, a `C:\Users\SERVIDORCALIDAD\Desktop\ESCANODN-BI`. Reemplaza el código y los recursos. El paquete no contiene archivos que reemplacen `backend/.env`, `backend/uploads`, `backend/data`, los modelos activos ni la base productiva. Los archivos estáticos viejos pueden retirarse reemplazando únicamente `frontend/dist`.
+4. Ejecuta `instalar.bat`. Usa **npm ci --omit=dev**, conserva la configuración existente y prepara los datos iniciales que falten. No se instalan dependencias del frontend.
+5. Revisa `backend/.env` conservando sus credenciales. Para Gemini configura **GEMINI_MODEL=gemini-3.5-flash-lite**. No copies la clave del entorno de desarrollo. Conserva `NODE_ENV=production` y `PORT=5173`; el lanzador productivo también establece estos valores.
+6. Las nuevas tablas de honorarios se crean de forma idempotente al usar sus servicios. Puedes prepararlas antes del arranque con `.\.runtime\node.exe backend\scripts\migrate-honorarios.js`. Este script sólo crea estructuras en PostgreSQL de BI; no modifica SAP ni Vertical. El usuario de PostgreSQL debe poder crear las tablas e índices necesarios. `db:init` y los seeds son para instalación inicial, no para sustituir los datos de una actualización.
+7. Inicia `iniciar_produccion.bat`. Abre `http://localhost:5173/health`: debe indicar `status: ok`, `db: ok` y `environment: production`. Entra a `http://localhost:5173` y recarga con **Ctrl + F5**.
+8. Verifica con un usuario autorizado los tableros claro/oscuro, honorarios, reportes y revisión de cuentas. Los módulos nuevos y los 64 temas de reportes requieren sus permisos correspondientes en Administración de usuarios; el acceso completo especial de `amendoza` se conserva. No se asignan permisos nuevos automáticamente a otros usuarios.
 
-Cuando un Asistente de IA o Desarrollador realice mejoras o correcciones en el entorno local de desarrollo, **DEBE** generar la carpeta `pase_a_produccion` siguiendo estrictamente las reglas descritas a continuación.
 
-> [!IMPORTANT]
-> **REGLA DE ORO DE DESPLIEGUE:**
-> Al actualizar el servidor productivo, **ÚNICAMENTE SE COPIA EL CONTENIDO DE LA CARPETA `pase_a_produccion`**. 
-> NUNCA se debe copiar la carpeta entera de desarrollo con archivos temporales o sobrescribir el archivo `backend/.env` ni las bases de datos productivas.
+La revisión del 5 de octubre incorpora procedimientos quirúrgicos por rol desde PCFRCP/PCFRPR y el catálogo CP. Revisa sus tarifas autorizadas y posibles coincidencias con cargos antes de aprobarlos. El Excel respeta estado, médico, grupo y búsqueda; el Excel del cierre consulta los pagos actuales. Evidencia y alcance: `docs/revision-pase-honorarios-2026-10-05.md`.
 
-### 2.1 Archivos y Carpetas OBLIGATORIOS en `pase_a_produccion`
+La actualización del 6 de octubre incluye **Honorarios Médicos → Auditoría**: consulta de los registros originales de Vertical, filtros, detalle, paginación y Excel completo del filtro. Las listas de médicos, grupos y orígenes se cargan al abrir la pestaña y se actualizan al cambiar las fechas. Esta auditoría es de sólo lectura, utiliza el permiso existente de honorarios y no requiere una migración adicional. También incorpora la corrección del historial fiscal al cambiar de médico, la navegación vigente de Servicios, Pagos y PDF y Configuración, y todos los cambios actuales de los demás módulos. Consulta [la revisión de este pase](revision-pase-2026-10-07.md) y [el alcance de la auditoría](auditoria-honorarios-vertical.md).
 
-1. **Frontend Compilado**:
-   - `frontend/` (Debe contener el build generado por `npm run build` en la subcarpeta `dist/` o los estáticos requeridos).
-2. **Backend Limpio**:
-   - `backend/` únicamente con código fuente activo (`server.js`, `config/`, `controllers/`, `routes/`, `services/`, `middleware/`, `utils/`, `package.json`, `.env.example`).
-3. **Base de Datos (Solo Esquemas y Scripts DDL)**:
-   - `database/` conteniendo únicamente archivos `.sql` y `.dump` (`01_schema.sql` a `05_quality_and_interop.sql`, `escandon_bi_dw.dump`).
-4. **Scripts de Ejecución y Documentación**:
-   - `iniciar.bat`, `iniciar_produccion.bat`, `iniciar_tunel_db.bat`, `instalar.bat`, `servicio_tunel_db.vbs`, `build_deploy.ps1`.
-   - `README.md`, `README_PRODUCCION.md`, `INSTRUCCIONES_IA.md`, `ESTRUCTURA.md`, `contexto_plataforma.md`.
+La revisión del **7 de octubre** incorpora **Descargar PDF detallado** y **Descargar PDF resumido** junto al médico; ambos contienen sólo sus servicios aprobados. Al guardar una aprobación, la atención pasa a **Aprobados** y **Pagos y PDF**, sale de **Por revisar** y de **Aprobar pendientes**, y conserva su estado al volver a consultar. Si no pueden recuperarse las decisiones guardadas, la pantalla permite reintentar sin mostrarlas como pendientes. En Catálogo y precios, los servicios completos muestran **Configurados** en verde. También corrige la aprobación de servicios desactivados durante la revisión, conserva el orden solicitado de columnas en pantalla y Excel, continúa las páginas SAP vacías que tengan más resultados y respeta las cancelaciones de consultas. Incluye la revisión de etiquetas y gráficos de los tableros. Consulta [la evidencia y el alcance de esta revisión](revision-pase-2026-10-07.md).
 
----
+## Configuración y fuentes
 
-### 2.2 Lista de Exclusión Estricta (NUNCA incluir en `pase_a_produccion`)
+La ampliación de **Jefes de área** agrega una tabla editable de pagos mensuales vinculada al médico existente. El usuario decide si incluye el fijo de cada mes; se toma completo el importe capturado y se calcula el total e impuestos al final con la ficha del médico. Se conserva un único registro por médico y mes y el importe histórico de los pagos preparados. Consulta [el flujo y las comprobaciones](honorarios-jefes-de-area.md). `backend/scripts/migrate-honorarios.js` incluye las nuevas estructuras propias de BI.
 
-La IA o el script de empaquetado debe **EXCLUIR EXPLICITAMENTE**:
+Se conserva la conexión SQL Server/Tailscale `REMOTE_DB_SERVER=100.121.115.8`, `REMOTE_DB_PORT=1433`, base `KH_HE`. SAP usa el Service Layer configurado en el servidor. PostgreSQL conserva usuarios, decisiones, plantillas, tarifas, cierres, aplicaciones e histórico.
 
-```text
-❌ node_modules/                  (Se instalan en destino si fuera necesario)
-❌ backend/.env                   (PRESERVAR SIEMPRE el .env del servidor productivo)
-❌ backend/database.sqlite        (Restos de pruebas SQLite)
-❌ database/*.db                  (SQLite eliminado; NO sobrescribir escandon_bi_backup_pre_pg.db)
-❌ database/*.db-shm              (Archivos WAL/SHM temporales de SQLite)
-❌ database/*.db-wal
-❌ scratch/                       (Carpeta de pruebas sueltas)
-❌ backend/scratch/               (Carpeta de pruebas backend)
-❌ scratch_*.js / scratch_*.cjs   (Scripts de pruebas temporales)
-❌ test_*.js / test_*.cjs         (Scripts de pruebas automatizadas/manuales)
-❌ test_*.xlsx / test.xlsx        (Archivos Excel de pruebas)
-❌ check_*.js                     (Scripts de inspección temporal)
-❌ search_*.js                    (Scripts de búsqueda de columnas)
-❌ query_*.js / query_*.cjs       (Queries de prueba sueltas)
-❌ update_*.cjs / update_*.js     (Parches temporales)
-❌ modify.js / sync_almacen.js
-❌ *.log                          (Logs de ejecución)
-❌ frontend/screenshot.png        (Capturas de pantalla)
-```
+Las opciones nuevas son `HONORARIOS_CATALOG_SYNC_MINUTES=30`, `HONORARIOS_DISCOVERY_MONTHS=12` y `SAP_LOCAL_CURRENCY=MXN`. Si no existen en el `.env` del servidor se usan esos valores predeterminados. El catálogo se sincroniza al arrancar y según su intervalo sin reemplazar tarifas autorizadas. Las tablas del DW y las columnas faltantes se preparan por los inicializadores existentes; no se recrea el histórico.
 
----
+La auditoría de honorarios excluye los códigos **FAR/ALM** y cualquier grupo de **farmacia o almacenes**, como Almacén General, Almacén Quirófano y Farmacia Satélite. También excluye servicios con código SER u otro código que pertenezcan a esos grupos. La exclusión se aplica a registros, totales, listas de filtros y Excel. Para aplicar este cambio hay que actualizar el código y reiniciar el backend; no requiere migraciones ni cambios en Vertical.
 
-## 📦 3. Procedimiento para Aplicar Cambios en el Servidor
+La IA necesita la clave existente del proveedor configurado y salida HTTPS a su servicio; para Gemini, `generativelanguage.googleapis.com`. Las reservas entre proveedores sólo se habilitan con `REPORT_AI_FALLBACK_PROVIDERS`; cada una necesita su propia clave. `REPORT_AI_GEMINI_FALLBACK_MODELS` permite indicar modelos Gemini de reserva. El chat envía la solicitud y metadatos del catálogo autorizado; no envía resultados de pacientes. Si el proveedor falla, mantiene la búsqueda guiada y la selección manual. Cambiar el ejemplo de configuración no cambia por sí solo el `.env` conservado del servidor.
 
-1. **En la PC de Desarrollo**:
-   Ejecutar el script de construcción de producción:
-   ```powershell
-   .\build_deploy.ps1
-   ```
-   Esto generará o actualizará automáticamente la carpeta `D:\Escritorio\escandon-bi\pase_a_produccion` aplicando todas las reglas de exclusión arriba mencionadas.
+Los pronósticos de ML conservan sus scripts Python, modelos iniciales y `backend/ml/requirements.txt`. Python y sus bibliotecas deben estar disponibles en el servidor que use esas funciones; no se copia un entorno virtual local.
 
-2. **Transferencia al Servidor Productivo**:
-   Copiar todo el contenido dentro de `pase_a_produccion` y pegarlo en el servidor de producción (`C:\Users\SERVIDORCALIDAD\Desktop\ESCANODN-BI`), eligiendo **reemplazar archivos existentes**.
+## Verificación tras copiar
 
-3. **Arranque**:
-   En el servidor productivo, hacer doble clic en `iniciar.bat`.
+En Honorarios, verifica **Servicios**, **Pagos y PDF**, **Configuración** y **Auditoría** con un usuario autorizado. Comprueba la configuración de una tarifa, la revisión de una atención y un cierre con un pago parcial en un entorno de prueba. El PDF debe mostrar el saldo restante y bloquearse si no puede validar los importes o la fuente clínica. En Auditoría, verifica las fechas, los filtros, el detalle y que el Excel contenga todos los resultados del filtro. Consulta `docs/instructivo_honorarios.html`, `docs/honorarios-aprobados-y-pdf-pago.md` y `docs/auditoria-honorarios-vertical.md` para el flujo y sus comprobaciones. Comprueba también las dos descargas junto al médico y el distintivo Configurados en verde sólo cuando el servicio tiene tarifa autorizada. Los PDF de revisión siguen disponibles como documentos de revisión.
 
----
+La verificación estricta del manifiesto se aplica a la carpeta del pase **antes de mezclarla con la instalación existente**. Esa instalación contiene configuración, cargas y dependencias que no forman parte del paquete. El empaquetado también contrasta las fuentes actuales para detectar cambios que aún no hayan pasado a producción.
 
-## 🔄 4. Arquitectura de Sincronización y Data Warehouse (PostgreSQL DW)
+Para otras computadoras abre `http://IP-DEL-SERVIDOR:5173`; no uses localhost. `permitir_acceso_red.bat` prepara el acceso de red cuando corresponde. Consulta `GUIA_CONEXION_PRODUCCION_TAILSCALE.md` para la conexión remota.
 
-La plataforma utiliza una **arquitectura híbrida de 3 capas** para garantizar consultas inmediatas en los tableros sin saturar las bases de datos de producción:
-
-### 4.1 Distribución de Fuentes de Datos
-1. **SAP Service Layer (ERP)**: Se consulta en **tiempo real para el día en curso** (facturación, ingresos oficiales grupo 111, inventario valorizado).
-2. **SQL Server / Tailscale VPN (Vertical)**: Se consulta en **tiempo real para el día en curso** (cuentas de pacientes activas, expediente clínico, censos).
-3. **PostgreSQL Data Warehouse (Local)**: Concentra **todo el histórico (ayer y fechas pasadas)**. Todos los tableros analíticos (Quirófano, Urgencias, Eficiencia, CEX) leen el histórico directamente desde PostgreSQL local para ofrecer respuestas en milisegundos.
-
----
-
-### 4.2 Lógica de Sincronización (Incremental vs Completa)
-- **Sincronización Incremental (Cada 15 minutos)**:
-  Un Cron Job interno (`initDashboardCron` e `initQuirofanoCron`) ejecuta ciclos cada 15 minutos sincronizando una ventana de **15 días hacia atrás** desde SQL Server y SAP Service Layer hacia PostgreSQL DW.
-- **Sincronización Histórica Completa (`fullSync`)**:
-  Al arrancar el servidor (`server.js`), el sistema verifica la salud de la base de datos local:
-  - Si la tabla de servicios o eventos de Quirófano tiene menos de 1,000 registros o su fecha más antigua (`MIN(fecha_de_cargo)`) es posterior a **60 días atrás**, la plataforma detecta automáticamente que el histórico está incompleto y dispara la carga completa `fullSync` desde `2026-04-01`.
-
----
-
-### 4.3 Resolución de Inconsistencias (Ej. 84 vs 19 Cirugías en Quirófano)
-- **Causa**: Al copiar la plataforma a un nuevo servidor de producción sin migrar el histórico de PostgreSQL, si sólo corría la sincronización incremental (15 días), la consulta del mes completo (ej. 01 al 31 de julio) sólo encontraba datos del 26 al 31 de julio (**19 cirugías**).
-- **Solución Automática**: La plataforma ahora detecta la falta de histórico al iniciar y llena automáticamente todo el período de meses pasados (**84 cirugías**).
-
----
-
-### 4.4 Cómo Forzar la Resincronización Histórica Manualmente
-Si se requiere purgar y volver a descargar todo el histórico desde SQL Server / SAP hacia PostgreSQL DW:
-
-1. **Vía Endpoint REST (Rol ADMIN)**:
-   ```http
-   POST http://localhost:4000/api/admin/sync-dw-full
-   Header: Authorization: Bearer <TOKEN_ADMIN>
-   ```
-
-2. **Vía Consola de Node.js (Servidor)**:
-   Desde el directorio `backend/`:
-   ```bash
-   node -e "require('./node_modules/dotenv').config(); const { syncAllDashboards } = require('./services/dashboardSync.service'); const { syncQuirofanoData } = require('./services/quirofanoSync.service'); (async () => { await syncQuirofanoData({ fullSync: true }); await syncAllDashboards({ fullSync: true }); console.log('✅ Re-sincronización completa finalizada.'); process.exit(0); })();"
-   ```
-
----
-
-<p align="center">
-  🏥 <b>Hospital Escandón BI</b> · Manual de Producción v1.1
-</p>
+El pase se preparó y validó localmente. Su preparación no aplica cambios ni inicia procesos en SERVIDORCALIDAD.

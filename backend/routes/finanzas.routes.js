@@ -102,12 +102,12 @@ router.post('/ml-forecast/run', authenticate, authorize(['ADMIN', 'DIRECTOR']), 
 
     res.json({
       ok: true,
-      message: 'Pipeline de proyecciones ejecutado correctamente',
+      message: "Estimaciones de ingresos actualizadas.",
       data: jobInfo
     });
   } catch (err) {
     console.error('[POST ML Forecast Error]', err);
-    res.status(500).json({ ok: false, error: 'Error al ejecutar pipeline de ingresos' });
+    res.status(500).json({ ok: false, error: "No se pudieron actualizar las estimaciones de ingresos. Intenta de nuevo." });
   }
 });
 

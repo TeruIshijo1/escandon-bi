@@ -1,3 +1,4 @@
+import '../components/dashboard/DashboardVisuals.css';
 /**
  * DashboardArea.jsx — Tablero por Área Hospitalaria
  * Hospital Escandón BI Platform v4.0
@@ -24,6 +25,10 @@ import DashboardUciNativo from '../components/dashboard/DashboardUciNativo';
 import DashboardHospitalizacionNativo from '../components/dashboard/DashboardHospitalizacionNativo';
 import { AREAS, AREAS_LABELS, AREA_TO_PERMISSION, ROUTE_TO_PERMISSION, can } from '../utils/rbac';
 import { useKPIConfig } from '../hooks/useKPIConfig';
+import AreaSwitcher from '../components/dashboard/AreaSwitcher';
+import AreaIcon from '../components/dashboard/AreaIcon';
+import { areaPalette } from '../components/dashboard/areaColors';
+import './DashboardArea.css';
 
 const KPI_DB_MAP = {
   'Ocupación': 'ocupacion',
@@ -36,75 +41,39 @@ const API_BASE = '/api';
 
 /* ── Config visual por área ──────────────────────────────── */
 const AREA_CONFIG = {
-  [AREAS.QUIROFANO]: { icon:'🔪', color:'#004687' },
-  [AREAS.UCI]:       { icon:'❤️‍🩺', color:'#EF4444' },
-  [AREAS.URGENCIAS]: { icon:'🚨', color:'#E8853D' }, // Warm accent for urgencias
-  [AREAS.CUNEROS]:   { icon:'👶', color:'#0088C9' },
-  [AREAS.IMAGENOLOGIA]: { icon:'🔬', color:'#8B5CF6' },
-  [AREAS.LABORATORIO]:  { icon:'🧪', color:'#10B981' },
-  [AREAS.CONSULTA_EXTERNA]: { icon:'🩺', color:'#0088C9' },
-  [AREAS.FINANZAS]:         { icon:'💰', color:'#10B981' },
-  [AREAS.HOSPITALIZACION]:  { icon:'🛏️', color:'#005FA9' },
-  [AREAS.ASEGURADORAS]:     { icon:'🛡️', color:'#10B981' },
+  [AREAS.QUIROFANO]: { icon: 'surgery', color: '#004687', description: 'Cirugías, tiempos de atención e ingresos del área.' },
+  [AREAS.UCI]: { icon: 'intensive', color: '#EF4444', chartAccent: '#0088C9', description: 'Ocupación de camas, estancias y atención de pacientes.' },
+  [AREAS.URGENCIAS]: { icon: 'emergency', color: '#E8853D', description: 'Atenciones, altas y disponibilidad de camas.' },
+  [AREAS.CUNEROS]: { icon: 'nursery', color: '#0088C9', description: 'Atención neonatal, alimentación y consumo de insumos.' },
+  [AREAS.IMAGENOLOGIA]: { icon: 'imaging', color: '#8B5CF6', description: 'Estudios realizados, servicios más solicitados e ingresos.' },
+  [AREAS.LABORATORIO]: { icon: 'laboratory', color: '#10B981', description: 'Estudios realizados, servicios más solicitados e ingresos.' },
+  [AREAS.CONSULTA_EXTERNA]: { icon: 'consultation', color: '#0088C9', description: 'Consultas, asistencia y actividad de los médicos.' },
+  [AREAS.FINANZAS]: { icon: 'finance', color: '#10B981', description: 'Ingresos, movimientos y resultados financieros.' },
+  [AREAS.HOSPITALIZACION]: { icon: 'hospital', color: '#005FA9', description: 'Ocupación, estancias e ingresos por atención.' },
+  [AREAS.ASEGURADORAS]: { icon: 'insurance', color: '#10B981', description: 'Pacientes con convenio, facturación y saldos pendientes.' },
+  [AREAS.FARMACIA]: { icon: 'pharmacy', color: '#0088C9', description: 'Consumo de medicamentos e insumos del área.' },
+  [AREAS.CARDIOLOGIA]: { icon: 'intensive', color: '#EF4444', chartAccent: '#0088C9', description: 'Consulta la actividad y los resultados de Cardiología.' },
+  [AREAS.ALMACEN_GENERAL]: { icon: 'warehouse', color: '#005FA9', description: 'Consulta los movimientos y resultados del almacén.' },
 };
 
 const DEFAULT_AREA = AREAS.URGENCIAS;
 
 /* ── Sub-componente KPI mini ─────────────────────────────── */
-function AreaKPICard({ label, value, delta, up, accent }) {
-  const deltaColor = up === true ? 'var(--color-verde-e)' : up === false ? 'var(--color-danger)' : 'var(--text-muted)';
-  const arrow      = up === true ? '▲ ' : up === false ? '▼ ' : '● ';
+function AreaKPICard({ label, value, delta, up }) {
+  const deltaColor = up === true ? 'var(--color-verde-e)' : up === false ? 'var(--color-danger)' : '#52647a';
   return (
-    <div style={{
-      background:   '#FFFFFF',
-      borderRadius:  '14px',
-      padding:      '1.1rem 1.25rem',
-      border:       '1px solid rgba(0,70,135,0.05)',
-      borderLeft:   `4px solid ${accent}`,
-      boxShadow:    'var(--shadow-xs)',
-      position:     'relative',
-      overflow:     'hidden',
-      transition:   'all var(--transition-base)',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      minHeight: value == null ? '80px' : 'auto'
-    }}
-      className="area-kpi-card"
-    >
-      <div style={{
-        fontFamily: 'var(--font-display)',
-        fontSize:'0.64rem',
-        fontWeight:700,
-        textTransform:'uppercase',
-        letterSpacing:'0.06em',
-        color:'var(--text-muted)',
-        marginBottom: value != null ? '0.35rem' : 0
-      }}>{label}</div>
-      {value != null && (
-        <div style={{
-          fontFamily:"var(--font-mono)",
-          fontSize:'1.65rem',
-          fontWeight:700,
-          color:'var(--text-primary)',
-          lineHeight:1,
-          marginBottom:'0.3rem',
-          letterSpacing: '-0.02em',
-        }}>{value}</div>
-      )}
+    <div className="area-kpi-card dashboard-metric-card">
+      <div className="area-kpi-card__label dashboard-metric-label">{label}</div>
+      {value != null && <div className="area-kpi-card__value dashboard-metric-value">{value}</div>}
       {value != null && delta != null && (
-        <div style={{
-          fontFamily: 'var(--font-body)',
-          fontSize:'0.72rem',
-          color:deltaColor,
-          fontWeight:600
-        }}>{arrow}{delta}</div>
+        <div className="area-kpi-card__note dashboard-metric-note" style={{ color: deltaColor }}>
+          {up === true ? '↑ ' : up === false ? '↓ ' : ''}{delta}
+        </div>
       )}
     </div>
   );
 }
 
-/* ── Componente principal ────────────────────────────────── */
 export default function DashboardArea() {
   const { user }         = useAuth();
   const { getKPI }       = useKPIConfig();
@@ -309,143 +278,7 @@ export default function DashboardArea() {
   };
 
   const cfg = AREA_CONFIG[area] || AREA_CONFIG[DEFAULT_AREA];
-
-  return (
-    <div id="dashboard-container" style={{ maxWidth:'var(--content-max, 1200px)', margin:'0 auto' }}>
-      <style>{`
-        .area-kpi-card:hover {
-          transform: translateY(-2px);
-          box-shadow: var(--shadow-md) !important;
-        }
-        .area-action-btn:hover {
-          transform: translateY(-1.5px);
-          box-shadow: var(--shadow-xs);
-        }
-        .custom-select-area::-ms-expand {
-          display: none;
-        }
-      `}</style>
-
-      {pbiModal && (
-        <PBIModal {...pbiModal} onClose={() => setPBIModal(null)} />
-      )}
-      {/* <ExportApiModal isOpen={showExportApi} onClose={() => setShowExportApi(false)} /> */ }
-
-      {/* Header Panel */}
-      <div style={{ 
-        background: '#0B132B', // Sleek dark navy background
-        borderRadius: '20px', 
-        padding: '2rem 2.25rem', 
-        color: 'white', 
-        marginBottom: '2rem', 
-        boxShadow: '0 10px 30px rgba(11, 19, 43, 0.15)', 
-        position: 'relative', 
-        overflow: 'hidden',
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        flexWrap: 'wrap', 
-        gap: '1.25rem',
-        border: '1px solid rgba(255, 255, 255, 0.05)',
-        borderTop: '1.5px solid rgba(255, 255, 255, 0.12)'
-      }}>
-        {/* Glowing mesh gradient background shapes using dynamic area color */}
-        <div style={{
-          position: 'absolute',
-          top: '-50%',
-          right: '-10%',
-          width: '350px',
-          height: '350px',
-          borderRadius: '50%',
-          background: `radial-gradient(circle, ${cfg.color}33 0%, rgba(13, 37, 63, 0) 70%)`,
-          filter: 'blur(40px)',
-          pointerEvents: 'none'
-        }} />
-
-        {/* ECG visual details */}
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          opacity: 0.05,
-          pointerEvents: 'none',
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 120' width='800' height='120'%3E%3Cpath d='M0 60h120l10-15 15 10 10-25 15 80 10-65 15 15h120l10-15 15 10 10-25 15 80 10-65 15 15h200' fill='none' stroke='%23ffffff' stroke-width='2'/%3E%3C/svg%3E")`,
-          backgroundSize: '450px 60px',
-          backgroundPosition: 'left center',
-        }}/>
-
-        {/* Título */}
-        <div style={{ position:'relative', zIndex:1 }}>
-          <div style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize:'0.75rem',
-            fontWeight:700,
-            letterSpacing:'0.15em',
-            textTransform:'uppercase',
-            color: '#38BDF8', // Cyan-blue highlight
-            marginBottom:'0.4rem'
-          }}>
-            Plataforma HE-BI · Gestión de Área
-          </div>
-          <h1 style={{
-            fontFamily:"'Outfit', sans-serif",
-            fontSize:'2rem',
-            fontWeight:800,
-            color:'white',
-            margin:0,
-            display:'flex',
-            alignItems:'center',
-            gap:'0.75rem',
-            letterSpacing: '-0.01em'
-          }}>
-            <span style={{ fontSize:'2.2rem', WebkitTextFillColor: 'initial' }}>{cfg.icon}</span>
-            {AREAS_LABELS[area]}
-          </h1>
-        </div>
-
-        {/* Acciones */}
-        <div style={{ display:'flex', gap:'0.875rem', alignItems:'center', position:'relative', zIndex:1, flexWrap: 'wrap' }}>
-          
-          {/* Acciones de Exportación */}
-          <div style={{ display:'flex', gap:'0.5rem', marginRight:'0.25rem', paddingRight:'0.875rem', borderRight:'1px solid rgba(255,255,255,0.18)' }}>
-            <ExportButton type="pdf" reportId={area} />
-            {area === AREAS.URGENCIAS && (
-              <ExportButton 
-                type="excel" 
-                directUrl={`/dashboard/export-excel?dashboard=urgencias&startDate=${globalFilters.startDate || ''}&endDate=${globalFilters.endDate || ''}&search=${encodeURIComponent(urgenciasSearch || globalFilters.search || '')}`} 
-              />
-            )}
-            {area === AREAS.QUIROFANO && (
-              <ExportButton 
-                type="excel" 
-                directUrl={`/dashboard/export-excel?dashboard=quirofano&startDate=${globalFilters.startDate || ''}&endDate=${globalFilters.endDate || ''}&search=${encodeURIComponent(globalFilters.search || '')}`} 
-              />
-            )}
-          </div>
-
-          {/* Selector de Área */}
-          <div style={{ position: 'relative' }}>
-            <select 
-              value={area} 
-              onChange={(e) => setArea(e.target.value)}
-              disabled={!canSwitchArea}
-              className="custom-select-area"
-              style={{
-                padding: '0.55rem 2.25rem 0.55rem 1rem',
-                borderRadius: '12px',
-                border: '1.5px solid rgba(255,255,255,0.25)',
-                background: 'rgba(255,255,255,0.15)',
-                color: 'white',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                fontFamily: 'var(--font-display)',
-                outline: 'none',
-                cursor: canSwitchArea ? 'pointer' : 'not-allowed',
-                minWidth: 160,
-                appearance: 'none',
-                WebkitAppearance: 'none',
-              }}
-            >
-              {Object.entries(AREAS_LABELS)
+  const selectableAreas = Object.entries(AREAS_LABELS)
                 .filter(([key]) => {
                   // Ocultar Farmacia, Finanzas, Almacén General y Cardiología (ya que tienen sus propios módulos dedicados o no requieren tablero clínico)
                   if (key === AREAS.FARMACIA || key === AREAS.FINANZAS || key === AREAS.ALMACEN_GENERAL || key === AREAS.CARDIOLOGIA) {
@@ -460,73 +293,54 @@ export default function DashboardArea() {
                   // Sin restricciones de permisos
                   return true;
                 })
-                .map(([key, label]) => (
-                <option key={key} value={key} style={{ color:'var(--text-primary)', background: '#FFFFFF', fontWeight: 600 }}>{label}</option>
-              ))}
-            </select>
-            <span style={{
-              position: 'absolute',
-              right: '0.875rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'white',
-              fontSize: '0.6rem',
-              pointerEvents: 'none',
-            }}>▼</span>
+    .map(([value, label]) => ({ value, label, color: (AREA_CONFIG[value] || cfg).color }));
+
+  return (
+    <div id="dashboard-container" className="area-dashboard dashboard-view" data-area={area} style={areaPalette(cfg.color, cfg.chartAccent)}>
+      {pbiModal && (
+        <PBIModal {...pbiModal} onClose={() => setPBIModal(null)} />
+      )}
+      {/* <ExportApiModal isOpen={showExportApi} onClose={() => setShowExportApi(false)} /> */ }
+
+      <header className="area-dashboard__header">
+        <div className="area-dashboard__identity">
+          <span className="area-dashboard__icon"><AreaIcon name={cfg.icon} /></span>
+          <div>
+            <p className="area-dashboard__eyebrow">Hospital Escandón · Tablero de área</p>
+            <h1>{AREAS_LABELS[area] || 'Mi área'}</h1>
+            <p className="area-dashboard__description">{cfg.description}</p>
           </div>
         </div>
-      </div>
+        <div className="area-dashboard__actions">
+          <div className="area-dashboard__exports">
+            <ExportButton type="pdf" reportId={area} />
+            {area === AREAS.URGENCIAS && (
+              <ExportButton 
+                type="excel" 
+                directUrl={`/dashboard/export-excel?dashboard=urgencias&startDate=${globalFilters.startDate || ''}&endDate=${globalFilters.endDate || ''}&search=${encodeURIComponent(urgenciasSearch || globalFilters.search || '')}`} 
+              />
+            )}
+            {area === AREAS.QUIROFANO && (
+              <ExportButton 
+                type="excel" 
+                directUrl={`/dashboard/export-excel?dashboard=quirofano&startDate=${globalFilters.startDate || ''}&endDate=${globalFilters.endDate || ''}&search=${encodeURIComponent(globalFilters.search || '')}`} 
+              />
+            )}
+          </div>
+          <AreaSwitcher value={area} areas={selectableAreas} onChange={setArea} disabled={!canSwitchArea} />
+        </div>
+      </header>
 
       <GlobalFilterBar 
+        variant="area"
         filters={globalFilters} 
         setFilters={setGlobalFilters} 
         onApply={handleApplyFilters} 
       />
 
-      {/* Sliding Underline Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '2rem',
-        marginBottom: '1.5rem',
-        borderBottom: '1px solid rgba(0, 70, 135, 0.08)',
-        paddingBottom: '2px',
-        position: 'relative',
-      }}>
-        {[
-          { key:'kpis',     label:'📊 Indicadores'    },
-        ].map(t => {
-          const isActive = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                padding: '0.6rem 0.25rem',
-                border: 'none',
-                background: 'none',
-                color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-                fontFamily: "var(--font-display)",
-                fontSize: '0.88rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 200ms ease',
-                position: 'relative',
-              }}
-            >
-              {t.label}
-              <span style={{
-                position: 'absolute',
-                bottom: -2,
-                left: 0,
-                right: 0,
-                height: 3,
-                background: isActive ? cfg.color : 'transparent',
-                borderRadius: '3px 3px 0 0',
-                transition: 'background-color 200ms ease',
-              }}/>
-            </button>
-          );
-        })}
+      <div className="area-dashboard__section-heading">
+        <h2>Resumen del área</h2>
+        <p>Indicadores y actividad del periodo consultado</p>
       </div>
 
       {/* KPIs Grid */}
@@ -534,16 +348,16 @@ export default function DashboardArea() {
         <>
           {loadingData ? (
             <div style={{ background: 'var(--color-bg-white, white)', borderRadius: 14, padding: '5rem 3rem', textAlign: 'center', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '350px', marginTop: '1rem' }}>
-              <PremiumLoader text={`Cargando información nativa de ${(AREAS_LABELS[area] || area).toLowerCase()}...`} />
+              <PremiumLoader text={`Cargando información de ${(AREAS_LABELS[area] || 'tu área').toLowerCase()}...`} />
             </div>
           ) : (
             <>
               {area !== AREAS.QUIROFANO && area !== AREAS.CUNEROS && area !== AREAS.UCI && (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
+                <div className="area-metric-grid dashboard-metric-grid">
                   {areaData.kpis.map((kpi, i) => {
                     const dbKey = KPI_DB_MAP[kpi.label] || kpi.label.replace(/\s+/g, '_').toLowerCase();
                     const elementId = `area.${area.toLowerCase()}.${dbKey}`;
-                    const kpiConfig = getKPI(elementId);
+                    const kpiConfig = getKPI(elementId, kpi.label);
                     const displayName = kpiConfig?.nombre || kpi.label;
                     return (
                       <EditableKPIWrapper 
@@ -602,7 +416,7 @@ export default function DashboardArea() {
                     );
                   })}
 
-                  {areaData.kpis.length === 0 && (!user?.permisos || user.permisos.length === 0) && (
+                  {areaData.kpis.length === 0 && ![AREAS.URGENCIAS, AREAS.QUIROFANO, AREAS.CUNEROS, AREAS.UCI, AREAS.HOSPITALIZACION, AREAS.CONSULTA_EXTERNA, AREAS.IMAGENOLOGIA, AREAS.LABORATORIO, AREAS.FARMACIA, AREAS.ASEGURADORAS].includes(area) && (!user?.permisos || user.permisos.length === 0) && (
                     <div style={{ background:'white', borderRadius:12, padding:'3rem', textAlign:'center', border:'1px solid var(--border-color)', boxShadow:'var(--shadow-sm)' }}>
                       <PremiumLoader text="Cargando indicadores..." style={{ padding: '1rem' }} />
                     </div>
@@ -622,19 +436,19 @@ export default function DashboardArea() {
                   data={areaData.rawQuirofanoData} 
                 />
               ) : area === AREAS.IMAGENOLOGIA ? (
-                <div style={{ marginTop: '1rem' }}>
+                <div>
                   <DashboardAuxiliaresNativo type="imagenologia" globalFilters={globalFilters} globalTrigger={applyTrigger} />
                 </div>
               ) : area === AREAS.LABORATORIO ? (
-                <div style={{ marginTop: '1rem' }}>
+                <div>
                   <DashboardAuxiliaresNativo type="laboratorio" globalFilters={globalFilters} globalTrigger={applyTrigger} />
                 </div>
               ) : area === AREAS.FARMACIA ? (
-                <div style={{ marginTop: '1rem' }}>
+                <div>
                   <DashboardAuxiliaresNativo type="farmacia" globalFilters={globalFilters} globalTrigger={applyTrigger} />
                 </div>
               ) : area === AREAS.CUNEROS ? (
-                <div style={{ marginTop: '1rem' }}>
+                <div>
                   <DashboardCunerosNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
                 </div>
               ) : area === AREAS.UCI ? (
@@ -652,7 +466,7 @@ export default function DashboardArea() {
                   setSearchFilter={(val) => setGlobalFilters(prev => ({...prev, search: val}))}
                 />
               ) : area === AREAS.ASEGURADORAS ? (
-                <div style={{ marginTop: '1rem' }}>
+                <div>
                   <DashboardAseguradorasNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
                 </div>
               ) : (

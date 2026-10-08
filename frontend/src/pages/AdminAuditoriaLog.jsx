@@ -1,3 +1,4 @@
+import { userMessage } from '../utils/userMessages';
 /**
  * AdminAuditoriaLog.jsx — Log de acciones del sistema
  * Hospital Escandón BI Platform v4.0
@@ -13,11 +14,17 @@ const METHOD_COLORS = {
   DELETE:'#EF4444', 
   PATCH:'#8B5CF6' 
 };
-const STATUS_COLORS = { 
+const STATUS_COLORS = {
   2:'var(--color-verde-e)', 
   4:'var(--color-danger)', 
   5:'var(--color-danger)' 
 };
+
+const ACTION_LABELS = { GET: 'Consultar', POST: 'Registrar', PUT: 'Actualizar', PATCH: 'Actualizar', DELETE: 'Eliminar' };
+const ROLE_LABELS = { ADMIN: 'Administrador', DIRECTOR: 'Dirección', JEFE_AREA: 'Jefatura de área', USUARIO_OPERATIVO: 'Personal operativo', ALMACEN_GENERAL: 'Almacén general', CONSULTA_EXTERNA: 'Consulta externa' };
+const SECTION_LABELS = { auth: 'Acceso a la plataforma', dashboard: 'Tableros', admin: 'Administración', honorarios: 'Honorarios médicos', audit: 'Revisión de cargos', pharmacy: 'Farmacia', almacen: 'Almacén', cex: 'Consulta externa', sap: 'Compras e inventario', 'sap-query': 'Consultas de información', finanzas: 'Finanzas', 'data-quality': 'Revisión de la información', siti: 'Reportes históricos', ai: 'Asistente', aria: 'Asistente', export: 'Descarga de reportes', bi: 'Reportes' };
+const sectionLabel = route => SECTION_LABELS[String(route || '').replace(/^\/api\//, '').split(/[/?]/)[0]] || 'Plataforma';
+const resultLabel = status => Number(status) < 400 ? 'Completado' : Number(status) === 401 ? 'Sesión terminada' : Number(status) === 403 ? 'Sin permiso' : 'No completado';
 
 export default function AdminAuditoriaLog() {
   const [logs, setLogs] = useState([]);
@@ -40,12 +47,12 @@ export default function AdminAuditoriaLog() {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        if (!res.ok) throw new Error('Error al cargar logs de auditoría');
+        if (!res.ok) throw new Error('No se pudo cargar el historial de actividad. Intenta de nuevo.');
         
         const json = await res.json();
         setLogs(json.data || []);
       } catch (err) {
-        setError(err.message);
+        setError(userMessage(err.message));
       } finally {
         setLoading(false);
       }
@@ -66,7 +73,8 @@ export default function AdminAuditoriaLog() {
 
   const rows = logs.filter(r =>
     (r.usuario || '').toLowerCase().includes(filter.toLowerCase()) || 
-    (r.ruta || '').toLowerCase().includes(filter.toLowerCase()) || 
+    sectionLabel(r.ruta).toLowerCase().includes(filter.toLowerCase()) ||
+    resultLabel(r.status).toLowerCase().includes(filter.toLowerCase()) ||
     String(r.status).includes(filter)
   );
 
@@ -111,7 +119,7 @@ export default function AdminAuditoriaLog() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h1 style={{ fontFamily: "var(--font-display)", fontSize: '1.65rem', fontWeight: 800, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
-              Log de Auditoría
+              Historial de actividad
             </h1>
             <button
               onClick={async () => {
@@ -135,7 +143,7 @@ export default function AdminAuditoriaLog() {
                   a.remove();
                   window.URL.revokeObjectURL(url);
                 } catch(e) {
-                  alert(e.message);
+                  alert(userMessage(e.message));
                 }
               }}
               style={{
@@ -152,7 +160,7 @@ export default function AdminAuditoriaLog() {
             </button>
           </div>
           <p style={{ fontFamily: 'var(--font-body)', color: 'rgba(255,255,255,0.72)', fontSize: '0.85rem', margin: '0.4rem 0 0', fontWeight: 500 }}>
-            Registro en tiempo real de todas las acciones operativas y administrativas del sistema
+            Consulta quién usó la plataforma, qué hizo y cuándo.
           </p>
         </div>
       </div>
@@ -188,7 +196,7 @@ export default function AdminAuditoriaLog() {
           <input
             type="text"
             className="search-input-field"
-            placeholder="Filtrar logs por usuario, endpoint, código de respuesta..."
+            placeholder="Buscar por usuario, sección o resultado…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             style={{
@@ -218,7 +226,7 @@ export default function AdminAuditoriaLog() {
           alignItems: 'center',
           gap: '0.5rem'
         }}>
-          <span>❌</span> {error}
+          <span>❌</span> {userMessage(error)}
         </div>
       )}
 
@@ -234,7 +242,7 @@ export default function AdminAuditoriaLog() {
           <table className="audit-table" style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.82rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid rgba(0,70,135,0.06)' }}>
-                {['Fecha / Hora','Usuario','Rol','Método','Ruta','Status','Duración','IP'].map(h => (
+                {['Fecha / Hora','Usuario','Perfil','Acción','Sección','Resultado','Tiempo de respuesta','Equipo (IP)'].map(h => (
                   <th key={h} style={{ 
                     background:'#FAFBFD', 
                     color:'var(--text-primary)', 
@@ -263,7 +271,7 @@ export default function AdminAuditoriaLog() {
                   <tr key={r.id || i} style={{ borderBottom: '1px solid rgba(0,70,135,0.04)', transition: 'background-color 150ms' }}>
                     <td style={{ padding:'0.75rem 1rem', fontFamily:'var(--font-mono)', fontSize:'0.74rem', color:'var(--text-secondary)', whiteSpace:'nowrap' }}>{r.fecha}</td>
                     <td style={{ padding:'0.75rem 1rem' }}><code style={{ fontFamily:'var(--font-mono)', fontSize:'0.74rem', color:'var(--color-azul-fuerte)', fontWeight: 600 }}>{r.usuario}</code></td>
-                    <td style={{ padding:'0.75rem 1rem', fontSize:'0.74rem', color:'var(--text-muted)', fontFamily: 'var(--font-body)', fontWeight: 500 }}>{r.rol}</td>
+                    <td style={{ padding:'0.75rem 1rem', fontSize:'0.74rem', color:'var(--text-muted)', fontFamily: 'var(--font-body)', fontWeight: 500 }}>{ROLE_LABELS[r.rol] || 'Personal del hospital'}</td>
                     <td style={{ padding:'0.75rem 1rem' }}>
                       <span style={{ 
                         background:`${mc}12`, 
@@ -274,7 +282,7 @@ export default function AdminAuditoriaLog() {
                         fontSize:'0.68rem', 
                         fontWeight:800,
                         fontFamily: 'var(--font-mono)'
-                      }}>{r.metodo}</span>
+                      }}>{ACTION_LABELS[r.metodo] || 'Acción registrada'}</span>
                     </td>
                     <td style={{ 
                       padding:'0.75rem 1rem', 
@@ -285,9 +293,9 @@ export default function AdminAuditoriaLog() {
                       overflow:'hidden', 
                       textOverflow:'ellipsis', 
                       whiteSpace:'nowrap' 
-                    }} title={r.ruta}>{r.ruta}</td>
+                    }}>{sectionLabel(r.ruta)}</td>
                     <td style={{ padding:'0.75rem 1rem' }}>
-                      <span style={{ color:sc, fontWeight:800, fontSize:'0.82rem', fontFamily: 'var(--font-mono)' }}>{r.status}</span>
+                      <span style={{ color:sc, fontWeight:800, fontSize:'0.82rem', fontFamily: 'var(--font-mono)' }}>{resultLabel(r.status)}</span>
                     </td>
                     <td style={{ 
                       padding:'0.75rem 1rem', 

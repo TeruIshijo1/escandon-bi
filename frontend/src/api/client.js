@@ -13,10 +13,11 @@
  *   const blob = await apiFetch('/export/pdf/x', { raw: 'blob' });
  */
 import { API_BASE } from './config';
+import { userMessage } from '../utils/userMessages';
 
 export class ApiError extends Error {
   constructor(status, message, data = null) {
-    super(message);
+    super(userMessage(message, status));
     this.name = 'ApiError';
     this.status = status;
     this.data = data;
@@ -37,7 +38,7 @@ export function setToken(token) {
 /**
  * Fetch centralizado.
  * @param {string} path  Ruta API (ej. '/dashboard/stats' o '/api/dashboard/stats')
- * @param {Object} options { method, body, params, headers, raw }
+ * @param {Object} options { method, body, params, headers, raw, signal }
  *   - params: objeto → query string
  *   - raw: 'blob' | 'text' para no intentar parsear JSON
  * @returns {Promise<any>} JSON parseado, blob o texto
@@ -48,6 +49,7 @@ export async function apiFetch(path, {
   params,
   headers = {},
   raw,
+  signal,
 } = {}) {
   let url = path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? path : '/' + path}`;
 
@@ -59,19 +61,27 @@ export async function apiFetch(path, {
   }
 
   const token = getToken();
-  const res = await fetch(url, {
-    method,
-    headers: {
-      ...(body !== undefined && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      signal,
+      headers: {
+        ...(body !== undefined && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (error) {
+    // Cancellation belongs to the caller's request lifecycle, not a connection failure.
+    if (signal?.aborted || error?.name === 'AbortError') throw error;
+    throw new ApiError(0, userMessage(error));
+  }
 
   // Respuestas binarias (PDF/Excel)
   if (raw === 'blob') {
-    if (!res.ok) throw new ApiError(res.status, `Error ${res.status} al descargar el archivo`);
+    if (!res.ok) throw new ApiError(res.status, 'No se pudo descargar el archivo. Intenta de nuevo.');
     return res.blob();
   }
   if (raw === 'text') {
@@ -89,7 +99,7 @@ export async function apiFetch(path, {
   }
 
   if (!res.ok) {
-    const msg = (data && (data.message || data.error)) || `Error del servidor (${res.status})`;
+    const msg = (data && (data.message || data.error)) || 'No se pudo completar la acción. Intenta de nuevo.';
     throw new ApiError(res.status, msg, data);
   }
 

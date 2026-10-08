@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect } from 'react';
 
 const formatCurrency = (val) => {
@@ -38,10 +39,10 @@ export default function EstadoCuentaModal({ pcNum, onClose }) {
         if (json.success) {
           setData(json.data);
         } else {
-          setError(json.error || 'Error al obtener datos');
+          setError(userMessage(json.error || 'Error al obtener datos'));
         }
       } catch (err) {
-        setError(err.message);
+        setError(userMessage(err.message));
       } finally {
         setLoading(false);
       }
@@ -118,7 +119,7 @@ export default function EstadoCuentaModal({ pcNum, onClose }) {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>Cargando estado de cuenta...</div>
           ) : error ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#ef4444' }}>Error: {error}</div>
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#ef4444' }}>Error: {userMessage(error)}</div>
           ) : (
             <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
               <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

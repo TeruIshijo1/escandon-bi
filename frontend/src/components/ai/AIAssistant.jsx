@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE } from '../../api/config';
+import { userMessage } from '../../utils/userMessages';
 
 const SUGGESTED_QUESTIONS = [
   '🏥 ¿Cuáles son las cirugías del momento?',
@@ -138,7 +139,7 @@ export default function AIAssistant() {
       } else {
         setMessages(prev => [
           ...prev,
-          { role: 'assistant', content: `Lo siento, ocurrió un error: ${json.error || 'Intenta de nuevo.'}` },
+          { role: 'assistant', content: userMessage(json.error || 'No se pudo consultar la información. Intenta de nuevo.') },
         ]);
       }
     } catch (err) {
@@ -204,7 +205,7 @@ export default function AIAssistant() {
             <span style={{ fontSize:'1.4rem' }}>🤖</span>
             <div style={{ flex:1 }}>
               <div className="ai-panel-title" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.85rem' }}>Mar-IA — Asistente Inteligente</div>
-              <div className="ai-panel-subtitle" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', opacity: 0.7 }}>Hospital Escandón · BI Assistant</div>
+              <div className="ai-panel-subtitle" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', opacity: 0.7 }}>Hospital Escandón · Asistente</div>
             </div>
             <button
               onClick={() => setOpen(false)}

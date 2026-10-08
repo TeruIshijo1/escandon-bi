@@ -1,3 +1,4 @@
+import { userMessage } from '../utils/userMessages';
 /**
  * AdminUsuarios.jsx — Gestión de Usuarios (solo ADMIN)
  * Hospital Escandón BI Platform v4.0
@@ -146,14 +147,14 @@ export default function AdminUsuarios() {
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Error al guardar usuario');
+      if (!res.ok) throw new Error(userMessage(json.error || 'Error al guardar usuario'));
 
       setToast(modalEdit.isNew ? `Usuario ${editForm.nombre} creado` : `Usuario ${editForm.nombre} actualizado`);
       fetchUsers();
       setModalEdit(null);
       setTimeout(() => setToast(''), 3000);
     } catch (err) {
-      alert(err.message);
+      alert(userMessage(err.message));
     }
   };
 
@@ -175,7 +176,7 @@ export default function AdminUsuarios() {
       fetchUsers();
       setTimeout(() => setToast(''), 3000);
     } catch (err) {
-      alert(err.message);
+      alert(userMessage(err.message));
     }
   };
 
@@ -203,7 +204,7 @@ export default function AdminUsuarios() {
       setModalTableros(null);
       setTimeout(() => setToast(''), 3000);
     } catch (err) {
-      alert(err.message);
+      alert(userMessage(err.message));
     }
   };
 
@@ -466,7 +467,7 @@ export default function AdminUsuarios() {
         <div style={{ position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(15, 26, 46, 0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:999, backdropFilter:'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
           <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }`}</style>
           <div style={{ background:'white', borderRadius:20, width:'90%', maxWidth:680, padding:'2.25rem', boxShadow:'var(--shadow-xl)', animation:'fadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)', maxHeight:'90vh', overflowY:'auto', boxSizing:'border-box' }}>
-            <h2 style={{ fontFamily:"var(--font-display)", fontWeight: 800, margin:'0 0 0.4rem', fontSize:'1.4rem', color:'var(--color-azul-fuerte)', letterSpacing: '-0.01em' }}>Configuración de Permisos BI</h2>
+            <h2 style={{ fontFamily:"var(--font-display)", fontWeight: 800, margin:'0 0 0.4rem', fontSize:'1.4rem', color:'var(--color-azul-fuerte)', letterSpacing: '-0.01em' }}>Permisos de acceso</h2>
             <p style={{ fontFamily: 'var(--font-body)', fontSize:'0.82rem', color:'var(--text-muted)', marginBottom:'1.5rem', fontWeight: 500 }}>Gestiona los niveles de acceso y reportes específicos para <strong style={{ color: 'var(--text-primary)' }}>{modalTableros.nombre}</strong>.</p>
             
             <div style={{ display:'flex', gap:'0.75rem', marginBottom:'1.5rem' }}>
@@ -545,7 +546,6 @@ export default function AdminUsuarios() {
                               <span>{s.icon}</span>
                               {s.name}
                             </div>
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize:'0.65rem', color:'var(--text-muted)', marginTop: '2px' }}>ID: {s.id}</div>
                           </div>
                         </div>
                       ))}

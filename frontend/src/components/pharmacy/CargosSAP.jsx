@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
@@ -83,7 +84,7 @@ export default function CargosSAP() {
         setData(json);
         setPage(1);
       } catch (err) {
-        setError(err.message);
+        setError(userMessage(err.message));
       } finally {
         setLoading(false);
       }
@@ -164,7 +165,7 @@ export default function CargosSAP() {
           <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#1E293B', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '2.5rem' }}>🧾</span> Cargos a Pacientes <span style={{ fontSize: '1.25rem', color: '#0088C9', fontWeight: 'normal', marginTop: '0.5rem' }}>(Farmacia)</span>
           </h1>
-          <p style={{ color: '#64748b' }}>Dispensaciones y consumos de medicamentos e insumos de Farmacia con trazabilidad de origen, destino, usuarios y lotes SAP.</p>
+          <p style={{ color: '#64748b' }}>Consulta qué medicamentos y materiales salieron de farmacia, a dónde se enviaron y quién los entregó.</p>
         </div>
         
         {rows.length > 0 && (
@@ -213,7 +214,7 @@ export default function CargosSAP() {
 </style></head><body>
 <table>
   <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
-  <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte de Cargos a Pacientes — Farmacia (Trazabilidad Origen/Destino y SAP)</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Cargos a pacientes — Farmacia</td></tr>
   <tr class="info-row"><td colspan="${cols.length}">Período: ${fechaDesde} al ${fechaHasta} &nbsp;|&nbsp; Filtro Área: ${areaBusqueda || 'TODAS'} &nbsp;|&nbsp; Registros: ${filtered.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
   <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
   <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
@@ -287,10 +288,10 @@ export default function CargosSAP() {
       </div>
 
       {loading ? (
-        <PremiumLoader text="Consultando cargos de Farmacia en Cirrus y SAP..." />
+        <PremiumLoader text="Consultando cargos de Farmacia en Vertical y SAP..." />
       ) : error ? (
         <div style={{ padding: '2rem', background: '#fee2e2', color: '#991b1b', borderRadius: '12px', textAlign: 'center' }}>
-          <p><strong>Error:</strong> {error}</p>
+          <p><strong>Error:</strong> {userMessage(error)}</p>
           <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#dc2626', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>Reintentar</button>
         </div>
       ) : (

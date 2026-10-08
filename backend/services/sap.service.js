@@ -22,7 +22,7 @@ class SapService {
   /**
    * Helper interno para hacer peticiones HTTP
    */
-  _request(endpoint, method, payload = null, headers = {}) {
+  _request(endpoint, method, payload = null, headers = {}, requestOptions = {}) {
     return new Promise((resolve, reject) => {
       const urlObj = new URL(`${sapConfig.baseUrl}${endpoint}`);
       
@@ -32,6 +32,7 @@ class SapService {
         port: urlObj.port,
         path: urlObj.pathname + urlObj.search,
         agent: this.httpsAgent,
+        signal: requestOptions.signal,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -45,10 +46,13 @@ class SapService {
         options.headers['Content-Length'] = Buffer.byteLength(payloadString, 'utf8');
       }
 
+      let requestTimer;
       const req = https.request(options, (res) => {
         let data = '';
+        res.on('error', reject);
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
+          clearTimeout(requestTimer);
           let json;
           try {
             json = JSON.parse(data);
@@ -86,6 +90,14 @@ class SapService {
       });
 
       req.on('error', (err) => reject(err));
+      req.once('close', () => clearTimeout(requestTimer));
+      if (Number.isFinite(requestOptions.timeoutMs) && requestOptions.timeoutMs > 0) {
+        requestTimer = setTimeout(() => {
+          const error = new Error('SAP no respondió dentro del tiempo de la consulta.');
+          error.code = 'SAP_READ_TIMEOUT';
+          req.destroy(error);
+        }, requestOptions.timeoutMs);
+      }
       
       if (payloadString) {
         req.write(payloadString);
@@ -98,7 +110,7 @@ class SapService {
   /**
    * Inicia sesión en SAP y guarda la cookie en caché
    */
-  async login(retries = 2) {
+  async login(retries = 2, requestOptions = {}) {
     if (!sapConfig.companyDb || !sapConfig.username || !sapConfig.password) {
       throw new Error('Credenciales de SAP no configuradas en el servidor.');
     }
@@ -111,7 +123,7 @@ class SapService {
       };
 
       console.log(`[SAP] Intentando login en ${sapConfig.baseUrl} para base de datos ${sapConfig.companyDb}...`);
-      const response = await this._request('/Login', 'POST', payload);
+      const response = await this._request('/Login', 'POST', payload, {}, requestOptions);
       
       // Extraer Cookies de SAP (B1SESSION y ROUTEID)
       if (response.headers && response.headers['set-cookie']) {
@@ -134,7 +146,7 @@ class SapService {
       if (retries > 0 && (error.status === 500 || error.status === 502 || error.status === 503 || error.code === 299 || error.status === 299)) {
         console.warn(`[SAP] Reintentando login en 2.5s (${retries} restantes)...`);
         await new Promise(r => setTimeout(r, 2500));
-        return this.login(retries - 1);
+        return this.login(retries - 1, requestOptions);
       }
       throw error;
     }
@@ -143,24 +155,24 @@ class SapService {
   /**
    * Verifica si hay una sesión válida. Si no, inicia sesión automáticamente.
    */
-  async _ensureSession() {
+  async _ensureSession(requestOptions = {}) {
     if (!this.sessionCookie || !this.sessionExpiresAt || Date.now() > this.sessionExpiresAt) {
       console.log('[SAP] Sesión inválida o expirada. Renovando automáticamente...');
-      await this.login();
+      await this.login(2, requestOptions);
     }
   }
 
   /**
    * Helper interno con reintentos automáticos para errores temporales (502, 503, 504, drop de red)
    */
-  async _requestWithRetry(endpoint, method, payload = null, headers = {}, retries = 2) {
+  async _requestWithRetry(endpoint, method, payload = null, headers = {}, retries = 2, requestOptions = {}) {
     try {
-      return await this._request(endpoint, method, payload, headers);
+      return await this._request(endpoint, method, payload, headers, requestOptions);
     } catch (err) {
       if (retries > 0 && (err.status === 502 || err.status === 503 || err.status === 504 || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT')) {
         console.warn(`[SAP] Error HTTP ${err.status || err.code} al consultar ${endpoint}. Reintentando en 1.5s (${retries} restantes)...`);
         await new Promise(r => setTimeout(r, 1500));
-        return this._requestWithRetry(endpoint, method, payload, headers, retries - 1);
+        return this._requestWithRetry(endpoint, method, payload, headers, retries - 1, requestOptions);
       }
       throw err;
     }
@@ -170,24 +182,24 @@ class SapService {
    * Petición GET genérica a SAP
    * Ej: await sapService.get('/Items')
    */
-  async get(endpoint, additionalHeaders = {}) {
-    await this._ensureSession();
+  async get(endpoint, additionalHeaders = {}, requestOptions = {}) {
+    await this._ensureSession(requestOptions);
     return this._requestWithRetry(endpoint, 'GET', null, {
       'Cookie': this.sessionCookie,
       ...additionalHeaders
-    });
+    }, 2, requestOptions);
   }
 
   /**
    * Petición POST genérica a SAP
    * Ej: await sapService.post('/Orders', { ... })
    */
-  async post(endpoint, payload, additionalHeaders = {}) {
-    await this._ensureSession();
+  async post(endpoint, payload, additionalHeaders = {}, requestOptions = {}) {
+    await this._ensureSession(requestOptions);
     return this._requestWithRetry(endpoint, 'POST', payload, {
       'Cookie': this.sessionCookie,
       ...additionalHeaders
-    });
+    }, 2, requestOptions);
   }
 
   /**

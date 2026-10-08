@@ -49,14 +49,15 @@ export function useKPIConfig() {
   }, []);
 
   /** Devuelve la config de un KPI por su elementoId */
-  const getKPI = useCallback((elementoId) => {
+  const getKPI = useCallback((elementoId, nombreFallback) => {
+    const parts = (elementoId || '').split('.');
+    const fallback = nombreFallback || parts[parts.length - 1]?.replace(/_/g, ' ') || 'Indicador';
     if (!config) {
-      // Mientras carga: generar nombre legible del elementoId como fallback
-      const parts = (elementoId || '').split('.');
-      const fallback = parts[parts.length - 1]?.replace(/_/g, ' ') || elementoId;
       return { nombre: fallback, icono: '📊', pbiUrl: null, nombreDefault: fallback, nombreCustom: null };
     }
-    return config[elementoId] || { nombre: elementoId, icono: '📊', pbiUrl: null };
+    const item = config[elementoId];
+    if (!item) return { nombre: fallback, icono: '📊', pbiUrl: null, nombreDefault: fallback };
+    return { ...item, nombre: item.nombre && item.nombre !== elementoId ? item.nombre : fallback };
   }, [config]);
 
 

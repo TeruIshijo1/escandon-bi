@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Revisión de honorarios · 6 de octubre de 2026</title>
+<style>
+body{font:16px/1.6 system-ui,sans-serif;background:#f3f6fa;color:#17304d;margin:0}main{max-width:960px;margin:40px auto;padding:28px;background:white;border:1px solid #dce5f0;border-radius:16px}h1{line-height:1.2}h2{font-size:21px;margin-top:28px}.ok{background:#eaf8ee;border-left:5px solid #19854b;padding:16px}.note{background:#fff6de;padding:16px}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:12px;border-bottom:1px solid #dce5f0}img{width:100%;height:auto;border:1px solid #dce5f0;border-radius:10px}a{color:#005fa9}small{color:#52647c}@media(max-width:600px){main{margin:12px;padding:18px}table{font-size:13px}th,td{padding:8px}}
+</style>
+<main>
+<h1>Honorarios médicos: revisión funcional</h1>
+<p>6 de octubre de 2026. Se probó el código del proyecto y se comprobaron las conexiones reales mediante lecturas.</p>
+<p class="ok"><strong>Resultado:</strong> 126 pruebas unitarias, ocho recorridos de navegador y dos integraciones con PostgreSQL aprobados. No quedaron fallos detectados en los escenarios ejecutados. Compilación actualizada.</p>
+<h2>Fallo encontrado y corregido</h2>
+<p>Al solicitar el historial fiscal y cambiar de médico antes de recibirlo, la respuesta anterior podía aparecer en la ficha del médico nuevo. Se reprodujo el fallo antes de corregirlo. Ahora se descartan respuestas de una selección anterior, incluidas sus notificaciones de error.</p>
+<p>La prueba de regresión simula una respuesta tardía y confirma que el historial del médico anterior no aparece. Se actualizaron también dos recorridos que aún buscaban tablas y controles sustituidos por las tarjetas y la navegación actuales.</p>
+<h2>Escenarios comprobados</h2>
+<table>
+<thead><tr><th>Área</th><th>Comprobación</th><th>Resultado</th></tr></thead>
+<tbody>
+<tr><td>Catálogo y tarifas</td><td>Incluir/excluir, función del médico, fecha final, edición, motivos retirados, vigencias inclusivas, tarifas superpuestas e historial.</td><td>Aprobado</td></tr>
+<tr><td>Errores de captura y conexión</td><td>Fecha final anterior, guardado fallido sin perder captura, reintento y doble clic sin duplicar la tarifa.</td><td>Aprobado</td></tr>
+<tr><td>Búsqueda y vistas</td><td>Filtros combinados, tres vistas, folios distintos, resultados vacíos y paginación con 12,796 registros.</td><td>Aprobado</td></tr>
+<tr><td>Revisión clínica</td><td>Aprobación individual y conjunta, selección de dos entre 50, cancelación, IVA explícito, exclusión y conflictos entre revisores.</td><td>Aprobado</td></tr>
+<tr><td>Datos fiscales</td><td>Ficha interna, SAP completo/incompleto/no disponible, vigencia, conservación de cambios e historial al cambiar de médico.</td><td>Aprobado</td></tr>
+<tr><td>Pagos y cierres</td><td>Cierre conservado, impuestos, pagos parciales, ajustes, saldos, comprobantes duplicados y rechazo de sobrepagos.</td><td>Aprobado</td></tr>
+<tr><td>PDF y Excel</td><td>Descargas reales, solo servicios del filtro/médico, folios separados y saldo actualizado; bloqueo cuando el cierre necesita revisión.</td><td>Aprobado</td></tr>
+<tr><td>Pantallas pequeñas</td><td>Sin desbordamiento horizontal en los escenarios probados a 320, 390 y 768 píxeles.</td><td>Aprobado</td></tr>
+</tbody>
+</table>
+<h2>Recorrido con pantalla, API y base de datos reales de prueba</h2>
+<p>El recorrido nuevo usa los componentes, las rutas y los servicios reales con un esquema PostgreSQL temporal. Solo las fuentes clínicas y SAP se sustituyen por datos ficticios.</p>
+<p>Una tarifa de $250 con IVA de $40, ISR de $25 y retención de IVA de $26.67 produce un neto de <strong>$238.33</strong>. Después de registrar $100, tanto la pantalla como el PDF muestran un saldo de <strong>$138.33</strong>. Un comprobante repetido se rechaza.</p>
+<img src="evidencia-honorarios-2026-10-06/pago-validado.png" alt="Pantalla de pago con médico ficticio: neto 238.33, pagado 100 y saldo 138.33">
+<h2>Comprobación de conexiones reales</h2>
+<p>PostgreSQL, Vertical y SAP respondieron. Para el periodo del 5 al 6 de octubre, Vertical devolvió 328 candidatos; cinco resultaron habilitados para revisión y 322 tenían el catálogo pendiente de configurar. PostgreSQL contenía 2,960 conceptos y una tarifa activa. El directorio de SAP devolvió 687 proveedores y 12 médicos con configuración suficiente para las comprobaciones fiscales del directorio.</p>
+<p class="note">Los servicios pendientes y las fichas fiscales incompletas necesitan configuración del responsable. Una referencia de precio no autoriza por sí sola un pago. La conexión real se comprobó mediante lecturas: las aprobaciones, cierres, pagos y ajustes de los recorridos se realizaron con datos ficticios en esquemas temporales.</p>
+<h2>Evidencia y alcance</h2>
+<ul>
+<li><a href="evidencia-honorarios-2026-10-06/browser-results.json">Resultados de los ocho recorridos</a>.</li>
+<li><a href="evidencia-honorarios-2026-10-06/backend-results.json">Resultados de 94 pruebas del backend</a>, más 32 pruebas del frontend aprobadas.</li>
+<li><a href="evidencia-honorarios-2026-10-06/live-readonly-results.json">Comprobación de conexiones y conteos por lectura</a>.</li>
+<li><a href="evidencia-honorarios-2026-10-06/build.txt">Compilación actualizada</a>. Análisis estático de honorarios: cero errores; permanecen advertencias de variables y reconocimiento de JSX. El compilador advierte sobre el tamaño de un paquete.</li>
+</ul>
+<p><small>Esta revisión describe los escenarios ejecutados sobre el proyecto. No certifica ausencia absoluta de defectos ni confirma que un servidor remoto ya tenga instalada esta compilación.</small></p>
+</main>
+</html>

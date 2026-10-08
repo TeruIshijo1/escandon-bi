@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
@@ -31,7 +32,7 @@ export default function DoctorVariations() {
           const procs = Object.keys(varJson.data || {});
           if (procs.length > 0 && !selectedProcedure) setSelectedProcedure(procs[0]);
         } else {
-          setError(varJson.error || 'Error al obtener variaciones por médico');
+          setError(userMessage(varJson.error || 'Error al obtener variaciones por médico'));
         }
 
         if (kitsJson.ok) setKits(kitsJson.data || []);
@@ -199,7 +200,7 @@ export default function DoctorVariations() {
             <span>👨‍⚕️</span> Variaciones por Cirujano y Rastreo de Insumos
           </h2>
           <p style={{ color: 'var(--text-muted, #64748b)', margin: '0.35rem 0 0 0', fontSize: '0.95rem' }}>
-            Comparativa exacta de consumos por médico, tabla de diferencias y rastreador de insumos sobrantes/devoluciones por cirugía específica.
+            Compara los materiales usados por cada médico y revisa los sobrantes y devoluciones de cada cirugía.
           </p>
         </div>
 
@@ -321,7 +322,7 @@ export default function DoctorVariations() {
         </div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px', fontWeight: 'bold' }}>
-          ⚠️ {error}
+          ⚠️ {userMessage(error)}
         </div>
       ) : (
         <div>
@@ -422,7 +423,7 @@ export default function DoctorVariations() {
                         </th>
                       ))}
                       <th style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--sub-bg, #f8fafc)', borderBottom: '2px solid var(--border-color, #cbd5e1)', padding: '0.85rem 1rem', textAlign: 'center', width: '130px' }}>Diferencia Max</th>
-                      <th style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--sub-bg, #f8fafc)', borderBottom: '2px solid var(--border-color, #cbd5e1)', padding: '0.85rem 1rem', textAlign: 'center', width: '150px' }}>Estatus / Variación</th>
+                      <th style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--sub-bg, #f8fafc)', borderBottom: '2px solid var(--border-color, #cbd5e1)', padding: '0.85rem 1rem', textAlign: 'center', width: '150px' }}>Estado / Variación</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -647,7 +648,7 @@ export default function DoctorVariations() {
                           <th style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--sub-bg, #f8fafc)', borderBottom: '2px solid var(--border-color, #cbd5e1)', padding: '0.85rem 1rem', width: '130px' }}>Código SAP</th>
                           <th style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--sub-bg, #f8fafc)', borderBottom: '2px solid var(--border-color, #cbd5e1)', padding: '0.85rem 1rem' }}>Insumo / Descripción Completa</th>
                           <th style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--sub-bg, #f8fafc)', borderBottom: '2px solid var(--border-color, #cbd5e1)', padding: '0.85rem 1rem', textAlign: 'right', width: '140px' }}>Cantidad Exacta</th>
-                          <th style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--sub-bg, #f8fafc)', borderBottom: '2px solid var(--border-color, #cbd5e1)', padding: '0.85rem 1rem', textAlign: 'center', width: '180px' }}>Estatus / Destino</th>
+                          <th style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--sub-bg, #f8fafc)', borderBottom: '2px solid var(--border-color, #cbd5e1)', padding: '0.85rem 1rem', textAlign: 'center', width: '180px' }}>Estado / Destino</th>
                         </tr>
                       </thead>
                       <tbody>

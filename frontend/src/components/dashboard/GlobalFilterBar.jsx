@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { API_BASE } from '../../api/config';
 
-export default function GlobalFilterBar({ filters, setFilters, onApply, showSearch = true, activeTab = '' }) {
+export default function GlobalFilterBar({ filters, setFilters, onApply, showSearch = true, activeTab = '', variant = 'default' }) {
   const [options, setOptions] = useState({ medicos: [], especialidades: [] });
+  const id = useId();
 
   useEffect(() => {
     if (activeTab === 'eficacia') {
@@ -86,7 +87,7 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
   };
 
   return (
-    <div style={{
+    <div className={variant === 'area' ? 'area-filter-bar' : undefined} style={{
       background: 'white',
       borderRadius: 12,
       padding: '1rem 1.5rem',
@@ -98,22 +99,24 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
       gap: '1rem'
     }}>
       
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      {variant === 'area' && <h2 className="area-filter-bar__heading">Filtrar información</h2>}
+      <div className="area-filter-bar__fields" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
       
       {showSearch && (
-        <div style={{ flex: '1 1 200px' }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+        <div className="area-filter-bar__search" style={{ flex: '1 1 200px' }}>
+          <label htmlFor={`${id}-search`} style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
             Buscar (Paciente o Médico)
           </label>
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 12, top: 10, color: '#94A3B8' }}>🔍</span>
             <input
               type="text"
+              id={`${id}-search`}
               name="search"
               value={filters.search}
               onChange={handleInputChange}
               onKeyPress={handleKeyPress}
-              placeholder="Ej: Juan Perez, Neonatología..."
+              placeholder="Nombre del paciente o médico"
               style={{
                 width: '100%',
                 padding: '0.6rem 1rem 0.6rem 2.2rem',
@@ -170,12 +173,13 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
       )}
 
       <div style={{ flex: '1 1 150px' }}>
-        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+        <label htmlFor={`${id}-start`} style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
           Fecha Inicio
         </label>
         <input
           type="date"
           name="startDate"
+          id={`${id}-start`}
           value={filters.startDate}
           onChange={handleInputChange}
           style={{
@@ -192,12 +196,13 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
       </div>
 
       <div style={{ flex: '1 1 150px' }}>
-        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+        <label htmlFor={`${id}-end`} style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#64748B', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
           Fecha Fin
         </label>
         <input
           type="date"
           name="endDate"
+          id={`${id}-end`}
           value={filters.endDate}
           onChange={handleInputChange}
           style={{
@@ -215,6 +220,7 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
 
       <div style={{ flex: '0 0 auto' }}>
         <button
+          className="area-filter-bar__apply"
           onClick={onApply}
           style={{
             background: '#005FA9',
@@ -237,6 +243,7 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
 
       <div style={{ flex: '0 0 auto' }}>
         <button
+          className="area-filter-bar__reset"
           onClick={() => {
             setFilters({ search: '', startDate: '', endDate: '', medico: '', especialidad: '' });
             setTimeout(onApply, 50); // Small delay to let state update
@@ -263,9 +270,9 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
     </div>
       
       {/* Botones de fechas rápidas */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', paddingTop: '0.5rem', borderTop: '1px solid #E2E8F0' }}>
+      <div className="area-filter-bar__quick" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', paddingTop: '0.5rem', borderTop: '1px solid #E2E8F0' }}>
         <span style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600, display: 'flex', alignItems: 'center', marginRight: '0.5rem' }}>
-          Rápido:
+          Elegir periodo:
         </span>
         <button onClick={() => setQuickDate('hoy')} style={quickBtnStyle}>Hoy</button>
         <button onClick={() => setQuickDate('semana')} style={quickBtnStyle}>Esta Semana</button>

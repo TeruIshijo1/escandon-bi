@@ -13,6 +13,10 @@ async function ensureTables() {
       id bigserial PRIMARY KEY, row_id text NOT NULL, payload jsonb NOT NULL,
       revision integer NOT NULL, updated_by text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS bi_honorarios_finalized_rows (
+      row_id text PRIMARY KEY, liquidation_id bigint NOT NULL, snapshot jsonb NOT NULL,
+      finalized_at timestamptz NOT NULL DEFAULT now()
+    );
   `).catch(error => { ready = undefined; throw error; });
   await ready;
 }
@@ -23,7 +27,7 @@ function canReview(user) {
     || user?.permisos?.includes('interconsultas-jornadas') === true;
 }
 
-function validateDecision(input) {
+function validateDecision(input, sourceValidated = false) {
   const { rowId, serviceDate, expectedRevision, decision } = input || {};
   if (typeof rowId !== 'string' || !rowId.trim() || rowId.length > 1000
     || !/^\d{4}-\d{2}-\d{2}$/.test(serviceDate || '') || !Number.isFinite(Date.parse(serviceDate))
@@ -34,6 +38,7 @@ function validateDecision(input) {
     throw Object.assign(new Error('La decisión, su motivo o el registro no son válidos.'), { status: 400 });
   }
   const sapDocument = decision.sourceType === 'SAP_DOCUMENTO';
+  const biService = sourceValidated && decision.sourceType === 'BI_PRESTACION';
   if (decision.action === 'APROBAR' && !sapDocument && (typeof decision.customAmount !== 'number'
     || !Number.isFinite(decision.customAmount) || decision.customAmount <= 0 || decision.customAmount > 1e9)) {
     throw Object.assign(new Error('Se requiere una base de honorarios positiva.'), { status: 400 });
@@ -45,9 +50,41 @@ function validateDecision(input) {
     action: decision.action, customAmount: sapDocument ? null : decision.customAmount ?? null,
     vatRate: sapDocument ? null : decision.vatRate ?? null,
     motivo: decision.motivo.trim(), fingerprint: decision.fingerprint,
-    sourceType: sapDocument ? 'SAP_DOCUMENTO' : 'CLINICO',
-    separateServicesConfirmed: decision.separateServicesConfirmed === true
+    sourceType: sapDocument ? 'SAP_DOCUMENTO' : biService ? 'BI_PRESTACION' : 'CLINICO',
+    separateServicesConfirmed: decision.separateServicesConfirmed === true,
+    ...(biService ? { snapshot: decision.snapshot || null, executionConfirmed: decision.executionConfirmed === true,
+      evidenceReference: String(decision.evidenceReference || '').trim().slice(0, 1000),
+      duplicateConfirmed: decision.duplicateConfirmed === true, providerId: decision.providerId,
+      quantity: decision.quantity, physicianChangeReason: decision.snapshot?.physicianCorrection?.reason || null } : {})
   } };
+}
+
+function recordPhysicianCorrection(decision, previous, user) {
+  const snapshot = decision.snapshot;
+  const correction = snapshot?.physicianCorrection;
+  if (decision.action !== 'APROBAR' || !correction) return;
+  if (typeof correction.reason !== 'string' || !correction.reason.trim() || correction.reason.trim().length > 2000
+    || String(correction.toProviderId) !== String(snapshot.providerId)) {
+    throw Object.assign(new Error('Escribe un motivo válido para la corrección del médico.'), { status: 400 });
+  }
+  const fields = ['fromProviderId', 'fromProviderName', 'toProviderId', 'toProviderName', 'reason'];
+  const original = previous?.snapshot;
+  const previousCorrection = original?.physicianCorrection;
+  const sameCorrection = previous?.action === 'APROBAR' && previousCorrection && original.sourceFingerprint === snapshot.sourceFingerprint
+    && original.rowId === snapshot.rowId && String(original.providerId) === String(snapshot.providerId)
+    && fields.every(key => previousCorrection[key] === correction[key]);
+  // Autor y fecha sólo se conservan desde la revisión bloqueada en BI. Cualquier
+  // identidad o fecha incluida en la petición queda fuera del registro nuevo.
+  const attribution = sameCorrection ? {
+    correctedBy: previousCorrection.correctedBy, correctedAt: previousCorrection.correctedAt
+  } : {
+    correctedBy: { id: user.id, name: user.nombre || user.username || 'Usuario BI', username: user.username || null },
+    correctedAt: new Date().toISOString()
+  };
+  decision.snapshot = { ...snapshot, physicianCorrection: {
+    ...Object.fromEntries(fields.map(key => [key, correction[key]])), reason: correction.reason.trim(), ...attribution
+  } };
+  decision.physicianChangeReason = correction.reason.trim();
 }
 
 async function readReviews(startDate, endDate) {
@@ -58,19 +95,40 @@ async function readReviews(startDate, endDate) {
     revision: row.revision, reviewer: row.updated_by, timestamp: row.updated_at }]));
 }
 
-async function saveReview(input, user) {
+async function saveReview(input, user, { sourceValidated = false } = {}) {
   if (!canReview(user)) throw Object.assign(new Error('No tienes permiso para aprobar o rechazar honorarios.'), { status: 403 });
-  const { rowId, serviceDate, expectedRevision, decision } = validateDecision(input);
+  const { rowId, serviceDate, expectedRevision, decision } = validateDecision(input, sourceValidated);
   await ensureTables();
   const client = await getDb().pool.connect();
   try {
     await client.query('BEGIN');
     // El bloqueo también protege la primera aprobación de un registro inexistente.
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [rowId]);
-    const previous = await client.query('SELECT revision FROM bi_honorarios_reviews WHERE row_id=$1 FOR UPDATE', [rowId]);
+    const closed = await client.query('SELECT liquidation_id FROM bi_honorarios_finalized_rows WHERE row_id=$1', [rowId]);
+    if (closed.rows.length) throw Object.assign(new Error('Este servicio pertenece a una liquidación cerrada. Registra un ajuste en el cierre para conservar el historial.'), { status: 409 });
+    if (decision.action === 'APROBAR' && decision.snapshot) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`honorarios-catalog:${decision.snapshot.itemCode}`]);
+      const config = await client.query('SELECT revision,status,source_active,scope_excluded FROM bi_honorarios_catalog WHERE item_code=$1 FOR UPDATE', [decision.snapshot.itemCode]);
+      const tariff = await client.query('SELECT revision,active FROM bi_honorarios_tariffs WHERE id=$1 FOR UPDATE', [decision.snapshot.tariff.id]);
+      if (config.rows[0]?.revision !== decision.snapshot.catalog.revision || config.rows[0]?.status !== 'INCLUIDO'
+        || config.rows[0]?.source_active !== true || config.rows[0]?.scope_excluded
+        || tariff.rows[0]?.revision !== decision.snapshot.tariff.revision || !tariff.rows[0]?.active) {
+        throw Object.assign(new Error('Cambió la configuración o tarifa durante la aprobación. Actualiza el reporte.'), { status: 409 });
+      }
+      const allocation = decision.snapshot.allocationKey;
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`allocation:${allocation}`]);
+      const used = await client.query(`SELECT COALESCE(sum((payload->'snapshot'->>'quantity')::numeric),0) AS quantity
+        FROM bi_honorarios_reviews WHERE row_id<>$1 AND payload->>'action'='APROBAR'
+        AND payload->'snapshot'->>'allocationKey'=$2`, [rowId, allocation]);
+      if (Number(used.rows[0].quantity) + decision.snapshot.quantity > decision.snapshot.maximumQuantity + 1e-8) {
+        throw Object.assign(new Error('La cantidad ya reconocida en otras citas supera la cantidad de esta línea. Revisa la distribución antes de aprobar.'), { status: 409 });
+      }
+    }
+    const previous = await client.query('SELECT revision,payload FROM bi_honorarios_reviews WHERE row_id=$1 FOR UPDATE', [rowId]);
     if ((previous.rows[0]?.revision || 0) !== expectedRevision) {
       throw Object.assign(new Error('Otra persona modificó este registro. Actualiza el reporte antes de decidir.'), { status: 409 });
     }
+    recordPhysicianCorrection(decision, previous.rows[0]?.payload, user);
     const revision = expectedRevision + 1;
     const reviewer = `${user.id}: ${user.nombre || user.username || 'Usuario BI'}`;
     const saved = await client.query(`INSERT INTO bi_honorarios_reviews (row_id,service_date,payload,revision,updated_by)
@@ -87,4 +145,4 @@ async function saveReview(input, user) {
   } finally { client.release(); }
 }
 
-module.exports = { readReviews, saveReview, canReview, validateDecision };
+module.exports = { readReviews, saveReview, canReview, validateDecision, ensureTables };

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagrama de Flujo - Honorarios Médicos</title>
+    <!-- Fuente moderna (Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f3f4f6; /* gris suave de fondo */
+            --text-color: #1f2937;
+            --card-bg: #ffffff;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: #111827;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            letter-spacing: -0.025em;
+        }
+
+        p.subtitle {
+            color: #4b5563;
+            font-size: 1.1rem;
+            margin: 0;
+            font-weight: 400;
+        }
+
+        .diagram-container {
+            background-color: var(--card-bg);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 1200px;
+            overflow-x: auto;
+            border: 1px solid #e5e7eb;
+        }
+
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            /* Asegura que no haya scrollbar a menos que sea necesario */
+            overflow: visible;
+        }
+    </style>
+    <!-- Incluir Mermaid.js -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'base',
+            themeVariables: {
+                fontFamily: 'Inter, sans-serif',
+                primaryColor: '#ffffff',
+                primaryTextColor: '#1f2937',
+                primaryBorderColor: '#cbd5e1',
+                lineColor: '#94a3b8',
+                secondaryColor: '#f8fafc',
+                tertiaryColor: '#f1f5f9',
+                clusterBkg: '#f8fafc',     /* Fondo de los subgrafos */
+                clusterBorder: '#e2e8f0',  /* Borde de los subgrafos */
+                edgeLabelBackground: '#ffffff',
+                fontSize: '14px'
+            },
+            flowchart: {
+                curve: 'basis', /* Líneas curvas suaves */
+                padding: 20,
+                htmlLabels: true
+            }
+        });
+    </script>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Control de Honorarios Médicos</h1>
+        <p class="subtitle">Propuesta final de integración y revisión en BI (30 sept 2026)</p>
+    </div>
+
+    <div class="diagram-container">
+        <div class="mermaid">
+flowchart TD
+    %% Definición de estilos profesionales con colores suaves %%
+    classDef startEnd fill:#1e293b,stroke:#1e293b,stroke-width:2px,color:#fff,rx:25,ry:25
+    classDef process fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e40af,rx:8,ry:8
+    classDef decision fill:#fefce8,stroke:#eab308,stroke-width:2px,color:#854d0e,rx:8,ry:8
+    classDef state fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#9a3412,rx:8,ry:8
+    classDef approve fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#166534,rx:8,ry:8
+    classDef exclude fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#991b1b,rx:8,ry:8
+    classDef database fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#374151,rx:8,ry:8
+    
+    Start(["Inicio"]):::startEnd --> Sync["Sincronizar con Vertical"]:::process
+    
+    subgraph Fase1 ["1. Catálogo"]
+        Sync --> NuevoConcepto{"¿Servicio<br>Configurado?"}:::decision
+        NuevoConcepto -- "No" --> Configurar["⚙️ Fijar Tarifa y Excepciones"]:::state
+        NuevoConcepto -- "Sí" --> Catalogo[("Catálogo Activo")]:::database
+        Configurar --> Catalogo
+    end
+    
+    subgraph Fase2 ["2. Revisión del Mes"]
+        Catalogo --> Extraer["📥 Extraer Prestaciones<br>(Órdenes, Citas, Cargos)"]:::process
+        Extraer --> AsignarMedico{"¿Médico<br>Confirmado?"}:::decision
+        AsignarMedico -- "Dudoso" --> AjusteManual["👤 Asignar Manualmente"]:::state
+        AjusteManual --> Evaluar
+        AsignarMedico -- "Sí" --> Evaluar["📋 Evaluar Prestación"]:::process
+    end
+    
+    subgraph Fase3 ["3. Autorización"]
+        Evaluar --> Cumple{"¿Válido y sin<br>duplicados?"}:::decision
+        
+        Cumple -- "Faltan datos" --> Pendientes["⚠️ Dejar Pendiente"]:::state
+        Cumple -- "No aplica" --> Excluido["❌ Excluir"]:::exclude
+        Cumple -- "Sí" --> Aprobar["✅ Aprobar (Individual / Lote)"]:::approve
+    end
+    
+    subgraph Fase4 ["4. Liquidación"]
+        Aprobar --> Totales["💰 Calcular Totales<br>e Impuestos"]:::process
+        Totales --> Pagos["💳 Registrar Pagos<br>y Ajustes"]:::process
+        Pagos --> Exportar["📄 Exportar Excel / PDF"]:::approve
+        Exportar --> Fin(["Fin"]):::startEnd
+    end
+    
+    Pendientes -. "Aclarar" .-> Evaluar
+        </div>
+    </div>
+
+</body>
+</html>

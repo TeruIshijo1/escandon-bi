@@ -1,3 +1,4 @@
+import { userMessage } from '../utils/userMessages';
 /**
  * LoginPage.jsx — Página de autenticación
  * Hospital Escandón BI Platform v4.0
@@ -39,7 +40,7 @@ export default function LoginPage() {
     const result = await login(form.username.trim().toLowerCase(), form.password);
     setSubmitting(false);
     if (result.ok) navigate(from, { replace: true });
-    else setLocalError(result.message || 'Credenciales incorrectas. Intente de nuevo.');
+    else setLocalError(userMessage(result.message || 'Credenciales incorrectas. Intente de nuevo.'));
   };
 
   return (
@@ -320,7 +321,7 @@ export default function LoginPage() {
                   <line x1="12" y1="9" x2="12" y2="13" />
                   <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
-                {localError}
+                {userMessage(localError)}
               </div>
             )}
 

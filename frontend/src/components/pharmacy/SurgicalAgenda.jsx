@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo } from 'react';
 import { apiFetch } from '../../api/client';
 import useEscapeKey from '../../hooks/useEscapeKey';
@@ -28,7 +29,7 @@ export default function SurgicalAgenda() {
     ])
       .then(([eventsJson, kitsJson]) => {
         if (eventsJson.ok) setEvents(eventsJson.data || []);
-        else setError(eventsJson.error || 'Error al obtener agenda quirúrgica');
+        else setError(userMessage(eventsJson.error || 'Error al obtener agenda quirúrgica'));
         
         if (kitsJson.ok) setKits(kitsJson.data || []);
         setLoading(false);
@@ -277,7 +278,7 @@ export default function SurgicalAgenda() {
         </div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px', fontWeight: 'bold' }}>
-          ⚠️ {error}
+          ⚠️ {userMessage(error)}
         </div>
       ) : filteredEvents.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted, #64748b)' }}>

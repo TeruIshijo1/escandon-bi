@@ -1,0 +1,88 @@
+.navbar.hospital-navbar {
+  --pulse-color: #0088c9;
+  --pulse-opacity: .38;
+  background: var(--navbar-bg);
+  border-bottom: 1px solid var(--navbar-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 0 28px;
+  gap: 24px;
+  isolation: isolate;
+  box-shadow: 0 2px 12px rgba(0, 46, 87, .025);
+}
+
+.hospital-navbar__pulse {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: var(--pulse-opacity);
+  mask-image: linear-gradient(90deg, transparent, rgba(0,0,0,.08) 15%, #000 36%, #000 65%, rgba(0,0,0,.08) 85%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, rgba(0,0,0,.08) 15%, #000 36%, #000 65%, rgba(0,0,0,.08) 85%, transparent);
+}
+.hospital-navbar__pulse-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: calc(100% + 240px);
+  height: 58px;
+  margin-top: -29px;
+  color: var(--pulse-color);
+  animation: hospital-pulse-flow 18s linear infinite;
+}
+.hospital-navbar__pulse-track path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.hospital-navbar__pulse-line { stroke-width: 1.4; }
+.hospital-navbar__pulse-halo { stroke-width: 5; opacity: .12; filter: blur(1.5px); }
+@keyframes hospital-pulse-flow { to { transform: translateX(-240px); } }
+
+.hospital-navbar__identity, .hospital-navbar__controls { display: flex; align-items: center; }
+.hospital-navbar__identity { gap: 16px; min-width: 0; }
+.hospital-navbar__titles { min-width: 0; }
+.hospital-navbar__breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; color: var(--text-muted); font: 500 .59rem/1 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
+.hospital-navbar__breadcrumb-current { color: var(--color-azul-claro); overflow: hidden; text-overflow: ellipsis; }
+.hospital-navbar__title { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font: 750 .97rem/1.25 var(--font-display); letter-spacing: -.025em; }
+.hospital-navbar__controls { flex-shrink: 0; gap: 14px; }
+.hospital-navbar__icon-button { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; padding: 0; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--text-secondary); cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+.hospital-navbar__icon-button:hover { background: var(--surface-2); color: var(--color-azul-claro); }
+.hospital-navbar__theme { background: var(--surface-raised); border-color: var(--navbar-border); box-shadow: var(--shadow-xs); }
+.hospital-navbar__role { padding: 6px 11px; border: 1px solid var(--navbar-border); border-radius: 7px; background: var(--role-background); color: var(--role-color); font: 600 .64rem/1.2 var(--font-mono); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.hospital-navbar__account { position: relative; }
+.hospital-navbar__account-trigger { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 4px 10px 4px 5px; border: 1px solid var(--navbar-border); border-radius: 20px; background: var(--surface-raised); box-shadow: var(--shadow-xs); color: var(--text-primary); cursor: pointer; }
+.hospital-navbar__account-trigger:hover, .hospital-navbar__account-trigger[aria-expanded="true"] { background: var(--surface-1); border-color: var(--color-azul-claro); }
+.hospital-navbar__avatar { display: grid; place-items: center; width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(135deg, #004687, #0088c9); color: #fff; font: 700 .65rem/1 var(--font-display); }
+.hospital-navbar__name { max-width: 125px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 .8rem/1.2 var(--font-body); }
+.hospital-navbar__chevron { color: var(--text-muted); transition: transform 180ms ease; }
+.hospital-navbar__account-trigger[aria-expanded="true"] .hospital-navbar__chevron { transform: rotate(180deg); }
+.hospital-navbar__dropdown { position: absolute; top: calc(100% + 10px); right: 0; z-index: 200; min-width: 210px; max-width: calc(100vw - 24px); overflow: hidden; border: 1px solid var(--navbar-border); border-radius: 14px; background: var(--color-bg-white); box-shadow: var(--shadow-lg); animation: hospital-account-open 160ms ease-out; }
+.hospital-navbar__account-details { padding: 14px 16px; border-bottom: 1px solid var(--navbar-border); overflow-wrap: anywhere; }
+.hospital-navbar__account-details p { margin: 0; color: var(--text-primary); font: 700 .82rem/1.5 var(--font-body); }
+.hospital-navbar__account-details small { display: block; margin-top: 2px; color: var(--text-muted); font: 400 .72rem/1.5 var(--font-body); }
+.hospital-navbar__dropdown-actions { padding: 6px; }
+.hospital-navbar__logout { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border: 0; border-radius: 8px; background: transparent; color: var(--color-danger); font: 600 .82rem/1.3 var(--font-body); cursor: pointer; text-align: left; }
+.hospital-navbar__logout:hover { background: var(--color-danger); color: white; }
+@keyframes hospital-account-open { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+[data-theme="dark"] .hospital-navbar { --pulse-color: #6acfff; --pulse-opacity: .32; }
+[data-theme="dark"] .hospital-navbar__role { color: #c3d8eb; background: rgba(91, 181, 226, .08); }
+[data-theme="dark"] .hospital-navbar__breadcrumb-current { color: #7acaf2; }
+
+@media (max-width: 1000px) {
+  .navbar.hospital-navbar { padding: 0 20px; gap: 18px; }
+  .hospital-navbar__controls { gap: 10px; }
+  .hospital-navbar__role { display: none; }
+}
+@media (max-width: 768px) {
+  .navbar.hospital-navbar { left: 0; padding: 0 12px; gap: 12px; }
+  .hospital-navbar__identity { gap: 10px; }
+}
+@media (max-width: 560px) {
+  .hospital-navbar__name, .hospital-navbar__breadcrumb-separator, .hospital-navbar__breadcrumb-current { display: none; }
+  .hospital-navbar__controls { gap: 8px; }
+  .hospital-navbar__title { font-size: .87rem; }
+  .hospital-navbar__pulse { opacity: .2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hospital-navbar__pulse-track, .hospital-navbar__dropdown { animation: none; }
+  .navbar.hospital-navbar, .hospital-navbar__chevron { transition: none; }
+}

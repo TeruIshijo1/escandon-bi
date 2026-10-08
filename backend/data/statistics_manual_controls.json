@@ -1,0 +1,11 @@
+{
+  "reviewedOn": "2026-10-07",
+  "controls": [
+    { "month": "2026-07", "key": "lab", "label": "Laboratorio: estudios netos", "value": 1160, "unit": "estudios", "source": "11_COVID.xlsx · 07_JULIO · SUM(C2:C135)" },
+    { "month": "2026-07", "key": "labIncome", "label": "Laboratorio: ingresos netos", "value": 917763.43, "unit": "MXN", "source": "11_COVID.xlsx · 07_JULIO · D2:D135, importes convertidos de texto MXN" },
+    { "month": "2026-09", "key": "lab", "label": "Laboratorio: estudios netos", "value": 982, "unit": "estudios", "source": "11_COVID.xlsx · 09_SEPTIEMBRE · SUM(C2:C140)" },
+    { "month": "2026-09", "key": "labIncome", "label": "Laboratorio: ingresos netos", "value": 885655.01, "unit": "MXN", "source": "11_COVID.xlsx · 09_SEPTIEMBRE · D2:D140, importes convertidos de texto MXN" },
+    { "month": "2026-09", "key": "hospitalOrders", "label": "Órdenes: total hospitalización", "value": 5225088.12, "unit": "MXN", "source": "03_14_15_ATENCIONES MEDICAS - MEDICOS HOSPITALIZACION.xlsx · 09_SEPTIEMBRE SAP · SUMIF(F3:F470,Hospitalizacion,I3:I470)" },
+    { "month": "2026-09", "key": "emergencyOrders", "label": "Órdenes: total urgencias", "value": 1304711.09, "unit": "MXN", "source": "03_14_15_ATENCIONES MEDICAS - MEDICOS HOSPITALIZACION.xlsx · 09_SEPTIEMBRE SAP · SUMIF(F3:F470,Urgencias,I3:I470)" }
+  ]
+}

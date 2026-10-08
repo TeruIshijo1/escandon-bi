@@ -148,7 +148,7 @@ export default function DashboardDirectivo() {
   }
 
   return (
-    <div style={{ maxWidth: 'var(--content-max, 1300px)', margin: '0 auto' }}>
+    <div className="dashboard-view" style={{ maxWidth: 'var(--content-max, 1300px)', margin: '0 auto' }}>
       {/* <ExportApiModal isOpen={showExportApi} onClose={() => setShowExportApi(false)} /> */}
 
       {/* ── Header del dashboard ── */}
@@ -317,8 +317,8 @@ export default function DashboardDirectivo() {
         {activeTab === 'eficiencia' && (
           <div>
             <SectionHeader
-              title="Tablero de Eficiencia Operativa (Nativo Directo a SQL)"
-              subtitle="Acceso ultra-rápido a métricas operativas desde UDR_BI_INDICADORES_OPERATIVOS"
+              title="Eficiencia operativa"
+              subtitle="Consulta cómo se usan los recursos y servicios del hospital."
               accent="#0088C9"
             />
             <DashboardEficienciaNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />
@@ -328,8 +328,8 @@ export default function DashboardDirectivo() {
         {activeTab === 'eficacia' && (
           <div>
             <SectionHeader
-              title="Tablero de Eficacia Clínica (Nativo Directo a SQL)"
-              subtitle="Acceso ultra-rápido a productividad de médicos y consultas"
+              title="Resultados de la atención médica"
+              subtitle="Consulta las atenciones y la actividad de los médicos."
               accent="#00974A"
             />
             <DashboardEficaciaNativo globalFilters={globalFilters} globalTrigger={applyTrigger} />

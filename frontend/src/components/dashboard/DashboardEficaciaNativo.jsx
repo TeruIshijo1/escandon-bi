@@ -1,8 +1,8 @@
+import DashboardMetricCard from './DashboardMetricCard';
+import { userMessage } from '../../utils/userMessages';
 import { useState, useEffect } from 'react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  AreaChart, Area, PieChart, Pie, Cell, LineChart, Line, ComposedChart
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area, PieChart, Pie, Cell, LineChart, Line, ComposedChart } from 'recharts';
+import DashboardChart from './DashboardChart';
 import { API_BASE } from '../../api/config';
 import ExportButton from '../shared/ExportButton';
 import PremiumLoader from '../shared/PremiumLoader';
@@ -73,7 +73,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
       if (json.ok) {
         setData(json.data);
       } else {
-        setError(json.error || 'Error al cargar datos');
+        setError(userMessage(json.error || 'Error al cargar datos'));
       }
     } catch (err) {
       setError('Error de conexión con el servidor.');
@@ -87,7 +87,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
   }
 
   if (error) {
-    return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{error}</div>;
+    return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{userMessage(error)}</div>;
   }
 
   const { tendenciaMensual, topEspecialidades, topMedicos, estatusConsultas, kpis } = data;
@@ -108,7 +108,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
   };
 
   return (
-    <div id="dashboard-eficacia" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
+    <div className="dashboard-view" id="dashboard-eficacia" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
       
       <div style={{ display: 'none' }}>
         <ExportButton id="export-pdf-btn" type="pdf" targetId="dashboard-eficacia" compact={true} />
@@ -123,8 +123,8 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
 
 
       {/* Tarjetas de KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <KPICard title="Total de Consultas (YTD)" value={kpis.totalConsultas.toLocaleString()} color="#0088C9" icon="🩺" />
+      <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+        <KPICard title="Consultas en el año" value={kpis.totalConsultas.toLocaleString()} color="#0088C9" icon="🩺" />
         <KPICard title="Top Especialidad" value={kpis.topEspecialidad} color="#10B981" icon="🏆" isText={true} />
         <KPICard title="Primeras Veces" value={kpis.primeras.toLocaleString()} color="#8B5CF6" icon="👤" />
         <KPICard title="Subsecuentes" value={kpis.subsecuentes.toLocaleString()} color="#F59E0B" icon="🔄" />
@@ -134,10 +134,10 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '2rem' }}>
         
         {/* Tendencia Mensual (AreaChart) */}
-        <div style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+        <div className="dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Volumen de Consultas por Mes</h3>
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 300 }}>
+            <DashboardChart>
               <AreaChart data={tendenciaMensual} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
@@ -153,15 +153,15 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                 <Area isAnimationActive={false} type="monotone" dataKey="Total" name="Consultas Totales" stroke="#0088C9" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
                 <Area isAnimationActive={false} type="monotone" dataKey="Primeras" name="Primeras Veces" stroke="#8B5CF6" strokeWidth={2} fillOpacity={0} />
               </AreaChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Estatus Consultas (PieChart) */}
-        <div style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Estatus de Citas del Día</h3>
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
+        <div className="dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Estado de Citas del Día</h3>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 300 }}>
+            <DashboardChart>
               <PieChart>
                 <Pie
                   isAnimationActive={false}
@@ -182,7 +182,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                 <Tooltip formatter={(value) => value.toLocaleString()} />
                 <Legend layout="vertical" verticalAlign="middle" align="right" />
               </PieChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
       </div>
@@ -191,10 +191,10 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
         
         {/* Top 10 Especialidades */}
-        <div style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+        <div className="dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Especialidades</h3>
-          <div style={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
+            <DashboardChart>
               <BarChart layout="vertical" data={topEspecialidades} margin={{ top: 10, right: 30, left: 100, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tick={{fill: '#64748B'}} axisLine={false} tickLine={false} />
@@ -216,15 +216,15 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                   style={{ cursor: 'pointer' }}
                 />
               </BarChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Top 10 Médicos */}
-        <div style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+        <div className="dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Médicos (Productividad)</h3>
-          <div style={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
+            <DashboardChart>
               <BarChart layout="vertical" data={topMedicos} margin={{ top: 10, right: 30, left: 120, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tick={{fill: '#64748B'}} axisLine={false} tickLine={false} />
@@ -232,7 +232,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                 <Tooltip cursor={{fill: 'rgba(0,136,201,0.05)'}} />
                 <Bar isAnimationActive={false} dataKey="Total" name="Consultas" fill="#0088C9" radius={[0, 4, 4, 0]} barSize={20} onClick={handleBarClick} style={{ cursor: 'pointer' }} />
               </BarChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
@@ -328,7 +328,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                   <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Paciente</th>
                   <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Médico</th>
                   <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Especialidad</th>
-                  <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Estatus</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Estado</th>
                 </tr>
               </thead>
               <tbody>
@@ -395,33 +395,6 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
   );
 }
 
-function KPICard({ title, value, color, icon, isText = false }) {
-  return (
-    <div style={{
-      background: 'white',
-      padding: '1.25rem',
-      borderRadius: 12,
-      borderLeft: `5px solid ${color}`,
-      boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '1rem'
-    }}>
-      <div style={{ fontSize: '2rem' }}>{icon}</div>
-      <div style={{ overflow: 'hidden' }}>
-        <div style={{ color: '#64748B', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{title}</div>
-        <div style={{ 
-          color: '#0D1B2A', 
-          fontSize: isText ? '1.1rem' : '1.5rem', 
-          fontWeight: 800, 
-          marginTop: '0.2rem',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}>
-          {value}
-        </div>
-      </div>
-    </div>
-  );
+function KPICard(props) {
+  return <DashboardMetricCard {...props} />;
 }

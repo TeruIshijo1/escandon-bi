@@ -8,6 +8,52 @@ const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const sapService = require('../services/sap.service');
+const sapAccountReview = require('../services/sapAccountReview.service');
+
+// This audit contains patient/account data. A role or an unrelated permission
+// must never unlock it through the general authorize middleware's fallback.
+function authorizeAccountReview(req, res, next) {
+  const user = req.user;
+  if (user && (String(user.username || '').toLowerCase() === 'amendoza' ||
+    (Array.isArray(user.permisos) && user.permisos.includes('auditoria-reapertura-cuentas')))) return next();
+  return res.status(403).json({ success: false, error: 'No tienes permiso para consultar la reapertura de cuentas.', code: 'ACCOUNT_REVIEW_FORBIDDEN' });
+}
+
+router.get('/account-review/search', authenticate, authorizeAccountReview, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const controller = new AbortController();
+  const cancel = () => { if (!res.writableEnded) controller.abort(); };
+  res.once('close', cancel);
+  try {
+    const data = await sapAccountReview.search({ mode: req.query.mode, q: req.query.q }, { signal: controller.signal });
+    res.json({ success: true, data });
+  } catch (error) {
+    if (controller.signal.aborted || res.destroyed) return;
+    const status = error.status === 400 ? 400 : 502;
+    res.status(status).json({ success: false, error: status === 400 ? error.message : 'No se pudo completar la búsqueda en SAP. Intenta de nuevo.' });
+  } finally {
+    res.removeListener('close', cancel);
+    controller.abort();
+  }
+});
+
+router.get('/account-review/:account', authenticate, authorizeAccountReview, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const controller = new AbortController();
+  const cancel = () => { if (!res.writableEnded) controller.abort(); };
+  res.once('close', cancel);
+  try {
+    const data = await sapAccountReview.review(req.params.account, { fullMap: req.query.fullMap === 'true', signal: controller.signal });
+    res.json({ success: true, data });
+  } catch (error) {
+    if (controller.signal.aborted || res.destroyed) return;
+    const status = error.status === 400 ? 400 : 502;
+    res.status(status).json({ success: false, error: status === 400 ? error.message : 'No se pudo verificar el estado de la cuenta en SAP. Intenta de nuevo.' });
+  } finally {
+    res.removeListener('close', cancel);
+    controller.abort();
+  }
+});
 
 /**
  * GET /api/sap/ping

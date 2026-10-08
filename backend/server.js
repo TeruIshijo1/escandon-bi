@@ -35,6 +35,9 @@ const { syncAllDashboards, initDashboardCron } = require('./services/dashboardSy
 
 const app  = express();
 const PORT = process.env.PORT || 4000;
+const { publicMessages } = require('./middleware/publicMessages.middleware');
+
+app.use(publicMessages);
 
 // Habilitar trust proxy para Tailscale Serve/Funnel, Nginx y túneles inversos
 app.set('trust proxy', 1);
@@ -203,26 +206,30 @@ app.use((err, req, res, next) => {
 
   // Error de validación JWT
   if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
-    return res.status(401).json({ error: 'Token inválido o expirado' });
+    return res.status(401).json({ error: 'Tu sesión terminó. Inicia sesión de nuevo.' });
   }
 
   // Error de base de datos (códigos SQLSTATE de PostgreSQL o legacy SQLite)
   if (err.severity || (err.code && /^[0-9A-Z]{5}$/.test(err.code))) {
-    return res.status(500).json({ error: 'Error de base de datos', code: err.code });
+    return res.status(500).json({ error: 'No se pudo consultar la información. Intenta de nuevo en unos minutos.' });
   }
 
   res.status(err.status || 500).json({
     message: err.message || 'Error interno del servidor',
     error:   err.message || 'Error interno del servidor',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 });
 
 /* ── Health check ampliado ──────────────────────────────────── */
 let dbStatus = 'pendiente';
+const { SERVICE_NAME, instanceId } = require('./utils/backendInstance');
+const installationId = instanceId(__dirname);
 
 app.get('/health', (req, res) => {
   res.json({
+    service:   SERVICE_NAME,
+    installationId,
+    environment: process.env.NODE_ENV || 'development',
     status:    dbStatus === 'ok' ? 'ok' : 'degradado',
     db:        dbStatus,
     timestamp: new Date().toISOString(),
@@ -257,17 +264,28 @@ if (process.env.NODE_ENV !== 'test') { (async () => {
     console.log(`🔌  Intentando conectar a PostgreSQL...\n`);
   });
 
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`\n❌ [ERROR EADDRINUSE] El puerto ${PORT} ya está ocupado por otro proceso de Node.js.`);
-      console.error(`💡 Solución: Ejecuta "taskkill /F /IM node.exe" para liberar el puerto e inicia nuevamente.\n`);
+  // Do not connect to databases or schedule ETLs until this process owns the port.
+  await new Promise(resolve => {
+    server.once('listening', resolve);
+    server.once('error', err => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`\n❌ El puerto ${PORT} ya está ocupado. Usa npm start para comprobar si el backend está disponible o revisa qué proceso ocupa ese puerto.\n`);
+      } else console.error('❌ No se pudo abrir el servidor:', err.message);
+      // Module imports may register timers; terminate before they can start SAP work.
       process.exit(1);
-    }
+    });
   });
 
   try {
     await connectDB();
     dbStatus = 'ok';
+    const syncHonorariosCatalog = async () => {
+      const { syncIfDue } = require('./services/honorariosCatalog.service');
+      await syncIfDue(await connectRemoteDB());
+    };
+    syncHonorariosCatalog().catch(error => console.warn('[Honorarios] Sincronización de catálogo:', error.message));
+    const honorariosSyncInterval = Math.max(60000, (Number(process.env.HONORARIOS_CATALOG_SYNC_MINUTES) || 30) * 60000);
+    setInterval(() => syncHonorariosCatalog().catch(error => console.warn('[Honorarios] Sincronización de catálogo:', error.message)), honorariosSyncInterval).unref();
     
     // Inicializar conexión a SQL Server Remoto
     connectRemoteDB().catch(e => console.warn('⚠️ SQL Server Remoto no inicializado al arranque.'));

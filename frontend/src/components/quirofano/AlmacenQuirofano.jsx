@@ -131,7 +131,7 @@ export default function AlmacenQuirofano() {
         { header: 'Código SAP', key: 'ItemCode', width: 110, align: 'left' },
         { header: 'Descripción / Insumo', key: 'ItemName', width: 320, align: 'left' },
         { header: 'Almacén', key: 'WhsCode', width: 130, align: 'center' },
-        { header: 'Stock Físico', key: 'QuantityOnStock', width: 100, align: 'right', type: 'num' },
+        { header: 'Existencias físicas', key: 'QuantityOnStock', width: 100, align: 'right', type: 'num' },
         { header: 'Precio Unitario ($)', key: 'SalesPrice', width: 130, align: 'right', type: 'money' },
         { header: 'Valor Total ($)', key: 'ValorTotal', width: 140, align: 'right', type: 'money' },
         { header: 'Grupo SAP', key: 'ItemGroupName', width: 160, align: 'left' }
@@ -292,7 +292,7 @@ export default function AlmacenQuirofano() {
             <span>🏥</span> Almacén Quirófano (QX, Recuperación, Carros Rojos y Código Mater)
           </h2>
           <p style={{ margin: '0.4rem 0 0 0', color: '#E0F2FE', fontSize: '0.95rem', fontWeight: 500 }}>
-            Gestión en tiempo real de insumos en stock, carros de paro, emergencias obstétricas y registro de devoluciones/retornos.
+            Consulta los materiales disponibles para cirugías y emergencias, y registra las devoluciones.
           </p>
         </div>
 
@@ -366,7 +366,7 @@ export default function AlmacenQuirofano() {
           title="Clic para ver todos los artículos de Quirófano y sus áreas"
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ fontSize: '0.78rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Artículos en Stock</div>
+            <div style={{ fontSize: '0.78rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Artículos en Existencias</div>
             {warehouseFilter === 'ALL' && subTab === 'inventory' && (
               <span style={{ fontSize: '0.7rem', background: '#0077B6', color: '#FFFFFF', padding: '0.15rem 0.5rem', borderRadius: '9999px', fontWeight: 700 }}>TODOS</span>
             )}
@@ -386,7 +386,7 @@ export default function AlmacenQuirofano() {
         </div>
 
         <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '1.25rem', boxShadow: '0 2px 8px rgba(0, 70, 135, 0.05)' }}>
-          <div style={{ fontSize: '0.78rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Valor Total Stock</div>
+          <div style={{ fontSize: '0.78rem', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>Valor Total Existencias</div>
           <div style={{ fontSize: '2rem', fontWeight: 800, color: '#D97706', marginTop: '0.25rem' }}>
             ${(stockStats.totalValue || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
           </div>
@@ -457,7 +457,7 @@ export default function AlmacenQuirofano() {
             transition: 'all 0.2s ease'
           }}
         >
-          📦 Stock Actual ({filteredStock.length})
+          📦 Existencias actuales ({filteredStock.length})
         </button>
 
         <button
@@ -604,7 +604,7 @@ export default function AlmacenQuirofano() {
                     <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Código</th>
                     <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Descripción / Insumo</th>
                     <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Almacén</th>
-                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Stock Físico</th>
+                    <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Existencias físicas</th>
                     <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Precio Unit.</th>
                     <th style={{ padding: '0.9rem 1.25rem', textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Valor Total ($)</th>
                     <th style={{ padding: '0.9rem 1.25rem', color: '#475569', fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Grupo SAP</th>

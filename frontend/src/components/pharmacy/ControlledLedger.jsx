@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
@@ -29,7 +30,7 @@ export default function ControlledLedger() {
         setData(json.data || []);
         setStats(json.stats || {});
       } else {
-        setError(json.error || 'Error al obtener datos');
+        setError(userMessage(json.error || 'Error al obtener datos'));
       }
     } catch (err) {
       console.error(err);
@@ -106,7 +107,7 @@ export default function ControlledLedger() {
   .con{color:#dc2626;font-weight:bold;}
 </style></head><body>
 <table>
-  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN - PLATAFORMA BI</td></tr>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
   <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte Oficial: Salidas de Farmacia y Medicamentos Controlados</td></tr>
   <tr class="info-row"><td colspan="${cols.length}">Fecha de exportación: ${fechaReporte} &nbsp;|&nbsp; Registros: ${filteredData.length} &nbsp;|&nbsp; Filtro: ${activeFilter}</td></tr>
   <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
@@ -354,7 +355,7 @@ export default function ControlledLedger() {
             <span>📤</span> Salidas de Farmacia y Libro de Controlados
           </h2>
           <p style={{ margin: '0.4rem 0 0 0', color: '#E0F2FE', fontSize: '0.95rem', fontWeight: 500 }}>
-            Trazabilidad completa de dispensaciones con lote y medicamentos controlados cruzando SAP y Cirrus.
+            Consulta las entregas de medicamentos controlados, sus lotes y los pacientes que los recibieron.
           </p>
         </div>
 
@@ -588,9 +589,9 @@ export default function ControlledLedger() {
       {/* Tabla Principal */}
       <div className="cl-table-container" style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)' }}>
         {loading ? (
-          <div style={{ padding: '3.5rem', textAlign: 'center', color: '#64748B', fontWeight: 600, fontSize: '1rem' }}>⏳ Cargando registro de salidas y trazabilidad de lotes…</div>
+          <div style={{ padding: '3.5rem', textAlign: 'center', color: '#64748B', fontWeight: 600, fontSize: '1rem' }}>⏳ Cargando salidas de medicamentos y sus lotes…</div>
         ) : error ? (
-          <div style={{ padding: '3.5rem', textAlign: 'center', color: '#DC2626', fontWeight: 700, fontSize: '1rem' }}>⚠️ {error}</div>
+          <div style={{ padding: '3.5rem', textAlign: 'center', color: '#DC2626', fontWeight: 700, fontSize: '1rem' }}>⚠️ {userMessage(error)}</div>
         ) : filteredData.length === 0 ? (
           <div style={{ padding: '3.5rem', textAlign: 'center', color: '#64748B', fontWeight: 600, fontSize: '1rem' }}>
             ⚠️ No se encontraron registros con el filtro seleccionado ({activeFilter}).

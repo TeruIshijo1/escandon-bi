@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  AreaChart, Area, PieChart, Pie, Cell
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
+import DashboardChart from './DashboardChart';
 import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function DashboardUrgenciasNativo({ data, searchFilter, setSearchFilter }) {
@@ -100,36 +98,36 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
   const formatCurrency = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
 
   return (
-    <div style={{ marginTop: '2rem' }}>
+    <div className="area-native-dashboard dashboard-view" style={{ marginTop: '2rem' }}>
       
 
       {/* ── SECCIÓN: CENSO DE CAMAS EN VIVO ── */}
       {censoCamas.length > 0 && (
-      <div style={{ background: '#FFFFFF', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '2rem', marginTop: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+      <div className="area-panel" style={{ background: '#FFFFFF', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '2rem', marginTop: '2rem' }}>
+        <div className="area-panel-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontFamily: "var(--font-display)", color: '#0F172A', fontSize: '1.2rem', fontWeight: 800 }}>Censo Clínico en Vivo — Camas Urgencias</h3>
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
+            <h3 className="area-text-primary" style={{ margin: 0, fontFamily: "var(--font-display)", color: '#0F172A', fontSize: '1.2rem', fontWeight: 800 }}>Censo Clínico en Vivo — Camas Urgencias</h3>
+            <p className="area-text-muted" style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
               Estado actual de las camas y cubículos de Urgencias. Haz clic en una ocupada para ver su cuenta.
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.8rem', fontSize: '0.75rem', fontWeight: 700 }}>
-            <span style={{ padding: '0.35rem 0.75rem', background: '#ECFDF5', color: '#047857', borderRadius: '20px', border: '1px solid rgba(16,185,129,0.2)' }}>
+            <span className="area-text-positive" style={{ padding: '0.35rem 0.75rem', background: '#ECFDF5', color: '#047857', borderRadius: '20px', border: '1px solid rgba(16,185,129,0.2)' }}>
               🟢 DISPONIBLES: {freeBedsCount}
             </span>
-            <span style={{ padding: '0.35rem 0.75rem', background: '#FEF2F2', color: '#B91C1C', borderRadius: '20px', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <span className="area-text-danger" style={{ padding: '0.35rem 0.75rem', background: '#FEF2F2', color: '#B91C1C', borderRadius: '20px', border: '1px solid rgba(239,68,68,0.2)' }}>
               🔴 OCUPADAS: {occupiedBedsCount}
             </span>
           </div>
         </div>
 
         {occupiedBedsCount === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#64748B', background: '#F8FAFC', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>
+          <div className="area-text-muted" style={{ textAlign: 'center', padding: '3rem', color: '#64748B', background: '#F8FAFC', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>
             <span style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>🛏️</span>
             No hay pacientes ingresados en urgencias en este momento.
           </div>
         ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+        <div className="area-bed-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
           {censoCamas.filter(bed => bed.Estado === 'OCUPADA').map((bed, idx) => {
             const isOcupada = bed.Estado === 'OCUPADA';
             return (
@@ -162,10 +160,10 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', fontWeight: 750, color: '#64748B', letterSpacing: '0.04em' }}>
+                  <div className="area-text-muted" style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', fontWeight: 750, color: '#64748B', letterSpacing: '0.04em' }}>
                     {bed.RoomCode}
                   </div>
-                  <span style={{
+                  <span className="area-text-adaptive" style={{
                     fontSize: '0.64rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em',
                     padding: '0.15rem 0.5rem', borderRadius: '20px',
                     background: isOcupada ? '#FEF2F2' : '#ECFDF5',
@@ -175,32 +173,32 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                   </span>
                 </div>
 
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', margin: '0.1rem 0' }}>
+                <div className="area-text-primary" style={{ fontFamily: 'var(--font-display)', fontSize: '0.98rem', fontWeight: 800, color: '#0F172A', margin: '0.1rem 0' }}>
                   {bed.RoomName}
                 </div>
 
                 {isOcupada ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid #F1F5F9', paddingTop: '0.6rem', marginTop: '0.2rem' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1E293B' }}>👤 {bed.Paciente}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B', display: 'flex', gap: '0.25rem' }}>
+                    <div className="area-text-primary" style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1E293B' }}>👤 {bed.Paciente}</div>
+                    <div className="area-text-muted" style={{ fontSize: '0.78rem', color: '#64748B', display: 'flex', gap: '0.25rem' }}>
                       <span style={{ fontWeight: 600 }}>Folio:</span> <span style={{ fontFamily: 'var(--font-mono)' }}>{bed.PCNum}</span>
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B' }}>🩺 <span style={{ fontWeight: 600 }}>Médico:</span> {bed.Medico || 'N/A'}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B' }}>📅 <span style={{ fontWeight: 600 }}>Ingreso:</span> {formatDateStr(bed.FechaIngreso)}</div>
+                    <div className="area-text-muted" style={{ fontSize: '0.78rem', color: '#64748B' }}>🩺 <span style={{ fontWeight: 600 }}>Médico:</span> {bed.Medico || 'N/A'}</div>
+                    <div className="area-text-muted" style={{ fontSize: '0.78rem', color: '#64748B' }}>📅 <span style={{ fontWeight: 600 }}>Ingreso:</span> {formatDateStr(bed.FechaIngreso)}</div>
                     
                     <div style={{ 
                       marginTop: '0.3rem', background: 'rgba(5, 150, 105, 0.04)', padding: '0.5rem 0.75rem', 
                       borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       border: '1.5px dashed rgba(5, 150, 105, 0.2)'
                     }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cargos Urgencias</span>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
+                      <span className="area-text-positive" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cargos Urgencias</span>
+                      <span className="area-text-positive" style={{ fontSize: '0.9rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
                         {formatCurrency(bed.totalCargos)}
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', padding: '1.5rem 0', color: '#94A3B8', gap: '0.4rem', borderTop: '1px solid #F1F5F9', marginTop: '0.2rem' }}>
+                  <div className="area-text-muted" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', padding: '1.5rem 0', color: '#94A3B8', gap: '0.4rem', borderTop: '1px solid #F1F5F9', marginTop: '0.2rem' }}>
                     <span style={{ fontSize: '1.5rem' }}>🛏️</span>
                     <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Cama disponible</span>
                   </div>
@@ -214,13 +212,13 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
       )}
 
       {/* Tarjeta de Ingresos Totales */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', padding: '1.5rem', borderRadius: 12, color: 'white', boxShadow: '0 4px 6px rgba(16,185,129,0.2)' }}>
+      <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="area-metric-card area-metric-card--highlight dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', padding: '1.5rem', borderRadius: 12, color: 'white', boxShadow: '0 4px 6px rgba(16,185,129,0.2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>Ingresos Urgencias (SAP)</div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, marginTop: '0.5rem' }}>{formatCurrency(data.kpisFinancieros?.ingresosSAP || 0)}</div>
-              <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem' }}>Contabilidad Oficial Grupo 104 (AMBULANCIAS / URGENCIAS)</div>
+              <div className="area-metric-label dashboard-metric-label" style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>Ingresos de Urgencias</div>
+              <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2rem', fontWeight: 800, marginTop: '0.5rem' }}>{formatCurrency(data.kpisFinancieros?.ingresosSAP || 0)}</div>
+              <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem' }}>Ingresos registrados por atención de urgencias y ambulancias</div>
             </div>
             <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.2)', borderRadius: 10 }}>
               <span style={{ fontSize: '1.5rem' }}>💰</span>
@@ -229,13 +227,13 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
+      <div className="area-chart-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
         
         {/* Gráfica: Tendencia de Llegadas */}
-        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Volumen de Llegadas (Últimos Días)</h3>
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
+        <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Volumen de Llegadas (Últimos Días)</h3>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 300 }}>
+            <DashboardChart>
               <AreaChart data={data.tendencia} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorUrgencias" x1="0" y1="0" x2="0" y2="1">
@@ -252,27 +250,27 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                 />
                 <Area type="monotone" dataKey="valor" stroke="#E8853D" strokeWidth={3} fillOpacity={1} fill="url(#colorUrgencias)" isAnimationActive={false} />
               </AreaChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Gráfica: Estatus de Pacientes */}
-        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Distribución de Estatus</h3>
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
+        <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Distribución de Estado</h3>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 300 }}>
+            <DashboardChart>
               <PieChart>
                 <Pie
                   data={data.estatus}
                   cx="50%"
                   cy="50%"
                   innerRadius={70}
-                  outerRadius={100}
+                  outerRadius={90}
                   paddingAngle={5}
                   dataKey="valor"
                   nameKey="nombre"
                   isAnimationActive={false}
-                  label={({ nombre, percent }) => `${nombre} ${(percent * 100).toFixed(0)}%`}
+                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                   onClick={(entry) => setSelectedEstatus(entry.nombre)}
                   style={{ cursor: 'pointer' }}
                 >
@@ -281,19 +279,20 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                   ))}
                 </Pie>
                 <Tooltip formatter={(value) => [value, 'Pacientes']} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
               </PieChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
       </div>
 
       {/* Gráficas de Ingresos */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
-        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Médicos por Ingreso</h3>
-          <div style={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer>
+      <div className="area-chart-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Médicos por Ingreso</h3>
+          <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
+            <DashboardChart>
               <BarChart layout="vertical" data={data.topMedicos} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
@@ -304,14 +303,14 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                 />
                 <Bar dataKey="ingresos" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
-            </ResponsiveContainer>
-          </div>
+            </DashboardChart>
+          </div></div>
         </div>
 
-        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Servicios Facturados</h3>
-          <div style={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer>
+        <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Servicios Facturados</h3>
+          <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
+            <DashboardChart>
               <BarChart layout="vertical" data={data.topServicios} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
@@ -322,59 +321,59 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                 />
                 <Bar dataKey="ingresos" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
-            </ResponsiveContainer>
-          </div>
+            </DashboardChart>
+          </div></div>
         </div>
       </div>
 
       {/* Tabla de Detalle */}
-      <div data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>Detalle de Pacientes (Top 100)</h3>
+      <div className="area-panel" data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+        <div className="area-panel-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 className="area-text-primary" style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>Detalle de Pacientes (Top 100)</h3>
           
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             {selectedEstatus && (
-              <span style={{ fontSize: '0.85rem', color: '#005FA9', fontWeight: 600, background: '#E0F2FE', padding: '0.2rem 0.6rem', borderRadius: 12 }}>
-                Estatus: {selectedEstatus}
+              <span className="area-text-primary" style={{ fontSize: '0.85rem', color: '#005FA9', fontWeight: 600, background: '#E0F2FE', padding: '0.2rem 0.6rem', borderRadius: 12 }}>
+                Estado: {selectedEstatus}
               </span>
             )}
             {(searchFilter || selectedEstatus) && (
-              <button 
+              <button className="area-text-danger"
                 onClick={() => { setSearchFilter(''); setSelectedEstatus(null); }}
                 style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
               >
                 Limpiar filtro
               </button>
             )}
-            <span style={{ fontSize: '0.85rem', color: '#8A97A8' }}>{filteredList.length} registros</span>
+            <span className="area-text-muted" style={{ fontSize: '0.85rem', color: '#8A97A8' }}>{filteredList.length} registros</span>
           </div>
         </div>
         
-        <div style={{ overflowX: 'auto' }}>
+        <div className="area-table-scroll" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', textAlign: 'left' }}>
-                <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Admisión</th>
-                <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Alta Médica</th>
-                <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Cuenta</th>
-                <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Paciente</th>
-                <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Estancia</th>
-                <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Estatus</th>
+                <th className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Admisión</th>
+                <th className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Alta Médica</th>
+                <th className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Cuenta</th>
+                <th className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Paciente</th>
+                <th className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Estancia</th>
+                <th className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: 600 }}>Estado</th>
               </tr>
             </thead>
             <tbody>
               {filteredList.slice(0, 100).map((c, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{c.IngresoFormat}</td>
-                  <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{c.EgresoFormat}</td>
-                  <td 
+                  <td className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{c.IngresoFormat}</td>
+                  <td className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{c.EgresoFormat}</td>
+                  <td className="area-text-primary"
                     onClick={() => setSearchFilter(c.PCNum.toString())}
                     style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#005FA9', cursor: 'pointer', textDecoration: 'underline' }}
                     title="Filtrar por Cuenta"
                   >
                     {c.PCNum}
                   </td>
-                  <td 
+                  <td className="area-text-primary"
                     onClick={() => setSearchFilter(c.Paciente)}
                     style={{ padding: '0.75rem 1rem', cursor: 'pointer', color: '#0D1B2A' }}
                     title="Filtrar por Paciente"
@@ -387,7 +386,7 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                     {c.MinutosEstancia > 0 ? `${(c.MinutosEstancia / 60).toFixed(1)} hrs` : '-'}
                   </td>
                   <td style={{ padding: '0.75rem 1rem' }}>
-                    <span style={{ 
+                    <span className="area-text-adaptive" style={{
                       background: c.Estatus === 'CL' ? '#D1FAE5' : c.Estatus === 'OP' ? '#FEF3C7' : '#FEE2E2',
                       color: c.Estatus === 'CL' ? '#065F46' : c.Estatus === 'OP' ? '#B45309' : '#991B1B',
                       padding: '0.2rem 0.6rem',
@@ -419,20 +418,20 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
           }}>
             <div style={{ padding: '1.5rem 1.75rem', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', background: 'linear-gradient(135deg, #FFF, #F8FAFC)' }}>
               <div>
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>
+                <span className="area-text-muted" style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>
                   Desglose de Cuenta — {selectedPatientDetail.room || 'Urgencias'}
                 </span>
-                <h2 style={{ margin: '0.2rem 0 0 0', fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#0F172A' }}>
+                <h2 className="area-text-primary" style={{ margin: '0.2rem 0 0 0', fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#0F172A' }}>
                   {selectedPatientDetail.paciente}
                 </h2>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.78rem', color: '#64748B' }}>
+                <div className="area-text-muted" style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.78rem', color: '#64748B' }}>
                   <span>Cuenta: <strong style={{ fontFamily: 'var(--font-mono)' }}>{selectedPatientDetail.folio}</strong></span>
                   {selectedPatientDetail.entrydate && <span>Ingreso: <strong>{formatDateStr(selectedPatientDetail.entrydate)}</strong></span>}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8' }}>Total Cargado</span>
-                <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
+                <span className="area-text-muted" style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', color: '#94A3B8' }}>Total Cargado</span>
+                <div className="area-text-positive" style={{ fontSize: '1.6rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
                   {formatCurrency(selectedPatientDetail.total)}
                 </div>
               </div>
@@ -446,7 +445,7 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.75rem' }}>
               {detailLoading ? (
-                <div style={{ textAlign: 'center', padding: '5rem 0', color: '#64748B' }}>Cargando estado de cuenta...</div>
+                <div className="area-text-muted" style={{ textAlign: 'center', padding: '5rem 0', color: '#64748B' }}>Cargando estado de cuenta...</div>
               ) : filteredDetailItems.length > 0 ? (
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
                   <thead>
@@ -462,8 +461,8 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                   <tbody>
                     {filteredDetailItems.map((item, idx) => (
                       <tr key={idx}>
-                        <td style={{ color: '#64748B', fontSize: '0.76rem' }}>{formatDateStr(item.fecha)}</td>
-                        <td style={{ color: '#64748B', fontSize: '0.76rem' }}>{item.grupo}</td>
+                        <td className="area-text-muted" style={{ color: '#64748B', fontSize: '0.76rem' }}>{formatDateStr(item.fecha)}</td>
+                        <td className="area-text-muted" style={{ color: '#64748B', fontSize: '0.76rem' }}>{item.grupo}</td>
                         <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem' }}>{item.codigo}</td>
                         <td style={{ fontWeight: 600 }}>{item.insumo}</td>
                         <td style={{ textAlign: 'right' }}>{item.cantidad}</td>
@@ -473,7 +472,7 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
                   </tbody>
                 </table>
               ) : (
-                <div style={{ textAlign: 'center', padding: '5rem 0', color: '#94A3B8' }}>No se encontraron cargos.</div>
+                <div className="area-text-muted" style={{ textAlign: 'center', padding: '5rem 0', color: '#94A3B8' }}>No se encontraron cargos.</div>
               )}
             </div>
             <div style={{ padding: '1.25rem 1.75rem', borderTop: '1px solid #F1F5F9', textAlign: 'right' }}>

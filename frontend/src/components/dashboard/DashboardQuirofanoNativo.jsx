@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, ComposedChart
-} from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ComposedChart } from 'recharts';
+import DashboardChart from './DashboardChart';
 import PremiumLoader from '../shared/PremiumLoader';
 
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -215,7 +213,7 @@ export default function DashboardQuirofanoNativo({ data }) {
 
   const formatCurrency = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
 
-  if (!data) return <PremiumLoader text="Cargando información nativa de quirófano..." />;
+  if (!data) return <PremiumLoader text="Cargando información de quirófano..." />;
 
   const clearFilters = () => {
     setSelectedRoom('Todos');
@@ -240,7 +238,7 @@ export default function DashboardQuirofanoNativo({ data }) {
       { header: 'Fecha Inicio', width: 150, align: 'center' },
       { header: 'Fecha Fin', width: 150, align: 'center' },
       { header: 'Duración (Min)', width: 120, align: 'right' },
-      { header: 'Estado (SAP)', width: 150, align: 'center' }
+      { header: 'Estado', width: 150, align: 'center' }
     ];
 
     let totalMinutos = 0;
@@ -307,24 +305,24 @@ export default function DashboardQuirofanoNativo({ data }) {
   };
 
   return (
-    <div style={{ marginTop: '1rem', fontFamily: 'var(--font-body)' }} id="dashboard-quirofano-nativo">
+    <div className="area-native-dashboard dashboard-view" style={{ marginTop: '1rem', fontFamily: 'var(--font-body)' }} id="dashboard-quirofano-nativo">
       
       {/* Header Native Dashboard */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="area-native-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ margin: 0, fontFamily: 'var(--font-display)', color: '#004687', fontSize: '1.75rem', fontWeight: 800 }}>Analítica de Quirófanos</h2>
-          <p style={{ margin: 0, color: '#64748B', fontSize: '0.9rem', fontWeight: 500 }}>Rendimiento y Ocupación</p>
+          <h2 className="area-text-primary" style={{ margin: 0, fontFamily: 'var(--font-display)', color: '#004687', fontSize: '1.75rem', fontWeight: 800 }}>Actividad de Quirófano</h2>
+          <p className="area-text-muted" style={{ margin: 0, color: '#64748B', fontSize: '0.9rem', fontWeight: 500 }}>Rendimiento y Ocupación</p>
         </div>
       </div>
 
       {/* Tarjeta de Ingreso Real Contabilizado (SAP) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
-        <div style={{ background: 'linear-gradient(135deg, #10B981, #059669)', padding: '1.25rem', borderRadius: 12, color: 'white', boxShadow: '0 4px 6px rgba(16, 185, 129, 0.2)' }}>
+      <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        <div className="area-metric-card area-metric-card--highlight dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', padding: '1.25rem', borderRadius: 12, color: 'white', boxShadow: '0 4px 6px rgba(16, 185, 129, 0.2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>Ingresos Quirófano (SAP)</div>
-              <div style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 800, marginTop: '0.5rem' }}>{formatCurrency(kpisFinancieros.ingresosSAP || 0)}</div>
-              <div style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem' }}>Contabilidad Oficial Grupo 111 (CIRUGIA QUIROFANO)</div>
+              <div className="area-metric-label dashboard-metric-label" style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>Ingresos de Quirófano</div>
+              <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 800, marginTop: '0.5rem' }}>{formatCurrency(kpisFinancieros.ingresosSAP || 0)}</div>
+              <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem' }}>Ingresos registrados por servicios de quirófano</div>
             </div>
             <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.2)', borderRadius: 10 }}>
               <span style={{ fontSize: '1.5rem' }}>💰</span>
@@ -334,60 +332,60 @@ export default function DashboardQuirofanoNativo({ data }) {
       </div>
 
       {/* Top KPIs Row */}
-      <div data-html2canvas-ignore="false" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+      <div className="area-metric-grid dashboard-metric-grid" data-html2canvas-ignore="false" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
         {/* Total Cirugías */}
-        <div style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', position: 'relative' }}>
-          <div style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600, marginBottom: '0.25rem' }}>Total Cirugías</div>
-          <div style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0D1B2A', lineHeight: 1 }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', position: 'relative' }}>
+          <div className="area-text-muted" style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600, marginBottom: '0.25rem' }}>Total Cirugías</div>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0D1B2A', lineHeight: 1 }}>
             {kpis.totalCirugias}
           </div>
-          <div style={{ height: 60, marginTop: '1rem', marginLeft: '-1.25rem', marginRight: '-1.25rem', marginBottom: '-1.25rem' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 60, marginTop: '1rem', marginLeft: '-1.25rem', marginRight: '-1.25rem', marginBottom: '-1.25rem' }}>
+            <DashboardChart width="100%" height="100%">
               <LineChart data={monthlyData}>
                 <Line type="monotone" dataKey="Total_Cirugias" stroke="#005FA9" strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Duración Promedio */}
-        <div style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', position: 'relative' }}>
-          <div style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600, marginBottom: '0.25rem' }}>Duración Promedio (min)</div>
-          <div style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0D1B2A', lineHeight: 1 }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', position: 'relative' }}>
+          <div className="area-text-muted" style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600, marginBottom: '0.25rem' }}>Duración Promedio (min)</div>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0D1B2A', lineHeight: 1 }}>
             {kpis.avgDuration}
           </div>
-          <div style={{ height: 60, marginTop: '1rem', marginLeft: '-1.25rem', marginRight: '-1.25rem', marginBottom: '-1.25rem' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 60, marginTop: '1rem', marginLeft: '-1.25rem', marginRight: '-1.25rem', marginBottom: '-1.25rem' }}>
+            <DashboardChart width="100%" height="100%">
               <LineChart data={monthlyData}>
                 <Line type="monotone" dataKey="Promedio_Duracion_Cirugia" stroke="#E8853D" strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Médicos Activos */}
-        <div style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', position: 'relative' }}>
-          <div style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600, marginBottom: '0.25rem' }}>Médicos Activos</div>
-          <div style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0D1B2A', lineHeight: 1 }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', position: 'relative' }}>
+          <div className="area-text-muted" style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600, marginBottom: '0.25rem' }}>Médicos Activos</div>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0D1B2A', lineHeight: 1 }}>
             {kpis.medicosActivos}
           </div>
-          <div style={{ height: 60, marginTop: '1rem', marginLeft: '-1.25rem', marginRight: '-1.25rem', marginBottom: '-1.25rem' }}>
+          <div className="dashboard-chart-host" style={{ height: 60, marginTop: '1rem', marginLeft: '-1.25rem', marginRight: '-1.25rem', marginBottom: '-1.25rem' }}>
             {/* Using same data just for decorative sparkline effect, ideally would use unique doctor count per month */}
-            <ResponsiveContainer width="100%" height="100%">
+            <DashboardChart width="100%" height="100%">
               <LineChart data={monthlyData}>
                 <Line type="step" dataKey="Total_Cirugias" stroke="#10B981" strokeWidth={2} dot={false} isAnimationActive={false} />
               </LineChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
       </div>
 
       {/* Nuevas Gráficas de Ingresos */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
-        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Médicos por Ingreso (SAP)</h3>
-          <div style={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer>
+      <div className="area-chart-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Médicos con mayores ingresos</h3>
+          <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
+            <DashboardChart>
               <BarChart layout="vertical" data={topMedicosIngresos} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
@@ -398,14 +396,14 @@ export default function DashboardQuirofanoNativo({ data }) {
                 />
                 <Bar dataKey="ingresos" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
-            </ResponsiveContainer>
-          </div>
+            </DashboardChart>
+          </div></div>
         </div>
 
-        <div data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Servicios Facturados (SAP)</h3>
-          <div style={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer>
+        <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Servicios con mayor facturación</h3>
+          <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
+            <DashboardChart>
               <BarChart layout="vertical" data={topServiciosIngresos} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
@@ -416,19 +414,19 @@ export default function DashboardQuirofanoNativo({ data }) {
                 />
                 <Bar dataKey="ingresos" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
-            </ResponsiveContainer>
-          </div>
+            </DashboardChart>
+          </div></div>
         </div>
       </div>
 
       {/* Main Charts Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1.25rem', alignItems: 'stretch' }}>
+      <div className="area-chart-grid area-chart-grid--overview" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1.25rem', alignItems: 'stretch' }}>
         
         {/* Evolución Mensual */}
-        <div data-html2canvas-ignore="false" style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: '#475569', fontWeight: 600 }}>Evolución Mensual</h3>
-          <div style={{ width: '100%', height: 280 }}>
-            <ResponsiveContainer>
+        <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)' }}>
+          <h3 className="area-text-muted" style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: '#475569', fontWeight: 600 }}>Evolución Mensual</h3>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 280 }}>
+            <DashboardChart>
               <ComposedChart data={monthlyData} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
                 <CartesianGrid stroke="#f5f5f5" vertical={false} strokeDasharray="3 3" />
                 <XAxis dataKey="Mes" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
@@ -439,17 +437,17 @@ export default function DashboardQuirofanoNativo({ data }) {
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
                 <Bar yAxisId="left" dataKey="Total_Cirugias" name="Total Cirugías" barSize={30} fill="#4F8DF9" isAnimationActive={false} />
-                <Line yAxisId="right" type="monotone" dataKey="Promedio_Duracion_Cirugia" name="Promedio_Duracion_Cirugia" stroke="#F17C43" strokeWidth={3} dot={false} isAnimationActive={false} />
+                <Line yAxisId="right" type="monotone" dataKey="Promedio_Duracion_Cirugia" name="Duración promedio (min)" stroke="#F17C43" strokeWidth={3} dot={false} isAnimationActive={false} />
               </ComposedChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Estado de Registro (Dona) */}
-        <div data-html2canvas-ignore="false" style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: '#475569', fontWeight: 600, textAlign: 'center' }}>Estado de Registro (SAP vs Bitácora)</h3>
-          <div style={{ width: '100%', flex: 1, minHeight: 250 }}>
-            <ResponsiveContainer>
+        <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
+          <h3 className="area-text-muted" style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', color: '#475569', fontWeight: 600, textAlign: 'center' }}>Estado de las cirugías</h3>
+          <div className="dashboard-chart-host" style={{ width: '100%', flex: 1, minHeight: 250 }}>
+            <DashboardChart>
               <PieChart>
                 <Pie
                   data={statusUsage}
@@ -483,21 +481,21 @@ export default function DashboardQuirofanoNativo({ data }) {
                   style={{ cursor: 'pointer' }}
                 />
               </PieChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Top Procedimientos */}
-        <div data-html2canvas-ignore="false" style={{ background: 'white', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="area-panel" data-html2canvas-ignore="false" style={{ background: 'white', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '1rem', borderBottom: '1px solid #F1F5F9' }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#475569', fontWeight: 600, textAlign: 'center' }}>Top Procedimientos</h3>
+            <h3 className="area-text-muted" style={{ margin: 0, fontSize: '0.95rem', color: '#475569', fontWeight: 600, textAlign: 'center' }}>Top Procedimientos</h3>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem', maxHeight: '280px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', color: '#94A3B8', borderBottom: '1px solid #F1F5F9', fontWeight: 600 }}>Procedimientos</th>
-                  <th style={{ textAlign: 'right', padding: '0.5rem', color: '#94A3B8', borderBottom: '1px solid #F1F5F9', fontWeight: 600 }}>Total</th>
+                  <th className="area-text-muted" style={{ textAlign: 'left', padding: '0.5rem', color: '#94A3B8', borderBottom: '1px solid #F1F5F9', fontWeight: 600 }}>Procedimientos</th>
+                  <th className="area-text-muted" style={{ textAlign: 'right', padding: '0.5rem', color: '#94A3B8', borderBottom: '1px solid #F1F5F9', fontWeight: 600 }}>Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -515,10 +513,10 @@ export default function DashboardQuirofanoNativo({ data }) {
                       onMouseEnter={(e) => !isSelected && (e.currentTarget.style.background = '#F8FAFC')}
                       onMouseLeave={(e) => !isSelected && (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td style={{ padding: '0.4rem 0.5rem', borderBottom: '1px solid #F8FAFC', color: isSelected ? '#1E40AF' : '#334155' }}>
+                      <td className="area-text-adaptive" style={{ padding: '0.4rem 0.5rem', borderBottom: '1px solid #F8FAFC', color: isSelected ? '#1E40AF' : '#334155' }}>
                         {proc.name}
                       </td>
-                      <td style={{ padding: '0.4rem 0.5rem', borderBottom: '1px solid #F8FAFC', textAlign: 'right', color: isSelected ? '#1E40AF' : '#64748B' }}>
+                      <td className="area-text-adaptive" style={{ padding: '0.4rem 0.5rem', borderBottom: '1px solid #F8FAFC', textAlign: 'right', color: isSelected ? '#1E40AF' : '#64748B' }}>
                         {proc.value}
                       </td>
                     </tr>
@@ -532,9 +530,9 @@ export default function DashboardQuirofanoNativo({ data }) {
       </div>
 
       {/* Productividad por Especialidades (Estilo Excel) */}
-      <div data-html2canvas-ignore="false" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', marginTop: '1.5rem' }}>
-        <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Productividad por Especialidades</h3>
-        <div style={{ overflowX: 'auto' }}>
+      <div className="area-panel" data-html2canvas-ignore="false" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', marginTop: '1.5rem' }}>
+        <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Productividad por Especialidades</h3>
+        <div className="area-table-scroll" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ background: '#005FA9', color: 'white' }}>
@@ -606,26 +604,26 @@ export default function DashboardQuirofanoNativo({ data }) {
               {/* TOTAL */}
               <tr style={{ background: '#E0E7FF', fontWeight: 700 }}>
                 <td colSpan={2} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #A5B4FC' }}>TOTAL PROCEDIMIENTOS (Aprox)</td>
-                <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #A5B4FC', fontSize: '1rem', color: '#1E40AF' }}>
+                <td className="area-text-info" style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #A5B4FC', fontSize: '1rem', color: '#1E40AF' }}>
                   {excelCategories.quirofano.count + excelCategories.maternidad.count + excelCategories.endoscopias.count + excelCategories.gastro.count}
                 </td>
               </tr>
             </tbody>
           </table>
-          <p style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.5rem', fontStyle: 'italic' }}>
-            *Nota: El conteo se realiza buscando palabras clave ("CESAREA", "COLONOSCOPIA", etc.) en los procedimientos registrados en bitácora. 
-            Si un paciente tiene 2 procedimientos en su texto (ej. "Endoscopía, Colonoscopía"), sumará en ambas categorías. Las cirugías que no coincidan con Maternidad/Endoscopia/Gastro caen en la cubeta general de "Cirugías Generales".
+          <p className="area-text-muted" style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.5rem', fontStyle: 'italic' }}>
+            Un paciente puede aparecer en más de una categoría si recibió varios procedimientos.
+            Los procedimientos sin una categoría específica se incluyen en Cirugías Generales.
           </p>
         </div>
       </div>
 
       {/* Tabla de Detalle de Cirugías */}
-      <div data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', marginTop: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>Detalle de Cirugías {selectedRoom !== 'Todos' ? `(${selectedRoom})` : ''}</h3>
+      <div className="area-panel" data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', marginTop: '1.5rem' }}>
+        <div className="area-panel-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h3 className="area-text-primary" style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>Detalle de Cirugías {selectedRoom !== 'Todos' ? `(${selectedRoom})` : ''}</h3>
           
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.85rem', color: '#8A97A8' }}>{filteredData.length} registros</span>
+            <span className="area-text-muted" style={{ fontSize: '0.85rem', color: '#8A97A8' }}>{filteredData.length} registros</span>
             <button
               onClick={exportFilteredSurgeriesToExcel}
               style={{
@@ -649,17 +647,17 @@ export default function DashboardQuirofanoNativo({ data }) {
           </div>
         </div>
         
-        <div style={{ overflowX: 'auto', maxHeight: '400px' }}>
+        <div className="area-table-scroll" style={{ overflowX: 'auto', maxHeight: '400px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
-              <tr style={{ borderBottom: '2px solid #E2E8F0', color: '#64748B', textAlign: 'left' }}>
+              <tr className="area-text-muted" style={{ borderBottom: '2px solid #E2E8F0', color: '#64748B', textAlign: 'left' }}>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Quirófano</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Procedimiento</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Médicos</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Inicio</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Fin</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, textAlign: 'right' }}>Duración</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Estado (SAP)</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>Estado</th>
               </tr>
             </thead>
             <tbody>
@@ -677,19 +675,19 @@ export default function DashboardQuirofanoNativo({ data }) {
 
                 return (
                   <tr key={i} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500, color: '#0D1B2A' }}>{row.Quirofano}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.Procedimientos || '-'}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.8rem' }}>{row.Medicos || '-'}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{startDate}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{endDate}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: '#004687', fontWeight: 600, textAlign: 'right' }}>{durText}</td>
-                    <td style={{ padding: '0.75rem 1rem', color: row.Notas === 'Cirugía Registrada' ? '#10B981' : '#EF4444', fontWeight: 600, fontSize: '0.75rem' }}>{row.Notas}</td>
+                    <td className="area-text-primary" style={{ padding: '0.75rem 1rem', fontWeight: 500, color: '#0D1B2A' }}>{row.Quirofano}</td>
+                    <td className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#475569' }}>{row.Procedimientos || '-'}</td>
+                    <td className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.8rem' }}>{row.Medicos || '-'}</td>
+                    <td className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{startDate}</td>
+                    <td className="area-text-muted" style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{endDate}</td>
+                    <td className="area-text-primary" style={{ padding: '0.75rem 1rem', color: '#004687', fontWeight: 600, textAlign: 'right' }}>{durText}</td>
+                    <td className="area-text-adaptive" style={{ padding: '0.75rem 1rem', color: row.Notas === 'Cirugía Registrada' ? '#10B981' : '#EF4444', fontWeight: 600, fontSize: '0.75rem' }}>{row.Notas}</td>
                   </tr>
                 );
               })}
               {filteredData.length === 0 && (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#94A3B8' }}>
+                  <td className="area-text-muted" colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#94A3B8' }}>
                     No hay cirugías con los filtros seleccionados
                   </td>
                 </tr>

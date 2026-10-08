@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
@@ -83,7 +84,7 @@ export default function ResumenMaestro() {
         setData(json);
         setPage(1);
       } catch (err) {
-        setError(err.message);
+        setError(userMessage(err.message));
       } finally {
         setLoading(false);
       }
@@ -264,7 +265,7 @@ export default function ResumenMaestro() {
         <PremiumLoader text="Consolidando datos de salidas..." />
       ) : error ? (
         <div style={{ padding: '2rem', background: '#fee2e2', color: '#991b1b', borderRadius: '12px', textAlign: 'center' }}>
-          <p><strong>Error:</strong> {error}</p>
+          <p><strong>Error:</strong> {userMessage(error)}</p>
           <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1rem', background: '#dc2626', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>Reintentar</button>
         </div>
       ) : (

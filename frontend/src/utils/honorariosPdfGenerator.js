@@ -1,7 +1,10 @@
 import { jsPDF } from 'jspdf';
 import { ESCANDON_LOGO_BASE64 } from './escandonLogo';
-import { formatConfiguredWithholdings, formatHonorariosRates } from './honorariosSapDisplay';
+import { formatHonorariosRates } from './honorariosSapDisplay';
 import { summarizeHonorarios } from './honorariosCalculation';
+import { formatHonorarioReference, formatHonorarioSalesOrder } from './honorariosIdentifiers';
+import { filterDoctorReviewRows } from './honorariosEligibility';
+import { formatHonorariosPdfText } from './honorariosPdfText';
 
 const PDF_MARGIN = 13;
 const PDF_CONTENT_BOTTOM_GAP = 14;
@@ -15,20 +18,23 @@ function formatCurrency(val) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(num);
 }
 
-function formatSapCurrency(currency) {
-  return currency === 'LCY' ? 'Moneda de SAP' : currency || 'Moneda no informada';
-}
-
-function formatSapAmount(val, currency) {
-  if (val === null || val === undefined || val === '' || !Number.isFinite(Number(val))) return 'No disponible';
-  const amount = new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val) || 0);
-  return `${formatSapCurrency(currency)} ${amount}`;
-}
-
 function readQuantity(value) {
-  if (value === null || value === undefined || value === '') return 1;
+  if (value === null || value === undefined || value === '') return null;
   const quantity = Number(value);
-  return Number.isFinite(quantity) ? quantity : 1;
+  return Number.isFinite(quantity) ? quantity : null;
+}
+
+const reviewStatusLabel = row => row._reviewStatus === 'APROBADO' ? 'Aprobado'
+  : row._reviewStatus === 'RECHAZADO' ? 'Excluido' : 'Por revisar';
+const reviewedFee = row => row._reviewStatus === 'APROBADO' && row._effectiveElegible
+  ? row._effectiveBase : row.BaseImporte ?? row.BasePropuesta;
+
+function prepareDoctorReview(doctorData, approvedOnly = false) {
+  const eligibleRows = filterDoctorReviewRows(doctorData);
+  const rows = approvedOnly ? eligibleRows.filter(row => row._reviewStatus === 'APROBADO' && row._effectiveElegible) : eligibleRows;
+  const rates = [...new Set(rows.map(row => row._effectiveISRRate).filter(rate => rate !== null && rate !== undefined))].sort((a, b) => a - b);
+  return { ...doctorData, approvedOnly, filas: rows, filasRevision: rows, ...summarizeHonorarios(rows),
+    tasaISR: rates.length === 1 ? rates[0] : null, tasasISR: rates };
 }
 
 /**
@@ -62,21 +68,12 @@ function getPeriodLabel(startDate, endDate) {
 /**
  * Agrupa y suma las filas de un médico por Grupo de Servicio y Descripción de Concepto
  */
-function aggregateDoctorServices(filas, includeZeroAmounts = true) {
+function aggregateDoctorServices(filas) {
   const groups = {};
 
   filas.forEach(row => {
-    if (row.TipoCalculo === 'SAP_DOCUMENTO') return;
-    // Si existe estado efectivo, respeta el ajuste manual aunque el origen fuera elegible.
-    const isEligible = row._effectiveElegible !== undefined
-      ? row._effectiveElegible
-      : Number(row.ElegiblePago) === 1;
-    if (!isEligible) return;
-
-    const monto = Number(row._effectiveBase !== undefined ? row._effectiveBase : row.BaseImporte) || 0;
-    
-    // Ocultar conceptos en ceros si no se pide formato detallado
-    if (!includeZeroAmounts && monto === 0) return;
+    const value = reviewedFee(row);
+    const monto = value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
 
     const grupo = (row.GrupoServicio || 'SERVICIOS MÉDICOS GENERALES').trim().toUpperCase();
     const concepto = (row.Servicio || row.ItemDescription || 'HONORARIO MÉDICO').trim();
@@ -87,17 +84,19 @@ function aggregateDoctorServices(filas, includeZeroAmounts = true) {
       groups[grupo] = {};
     }
 
-    const key = `${codigo}|${concepto}`;
+    const status = reviewStatusLabel(row);
+    const key = `${codigo}|${concepto}|${status}`;
     if (!groups[grupo][key]) {
       groups[grupo][key] = {
-        concepto,
+        concepto: `${concepto} - ${status}`,
         cantidad: 0,
         monto: 0
       };
     }
 
-    groups[grupo][key].cantidad += cant;
-    groups[grupo][key].monto += monto;
+    const group = groups[grupo][key];
+    group.cantidad = group.cantidad === null || cant === null ? null : group.cantidad + cant;
+    group.monto = group.monto === null || monto === null ? null : group.monto + monto;
   });
 
   return groups;
@@ -117,7 +116,7 @@ function drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader 
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
   doc.text('FUNDACIÓN MARÍA ANA MIER DE ESCANDÓN, I.A.P.', pageWidth - margin, 10, { align: 'right' });
-  doc.text(continuation ? 'RESUMEN DE HONORARIOS - CONTINUACIÓN' : 'RESUMEN DE HONORARIOS', pageWidth - margin, 14, { align: 'right' });
+  doc.text(`${doctorData.approvedOnly ? 'SERVICIOS APROBADOS' : 'REVISIÓN DE HONORARIOS'}${continuation ? ' - CONTINUACIÓN' : ''}`, pageWidth - margin, 14, { align: 'right' });
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 70, 135);
   doc.text(`FECHA DE EMISIÓN: ${new Date().toLocaleDateString('es-MX')}`, pageWidth - margin, 18, { align: 'right' });
@@ -128,7 +127,9 @@ function drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.2);
   doc.setTextColor(15, 23, 42);
-  doc.text('HONORARIOS - ATENCIONES Y REVISIONES', margin, 27, { maxWidth: contentWidth });
+  doc.text(doctorData.approvedOnly ? 'SERVICIOS APROBADOS' : 'REVISIÓN DE HONORARIOS', margin, 27, { maxWidth: contentWidth });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(0, 70, 135);
+  doc.text('Para preparar el pago, genera el PDF desde Pagos y PDF.', margin, 30);
 
   doc.setFillColor(241, 245, 249);
   doc.setDrawColor(203, 213, 225);
@@ -137,12 +138,14 @@ function drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.setTextColor(0, 70, 135);
-  doc.text(doctorData.medico || 'MÉDICO TRATANTE', margin + 4, 36.5);
+  const doctorLabel = formatHonorariosPdfText(doctorData.medico || 'MÉDICO TRATANTE').replace(/\s+/g, ' ').trim();
+  while (doc.getTextWidth(doctorLabel) > contentWidth - 8 && doc.getFontSize() > 7.5) doc.setFontSize(doc.getFontSize() - .5);
+  doc.text(doctorLabel, margin + 4, 36.5, { maxWidth: contentWidth - 8 });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.2);
   doc.setTextColor(71, 85, 105);
   const tasaIsrLabel = formatHonorariosRates(doctorData);
-  doc.text(`ESPECIALIDAD: ${doctorData.especialidad || 'MEDICINA'}  |  RETENCIÓN DE ISR ESTIMADA: ${tasaIsrLabel}`, margin + 4, 42.5);
+  doc.text(formatHonorariosPdfText(`ESPECIALIDAD: ${doctorData.especialidad || 'MEDICINA'}  |  RETENCIÓN DE ISR ESTIMADA: ${tasaIsrLabel}`), margin + 4, 42.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(5, 150, 105);
   doc.text(periodInfo.periodLabel, pageWidth - margin - 4, 39.5, { align: 'right' });
@@ -156,7 +159,7 @@ function drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader 
   doc.setTextColor(255, 255, 255);
   doc.text('CONCEPTO DEL SERVICIO', margin + 3, currentY + 4.1);
   doc.text('CANTIDAD', pageWidth - margin - 50, currentY + 4.1, { align: 'center' });
-  doc.text('MONTO HONORARIOS', pageWidth - margin - 4, currentY + 4.1, { align: 'right' });
+  doc.text('HONORARIO', pageWidth - margin - 4, currentY + 4.1, { align: 'right' });
   return currentY + 6;
 }
 
@@ -177,11 +180,10 @@ function addPdfFooters(doc) {
 }
 
 /**
- * Renderiza la página completa de liquidación para un médico en el documento jsPDF
+ * Renderiza los servicios configurados y su revisión para un médico.
  */
-function renderDoctorReceipt(doc, doctorData, periodInfo, includeZeroAmounts = true, generatedBy = '') {
-  // El detalle puede venir filtrado por estado. El resumen siempre se calcula
-  // con el universo de revisión, que incluye aprobados, rechazados y pendientes.
+function renderDoctorReceipt(doc, doctorData, periodInfo) {
+  // El detalle y el resumen comparten el mismo catálogo autorizado y médico.
   const reviewRows = doctorData.filasRevision || doctorData.filas || [];
   doctorData = { ...doctorData, filas: reviewRows, ...summarizeHonorarios(reviewRows) };
   const pageWidth = doc.internal.pageSize.getWidth(); // 215.9 mm
@@ -191,7 +193,7 @@ function renderDoctorReceipt(doc, doctorData, periodInfo, includeZeroAmounts = t
   let currentY = drawDoctorPageHeader(doc, doctorData, periodInfo);
 
   // 4. Renglones Agrupados
-  const aggregated = aggregateDoctorServices(doctorData.filas || [], includeZeroAmounts);
+  const aggregated = aggregateDoctorServices(doctorData.filas || []);
   const groupNames = Object.keys(aggregated);
 
   let zebra = false;
@@ -204,13 +206,13 @@ function renderDoctorReceipt(doc, doctorData, periodInfo, includeZeroAmounts = t
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(3, 105, 161);
-    doc.text(`  ${grupo}${continuation ? ' - CONTINUACIÓN' : ''}`, margin + 1, currentY + 3.4);
+    doc.text(formatHonorariosPdfText(`  ${grupo}${continuation ? ' - CONTINUACIÓN' : ''}`), margin + 1, currentY + 3.4);
     currentY += 4.8;
   };
 
   for (const grupo of groupNames) {
     const conceptos = Object.values(aggregated[grupo]).map(concepto => {
-      const label = concepto.concepto;
+      const label = formatHonorariosPdfText(concepto.concepto);
       const lines = doc.splitTextToSize(label, contentWidth - 75);
       return { ...concepto, labelLines: lines, rowHeight: Math.max(4.8, lines.length * 3 + 1.4) };
     });
@@ -222,7 +224,7 @@ function renderDoctorReceipt(doc, doctorData, periodInfo, includeZeroAmounts = t
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(3, 105, 161);
-      doc.text(`  ${grupo}`, margin + 1, currentY + 3.4);
+      doc.text(formatHonorariosPdfText(`  ${grupo}`), margin + 1, currentY + 3.4);
       currentY += 4.8;
     }
 
@@ -235,100 +237,12 @@ function renderDoctorReceipt(doc, doctorData, periodInfo, includeZeroAmounts = t
       doc.setFontSize(8);
       doc.setTextColor(30, 41, 59);
       doc.text(concepto.labelLines, margin + 3, currentY + 3.1);
-      doc.text(Number(concepto.cantidad).toFixed(1), pageWidth - margin - 50, currentY + Math.min(concepto.rowHeight - 1, 4.2), { align: 'center' });
+      doc.text(concepto.cantidad === null ? 'Pendiente' : Number(concepto.cantidad).toFixed(1), pageWidth - margin - 50, currentY + Math.min(concepto.rowHeight - 1, 4.2), { align: 'center' });
       doc.setFont('helvetica', 'bold');
       doc.text(formatCurrency(concepto.monto), pageWidth - margin - 4, currentY + Math.min(concepto.rowHeight - 1, 4.2), { align: 'right' });
       zebra = !zebra;
       currentY += concepto.rowHeight;
     }
-  }
-
-  // Las líneas contables SAP son visibles en la liquidación aunque la factura
-  // siga pendiente o la pestaña actual sólo muestre aprobados. Se etiquetan
-  // como referencia para no confundir su importe registrado con base médica.
-  const sapInvoices = doctorData.sap?.invoices || [];
-  const sapLineRows = sapInvoices.flatMap(invoice => (invoice.lines || []).map((line, index) => ({
-    invoice, line, coverage: invoice.verticalLineCoverage?.[index]
-  })));
-  if (sapLineRows.length) {
-    const sectionTitle = 'FACTURAS PARA REVISAR CONTRA LAS ATENCIONES';
-    const drawSectionTitle = (continued = false) => {
-      doc.setFillColor(224, 242, 254);
-      doc.rect(margin, currentY, contentWidth, 4.8, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(3, 105, 161);
-      doc.text(`${sectionTitle}${continued ? ' - CONTINUACIÓN' : ''}`, margin + 2, currentY + 3.4);
-      currentY += 5;
-    };
-    const drawSapColumnHeader = () => {
-      doc.setFillColor(239, 246, 255);
-      doc.rect(margin, currentY, contentWidth, 4.5, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
-      doc.setTextColor(71, 85, 105);
-      doc.text('FACTURA Y CONCEPTO', margin + 2, currentY + 3.3);
-      doc.text('CANTIDAD', pageWidth - margin - 50, currentY + 3.3, { align: 'center' });
-      doc.text('IMPORTE', pageWidth - margin - 3, currentY + 3.3, { align: 'right' });
-      currentY += 4.5;
-    };
-    if (currentY + 20 > contentBottom) {
-      doc.addPage('letter', 'portrait');
-      currentY = drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader: false, continuation: true });
-    }
-    drawSectionTitle();
-    drawSapColumnHeader();
-
-    for (const { invoice, line, coverage } of sapLineRows) {
-      const concept = `Factura ${invoice.docNum || invoice.docEntry}${invoice.cancelled ? ' - CANCELADA' : ''} - ${line.description || 'Concepto sin descripción'}`;
-      const conceptLines = doc.splitTextToSize(concept, contentWidth - 77);
-      const coverageLabel = coverage?.label || 'Aún no se comparó con las atenciones';
-      const coverageLines = doc.splitTextToSize(coverageLabel, contentWidth - 77);
-      const rowHeight = Math.max(6, (conceptLines.length + coverageLines.length) * 2.6 + 1.8);
-      if (currentY + rowHeight + 6 > contentBottom) {
-        doc.addPage('letter', 'portrait');
-        currentY = drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader: false, continuation: true });
-        drawSectionTitle(true);
-        drawSapColumnHeader();
-      }
-
-      doc.setFillColor(248, 250, 252);
-      doc.rect(margin, currentY, contentWidth, rowHeight, 'F');
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(51, 65, 85);
-      doc.text(conceptLines, margin + 2, currentY + 2.8);
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(6.5);
-      doc.setTextColor(coverage?.status === 'NO_LOCALIZADO' ? 180 : 100,
-        coverage?.status === 'NO_LOCALIZADO' ? 83 : 116, coverage?.status === 'NO_LOCALIZADO' ? 9 : 139);
-      doc.text(coverageLines, margin + 2, currentY + 2.8 + conceptLines.length * 2.6);
-      const quantity = Number(line.quantity);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(51, 65, 85);
-      doc.text(Number.isFinite(quantity) && quantity > 0 ? quantity.toFixed(1) : 'No informada', pageWidth - margin - 50, currentY + 3.3, { align: 'center' });
-      const amount = invoice.currency === 'MXN' ? formatCurrency(line.recordedAmount) : formatSapAmount(line.recordedAmount, invoice.currency);
-      doc.text(amount, pageWidth - margin - 3, currentY + 3.3, { align: 'right' });
-      currentY += rowHeight;
-    }
-
-    const referenceNote = doc.splitTextToSize(
-      'Las atenciones y su estado vienen de Vertical, el sistema donde se registran los servicios. Las facturas se consultan en SAP, el sistema de contabilidad, para encontrar servicios que pudieran faltar. La comparación por descripción es solo una pista: confirma que no sea la misma atención antes de aprobarla. Los importes y cantidades de la factura son una referencia; no reemplazan las atenciones ni su cálculo.',
-      contentWidth - 4
-    );
-    const noteHeight = referenceNote.length * 2.8 + 2;
-    if (currentY + noteHeight > contentBottom) {
-      doc.addPage('letter', 'portrait');
-      currentY = drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader: false, continuation: true });
-      drawSectionTitle(true);
-      drawSapColumnHeader();
-    }
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7);
-    doc.setTextColor(100, 116, 139);
-    referenceNote.forEach((line, index) => doc.text(line, margin + 2, currentY + 3 + index * 2.8));
-    currentY += noteHeight + 1;
   }
 
   // Línea inferior de la tabla
@@ -337,7 +251,7 @@ function renderDoctorReceipt(doc, doctorData, periodInfo, includeZeroAmounts = t
   currentY += 2.5;
 
   // 5. Cuadro Financiero / Resumen Fiscal (Alineado a la derecha)
-  const summaryWidth = 85;
+  const summaryWidth = 108;
   const summaryX = pageWidth - margin - summaryWidth;
 
   const subtotal = doctorData.totalBase;
@@ -352,63 +266,34 @@ function renderDoctorReceipt(doc, doctorData, periodInfo, includeZeroAmounts = t
   const ivaCalculado = totalIVA;
 
   const summaryRows = [
-    { label: 'ATENCIONES APROBADAS', val: formatCurrency(subtotal), bold: false, color: [51, 65, 85] }
+    { label: reviewRows.some(row => row.FixedMonthly) ? 'HONORARIOS APROBADOS' : 'ATENCIONES APROBADAS', val: formatCurrency(subtotal), bold: false, color: [51, 65, 85] }
   ];
 
   if (ivaCalculado !== 0) {
-    summaryRows.push({ label: 'IVA', val: formatCurrency(ivaCalculado), bold: false, color: [51, 65, 85] });
+    const vatRates = [...new Set(reviewRows.filter(row => row._effectiveElegible).map(row => row._effectiveVatRate).filter(rate => rate != null))];
+    summaryRows.push({ label: vatRates.length === 1 ? `IVA CONFIRMADO (${Math.round(vatRates[0] * 100)}%)` : 'IVA CONFIRMADO', val: formatCurrency(ivaCalculado), bold: false, color: [51, 65, 85] });
     summaryRows.push({ label: 'HONORARIOS + IVA', val: formatCurrency(totalGross), bold: true, color: [15, 23, 42] });
   }
 
-  summaryRows.push({ label: `RETENCIÓN DE ISR ESTIMADA (${tasaIsrLabel})`, val: `-${formatCurrency(totalISR)}`, bold: false, color: [220, 38, 38] });
+  summaryRows.push({ label: `RETENCIÓN DE ISR ESTIMADA (${tasaIsrLabel})`, val: totalISR === null ? 'PENDIENTE' : `-${formatCurrency(totalISR)}`, bold: false, color: [220, 38, 38] });
   if (totalIVA !== 0) {
-    summaryRows.push({ label: 'RETENCIÓN DE IVA ESTIMADA', val: totalRetIVA === null ? 'PENDIENTE' : `-${formatCurrency(totalRetIVA)}`, bold: false, color: [220, 38, 38] });
+    summaryRows.push({ label: 'RETENCIÓN DE IVA', val: totalRetIVA === null ? 'FALTA DATO FISCAL' : `-${formatCurrency(totalRetIVA)}`, bold: false, color: [220, 38, 38] });
   }
-  if (doctorData.approvedDocuments > 0) {
-    summaryRows.push({ label: 'IMPORTE FINAL DE ATENCIONES', val: formatCurrency(doctorData.clinicalNet), bold: true, color: [15,23,42] });
-    summaryRows.push({ label: 'IMPORTE FINAL DE FACTURAS', val: formatCurrency(doctorData.sapDocumentNet), bold: true, color: [15,23,42] });
-  }
-
-  // Se coloca el resumen justo después del detalle; aclaraciones y firmas sólo pasan de hoja si ya no caben.
-  const sap = doctorData.sap;
-  const sapStatus = sap?.linkStatus === 'solo_sap'
-    ? 'Hay facturas en SAP que no están relacionadas con las atenciones de este periodo.'
-    : sap?.linkStatus === 'candidato_unico'
-    ? `Posible proveedor encontrado en SAP: ${sap.candidates?.[0]?.cardName || 'nombre no disponible'}. Confirma que sea el médico correcto.`
-    : sap?.linkStatus === 'ambiguo'
-      ? 'Se encontraron varios proveedores con nombres parecidos; no se asignaron facturas para evitar errores.'
-      : sap?.linkStatus === 'sin_coincidencia'
-        ? 'No se encontró al proveedor en SAP.'
-        : 'No se pudieron consultar las facturas de SAP para este resumen.';
-  const sapTotalsText = ['candidato_unico', 'solo_sap'].includes(sap?.linkStatus) && sap.totalsByCurrency?.length
-    ? sap.totalsByCurrency.map(total => {
-      const retentions = (total.withholdings || [])
-        .map(item => `${item.description} ${formatSapAmount(item.amount, total.currency)}`).join(', ');
-      return `${formatSapCurrency(total.currency)}: ${total.invoiceCount} factura(s); importe total ${formatSapAmount(total.documentTotal, total.currency)}; IVA registrado ${formatSapAmount(total.vatRecorded, total.currency)}; pagado a la fecha ${formatSapAmount(total.paidToDate, total.currency)}; saldo pendiente ${formatSapAmount(total.openBalance, total.currency)}; pagos durante el periodo ${formatSapAmount(total.periodAppliedPayments, total.currency)}${retentions ? `; impuestos retenidos: ${retentions}` : ''}.`;
-    }).join(' ')
-    : '';
-  const candidate = sap?.linkStatus === 'candidato_unico' ? sap.candidates?.[0] : null;
-  const fiscalText = candidate ? ` RFC registrado en SAP: ${candidate.federalTaxId || 'no disponible'}. Régimen fiscal registrado: ${candidate.fiscalRegime || 'no disponible'}; confirma que los datos estén actualizados.\n\n${formatConfiguredWithholdings(candidate)} Estos datos son una referencia; se usan los importes que aparecen en cada factura.\n\n` : '';
   const calculationText = doctorData.fiscalNotes.join(' ');
   const counts = { APROBADO: 0, RECHAZADO: 0, PENDIENTE: 0 };
-  reviewRows.forEach(row => { counts[row._reviewStatus || 'PENDIENTE'] += 1; });
-  const sapPeriod = doctorData.sapPeriod || periodInfo;
-  const legalText = `Revisión: ${counts.APROBADO} aprobados, ${counts.RECHAZADO} rechazados y ${counts.PENDIENTE} pendientes. Solo lo aprobado suma al total. Fechas de registro de las facturas en SAP: ${sapPeriod.startDate} al ${sapPeriod.endDate}.\n\n${sapStatus}${fiscalText} ${sapTotalsText}\n\n${calculationText}\n\nEl importe final de cada atención se calcula así: honorario + IVA (impuesto al valor agregado) - ISR (impuesto sobre la renta) - retención de IVA. Los impuestos son estimados y pueden variar por redondeo. Las facturas aprobadas suman el importe final que aparece en SAP; incluye pagos ya realizados, por lo que no indica cuánto falta por pagar. No sumes una factura y una atención si son el mismo servicio. Si un cálculo aparece como pendiente, falta revisar o completar información; no significa $0. Este resumen es de uso interno y no es una factura ni un comprobante de pago.`;
+  reviewRows.forEach(row => { counts[row._reviewStatus] !== undefined ? counts[row._reviewStatus] += 1 : counts.PENDIENTE += 1; });
+  const configurationText = reviewRows.some(row => row.FixedMonthly)
+    ? 'Las atenciones utilizan su tarifa autorizada. Los pagos fijos mensuales son adicionales y requieren una decisión explícita para incluir el importe completo del mes. Configurar una jefatura no incluye automáticamente su pago.'
+    : 'Los servicios de este documento pertenecen al catálogo Aprobados y tienen una tarifa aplicable al médico, su función y la fecha del servicio. La aprobación del catálogo no autoriza automáticamente el pago de cada atención.';
+  const legalText = `Revisión: ${counts.APROBADO} aprobados, ${counts.RECHAZADO} excluidos y ${counts.PENDIENTE} por revisar. Solo los conceptos aprobados suman al importe aprobado. La tabla muestra el honorario de cada concepto y su estado.\n\n${configurationText}\n\n${calculationText}\n\nEl importe final se calcula así: honorario + IVA - retención de ISR - retención de IVA. Los impuestos son estimados y pueden variar por redondeo. Si un importe aparece como pendiente, falta revisar o completar información; no significa $0. Este resumen sirve para revisar servicios y no acredita un pago realizado.`;
   const paddingX = 4;
   const paddingY = 2.5;
   const usableWidth = contentWidth - paddingX * 2;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  const splitLegal = doc.splitTextToSize(legalText.replace(/\n{2,}/g, '\n'), usableWidth);
+  const splitLegal = doc.splitTextToSize(formatHonorariosPdfText(legalText).replace(/\n{2,}/g, '\n'), usableWidth);
   const lineHeight = 3;
   const legalBoxHeight = splitLegal.length * lineHeight + paddingY * 2;
-  const conformityText = 'Manifiesto mi conformidad con esta liquidación de honorarios por los servicios profesionales que le presté, sin sujeción a un horario, a la FUNDACIÓN MARÍA ANA MIER DE ESCANDÓN, I.A.P. en el libre ejercicio de mi profesión de médico; en el mes arriba mencionado y para que estos me sean pagados, contra la firma de este documento, entrego Comprobante Fiscal Digital Por Internet, expedido por el suscrito, por lo que no me adeuda cantidad alguna por concepto de honorarios y reitero además que la relación que me une con dicha Fundación es de naturaleza civil por virtud del contrato de prestación de servicios profesionales que tenemos celebrado, reiterando que la única relación existente es la antes mencionada y por ende, no existe ninguna otra ni de naturaleza laboral ni de ninguna otra. Así mismo, con el pago que se me haga de estos honorarios se encuentra pagada cualquier cantidad adeudada por la Fundación, por lo que no me reservo derecho ni acción algunos que ejercitar en contra de esa Fundación, ni en el presente ni en el futuro, por ninguna vía, otorgándoles por este medio el finiquito más amplio que en derecho proceda.';
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.4);
-  const conformityLines = doc.splitTextToSize(conformityText, contentWidth - 12);
-  const conformityLineHeight = 3.4;
-  const conformityCardHeight = 6 + conformityLines.length * conformityLineHeight;
-  const closingBlockHeight = conformityCardHeight + 10;
   const summaryHeight = summaryRows.length * 5.2 + 9;
   if (currentY + summaryHeight > contentBottom) {
     doc.addPage('letter', 'portrait');
@@ -428,13 +313,13 @@ function renderDoctorReceipt(doc, doctorData, periodInfo, includeZeroAmounts = t
     currentY += 5.2;
   });
 
-  // El neto de preliquidación y los importes de SAP se presentan por separado.
+  // El importe final incluye únicamente decisiones aprobadas de estas atenciones.
   doc.setFillColor(0, 70, 135);
   doc.rect(summaryX, currentY, summaryWidth, 7, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(255, 255, 255);
-  doc.text('IMPORTE APROBADO (MXN)', summaryX + 3, currentY + 4.8);
+  doc.text(totalNeto == null ? 'NETO POR CALCULAR (MXN)' : 'NETO APROBADO (MXN)', summaryX + 3, currentY + 4.8);
   doc.setFontSize(10);
   doc.text(formatCurrency(totalNeto), summaryX + summaryWidth - 3, currentY + 4.8, { align: 'right' });
   currentY += 9;
@@ -452,49 +337,20 @@ function renderDoctorReceipt(doc, doctorData, periodInfo, includeZeroAmounts = t
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(71,85,105);
   splitLegal.forEach((line, index) => doc.text(line, margin + paddingX, currentY + paddingY + 2.5 + index * lineHeight));
   currentY += legalBoxHeight + 3;
-  if (currentY + closingBlockHeight > contentBottom) {
-    doc.addPage('letter', 'portrait');
-    currentY = drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader: false, continuation: true });
-  }
-
-  // 7. Manifiesto de conformidad y firmas de cierre.
-  currentY += 1;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(0, 70, 135);
-  doc.text('CONFORMIDAD DEL MÉDICO', margin, currentY + 3);
-  currentY += 5;
-
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(margin, currentY, contentWidth, conformityCardHeight, 2, 2, 'FD');
-  doc.setFillColor(0, 112, 180);
-  doc.rect(margin, currentY + 1, 1.4, conformityCardHeight - 2, 'F');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.4);
-  doc.setTextColor(51, 65, 85);
-  conformityLines.forEach((line, index) => {
-    doc.text(line, margin + 6, currentY + 4.5 + index * conformityLineHeight);
-  });
-  currentY += conformityCardHeight + 4;
-
   return currentY;
 }
 
-// Anexo del mismo documento: conserva estados y cifras originales de SAP.
+// El detalle conserva las decisiones de revisión de los mismos servicios autorizados.
 function renderReviewAppendix(doc, doctorData, periodInfo, detailed, startAtY) {
-  const reviewRows = doctorData.filasRevision || doctorData.filas || [];
-  const documents = reviewRows.filter(row => row.TipoCalculo === 'SAP_DOCUMENTO');
-  const clinical = detailed ? reviewRows.filter(row => row.TipoCalculo !== 'SAP_DOCUMENTO') : [];
-  if (!documents.length && !clinical.length) return startAtY;
+  const clinical = detailed ? doctorData.filasRevision || doctorData.filas || [] : [];
+  if (!clinical.length) return startAtY;
   let y = Number.isFinite(startAtY) ? startAtY + 3 : undefined;
   const nextPage = () => {
     doc.addPage('letter', 'portrait');
     y = drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader: false, continuation: true });
   };
   const line = (value, bold = false) => {
-    const normalized = String(value || '').replace(/[\u2013\u2014]/g, '-');
+    const normalized = formatHonorariosPdfText(value).replace(/[\u2013\u2014]/g, '-');
     if (!normalized.trim()) return;
     const lineHeight = 2.5;
     doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(7); doc.setTextColor(30,41,59);
@@ -513,7 +369,7 @@ function renderReviewAppendix(doc, doctorData, periodInfo, detailed, startAtY) {
     for (const entry of entries) {
       doc.setFont('helvetica', entry.bold ? 'bold' : 'normal');
       doc.setFontSize(7);
-      const text = String(entry.value || '').replace(/[\u2013\u2014]/g, '-');
+      const text = formatHonorariosPdfText(entry.value).replace(/[\u2013\u2014]/g, '-');
       const lines = doc.splitTextToSize(text, doc.internal.pageSize.getWidth() - PDF_MARGIN * 2);
       blockHeight += lines.length * 2.5 + 0.1;
     }
@@ -522,51 +378,24 @@ function renderReviewAppendix(doc, doctorData, periodInfo, detailed, startAtY) {
   };
   const pageHeight = doc.internal.pageSize.getHeight();
   if (!Number.isFinite(y) || y > pageHeight - PDF_CONTENT_BOTTOM_GAP - 3.2) nextPage();
-  const sapPeriod = doctorData.sapPeriod || periodInfo;
-  const sapInvoiceEntries = row => {
-    const invoice = row.SapDocumento;
-    const summary = [
-      { value: `Factura ${invoice.docNum} | ${String(invoice.postingDate || '').slice(0,10)} | ${row._reviewStatus}${invoice.cancelled ? ' | CANCELADA' : ''}`, bold: true },
-      { value: `Total de la factura: ${formatSapAmount(invoice.documentTotal, invoice.currency)}. Pagado a la fecha: ${formatSapAmount(invoice.paidToDate, invoice.currency)}. Saldo pendiente: ${formatSapAmount(invoice.openBalance, invoice.currency)}.` },
-      { value: `Impuestos retenidos: ${(invoice.retentions || []).map(t => `${t.description}: ${formatSapAmount(t.amount,invoice.currency)}`).join('; ') || 'No se recibió el detalle'}.` }
-    ];
-    const details = [];
-    if (detailed) for (const item of invoice.lines || []) {
-      const quantity = Number(item.quantity);
-      details.push({ value: `${item.description} | Cantidad: ${Number.isFinite(quantity) && quantity > 0 ? quantity : 'No disponible'} | Importe registrado en la factura: ${formatSapAmount(item.recordedAmount, invoice.currency)}` });
-    }
-    if (invoice.comments) details.push({ value: invoice.comments });
-    details.push({ value: `Motivo de la revisión: ${row._overrideMotivo || 'Sin motivo registrado'}. Revisó: ${row._reviewer || 'Aún no revisado'}. ${row._overrideTimestamp || ''}` });
-    details.push({ value: `Importe que suma al total aprobado: ${formatCurrency(row._effectiveNeto)}. ${row._fiscalNote}` });
-    return { summary, details };
-  };
-  if (documents.length) {
-    documents.forEach((row, index) => {
-      const invoice = sapInvoiceEntries(row);
-      appendBlock(index === 0
-        ? [{ value: `FACTURAS REGISTRADAS EN SAP - ${sapPeriod.startDate} AL ${sapPeriod.endDate}`, bold: true }, ...invoice.summary]
-        : invoice.summary);
-      invoice.details.forEach(entry => line(entry.value, entry.bold));
-    });
-  }
   const clinicalEntries = row => {
     const approved = row._effectiveElegible === true;
-    const reviewedBase = row._effectiveBase ?? row.BaseImporte ?? row.BasePropuesta;
+    const reviewedBase = reviewedFee(row);
     return [
-      { value: `${String(row.FechaAtencion || '').slice(0,10)} | Folio ${row.FolioAtencion} | ${row._reviewStatus} | ${row.FuenteHonorario || 'Atención clínica'}`, bold: true },
-      { value: `${row.Servicio || 'Servicio por confirmar'}. Paciente: ${row.Paciente || 'Sin identificar'}. Honorario ${approved ? 'aprobado' : 'propuesto'}: ${formatCurrency(reviewedBase)}; ${approved ? `importe final aprobado: ${formatCurrency(row._effectiveNeto)}` : 'importe que suma al total aprobado: $0.00'}.` },
+      { value: row.FixedMonthly ? `Mes ${row.FeeMonth} | Pago fijo mensual | ${reviewStatusLabel(row)}` : `${String(row.FechaAtencion || '').slice(0,10)} | ${formatHonorarioReference(row)} | ${formatHonorarioSalesOrder(row)} | ${reviewStatusLabel(row)} | ${row.FuenteHonorario || 'Atención clínica'}`, bold: true },
+      { value: `${row.Servicio || 'Servicio por confirmar'}. ${row.FixedMonthly ? `Pago fijo mensual completo de ${row.FeeMonth}, adicional a servicios` : `Paciente: ${row.Paciente || 'Sin identificar'}`}. Honorario ${approved ? 'aprobado' : 'propuesto'}: ${formatCurrency(reviewedBase)}; ${approved ? `importe final aprobado: ${formatCurrency(row._effectiveNeto)}` : 'importe que suma al total aprobado: $0.00'}.` },
       { value: `${row._effectiveMotivo || ''} ${row._reviewer ? `Revisor: ${row._reviewer}. Fecha: ${row._overrideTimestamp}.` : ''}` }
     ];
   };
   if (clinical.length) {
     const firstRow = clinicalEntries(clinical[0]);
-    appendBlock([{ value: 'DETALLE DE REVISIÓN DE ATENCIONES', bold: true }, ...firstRow]);
+    appendBlock([{ value: clinical.some(row => row.FixedMonthly) ? 'DETALLE DE SERVICIOS Y PAGOS MENSUALES' : 'DETALLE DE REVISIÓN DE ATENCIONES', bold: true }, ...firstRow]);
     clinical.slice(1).forEach(row => appendBlock(clinicalEntries(row)));
   }
   return y;
 }
 
-function renderFinalSignatures(doc, doctorData, periodInfo, generatedBy, startAtY) {
+function renderFinalSignature(doc, doctorData, periodInfo, startAtY) {
   const margin = PDF_MARGIN;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -583,41 +412,35 @@ function renderFinalSignatures(doc, doctorData, periodInfo, generatedBy, startAt
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(0, 70, 135);
-  doc.text('FIRMAS', margin, currentY + 3);
+  doc.text('FIRMA', margin, currentY + 3);
   currentY += 13;
 
-  const signatureGap = 14;
-  const signatureWidth = (contentWidth - signatureGap) / 2;
-  const physicianName = String(doctorData.medico || '').trim() || 'Médico no identificado';
-  const reviewerName = String(generatedBy || '').trim() || 'Usuario no identificado';
-  const signatureColumns = [
-    { x: margin, name: physicianName, title: 'MÉDICO / PRESTADOR' },
-    { x: margin + signatureWidth + signatureGap, name: reviewerName, title: 'RESPONSABLE DE REVISIÓN' }
-  ];
+  const signatureWidth = contentWidth / 2;
+  const center = pageWidth / 2;
+  const physicianName = formatHonorariosPdfText(doctorData.medico).trim() || 'Médico no identificado';
 
   doc.setDrawColor(100, 116, 139);
   doc.setLineWidth(0.35);
-  signatureColumns.forEach(({ x, name, title }) => {
-    const center = x + signatureWidth / 2;
-    doc.line(x + 5, currentY, x + signatureWidth - 5, currentY);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(30, 41, 59);
-    const nameWidth = signatureWidth - 10;
-    const nameFontSize = Math.min(8, Math.max(6.5, 8 * nameWidth / Math.max(doc.getTextWidth(name), 1)));
-    doc.setFontSize(nameFontSize);
-    doc.text(name, center, currentY + 5.8, { align: 'center', maxWidth: nameWidth });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(100, 116, 139);
-    doc.text(title, center, currentY + 10.5, { align: 'center' });
-  });
+  const nameWidth = signatureWidth - 10;
+  doc.line(center - nameWidth / 2, currentY, center + nameWidth / 2, currentY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(30, 41, 59);
+  const nameFontSize = Math.min(8, Math.max(6.5, 8 * nameWidth / Math.max(doc.getTextWidth(physicianName), 1)));
+  doc.setFontSize(nameFontSize);
+  doc.text(physicianName, center, currentY + 5.8, { align: 'center', maxWidth: nameWidth });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text('MÉDICO / PRESTADOR', center, currentY + 10.5, { align: 'center' });
 }
 
 /**
- * Genera y descarga el PDF de preliquidación individual para un médico
+ * Genera y descarga la revisión de servicios autorizados de un médico
  */
-export function generateDoctorHonorariosPdf(doctorData, startDate, endDate, includeZeroAmounts = true, generatedBy = '') {
+export function generateDoctorHonorariosPdf(doctorData, startDate, endDate, includeZeroAmounts = true, _generatedBy = '', approvedOnly = false) {
+  doctorData = prepareDoctorReview(doctorData, approvedOnly);
+  if (!doctorData.filasRevision.length) return false;
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -625,21 +448,23 @@ export function generateDoctorHonorariosPdf(doctorData, startDate, endDate, incl
   });
 
   const periodLabel = getPeriodLabel(startDate, endDate);
-  const receiptEndY = renderDoctorReceipt(doc, doctorData, { startDate, endDate, periodLabel }, includeZeroAmounts, generatedBy);
+  const receiptEndY = renderDoctorReceipt(doc, doctorData, { startDate, endDate, periodLabel });
   const appendixEndY = renderReviewAppendix(doc, doctorData, { startDate, endDate, periodLabel }, includeZeroAmounts, receiptEndY);
-  renderFinalSignatures(doc, doctorData, { startDate, endDate, periodLabel }, generatedBy, appendixEndY ?? receiptEndY);
+  renderFinalSignature(doc, doctorData, { startDate, endDate, periodLabel }, appendixEndY ?? receiptEndY);
   addPdfFooters(doc);
 
   const cleanName = (doctorData.medico || 'Medico').replace(/[^a-zA-Z0-9]/g, '_');
   const typeStr = includeZeroAmounts ? 'Detallado' : 'Resumido';
-  doc.save(`Resumen_Honorarios_${typeStr}_${cleanName}_${startDate}_a_${endDate}.pdf`);
+  doc.save(`${approvedOnly ? 'Honorarios_Aprobados' : 'Resumen_Honorarios'}_${typeStr}_${cleanName}_${startDate}_a_${endDate}.pdf`);
+  return true;
 }
 
 /**
- * Genera y descarga un PDF combinado con todas las liquidaciones de todos los médicos activos
+ * Genera y descarga la revisión de todos los médicos con servicios autorizados
  */
-export function generateAllDoctorsHonorariosPdf(doctorsList, startDate, endDate, includeZeroAmounts = true, generatedBy = '') {
-  if (!doctorsList || doctorsList.length === 0) return;
+export function generateAllDoctorsHonorariosPdf(doctorsList, startDate, endDate, includeZeroAmounts = true, _generatedBy = '', approvedOnly = false) {
+  const eligibleDoctors = (doctorsList || []).map(doctor => prepareDoctorReview(doctor, approvedOnly)).filter(doctor => doctor.filasRevision.length);
+  if (!eligibleDoctors.length) return false;
 
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -648,22 +473,17 @@ export function generateAllDoctorsHonorariosPdf(doctorsList, startDate, endDate,
   });
 
   const periodLabel = getPeriodLabel(startDate, endDate);
-  const eligibleDoctors = doctorsList.filter(d => {
-    return d.filas?.length > 0;
-  });
-
-  if (eligibleDoctors.length === 0) return;
-
   eligibleDoctors.forEach((doctor, idx) => {
     if (idx > 0) {
       doc.addPage('letter', 'portrait');
     }
-    const receiptEndY = renderDoctorReceipt(doc, doctor, { startDate, endDate, periodLabel }, includeZeroAmounts, generatedBy);
+    const receiptEndY = renderDoctorReceipt(doc, doctor, { startDate, endDate, periodLabel });
     const appendixEndY = renderReviewAppendix(doc, doctor, { startDate, endDate, periodLabel }, includeZeroAmounts, receiptEndY);
-    renderFinalSignatures(doc, doctor, { startDate, endDate, periodLabel }, generatedBy, appendixEndY ?? receiptEndY);
+    renderFinalSignature(doc, doctor, { startDate, endDate, periodLabel }, appendixEndY ?? receiptEndY);
   });
 
   addPdfFooters(doc);
   const typeStr = includeZeroAmounts ? 'Detallados' : 'Resumidos';
-  doc.save(`Resumen_Honorarios_${typeStr}_Completos_${startDate}_a_${endDate}.pdf`);
+  doc.save(`${approvedOnly ? 'Honorarios_Aprobados' : 'Resumen_Honorarios'}_${typeStr}_Completos_${startDate}_a_${endDate}.pdf`);
+  return true;
 }

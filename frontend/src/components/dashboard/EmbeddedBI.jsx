@@ -53,7 +53,7 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
           const res = await fetch(`${API_BASE}/bi/token/${reportId}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          if (!res.ok) throw new Error('No se pudo obtener token de BI');
+          if (!res.ok) throw new Error('No se pudo abrir el reporte. Intenta de nuevo.');
           const data = await res.json();
           
           // CRITICAL: Set the real URL from the database
@@ -272,7 +272,7 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
               left: 0
             }}>
               <iframe 
-                title="Escandón BI Report" 
+                title="Reporte del Hospital Escandón"
                 width="100%" 
                 height="100%" 
                 src={embedUrl} 

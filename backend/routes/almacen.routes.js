@@ -86,7 +86,7 @@ router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
   }
 
   // Si no hay caché, error
-  res.status(503).json({ ok: false, error: 'El caché de inventario aún no está listo. Intente de nuevo en unos segundos.' });
+  res.status(503).json({ ok: false, error: "El inventario se está actualizando. Intenta de nuevo en unos segundos." });
 });
 
 /**
@@ -224,7 +224,7 @@ router.get('/reportes/kardex', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
         existencias AS "Existencias",
         fecha AS "Fecha y hora",
         servicio AS "Servicio que solicita",
-        usuario AS "Usuario que libera",
+        CASE WHEN UPPER(TRIM(usuario)) = 'CIRRUS' THEN 'Vertical' ELSE usuario END AS "Usuario que libera",
         movimiento AS "Historial de movimiento",
         valoracumulado AS "Valor acumulado por articulo"
       FROM dw_sap_kardex 
@@ -368,7 +368,7 @@ router.get('/reportes/consumo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
         paciente AS "Paciente",
         habitacion AS "Habitacion",
         medico AS "Medico",
-        usuariocargo AS "Usuario Cargo"
+        CASE WHEN UPPER(TRIM(usuariocargo)) = 'CIRRUS' THEN 'Vertical' ELSE usuariocargo END AS "Usuario Cargo"
       FROM dw_cirrus_consumo
       WHERE fechacargo::date >= $1 AND fechacargo::date <= $2
     `;
@@ -640,7 +640,7 @@ router.get('/reportes/detalle/kardex/:codigo', authenticate, authorize(['ADMIN',
     
     const pgRes = await pool.query(`
       SELECT 
-        codigo AS "Codigo", descripcion AS "Descripcion", almacenorigen AS "AlmacenOrigen", almacendestino AS "AlmacenDestino", documentoref AS "DocumentoRef", existencias AS "Existencias", fecha AS "Fecha", servicio AS "Servicio", usuario AS "Usuario", movimiento AS "Movimiento", valoracumulado AS "ValorAcumulado"
+        codigo AS "Codigo", descripcion AS "Descripcion", almacenorigen AS "AlmacenOrigen", almacendestino AS "AlmacenDestino", documentoref AS "DocumentoRef", existencias AS "Existencias", fecha AS "Fecha", servicio AS "Servicio", CASE WHEN UPPER(TRIM(usuario)) = 'CIRRUS' THEN 'Vertical' ELSE usuario END AS "Usuario", movimiento AS "Movimiento", valoracumulado AS "ValorAcumulado"
       FROM dw_sap_kardex
       WHERE codigo LIKE $1 OR descripcion LIKE $1 OR documentoref LIKE $1
       ORDER BY fecha DESC
@@ -678,7 +678,7 @@ router.get('/reportes/detalle/censo/:cuenta', authenticate, authorize(['ADMIN', 
         COALESCE(montocobrado, 0) AS "Monto Total",
         lote AS "Lote",
         habitacion AS "Área / Cama",
-        usuariocargo AS "Usuario Liberó"
+        CASE WHEN UPPER(TRIM(usuariocargo)) = 'CIRRUS' THEN 'Vertical' ELSE usuariocargo END AS "Usuario Liberó"
       FROM dw_cirrus_consumo
       WHERE cuentahospitalaria = $1 OR (paciente LIKE $2 AND paciente != '')
       ORDER BY idcargo DESC
@@ -1018,7 +1018,7 @@ router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
     res.json({ ok: true, data: pgRes.rows });
   } catch (err) {
     console.error('[GET ML Dataset Error]', err);
-    res.status(500).json({ ok: false, error: 'Error al consultar el dataset analítico de ML' });
+    res.status(500).json({ ok: false, error: "No se pudo cargar el análisis de existencias. Intenta de nuevo." });
   }
 });
 
@@ -1030,10 +1030,10 @@ router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
   try {
     const { syncMLDataset } = require('../services/mlDataset.service');
     const count = await syncMLDataset();
-    res.json({ ok: true, message: `Dataset analítico sincronizado con éxito. ${count} registros calculados.` });
+    res.json({ ok: true, message: `Análisis de existencias actualizado. ${count} registros calculados.` });
   } catch (err) {
     console.error('[POST Sync ML Dataset Error]', err);
-    res.status(500).json({ ok: false, error: 'Error al sincronizar el dataset analítico: ' + err.message });
+    res.status(500).json({ ok: false, error: "No se pudo actualizar el análisis de existencias. Intenta de nuevo. " + err.message });
   }
 });
 
@@ -1070,7 +1070,7 @@ router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
     res.json({ ok: true, data: pgRes.rows });
   } catch (err) {
     console.error('[GET ML History Error]', err);
-    res.status(500).json({ ok: false, error: 'Error al consultar el historial analítico de ML' });
+    res.status(500).json({ ok: false, error: "No se pudo cargar el historial de consumo. Intenta de nuevo." });
   }
 });
 
@@ -1174,7 +1174,7 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
     res.json({ ok: true, data: pgRes.rows });
   } catch (err) {
     console.error('[GET ML Predictions Error]', err);
-    res.status(500).json({ ok: false, error: 'Error al consultar predicciones de Machine Learning' });
+    res.status(500).json({ ok: false, error: "No se pudieron cargar las alertas de productos. Intenta de nuevo." });
   }
 });
 
@@ -1220,7 +1220,7 @@ router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR',
       return res.status(500).json({
         ok: false,
         jobId: jobResult.jobId,
-        error: jobResult.error_message || 'Error al ejecutar modelo predictivo',
+        error: jobResult.error_message || "No se pudieron calcular las alertas de productos. Intenta de nuevo.",
         stderr: jobResult.stderr || ''
       });
     }
@@ -1228,7 +1228,7 @@ router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR',
     res.json({
       ok: true,
       jobId: jobResult.jobId,
-      message: 'Predicciones de Machine Learning ejecutadas y guardadas correctamente.',
+      message: "Alertas de productos actualizadas.",
       duration_seconds: jobResult.duration_seconds,
       stdout: jobResult.stdout
     });
@@ -1236,7 +1236,7 @@ router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR',
     console.error('[POST Run ML Predictions Error]', error);
     res.status(500).json({
       ok: false,
-      error: 'Error al procesar job de predicciones: ' + error.message
+      error: "No se pudieron calcular las alertas de productos. Intenta de nuevo. " + error.message
     });
   }
 });

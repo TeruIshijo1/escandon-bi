@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -90,11 +91,11 @@ export default function ReportesAlmacen() {
       });
       
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || result.message || 'Error al obtener reporte');
+      if (!response.ok) throw new Error(userMessage(result.error || result.message || 'Error al obtener reporte'));
       
       setData(result.data || []);
     } catch (err) {
-      setError(err.message);
+      setError(userMessage(err.message));
     } finally {
       setLoading(false);
     }
@@ -300,7 +301,7 @@ export default function ReportesAlmacen() {
               ? 'Reporte detallado de servicios de interconsulta y jornadas médicas registradas en SAP'
               : isPreciosArticulos
               ? 'Consulta de precios por artículo y servicio: Lista 1 (Hospitalización), Lista 2 (Público General) y Lista 4 (2025)'
-              : 'Auditoría integral, trazabilidad de almacén y desgloses interactivos'}
+              : 'Consulta las entradas, salidas y el uso de los productos del almacén.'}
           </p>
         </div>
         <button 
@@ -353,7 +354,7 @@ export default function ReportesAlmacen() {
       {/* Filtros */}
       <div style={{ background: 'white', padding: '2rem', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
         <h2 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem', color: '#1e293b' }}>
-          {isDedicatedView ? 'Parámetros de Consulta' : 'Filtros de Búsqueda'}
+          {isDedicatedView ? 'Filtros de búsqueda' : 'Filtros de Búsqueda'}
         </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-end' }}>
           {(activeTab === 'kardex' || activeTab === 'consumo') && (
@@ -476,7 +477,7 @@ export default function ReportesAlmacen() {
 
         {error && (
           <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#fef2f2', borderLeft: '4px solid #ef4444', color: '#991b1b', borderRadius: '4px', fontWeight: '500' }}>
-            {error}
+            {userMessage(error)}
           </div>
         )}
       </div>
@@ -491,7 +492,7 @@ export default function ReportesAlmacen() {
             </h2>
             {filteredData.length > 0 && (
               <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#0284c7', fontWeight: '600' }}>
-                💡 Haz clic en cualquier fila para ver la trazabilidad y desglose detallado
+                💡 Haz clic en una fila para ver el detalle del movimiento.
               </p>
             )}
           </div>
@@ -597,13 +598,13 @@ export default function ReportesAlmacen() {
             <div style={{ padding: '1.5rem 2rem', background: 'linear-gradient(135deg, #0f172a 0%, #004687 100%)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '700', color: 'white' }}>
-                  🔍 Detalle y Trazabilidad de Movimiento
+                  🔍 Detalle del movimiento
                 </h3>
                 <p style={{ margin: '0.25rem 0 0 0', color: '#93c5fd', fontSize: '0.9rem' }}>
                   {activeTab === 'kardex' && 'Recorrido completo e historial del insumo entre almacenes'}
                   {activeTab === 'censo' && 'Ficha del paciente y cargos de medicamentos/almacén'}
                   {activeTab === 'entradas' && 'Partidas de la factura de entrada y proveedor'}
-                  {activeTab === 'consumo' && 'Trazabilidad desde almacén hasta la aplicación al paciente'}
+                  {activeTab === 'consumo' && 'Recorrido del producto desde el almacén hasta su uso con el paciente'}
                 </p>
               </div>
               <button 
@@ -619,7 +620,7 @@ export default function ReportesAlmacen() {
               {modalLoading ? (
                 <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
                   <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⏳</div>
-                  Cargando trazabilidad completa...
+                  Cargando detalle del movimiento…
                 </div>
               ) : (
                 <>
@@ -728,7 +729,7 @@ export default function ReportesAlmacen() {
                                   <td style={{ padding: '0.75rem', fontWeight: 'bold' }}>{c['Cantidad']}</td>
                                   <td style={{ padding: '0.75rem' }}>{formatCellValue('Precio', c['Precio Unitario'])}</td>
                                   <td style={{ padding: '0.75rem', fontWeight: 'bold', color: '#059669' }}>{formatCellValue('Total', c['Monto Total'])}</td>
-                                  <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>{c['Usuario Liberó'] || 'Cirrus'}</td>
+                                  <td style={{ padding: '0.75rem', fontSize: '0.85rem' }}>{c['Usuario Liberó'] || 'Vertical'}</td>
                                 </tr>
                               ))}
                             </tbody>

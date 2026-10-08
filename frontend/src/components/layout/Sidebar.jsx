@@ -46,7 +46,7 @@ export default function Sidebar() {
         </div>
         <div className="sidebar-logo-text">
           <span className="sidebar-logo-title" style={{ fontFamily: 'var(--font-display)', letterSpacing: '0.02em', fontSize: '0.9rem' }}>Hospital Escandón</span>
-          <span className="sidebar-logo-sub" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', marginTop: '2px' }}>Plataforma HE-BI</span>
+          <span className="sidebar-logo-sub" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', letterSpacing: '0.08em', marginTop: '2px' }}>Portal del hospital</span>
         </div>
       </div>
 

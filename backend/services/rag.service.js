@@ -6,8 +6,8 @@ const ariaService = require('./aria');
 const ExcelJS = require('exceljs');
 
 const LLM_API_KEY = process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
-const LLM_MODEL   = process.env.GEMINI_MODEL || process.env.DEEPSEEK_MODEL || process.env.OPENAI_MODEL || 
-  (process.env.GEMINI_API_KEY ? 'gemini-2.0-flash' : (process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o'));
+const LLM_MODEL   = process.env.GEMINI_API_KEY ? (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite') :
+  (process.env.DEEPSEEK_API_KEY ? (process.env.DEEPSEEK_MODEL || 'deepseek-chat') : (process.env.OPENAI_MODEL || 'gpt-4o'));
 const LLM_BASE    = process.env.LLM_BASE_URL || 
   (process.env.GEMINI_API_KEY ? 'https://generativelanguage.googleapis.com/v1beta/openai' : 
   (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' : (process.env.AZURE_OPENAI_ENDPOINT || 'https://api.openai.com/v1')));
@@ -213,7 +213,7 @@ async function processRAGQuery({ question, userRole, userArea, userName, file, s
 
     return {
       answer: ariaResponse.answer,
-      sources: ['Plataforma BI — Datos en vivo', ariaResponse.topic || 'Consulta Operativa', ...excelSources],
+      sources: ['Información actual del hospital', ariaResponse.topic || 'Consulta Operativa', ...excelSources],
       intent: ariaResponse.topic || 'general',
       assistant: 'Mar-IA',
       timestamp: new Date().toISOString(),
@@ -322,7 +322,7 @@ async function fetchDataForIntent(intent, { userRole, userArea }) {
     return {
       data,
       sql: sqlToUse,
-      sources: ['PostgreSQL — Hospital Escandón', `Consulta: ${intent}`],
+      sources: ['Información del Hospital Escandón'],
     };
   } catch (err) {
     console.error('[Mar-IA] Error al ejecutar query:', err.message);

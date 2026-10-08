@@ -1,3 +1,4 @@
+import { userMessage } from '../utils/userMessages';
 import { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../api/config';
 import PremiumLoader from '../components/shared/PremiumLoader';
@@ -34,7 +35,7 @@ export default function OcupacionCamas() {
         setBedsData(json.data);
         setLastUpdate(new Date());
       } else {
-        setError(json.error || 'Error al cargar datos');
+        setError(userMessage(json.error || 'Error al cargar datos'));
       }
     } catch (err) {
       setError('Error de conexión con el servidor.');
@@ -93,7 +94,7 @@ export default function OcupacionCamas() {
   }
 
   if (error) {
-    return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{error}</div>;
+    return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{userMessage(error)}</div>;
   }
 
   const { resumen } = bedsData;

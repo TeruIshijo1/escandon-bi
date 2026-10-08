@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
         const res  = await fetch(`${API_BASE}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) throw new Error('Token inválido');
+        if (!res.ok) throw new Error('Tu sesión terminó. Inicia sesión de nuevo.');
         const data = await res.json();
         setUser({ ...data.user, token });
       } catch {
@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
       setUser({ ...data.user, token: data.token });
       return { ok: true };
     } catch (err) {
-      const msg = 'No se pudo conectar al servidor. Verifique que el backend esté corriendo.';
+      const msg = 'No se pudo conectar. Revisa tu conexión e intenta de nuevo.';
       setError(msg);
       return { ok: false, message: msg };
     }

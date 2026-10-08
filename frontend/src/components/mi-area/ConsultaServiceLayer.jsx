@@ -1,9 +1,38 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
 import { hasSapModulePermission } from '../../utils/rbac';
+import ReportBuilderIcon, { reportTopicIcon } from './ReportBuilderIcon';
+import ReportAssistant from './ReportAssistant';
+import './ConsultaServiceLayer.css';
+
+const normalizeSearch = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const entitySource = entity => entity?.source === 'Vertical' ? 'Vertical' : 'SAP';
+const validDraftDate = value => {
+  if (value == null || value === '') return true;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
+const formatReportDate = (value, withTime = false) => {
+  const dateOnly = !withTime && String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const date = dateOnly ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return withTime ? date.toLocaleString('es-MX', { hourCycle: 'h23' }) : date.toLocaleDateString('es-MX');
+};
+const supportsFilter = (entity, filter) => {
+  if (!entity) return false;
+  if (Array.isArray(entity.filters)) return entity.filters.includes(filter);
+  const fieldKeys = {
+    almacen: ['WhsCode', 'Filler', 'ToWhsCode'],
+    estatusDoc: ['DocStatus', 'Status'],
+    clasificacionMedica: ['MedicalClassification', 'SecondaryClassification'],
+  };
+  return Boolean(entity.fields?.some(field => fieldKeys[filter]?.includes(field.key)));
+};
 
 const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align = 'left', maxWidth }) => {
   const val = colFilters[columnKey] || '';
@@ -97,7 +126,7 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
           >
             <option value="" style={{ color: '#1e293b' }}>Todos ({uniqueVals.length})</option>
             {uniqueVals.map((v, i) => (
-              <option key={i} value={v} style={{ color: '#1e293b' }}>{String(v)}</option>
+              <option key={i} value={String(v)} style={{ color: '#1e293b' }}>{typeof v === 'boolean' ? (v ? 'Sí' : 'No') : String(v)}</option>
             ))}
           </select>
         ) : (
@@ -143,11 +172,19 @@ export default function ConsultaServiceLayer() {
   const { user } = useAuth();
   const topScrollRef = useRef(null);
   const tableScrollRef = useRef(null);
+  const queryRequestRef = useRef(0);
+  const configurationRef = useRef(null);
+  const resultsRef = useRef(null);
+  const [reportMode, setReportMode] = useState('assistant');
   const [tableScrollWidth, setTableScrollWidth] = useState(1600);
 
   const [catalog, setCatalog] = useState([]);
-  const [selectedEntityId, setSelectedEntityId] = useState('inventory');
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState(null);
+  const [catalogRefresh, setCatalogRefresh] = useState(0);
+  const [selectedEntityId, setSelectedEntityId] = useState('');
   const [selectedFields, setSelectedFields] = useState([]);
+  const [manualTopicRequired, setManualTopicRequired] = useState(false);
 
   // Helpers de fecha
   const getTodayStr = () => new Date().toLocaleDateString('en-CA');
@@ -166,6 +203,8 @@ export default function ConsultaServiceLayer() {
 
   // Filtros
   const [activeCategory, setActiveCategory] = useState('ALL');
+  const [activeSource, setActiveSource] = useState('ALL');
+  const [moduleSearch, setModuleSearch] = useState('');
   const [fechaDesde, setFechaDesde] = useState(getDaysAgoStr(30));
   const [fechaHasta, setFechaHasta] = useState(getTodayStr());
   const [almacen, setAlmacen] = useState('ALL');
@@ -194,26 +233,28 @@ export default function ConsultaServiceLayer() {
 
   // Cargar catálogo de entidades
   useEffect(() => {
+    const controller = new AbortController();
     const fetchCatalog = async () => {
+      setCatalogLoading(true);
+      setCatalogError(null);
       try {
-        const res = await fetch(`${API_BASE}/sap-query/catalog`, { headers: authHeaders() });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.ok && json.catalog) {
-            setCatalog(json.catalog);
-            // Iniciar con campos default de la primera entidad
-            const defaultEnt = json.catalog.find(c => c.id === 'inventory') || json.catalog[0];
-            if (defaultEnt) {
-              setSelectedEntityId(defaultEnt.id);
-              setSelectedFields(defaultEnt.defaultFields || []);
-            }
-          }
-        }
+        const res = await fetch(`${API_BASE}/sap-query/catalog`, { headers: authHeaders(), signal: controller.signal });
+        const json = await res.json();
+        if (!res.ok || !json.ok || !Array.isArray(json.catalog)) throw new Error('No se pudo cargar la lista de módulos.');
+        if (!controller.signal.aborted) setCatalog(json.catalog);
       } catch (err) {
-        console.error('[SAP Query Builder] Error al cargar catálogo:', err);
+        if (controller.signal.aborted) return;
+        console.error('[Report Builder] Error al cargar catálogo:', err);
+        setCatalogError('No se pudo cargar la lista de módulos de SAP y Vertical. Intenta de nuevo.');
+      } finally {
+        if (!controller.signal.aborted) setCatalogLoading(false);
       }
     };
     fetchCatalog();
+    return () => controller.abort();
+  }, [catalogRefresh]);
+
+  useEffect(() => {
     loadSavedQueries();
   }, []);
 
@@ -226,38 +267,62 @@ export default function ConsultaServiceLayer() {
   }, [userAllowedCatalog, selectedEntityId]);
 
   const hasStatusField = useMemo(() => {
-    return Boolean(currentEntityDef?.fields?.some(f => f.key === 'DocStatus' || f.key === 'Status'));
+    return supportsFilter(currentEntityDef, 'estatusDoc');
   }, [currentEntityDef]);
 
   const hasWhsField = useMemo(() => {
-    return Boolean(currentEntityDef?.fields?.some(f => f.key === 'WhsCode' || f.key === 'Filler' || f.key === 'ToWhsCode'));
+    return supportsFilter(currentEntityDef, 'almacen');
   }, [currentEntityDef]);
 
   const hasMedClassField = useMemo(() => {
-    return Boolean(currentEntityDef?.fields?.some(f => f.key === 'MedicalClassification'));
+    return supportsFilter(currentEntityDef, 'clasificacionMedica');
   }, [currentEntityDef]);
 
+  const searchMatchedCatalog = useMemo(() => {
+    const terms = normalizeSearch(moduleSearch).trim().split(/\s+/).filter(Boolean);
+    return userAllowedCatalog.filter(entity => {
+      const searchable = normalizeSearch([entity.title, entity.description, entity.category, entitySource(entity), ...(entity.keywords || [])].join(' '));
+      return terms.every(term => searchable.includes(term));
+    });
+  }, [userAllowedCatalog, moduleSearch]);
+
+  const sourceMatchedCatalog = useMemo(() => {
+    return searchMatchedCatalog.filter(entity => activeSource === 'ALL' || entitySource(entity) === activeSource);
+  }, [searchMatchedCatalog, activeSource]);
+
   const filteredCatalog = useMemo(() => {
-    if (activeCategory === 'ALL') return userAllowedCatalog;
-    return userAllowedCatalog.filter(c => c.category === activeCategory);
-  }, [userAllowedCatalog, activeCategory]);
+    return sourceMatchedCatalog.filter(entity => activeCategory === 'ALL' || entity.category === activeCategory);
+  }, [sourceMatchedCatalog, activeCategory]);
 
   const categories = useMemo(() => {
-    const cats = new Set(userAllowedCatalog.map(c => c.category).filter(Boolean));
+    const cats = new Set(userAllowedCatalog.filter(entity => activeSource === 'ALL' || entitySource(entity) === activeSource).map(c => c.category).filter(Boolean));
     return ['ALL', ...Array.from(cats)];
-  }, [userAllowedCatalog]);
+  }, [userAllowedCatalog, activeSource]);
+
+  useEffect(() => {
+    if (!categories.includes(activeCategory)) setActiveCategory('ALL');
+  }, [categories, activeCategory]);
 
   // Si cambia la lista de módulos permitidos, asegurar que selectedEntityId sea válido
   useEffect(() => {
     if (userAllowedCatalog.length > 0 && !userAllowedCatalog.some(c => c.id === selectedEntityId)) {
-      handleSelectEntity(userAllowedCatalog[0].id);
+      if (manualTopicRequired && !selectedEntityId) return;
+      handleSelectEntity((userAllowedCatalog.find(c => c.id === 'inventory') || userAllowedCatalog[0]).id);
+    } else if (userAllowedCatalog.length === 0 && selectedEntityId) {
+      queryRequestRef.current += 1;
+      setSelectedEntityId('');
+      setSelectedFields([]);
+      setQueryResult(null);
+      setLoading(false);
     }
-  }, [userAllowedCatalog, selectedEntityId]);
+  }, [userAllowedCatalog, selectedEntityId, manualTopicRequired]);
 
   // Al cambiar de entidad, preseleccionar sus campos default y limpiar filtros no aplicables
   const handleSelectEntity = (entId) => {
+    const def = userAllowedCatalog.find(c => c.id === entId);
+    if (!def) return;
+    setManualTopicRequired(false);
     setSelectedEntityId(entId);
-    const def = catalog.find(c => c.id === entId);
     if (def) {
       setSelectedFields(def.defaultFields || def.fields.map(f => f.key));
     }
@@ -266,16 +331,18 @@ export default function ConsultaServiceLayer() {
     setPage(1);
     setQueryResult(null);
     setError(null);
+    queryRequestRef.current += 1;
+    setLoading(false);
     // Limpiar estatus si la nueva entidad no lo maneja
-    if (def && !def.fields.some(f => f.key === 'DocStatus' || f.key === 'Status')) {
+    if (!supportsFilter(def, 'estatusDoc') || !(def.statusOptions?.map(option => option.value) || ['ALL', 'OPEN', 'CLOSED']).includes(estatusDoc)) {
       setEstatusDoc('ALL');
     }
     // Limpiar clasificación médica si la nueva entidad no la maneja
-    if (def && !def.fields.some(f => f.key === 'MedicalClassification')) {
+    if (!supportsFilter(def, 'clasificacionMedica')) {
       setClasificacionMedica('ALL');
     }
     // Si la entidad no tiene almacén, resetear almacén
-    if (def && !def.fields.some(f => f.key === 'WhsCode' || f.key === 'Filler' || f.key === 'ToWhsCode')) {
+    if (!supportsFilter(def, 'almacen')) {
       setAlmacen('ALL');
     }
   };
@@ -314,16 +381,30 @@ export default function ConsultaServiceLayer() {
   };
 
   // Ejecutar consulta dinámica
-  const handleExecute = async () => {
-    if (!currentEntityDef) return;
+  const handleExecute = async (configuration) => {
+    const definition = configuration ? userAllowedCatalog.find(entity => entity.id === configuration.entity) : currentEntityDef;
+    if (!definition) return;
+    const fields = configuration?.selectedFields || selectedFields;
+    const filters = configuration?.filters || { fechaDesde, fechaHasta, busqueda, almacen, estatusDoc, clasificacionMedica };
 
-    if (currentEntityDef.requiresDateFilter) {
-      if (!fechaDesde || !fechaHasta) {
-        setError(`Para evitar sobrecarga en SAP Service Layer, el módulo '${currentEntityDef.title}' requiere obligatoriamente seleccionar Fecha Desde y Fecha Hasta.`);
+    if (!Array.isArray(fields) || !fields.length || fields.some(key => !definition.fields.some(field => field.key === key))) {
+      setError('Las columnas disponibles cambiaron. Elige de nuevo los datos que quieres incluir.');
+      return;
+    }
+
+    if (definition.requiresDateFilter) {
+      if (!filters.fechaDesde || !filters.fechaHasta) {
+        setError(`Elige las fechas de inicio y fin para consultar ${definition.title}.`);
+        return;
+      }
+      if (filters.fechaDesde > filters.fechaHasta) {
+        setError('La fecha de inicio debe ser anterior o igual a la fecha de fin.');
         return;
       }
     }
 
+    const requestId = ++queryRequestRef.current;
+    const requestedFilters = { fechaDesde: filters.fechaDesde || '', fechaHasta: filters.fechaHasta || '', busqueda: filters.busqueda || '', almacen: supportsFilter(definition, 'almacen') ? filters.almacen || 'ALL' : 'ALL', estatusDoc: supportsFilter(definition, 'estatusDoc') ? filters.estatusDoc || 'ALL' : 'ALL', clasificacionMedica: supportsFilter(definition, 'clasificacionMedica') ? filters.clasificacionMedica || 'ALL' : 'ALL' };
     setLoading(true);
     setError(null);
     setPage(1);
@@ -337,29 +418,96 @@ export default function ConsultaServiceLayer() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          entity: selectedEntityId,
-          selectedFields,
-          fechaDesde,
-          fechaHasta,
-          almacen,
-          estatusDoc,
-          clasificacionMedica,
-          busqueda
+          entity: definition.id,
+          selectedFields: fields,
+          ...requestedFilters
         })
       });
 
       const json = await res.json();
+      if (requestId !== queryRequestRef.current) return;
       if (!res.ok || !json.ok) {
-        throw new Error(json.error || 'Error al ejecutar la consulta en Service Layer');
+        throw new Error(userMessage(json.error || 'No se pudo consultar la información. Intenta de nuevo.'));
       }
 
-      setQueryResult(json);
+      setQueryResult({ ...json, requestedFilters });
+      return { total: json.data?.length || 0, truncated: Boolean(json.truncated) };
     } catch (err) {
+      if (requestId !== queryRequestRef.current) return;
       console.error('[SAP Query Execution Error]', err);
-      setError(err.message);
+      setError(userMessage(err.message));
+      if (configuration) throw err;
     } finally {
-      setLoading(false);
+      if (requestId === queryRequestRef.current) setLoading(false);
     }
+  };
+
+  const handleAssistantGenerate = async (plan) => {
+    const definition = userAllowedCatalog.find(entity => entity.id === plan.entity);
+    if (!definition || plan.selectedFields.some(key => !definition.fields.some(field => field.key === key))) throw new Error('Ese tema o alguna columna ya no está disponible. Intenta con otro reporte.');
+    handleSelectEntity(plan.entity);
+    setSelectedFields(plan.selectedFields);
+    setFechaDesde(plan.filters.fechaDesde || '');
+    setFechaHasta(plan.filters.fechaHasta || '');
+    setAlmacen(plan.filters.almacen || 'ALL');
+    setEstatusDoc(plan.filters.estatusDoc || 'ALL');
+    setClasificacionMedica(plan.filters.clasificacionMedica || 'ALL');
+    setBusqueda(plan.filters.busqueda || '');
+    return handleExecute(plan);
+  };
+
+  const showResults = () => {
+    resultsRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+    resultsRef.current?.focus({ preventScroll: true });
+  };
+
+  const resetAssistantReport = () => {
+    queryRequestRef.current += 1;
+    setQueryResult(null);
+    setError(null);
+    setLoading(false);
+    setColFilters({});
+    setPage(1);
+  };
+
+  const handleAssistantManual = (draft) => {
+    setReportMode('manual');
+    resetAssistantReport();
+    setModuleSearch('');
+    setActiveCategory('ALL');
+    setActiveSource('ALL');
+    const definition = draft && userAllowedCatalog.find(entity => entity.id === draft.entity);
+    const filters = draft?.filters && typeof draft.filters === 'object' && !Array.isArray(draft.filters) ? draft.filters : {};
+    const choices = {
+      almacen: supportsFilter(definition, 'almacen') ? ['ALL', 'FAR', 'QX', 'QXCR', 'QXRCR', 'TERACR', 'PPBCR', 'PPACR', 'IMAGCR', 'CARDIOCR', 'CUNACR', 'QXCM', 'URG1CM', 'ALG'] : ['ALL'],
+      estatusDoc: supportsFilter(definition, 'estatusDoc') ? definition.statusOptions?.map(option => option.value) || ['ALL', 'OPEN', 'CLOSED'] : ['ALL'],
+      clasificacionMedica: supportsFilter(definition, 'clasificacionMedica') ? ['ALL', 'CON', 'ANTI', 'REFRI'] : ['ALL'],
+    };
+    const valid = definition && Array.isArray(draft.selectedFields) && draft.selectedFields.length > 0
+      && draft.selectedFields.every(key => definition.fields.some(field => field.key === key))
+      && (draft.filters == null || typeof draft.filters === 'object' && !Array.isArray(draft.filters))
+      && Object.keys(filters).every(key => ['fechaDesde', 'fechaHasta', 'busqueda', 'almacen', 'estatusDoc', 'clasificacionMedica'].includes(key))
+      && validDraftDate(filters.fechaDesde) && validDraftDate(filters.fechaHasta)
+      && (!filters.fechaDesde || !filters.fechaHasta || filters.fechaDesde <= filters.fechaHasta)
+      && Object.entries(choices).every(([key, values]) => values.includes(filters[key] || 'ALL'))
+      && (filters.busqueda == null || typeof filters.busqueda === 'string' && filters.busqueda.length <= 200);
+    if (!valid) {
+      setManualTopicRequired(true);
+      setSelectedEntityId(''); setSelectedFields([]);
+      setFechaDesde(''); setFechaHasta(''); setBusqueda('');
+      setAlmacen('ALL'); setEstatusDoc('ALL'); setClasificacionMedica('ALL');
+      if (draft) setError('El tema o las columnas cambiaron. Elige un tema disponible para continuar.');
+      return;
+    }
+    // Only fill the form. The user completes it and explicitly starts the query.
+    handleSelectEntity(definition.id);
+    setSelectedFields([...new Set(draft.selectedFields)]);
+    setFechaDesde(definition.requiresDateFilter ? filters.fechaDesde || '' : '');
+    setFechaHasta(definition.requiresDateFilter ? filters.fechaHasta || '' : '');
+    setBusqueda(filters.busqueda || '');
+    setAlmacen(filters.almacen || 'ALL');
+    setEstatusDoc(filters.estatusDoc || 'ALL');
+    setClasificacionMedica(filters.clasificacionMedica || 'ALL');
   };
 
   // Guardar consulta
@@ -380,12 +528,12 @@ export default function ConsultaServiceLayer() {
           description: saveDescription.trim(),
           entity: selectedEntityId,
           selectedFields,
-          filters: { fechaDesde, fechaHasta, almacen, estatusDoc, clasificacionMedica, busqueda },
+          filters: { fechaDesde, fechaHasta, almacen: hasWhsField ? almacen : 'ALL', estatusDoc: hasStatusField ? estatusDoc : 'ALL', clasificacionMedica: hasMedClassField ? clasificacionMedica : 'ALL', busqueda },
           isPublic: saveIsPublic
         })
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || 'No se pudo guardar la consulta');
+      if (!res.ok || !json.ok) throw new Error(userMessage(json.error || 'No se pudo guardar la consulta'));
 
       setShowSaveFormModal(false);
       setSaveTitle('');
@@ -393,7 +541,7 @@ export default function ConsultaServiceLayer() {
       loadSavedQueries();
       alert('✅ Plantilla de consulta guardada con éxito.');
     } catch (err) {
-      alert('❌ Error al guardar: ' + err.message);
+      alert(userMessage('❌ Error al guardar: ' + err.message));
     } finally {
       setSavingQuery(false);
     }
@@ -401,16 +549,23 @@ export default function ConsultaServiceLayer() {
 
   // Cargar una plantilla guardada
   const handleLoadSavedQuery = (sq) => {
+    const entity = userAllowedCatalog.find(def => def.id === sq.entity);
+    if (!entity) {
+      setError('Este módulo no está disponible para tu usuario. Solicita acceso al área de Sistemas.');
+      setShowSavedModal(false);
+      return;
+    }
     handleSelectEntity(sq.entity);
     if (sq.selectedFields && sq.selectedFields.length > 0) {
-      setSelectedFields(sq.selectedFields);
+      const availableFields = sq.selectedFields.filter(key => entity.fields.some(field => field.key === key));
+      if (availableFields.length) setSelectedFields(availableFields);
     }
     if (sq.filters) {
       if (sq.filters.fechaDesde) setFechaDesde(sq.filters.fechaDesde);
       if (sq.filters.fechaHasta) setFechaHasta(sq.filters.fechaHasta);
-      if (sq.filters.almacen) setAlmacen(sq.filters.almacen);
-      if (sq.filters.estatusDoc) setEstatusDoc(sq.filters.estatusDoc);
-      if (sq.filters.clasificacionMedica) setClasificacionMedica(sq.filters.clasificacionMedica);
+      setAlmacen(supportsFilter(entity, 'almacen') ? (sq.filters.almacen || 'ALL') : 'ALL');
+      setEstatusDoc(supportsFilter(entity, 'estatusDoc') && (entity.statusOptions?.map(option => option.value) || ['ALL', 'OPEN', 'CLOSED']).includes(sq.filters.estatusDoc) ? sq.filters.estatusDoc : 'ALL');
+      setClasificacionMedica(supportsFilter(entity, 'clasificacionMedica') ? (sq.filters.clasificacionMedica || 'ALL') : 'ALL');
       if (sq.filters.busqueda) setBusqueda(sq.filters.busqueda);
     }
     setShowSavedModal(false);
@@ -430,10 +585,10 @@ export default function ConsultaServiceLayer() {
         loadSavedQueries();
       } else {
         const json = await res.json();
-        alert('Error: ' + json.error);
+        alert(userMessage('Error: ' + json.error));
       }
     } catch (err) {
-      alert('Error al eliminar: ' + err.message);
+      alert(userMessage('Error al eliminar: ' + err.message));
     }
   };
 
@@ -464,7 +619,7 @@ export default function ConsultaServiceLayer() {
       : (queryResult?.columnas ? queryResult.columnas.map(c => c.key) : currentEntityDef.fields.map(f => f.key));
     
     // Obtener las definiciones completas de las columnas seleccionadas
-    const activeDefs = currentEntityDef.fields.filter(f => activeKeys.includes(f.key));
+    const activeDefs = [...new Set(activeKeys)].map(key => currentEntityDef.fields.find(field => field.key === key)).filter(Boolean);
     return activeDefs.length > 0 ? activeDefs : (queryResult?.columnas || currentEntityDef.fields);
   }, [currentEntityDef, selectedFields, queryResult]);
 
@@ -475,7 +630,7 @@ export default function ConsultaServiceLayer() {
 
     return rawList.filter(row => {
       // 1. Filtro de búsqueda general de texto (en todas las propiedades del objeto)
-      if (busqueda && busqueda.trim()) {
+      if (busqueda && busqueda.trim() && busqueda !== queryResult.requestedFilters?.busqueda) {
         const q = busqueda.trim().toLowerCase();
         const matchesSearch = Object.values(row).some(val => 
           val != null && String(val).toLowerCase().includes(q)
@@ -484,7 +639,7 @@ export default function ConsultaServiceLayer() {
       }
 
       // 2. Filtro de almacén
-      if (almacen && almacen !== 'ALL') {
+      if (hasWhsField && almacen && almacen !== 'ALL' && almacen !== queryResult.requestedFilters?.almacen && (row.WhsCode != null || row.FillerCode != null || row.ToWhsCodeRaw != null || row.WhsName != null || row.Filler != null || row.ToWhsCode != null)) {
         const alm = almacen.trim().toUpperCase();
         const rowWhs = String(row.WhsCode || row.FillerCode || row.ToWhsCodeRaw || '').toUpperCase();
         const rowWhsName = String(row.WhsName || row.Filler || row.ToWhsCode || '').toUpperCase();
@@ -493,24 +648,27 @@ export default function ConsultaServiceLayer() {
       }
 
       // 3. Filtro de estatus de documento (solo si la fila realmente contiene estatus)
-      if (estatusDoc && estatusDoc !== 'ALL') {
-        const hasStatus = row.DocStatus != null || row.Status != null;
+      if (hasStatusField && estatusDoc && estatusDoc !== 'ALL' && estatusDoc !== queryResult.requestedFilters?.estatusDoc) {
+        const hasStatus = row.DocStatus != null || row.Status != null || row[currentEntityDef?.statusField] != null;
         if (hasStatus) {
-          const s = String(row.DocStatus || row.Status || '').toUpperCase();
+          const s = String(row[currentEntityDef?.statusField] || row.DocStatus || row.Status || '').toUpperCase();
           if (estatusDoc === 'OPEN') {
             const isOpen = s.includes('ABIERTA') || s.includes('ACTIVO') || s.includes('PRÓXIMO') || s === 'O' || s === 'OPEN' || s === 'BOST_OPEN' || s === 'Y';
             if (!isOpen) return false;
           } else if (estatusDoc === 'CLOSED') {
             const isClosed = s.includes('CERRADA') || s.includes('VENCIDO') || s === 'C' || s === 'CLOSED' || s === 'BOST_CLOSE' || s === 'N';
             if (!isClosed) return false;
-          }
+          } else if (estatusDoc === 'CANCELED' && !s.includes('CANCELAD')) return false;
         }
+        const discharge = row[currentEntityDef?.medicalDischargeField];
+        if (estatusDoc === 'MEDICAL_DISCHARGE' && discharge != null && discharge !== 'Sí') return false;
+        if (estatusDoc === 'NO_MEDICAL_DISCHARGE' && discharge != null && discharge !== 'No') return false;
       }
 
       // 4. Filtro de clasificación sanitaria (solo si la fila la contiene)
-      if (clasificacionMedica && clasificacionMedica !== 'ALL') {
-        if (row.MedicalClassification != null) {
-          const c = String(row.MedicalClassification || '').toUpperCase();
+      if (hasMedClassField && clasificacionMedica && clasificacionMedica !== 'ALL' && clasificacionMedica !== queryResult.requestedFilters?.clasificacionMedica) {
+        if ('MedicalClassification' in row || 'SecondaryClassification' in row) {
+          const c = `${row.MedicalClassification || ''} ${row.SecondaryClassification || ''}`.toUpperCase();
           if (clasificacionMedica === 'CON' && !(c.includes('CON') || c.includes('CONTROL'))) return false;
           if (clasificacionMedica === 'ANTI' && !(c.includes('ANTI') || c.includes('ANTIBIOT'))) return false;
           if (clasificacionMedica === 'REFRI' && !(c.includes('REFRI') || c.includes('FRIO'))) return false;
@@ -525,7 +683,7 @@ export default function ConsultaServiceLayer() {
         return hay.includes(needle);
       });
     });
-  }, [queryResult, busqueda, almacen, estatusDoc, clasificacionMedica, colFilters]);
+  }, [queryResult, busqueda, almacen, estatusDoc, clasificacionMedica, colFilters, hasWhsField, hasStatusField, hasMedClassField, currentEntityDef]);
 
   // Resetear página a 1 cuando cambie cualquier filtro
   useEffect(() => {
@@ -533,8 +691,8 @@ export default function ConsultaServiceLayer() {
   }, [busqueda, almacen, estatusDoc, clasificacionMedica, colFilters, selectedFields]);
 
   const hasActiveFilters = Boolean(
-    busqueda || (almacen && almacen !== 'ALL') || (estatusDoc && estatusDoc !== 'ALL') || 
-    (clasificacionMedica && clasificacionMedica !== 'ALL') || Object.values(colFilters).some(Boolean)
+    busqueda || (hasWhsField && almacen && almacen !== 'ALL') || (hasStatusField && estatusDoc && estatusDoc !== 'ALL') ||
+    (hasMedClassField && clasificacionMedica && clasificacionMedica !== 'ALL') || Object.values(colFilters).some(Boolean)
   );
 
   const handleClearFilters = () => {
@@ -557,14 +715,16 @@ export default function ConsultaServiceLayer() {
 
     const fmt = (val, col) => {
       if (val == null || val === '') return '';
-      if (col.type === 'date') return new Date(val).toLocaleDateString('es-MX');
-      if (col.type === 'datetime') return new Date(val).toLocaleString('es-MX');
+      if (typeof val === 'boolean') return val ? 'Sí' : 'No';
+      if (col.type === 'date') return formatReportDate(val);
+      if (col.type === 'datetime') return formatReportDate(val, true);
       if (col.type === 'money') return `$${Number(val).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       if (col.type === 'percent') return `${Number(val).toFixed(1)}%`;
       return String(val).replace(/</g, '&lt;').replace(/>/g, '&gt;');
     };
 
     const fechaReporte = new Date().toLocaleString('es-MX');
+    const reportDates = queryResult?.requestedFilters || { fechaDesde, fechaHasta };
     const html = `
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:spreadsheet" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8">
@@ -581,8 +741,10 @@ export default function ConsultaServiceLayer() {
 </style></head><body>
 <table>
   <tr><td colspan="${columns.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
-  <tr><td colspan="${columns.length}" class="subtitle-bar">Reporte Service Layer SAP: ${currentEntityDef?.title || 'Consulta Personalizada'}</td></tr>
-  <tr class="info-row"><td colspan="${columns.length}">Generado por: ${user?.nombre || user?.username} &nbsp;|&nbsp; Período: ${fechaDesde} al ${fechaHasta} &nbsp;|&nbsp; Registros: ${filteredRows.length} &nbsp;|&nbsp; Fecha: ${fechaReporte}</td></tr>
+  <tr><td colspan="${columns.length}" class="subtitle-bar">Reporte de ${entitySource(currentEntityDef)}: ${currentEntityDef?.title || 'Consulta Personalizada'}</td></tr>
+  <tr class="info-row"><td colspan="${columns.length}">Generado por: ${user?.nombre || user?.username} &nbsp;|&nbsp; ${currentEntityDef?.requiresDateFilter ? `${currentEntityDef.dateFieldLabel || 'Período'}: ${reportDates.fechaDesde} al ${reportDates.fechaHasta} &nbsp;|&nbsp; ` : ''}Registros: ${filteredRows.length} &nbsp;|&nbsp; Fecha: ${fechaReporte}</td></tr>
+  ${currentEntityDef?.grain ? `<tr class="info-row"><td colspan="${columns.length}">Cada fila representa: ${fmt(currentEntityDef.grain, {})}</td></tr>` : ''}
+  ${queryResult?.truncated ? `<tr class="info-row"><td colspan="${columns.length}">${fmt(queryResult.message || `Se alcanzó el límite de ${queryResult.limit || rows.length} registros. Reduce el período o los filtros para revisar el resto.`, {})}</td></tr>` : ''}
   <tr><td colspan="${columns.length}" style="height:6px;border:none"></td></tr>
   <tr>${columns.map(c => `<th style="width:${c.width || 120}px">${c.label}</th>`).join('')}</tr>
   ${filteredRows.map((row, i) => `<tr class="${i%2===0?'even':'odd'}">${columns.map(c => {
@@ -600,7 +762,7 @@ export default function ConsultaServiceLayer() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Reporte_SAP_${selectedEntityId}_${fechaDesde}_${fechaHasta}.xls`;
+    a.download = `Reporte_${entitySource(currentEntityDef)}_${selectedEntityId}_${reportDates.fechaDesde}_${reportDates.fechaHasta}.xls`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -608,198 +770,216 @@ export default function ConsultaServiceLayer() {
   };
 
   return (
-    <div style={{ padding: '0.5rem 0', width: '100%', maxWidth: '100%', boxSizing: 'border-box', color: '#1e293b' }}>
+    <div className="report-builder">
       
       {/* ── Encabezado Principal ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '2.2rem' }}>🔌</span>
-            <div>
-              <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#004687', margin: 0, letterSpacing: '-0.02em' }}>
-                Crear Reporte Personalizado
-              </h1>
-              <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.875rem' }}>
-                Constructor visual de reportes a la medida sobre SAP Business One con nombres hospitalarios claros y exportación instantánea.
-              </p>
-            </div>
+      <header className="report-builder__header">
+        <div className="report-builder__intro">
+          <span className="report-builder__hero-icon"><ReportBuilderIcon /></span>
+          <div>
+            <p className="report-builder__eyebrow">Hospital Escandón · Reportes</p>
+            <h1>Crear reporte personalizado</h1>
+            <p className="report-builder__subtitle">{reportMode === 'assistant' ? 'Describe lo que necesitas y crea tu reporte con ayuda del asistente.' : 'Elige un tema, ajusta los filtros y descarga la información que necesitas.'}</p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="report-builder__header-actions">
           <button
+            type="button"
             onClick={() => setShowSavedModal(true)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
-              padding: '0.6rem 1.1rem', background: '#F1F5F9', border: '1px solid #CBD5E1',
-              borderRadius: 8, color: '#334155', fontWeight: 700, fontSize: '0.82rem',
-              cursor: 'pointer', transition: 'all 0.15s ease'
-            }}
+            className="report-builder__button report-builder__button--secondary"
           >
-            📂 Mis Plantillas Guardadas ({savedQueries.length})
+            <ReportBuilderIcon name="folder" /> Mis plantillas guardadas <span className="report-builder__button-count">{savedQueries.length}</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setShowSaveFormModal(true)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
-              padding: '0.6rem 1.1rem', background: '#004687', border: 'none',
-              borderRadius: 8, color: '#fff', fontWeight: 700, fontSize: '0.82rem',
-              cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,70,135,0.25)',
-              transition: 'all 0.15s ease'
-            }}
+            disabled={!currentEntityDef || catalogLoading || (reportMode === 'assistant' && !queryResult)}
+            className="report-builder__button report-builder__button--primary"
           >
-            💾 Guardar Consulta
+            <ReportBuilderIcon name="save" /> Guardar consulta
           </button>
         </div>
+      </header>
+
+      <div className="report-builder__modes" role="group" aria-label="Cómo crear tu reporte">
+        <button type="button" className={`report-builder__mode${reportMode === 'assistant' ? ' is-active' : ''}`} aria-pressed={reportMode === 'assistant'} onClick={() => setReportMode('assistant')}><ReportBuilderIcon name="chat" /> Crear con asistente</button>
+        <button type="button" className={`report-builder__mode${reportMode === 'manual' ? ' is-active' : ''}`} aria-pressed={reportMode === 'manual'} onClick={() => setReportMode('manual')}><ReportBuilderIcon name="grid" /> Elegir un tema</button>
       </div>
 
-      {/* ── Selector de Entidades / Módulos de SAP ── */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            1. Selecciona el Módulo o Tema a Consultar ({filteredCatalog.length} de {catalog.length}):
+      <div hidden={reportMode !== 'assistant'}>
+        <ReportAssistant catalog={userAllowedCatalog} catalogLoading={catalogLoading} catalogError={catalogError} onGenerate={handleAssistantGenerate} onViewReport={showResults} onManual={handleAssistantManual} onReset={resetAssistantReport} />
+      </div>
+
+      {/* ── Selector de módulos y temas de SAP / Vertical ── */}
+      <section hidden={reportMode !== 'manual'} className="report-catalog" aria-label="Módulos y temas disponibles" aria-busy={catalogLoading}>
+        <div className="report-catalog__heading">
+          <div className="report-builder__section-title">
+            <span className="report-builder__step" aria-hidden="true">01</span>
+            <div><h2>Elige qué quieres consultar</h2><p>Busca un tema o explora las categorías.</p></div>
+          </div>
+          {!catalogLoading && !catalogError && <span className="report-catalog__count" role="status">{filteredCatalog.length} de {userAllowedCatalog.length} módulos disponibles</span>}
+        </div>
+
+        {!catalogLoading && !catalogError && userAllowedCatalog.length > 0 && <>
+          <div className="report-catalog__tools">
+            <label className="report-catalog__search">
+              <span>Buscar módulos o temas</span>
+              <span className="report-catalog__search-field"><ReportBuilderIcon name="search" /><input type="search" value={moduleSearch} onChange={event => setModuleSearch(event.target.value)} placeholder="Ej. cuentas, médicos, cirugías, pagos…" /></span>
+            </label>
+            <div className="report-catalog__sources" role="group" aria-label="Fuente de información">
+              <span>Fuente de información</span>
+              <div className="report-catalog__chips">
+                {['ALL', 'SAP', 'Vertical'].map(source => (
+                  <button
+                    type="button" key={source} aria-pressed={activeSource === source}
+                    aria-label={`${source === 'ALL' ? 'Todas las fuentes' : source} (${source === 'ALL' ? searchMatchedCatalog.length : searchMatchedCatalog.filter(entity => entitySource(entity) === source).length})`}
+                    className={`report-catalog__chip${activeSource === source ? ' is-active' : ''}`}
+                    onClick={() => { setActiveSource(source); setActiveCategory('ALL'); }}
+                  >
+                    {source === 'ALL' ? 'Todas' : source}<span className="report-catalog__chip-count">{source === 'ALL' ? searchMatchedCatalog.length : searchMatchedCatalog.filter(entity => entitySource(entity) === source).length}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Selector de Categorías / Tabs */}
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+        </>}
+
+        <div className="report-catalog__layout">
+          {!catalogLoading && !catalogError && userAllowedCatalog.length > 0 && <aside className="report-catalog__categories" aria-label="Categorías de reportes">
+            <div className="report-catalog__category-heading"><ReportBuilderIcon name="grid" /><h3>Categorías</h3></div>
+            <label className="report-catalog__category-select">
+              <span>Filtrar por categoría</span>
+              <select aria-label="Filtrar por categoría" value={activeCategory} onChange={event => setActiveCategory(event.target.value)}>
+                {categories.map(cat => <option key={cat} value={cat}>{cat === 'ALL' ? 'Todos los módulos' : cat} ({cat === 'ALL' ? sourceMatchedCatalog.length : sourceMatchedCatalog.filter(entity => entity.category === cat).length})</option>)}
+              </select>
+            </label>
+            <div className="report-catalog__category-list" role="group" aria-label="Elegir categoría">
             {categories.map(cat => {
               const isCatActive = activeCategory === cat;
-              const count = cat === 'ALL' ? catalog.length : catalog.filter(c => c.category === cat).length;
+              const count = cat === 'ALL' ? sourceMatchedCatalog.length : sourceMatchedCatalog.filter(c => c.category === cat).length;
               return (
                 <button
+                  type="button"
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  style={{
-                    padding: '4px 10px',
-                    fontSize: '0.72rem',
-                    fontWeight: isCatActive ? 800 : 600,
-                    borderRadius: '20px',
-                    border: isCatActive ? '1px solid #0088C9' : '1px solid #CBD5E1',
-                    background: isCatActive ? '#004687' : '#fff',
-                    color: isCatActive ? '#fff' : '#475569',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
+                  aria-pressed={isCatActive}
+                  aria-label={`${cat === 'ALL' ? 'Todos los módulos' : cat} (${count})`}
+                  className={`report-catalog__category${isCatActive ? ' is-active' : ''}`}
                 >
-                  {cat === 'ALL' ? '🌟 Todos los Módulos' : cat} ({count})
+                  <span>{cat === 'ALL' ? 'Todos los módulos' : cat}</span><span className="report-catalog__category-count">{count}</span>
                 </button>
               );
             })}
-          </div>
-        </div>
+            </div>
+          </aside>}
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-          gap: '0.75rem'
-        }}>
+          <div className="report-catalog__content">
+            {!catalogLoading && !catalogError && userAllowedCatalog.length > 0 && <div className="report-catalog__results-heading"><h3 id="report-catalog-results">{moduleSearch.trim() ? 'Resultados de tu búsqueda' : activeCategory === 'ALL' ? 'Temas disponibles' : activeCategory}</h3><span>Selecciona una tarjeta para preparar tu reporte</span></div>}
+            <div className="report-catalog__results" role="region" aria-label="Lista de temas para tu reporte" tabIndex={0} key={`${activeCategory}-${activeSource}-${moduleSearch}`}>
+
+        {catalogLoading ? (
+          <div className="report-catalog__state" role="status">Cargando módulos de SAP y Vertical…</div>
+        ) : catalogError ? (
+          <div className="report-catalog__state" role="alert">
+            <p>{catalogError}</p>
+            <button type="button" className="report-catalog__chip" onClick={() => setCatalogRefresh(value => value + 1)}>Reintentar carga</button>
+          </div>
+        ) : userAllowedCatalog.length === 0 ? (
+          <div className="report-catalog__state" role="status">No hay módulos disponibles para tu usuario. Solicita acceso al área de Sistemas.</div>
+        ) : filteredCatalog.length === 0 ? (
+          <div className="report-catalog__state" role="status">
+            <strong>No hay módulos que coincidan con tu búsqueda y filtros.</strong>
+            <p>Prueba otro tema o vuelve a ver todos los módulos disponibles.</p>
+            <button type="button" className="report-catalog__chip" onClick={() => { setModuleSearch(''); setActiveSource('ALL'); setActiveCategory('ALL'); }}>Limpiar búsqueda de módulos</button>
+          </div>
+        ) : <div className="report-catalog__grid">
           {filteredCatalog.map(ent => {
             const isSelected = ent.id === selectedEntityId;
             return (
-              <div
+              <button
+                type="button"
                 key={ent.id}
                 onClick={() => handleSelectEntity(ent.id)}
-                style={{
-                  background: isSelected ? '#EFF6FF' : '#fff',
-                  border: isSelected ? '2px solid #0088C9' : '1px solid #E2E8F0',
-                  borderRadius: '10px',
-                  padding: '0.9rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  boxShadow: isSelected ? '0 4px 12px rgba(0,136,201,0.15)' : 'none',
-                  position: 'relative'
-                }}
+                aria-label={`Seleccionar módulo: ${ent.title}`}
+                aria-pressed={isSelected}
+                className={`report-catalog__card${isSelected ? ' is-selected' : ''}`}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                  <span style={{ fontSize: '1.3rem' }}>{ent.icon}</span>
-                  <span style={{ fontWeight: 700, fontSize: '0.88rem', color: isSelected ? '#004687' : '#1E293B' }}>
-                    {ent.title}
-                  </span>
-                </div>
-                <div style={{ fontSize: '0.72rem', color: '#64748B', lineHeight: '1.3' }}>
+                <span className="report-catalog__card-top">
+                  <span className={`report-catalog__badge report-catalog__badge--${entitySource(ent).toLowerCase()}`}>{entitySource(ent)}</span>
+                  <span className={`report-catalog__selection${isSelected ? ' is-selected' : ''}`} aria-hidden="true">{isSelected && <ReportBuilderIcon name="check" />}</span>
+                </span>
+                <span className="report-catalog__card-title"><span className="report-catalog__topic-icon"><ReportBuilderIcon name={reportTopicIcon(ent)} /></span><span>{ent.title}</span></span>
+                <span className="report-catalog__description">
                   {ent.description}
-                </div>
-                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '6px', flexWrap: 'wrap' }}>
-                  <span style={{
-                    fontSize: '0.62rem', fontWeight: 600, color: '#0369A1', background: '#E0F2FE',
-                    padding: '2px 6px', borderRadius: '4px'
-                  }}>
-                    {ent.category}
-                  </span>
+                </span>
+                <span className="report-catalog__badges">
+                  <span className="report-catalog__category-label">{ent.category}</span>
                   {ent.requiresDateFilter && (
-                    <span style={{
-                      fontSize: '0.62rem', fontWeight: 700, color: '#B45309', background: '#FEF3C7',
-                      padding: '2px 6px', borderRadius: '4px'
-                    }}>
-                      📅 Fechas obligatorias
-                    </span>
+                    <span className="report-catalog__date-note"><ReportBuilderIcon name="calendar" /> Elegir fechas</span>
                   )}
-                </div>
-              </div>
+                </span>
+              </button>
             );
           })}
+        </div>}
+            </div>
+          </div>
         </div>
-      </div>
+        {!catalogLoading && !catalogError && currentEntityDef && <div className="report-catalog__selected-report">
+          <span className="report-catalog__selected-icon"><ReportBuilderIcon name="check" /></span>
+          <div><span>Reporte seleccionado</span><strong>{currentEntityDef.title}</strong></div>
+          <button type="button" className="report-builder__button report-builder__button--primary" onClick={() => { configurationRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' }); configurationRef.current?.focus({ preventScroll: true }); }}>Configurar reporte <ReportBuilderIcon name="arrow" /></button>
+        </div>}
+      </section>
 
       {/* ── Panel de Configuración de Filtros y Columnas ── */}
       {currentEntityDef && (
-        <div style={{
-          background: '#fff',
-          borderRadius: '12px',
-          border: '1px solid #E2E8F0',
-          padding: '1.25rem',
-          marginBottom: '1.5rem',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '1.4rem' }}>{currentEntityDef.icon}</span>
+        <div hidden={reportMode !== 'manual'} className="report-builder__configuration-panel">
+          <div className="report-builder__configuration-heading">
+            <div className="report-builder__section-title">
+              <span className="report-builder__step" aria-hidden="true">02</span>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#004687' }}>
+                <h3 ref={configurationRef} tabIndex={-1}>
                   {currentEntityDef.title}
                 </h3>
-                <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Configura tus filtros y campos para generar el reporte</span>
+                <p>Elige los filtros y las columnas que quieres incluir.</p>
               </div>
             </div>
 
             <button
-              onClick={handleExecute}
+              type="button"
+              onClick={() => handleExecute()}
               disabled={loading}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-                padding: '0.65rem 1.5rem', background: '#0088C9', border: 'none',
-                borderRadius: 8, color: '#fff', fontWeight: 800, fontSize: '0.9rem',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                boxShadow: '0 4px 14px rgba(0,136,201,0.35)',
-                transition: 'all 0.2s ease'
-              }}
+              className="report-builder__button report-builder__button--primary"
             >
-              {loading ? '⏳ Consultando Service Layer...' : '⚡ Ejecutar Consulta SAP'}
+              <ReportBuilderIcon name="search" /> {loading ? 'Buscando información…' : 'Buscar información'}
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+          {currentEntityDef.grain && <div className="report-builder__grain"><strong>Cada fila representa:</strong> {currentEntityDef.grain}</div>}
+
+          <div className="report-builder__configuration">
             
             {/* Columna Izquierda: Rango de Fechas y Filtros Rápidos */}
             <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-                Filtros de Búsqueda {currentEntityDef.requiresDateFilter && <span style={{ color: '#DC2626' }}>(Fechas Obligatorias)</span>}
+              <div className="report-builder__field-heading">
+                Filtros de búsqueda {currentEntityDef.requiresDateFilter && <span className="report-builder__required-dates">Elige un período</span>}
               </div>
 
               {/* Rango de Fechas */}
               {currentEntityDef.requiresDateFilter ? (
-                <div style={{
-                  background: '#FFFBEB',
-                  border: '1px solid #FDE68A',
-                  borderRadius: '8px', padding: '0.85rem', marginBottom: '0.85rem'
-                }}>
+                <div className="report-builder__dates">
+                  {currentEntityDef.dateFieldLabel && <div className="report-builder__date-label" style={{ marginBottom: '0.5rem', fontWeight: 700, fontSize: '0.78rem' }}>Período según: {currentEntityDef.dateFieldLabel}</div>}
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                     <div style={{ flex: 1, minWidth: '130px' }}>
-                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                      <label htmlFor="report-date-from" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
                         Fecha Desde
                       </label>
                       <input
+                        id="report-date-from"
                         type="date"
                         value={fechaDesde}
                         onChange={(e) => setFechaDesde(e.target.value)}
@@ -807,10 +987,11 @@ export default function ConsultaServiceLayer() {
                       />
                     </div>
                     <div style={{ flex: 1, minWidth: '130px' }}>
-                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                      <label htmlFor="report-date-to" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
                         Fecha Hasta
                       </label>
                       <input
+                        id="report-date-to"
                         type="date"
                         value={fechaHasta}
                         onChange={(e) => setFechaHasta(e.target.value)}
@@ -820,7 +1001,7 @@ export default function ConsultaServiceLayer() {
                   </div>
 
                   {/* Atajos Rápidos de Fecha */}
-                  <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+                  <div className="report-builder__date-shortcuts" style={{ display: 'flex', gap: '0.3rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
                     <button onClick={() => { setFechaDesde(getTodayStr()); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>Hoy</button>
                     <button onClick={() => { setFechaDesde(getDaysAgoStr(7)); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>7 Días</button>
                     <button onClick={() => { setFechaDesde(getMonthStartStr()); setFechaHasta(getTodayStr()); }} style={{ padding: '2px 8px', fontSize: '0.7rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' }}>Este Mes</button>
@@ -830,41 +1011,30 @@ export default function ConsultaServiceLayer() {
                   </div>
                 </div>
               ) : (
-                <div style={{
-                  background: '#F0FDF4',
-                  border: '1px solid #BBF7D0',
-                  borderRadius: '8px', padding: '0.75rem', marginBottom: '0.85rem',
-                  display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#166534'
-                }}>
-                  <span style={{ fontSize: '1.2rem' }}>⚡</span>
+                <div className="report-builder__current-data">
+                  <ReportBuilderIcon name="report" />
                   <div>
-                    <strong>Catálogo en Vivo:</strong> Muestra las existencias y datos actualizados en tiempo real sin requerir rango de fechas.
+                    <strong>Información actual:</strong> Puedes consultar este tema sin elegir fechas.
                   </div>
                 </div>
               )}
 
               {/* Filtros de Almacén, Estatus, Clasificación y Búsqueda */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                    Almacén {!hasWhsField && <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>(N/A)</span>}
+              <div className="report-builder__filters">
+                {hasWhsField && <div>
+                  <label htmlFor="report-warehouse" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                    Almacén
                   </label>
                   <select
-                    disabled={!hasWhsField}
-                    value={hasWhsField ? almacen : 'ALL'}
+                    id="report-warehouse"
+                    value={almacen}
                     onChange={(e) => setAlmacen(e.target.value)}
                     style={{
                       width: '100%', padding: '0.45rem', borderRadius: '6px',
                       border: '1px solid #cbd5e1', fontSize: '0.82rem',
-                      background: !hasWhsField ? '#F8FAFC' : '#fff',
-                      color: !hasWhsField ? '#94A3B8' : '#1e293b',
-                      cursor: !hasWhsField ? 'not-allowed' : 'pointer'
+                      background: '#fff', color: '#1e293b', cursor: 'pointer'
                     }}
                   >
-                    {!hasWhsField ? (
-                      <option value="ALL">No aplica a este módulo</option>
-                    ) : (
-                      <>
                         <option value="ALL">Todos los Almacenes</option>
                         <option value="FAR">Farmacia Central (FAR)</option>
                         <option value="QX">Quirófano General (QX)</option>
@@ -879,73 +1049,55 @@ export default function ConsultaServiceLayer() {
                         <option value="QXCM">Quirófano Código Mater (QXCM)</option>
                         <option value="URG1CM">Urgencias 1 Código Mater (URG1CM)</option>
                         <option value="ALG">Almacén General (ALG)</option>
-                      </>
-                    )}
                   </select>
-                </div>
+                </div>}
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                    Estatus Documento {!hasStatusField && <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>(N/A)</span>}
+                {hasStatusField && <div>
+                  <label htmlFor="report-status" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                    {currentEntityDef.statusLabel || 'Estado del registro'}
                   </label>
                   <select
-                    disabled={!hasStatusField}
-                    value={hasStatusField ? estatusDoc : 'ALL'}
+                    id="report-status"
+                    value={estatusDoc}
                     onChange={(e) => setEstatusDoc(e.target.value)}
                     style={{
                       width: '100%', padding: '0.45rem', borderRadius: '6px',
                       border: '1px solid #cbd5e1', fontSize: '0.82rem',
-                      background: !hasStatusField ? '#F8FAFC' : '#fff',
-                      color: !hasStatusField ? '#94A3B8' : '#1e293b',
-                      cursor: !hasStatusField ? 'not-allowed' : 'pointer'
+                      background: '#fff', color: '#1e293b', cursor: 'pointer'
                     }}
                   >
-                    {!hasStatusField ? (
-                      <option value="ALL">No aplica a este módulo</option>
-                    ) : (
-                      <>
-                        <option value="ALL">Todos los Estatus</option>
-                        <option value="OPEN">Solo Abiertos / Pendientes / Activos</option>
-                        <option value="CLOSED">Solo Cerrados / Vencidos</option>
-                      </>
-                    )}
+                    {(currentEntityDef.statusOptions || [{ value: 'ALL', label: 'Todos los estados' }, { value: 'OPEN', label: 'Abiertos / Pendientes / Activos' }, { value: 'CLOSED', label: 'Cerrados / Vencidos' }]).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
-                </div>
+                  {currentEntityDef.statusDescription && <p className="report-builder__status-note">{currentEntityDef.statusDescription}</p>}
+                </div>}
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                    Clasificación Sanitaria {!hasMedClassField && <span style={{ color: '#94a3b8', fontWeight: 'normal' }}>(N/A)</span>}
+                {hasMedClassField && <div>
+                  <label htmlFor="report-classification" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                    Clasificación Sanitaria
                   </label>
                   <select
-                    disabled={!hasMedClassField}
-                    value={hasMedClassField ? clasificacionMedica : 'ALL'}
+                    id="report-classification"
+                    value={clasificacionMedica}
                     onChange={(e) => setClasificacionMedica(e.target.value)}
                     style={{
                       width: '100%', padding: '0.45rem', borderRadius: '6px',
                       border: '1px solid #cbd5e1', fontSize: '0.82rem',
-                      background: !hasMedClassField ? '#F8FAFC' : '#fff',
-                      color: !hasMedClassField ? '#94A3B8' : '#1e293b',
-                      cursor: !hasMedClassField ? 'not-allowed' : 'pointer'
+                      background: '#fff', color: '#1e293b', cursor: 'pointer'
                     }}
                   >
-                    {!hasMedClassField ? (
-                      <option value="ALL">No aplica a este módulo</option>
-                    ) : (
-                      <>
                         <option value="ALL">Todas las Clasificaciones</option>
                         <option value="CON">Controlados (Grupo I, II, III)</option>
                         <option value="ANTI">Antibióticos (Grupo IV)</option>
                         <option value="REFRI">Red Fría / Refrigerados</option>
-                      </>
-                    )}
                   </select>
-                </div>
+                </div>}
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
-                    Búsqueda de Texto
+                  <label htmlFor="report-record-search" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '3px' }}>
+                    Buscar en los registros
                   </label>
                   <input
+                    id="report-record-search"
                     type="text"
                     placeholder="Código, nombre, médico, proveedor..."
                     value={busqueda}
@@ -958,51 +1110,28 @@ export default function ConsultaServiceLayer() {
 
             {/* Columna Derecha: Selector de Campos / Columnas */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-                  Columnas a Incluir ({selectedFields.length} seleccionadas)
+              <div className="report-builder__field-heading">
+                <span>
+                  Columnas del reporte <span className="report-catalog__category-count">{selectedFields.length}</span>
                 </span>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <button onClick={selectAllFields} style={{ fontSize: '0.68rem', background: 'none', border: 'none', color: '#0088C9', cursor: 'pointer', fontWeight: 700 }}>Todos</button>
-                  <span style={{ color: '#cbd5e1' }}>|</span>
-                  <button onClick={selectDefaultFields} style={{ fontSize: '0.68rem', background: 'none', border: 'none', color: '#0088C9', cursor: 'pointer', fontWeight: 700 }}>Recomendados</button>
+                <div className="report-builder__field-actions">
+                  <button type="button" onClick={selectAllFields}>Todas</button>
+                  <button type="button" onClick={selectDefaultFields}>Recomendadas</button>
                 </div>
               </div>
 
-              <div style={{
-                maxHeight: '190px',
-                overflowY: 'auto',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
-                padding: '0.6rem',
-                background: '#F8FAFC',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: '0.4rem'
-              }}>
+              <div className="report-builder__fields">
                 {currentEntityDef.fields.map(f => {
                   const isChecked = selectedFields.includes(f.key);
                   return (
                     <label
                       key={f.key}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                        padding: '3px 6px',
-                        borderRadius: '4px',
-                        background: isChecked ? '#EFF6FF' : 'transparent',
-                        color: isChecked ? '#004687' : '#334155',
-                        fontWeight: isChecked ? 700 : 500
-                      }}
+                      className={`report-builder__field${isChecked ? ' is-checked' : ''}`}
                     >
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggleField(f.key)}
-                        style={{ accentColor: '#0088C9' }}
                       />
                       <span>{f.label}</span>
                     </label>
@@ -1017,19 +1146,19 @@ export default function ConsultaServiceLayer() {
 
       {/* ── Mensajes de Alerta / Error ── */}
       {error && (
-        <div style={{
+        <div role="alert" style={{
           background: '#FEE2E2', border: '1px solid #F87171', color: '#991B1B',
           padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontWeight: 600,
           display: 'flex', alignItems: 'center', gap: '0.5rem'
         }}>
           <span>⚠️</span>
-          <div>{error}</div>
+          <div>{userMessage(error)}</div>
         </div>
       )}
 
       {/* ── Panel de Resultados ── */}
       {queryResult && (
-        <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 8px -2px rgba(0,0,0,0.05)' }}>
+        <div ref={resultsRef} tabIndex={-1} aria-label="Reporte generado" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 8px -2px rgba(0,0,0,0.05)', scrollMarginTop: '100px' }}>
           
           {/* Barra de Acciones del Resultado */}
           <div style={{
@@ -1044,14 +1173,15 @@ export default function ConsultaServiceLayer() {
           }}>
             <div>
               <div style={{ fontWeight: 800, color: '#004687', fontSize: '1.05rem' }}>
-                {queryResult.entityTitle} ({filteredRows.length.toLocaleString('es-MX')} registros{filteredRows.length !== rows.length ? ` filtrados de ${rows.length.toLocaleString('es-MX')}` : ''})
+                {queryResult.entityTitle} ({filteredRows.length.toLocaleString('es-MX')} {filteredRows.length === 1 ? 'registro' : 'registros'}{filteredRows.length !== rows.length ? ` ${filteredRows.length === 1 ? 'filtrado' : 'filtrados'} de ${rows.length.toLocaleString('es-MX')}` : ''})
               </div>
               <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                Consulta ejecutada en tiempo real contra SAP Service Layer • {columns.length} columnas visibles
+                Información de {entitySource(currentEntityDef)} · {columns.length} columnas visibles
+                {currentEntityDef?.requiresDateFilter && queryResult.requestedFilters && <> · {formatReportDate(queryResult.requestedFilters.fechaDesde)} al {formatReportDate(queryResult.requestedFilters.fechaHasta)}</>}
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               {hasActiveFilters && (
                 <button
                   onClick={handleClearFilters}
@@ -1082,6 +1212,8 @@ export default function ConsultaServiceLayer() {
               </button>
             </div>
           </div>
+
+          {queryResult.truncated && <div className="report-builder__limit" role="status">{queryResult.message || `Se alcanzó el límite de ${Number(queryResult.limit || rows.length).toLocaleString('es-MX')} registros. Reduce el período o los filtros para revisar el resto.`}</div>}
 
           {/* Tarjetas de Métricas KPI Dinámicas */}
           {queryResult.kpis && queryResult.kpis.length > 0 && (
@@ -1131,12 +1263,12 @@ export default function ConsultaServiceLayer() {
 
           {loading ? (
             <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-              <PremiumLoader text="Obteniendo datos de Service Layer..." />
+              <PremiumLoader text="Cargando información…" />
             </div>
           ) : rows.length === 0 ? (
             <div style={{ padding: '4rem 2rem', textAlign: 'center', color: '#64748B' }}>
               <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>📭</div>
-              <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>No se encontraron registros en SAP para este período</div>
+              <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>No se encontraron registros en {entitySource(currentEntityDef)} con estos filtros</div>
               <p style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>Prueba ampliando el rango de fechas o cambiando los filtros.</p>
             </div>
           ) : (
@@ -1184,6 +1316,10 @@ export default function ConsultaServiceLayer() {
                         if (val == null || val === '') {
                           formattedVal = '-';
                           cellStyle.color = '#94A3B8';
+                        } else if (typeof val === 'boolean') {
+                          formattedVal = val ? 'Sí' : 'No';
+                        } else if (col.type === 'date' || col.type === 'datetime') {
+                          formattedVal = formatReportDate(val, col.type === 'datetime');
                         } else if (col.type === 'money') {
                           formattedVal = `$${Number(val).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                           cellStyle.fontWeight = 700;
@@ -1320,7 +1456,7 @@ export default function ConsultaServiceLayer() {
                         )}
                         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '6px' }}>
                           <span style={{ fontSize: '0.68rem', background: '#E0F2FE', color: '#0369A1', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                            Módulo: {sq.entity}
+                            Sección: {catalog.find(section => section.id === sq.entity)?.title || 'Consulta guardada'}
                           </span>
                           <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>
                             Por: {sq.username} | {new Date(sq.createdAt).toLocaleDateString()}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, Cell } from 'recharts';
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell } from 'recharts';
+import DashboardChart from './DashboardChart';
 import { API_BASE } from '../../api/config';
 import PremiumLoader from '../shared/PremiumLoader';
 import ExportToolbar from '../shared/ExportToolbar';
@@ -77,17 +78,17 @@ export default function DashboardAuxiliaresNativo({ type, globalFilters, globalT
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-      <PremiumLoader text={`Sincronizando Módulo ${title}...`} />
+      <PremiumLoader text={`Cargando información de ${title}...`} />
     </div>
   );
 
 
 
   return (
-    <div className="fade-in" id={`dashboard-${type}-siti`}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
-          Módulo {title}
+    <div className="fade-in area-native-dashboard dashboard-view" id={`dashboard-${type}-siti`}>
+      <div className="area-native-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h2 className="area-text-primary" style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827' }}>
+          Actividad de {title}
         </h2>
         <ExportToolbar 
           targetId={`dashboard-${type}-siti`} 
@@ -99,62 +100,63 @@ export default function DashboardAuxiliaresNativo({ type, globalFilters, globalT
         />
       </div>
       {/* KPIs Rápidos */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: `5px solid ${colorBase}` }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Volumen de Estudios (Histórico)</h3>
-          <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatNumber(totalVolumen)}</p>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: `5px solid ${colorBase}` }}>
+          <h3 className="area-metric-label area-metric-note dashboard-metric-label" style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Estudios realizados</h3>
+          <p className="area-metric-value dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatNumber(totalVolumen)}</p>
+          <p className="dashboard-metric-note">En el periodo seleccionado</p>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: `5px solid #10B981` }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresos {title} (SAP)</h3>
-          <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#10B981', marginTop: '0.5rem' }}>{formatMoney(totalIngresosSAP)}</p>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: `5px solid #10B981` }}>
+          <h3 className="area-metric-label area-metric-note dashboard-metric-label" style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresos de {title}</h3>
+          <p className="area-metric-value area-metric-value--positive dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#10B981', marginTop: '0.5rem' }}>{formatMoney(totalIngresosSAP)}</p>
+          <p className="dashboard-metric-note">Monto registrado en pesos</p>
         </div>
 
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', marginBottom: '2rem' }}>
+      <div className="area-chart-grid area-chart-grid--single" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', marginBottom: '2rem' }}>
         {/* Gráfica de Tendencia Anual */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Tendencia de Estudios e Ingresos (Mensual)</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={aggregatedAnual}>
-                <defs>
-                  <linearGradient id={`colorIngresos${type}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={colorAux} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={colorAux} stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
+        <div className="area-panel dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Estudios e ingresos por mes</h3>
+          <p className="dashboard-chart-description">Compara la actividad de cada mes y los ingresos registrados.</p>
+          <div className="dashboard-chart-key">
+            <span><i style={{ background: 'var(--chart-1)' }} aria-hidden="true" />Estudios · escala izquierda</span>
+            <span><i style={{ background: 'var(--chart-2)' }} aria-hidden="true" />Ingresos en pesos · escala derecha</span>
+          </div>
+          <div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
+              <ComposedChart data={aggregatedAnual} margin={{ top: 18, right: 8, left: 0, bottom: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                 <XAxis dataKey="label" tick={{fontSize: 10}} tickMargin={10} />
-                <YAxis yAxisId="left" tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} tick={{fontSize: 10}} />
-                <YAxis yAxisId="right" orientation="right" tickFormatter={(val) => `$${(val/1000000).toFixed(1)}M`} tick={{fontSize: 10}} />
+                <YAxis yAxisId="left" width={55} tickFormatter={formatNumber} tick={{fontSize: 12}} />
+                <YAxis yAxisId="right" width={74} orientation="right" tickFormatter={(val) => val >= 1000000 ? `$${(val/1000000).toFixed(1)}M` : `$${(val/1000).toFixed(0)}k`} tick={{fontSize: 12}} />
                 <Tooltip 
                   formatter={(value, name) => {
                     if (name.includes('Ingresos')) return [formatMoney(value), name];
                     return [formatNumber(value), name];
                   }} 
                 />
-                <Legend />
-                <Bar yAxisId="left" dataKey="volumen" name={`Volumen de ${title}`} fill={colorBase} radius={[4, 4, 0, 0]} />
-                <Area yAxisId="right" type="monotone" dataKey="ingresosSAP" name="Ingresos (SAP)" stroke="#10B981" strokeWidth={3} fillOpacity={0.4} fill="#10B981" />
-              </AreaChart>
-            </ResponsiveContainer>
+                <Bar yAxisId="left" dataKey="volumen" name="Estudios realizados" fill={colorBase} maxBarSize={40} radius={[6, 6, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="ingresosSAP" name="Ingresos" stroke="#10B981" strokeWidth={3} dot={{ r: 3, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+              </ComposedChart>
+            </DashboardChart>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+      <div className="area-chart-grid area-chart-grid--single" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
         {/* Top Estudios */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Top 10 {topLabel} Solicitados</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={data.topEstudios} margin={{ left: 80 }}>
+        <div className="area-panel dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>{topLabel} más solicitados</h3>
+          <p className="dashboard-chart-description">Cantidad registrada para cada servicio en el periodo seleccionado.</p>
+          <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
+              <BarChart layout="vertical" data={data.topEstudios} margin={{ left: 0, right: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
                 <XAxis type="number" tick={{fontSize: 10}} />
-                <YAxis dataKey="procedimiento" type="category" width={180} tick={{fontSize: 9}} />
+                <YAxis dataKey="procedimiento" type="category" width={180} tick={{fontSize: 11}} />
                 <Tooltip formatter={(value) => formatNumber(value)} />
                 <Bar dataKey="cantidad" name="Volumen" fill={colorBase} radius={[0, 4, 4, 0]}>
                   {data.topEstudios.map((entry, index) => (
@@ -162,8 +164,8 @@ export default function DashboardAuxiliaresNativo({ type, globalFilters, globalT
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
-          </div>
+            </DashboardChart>
+          </div></div>
         </div>
       </div>
     </div>

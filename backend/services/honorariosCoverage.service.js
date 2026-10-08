@@ -1,5 +1,7 @@
 'use strict';
 
+const { isExcludedHonorariosService } = require('../utils/honorariosScope');
+
 const numberOrNull = value => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
 const roundMoney = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
@@ -19,8 +21,8 @@ const APPOINTMENT_RECOVERY_SQL = `
   SELECT a.PCAPNum, a.PCNum, a.SONum, a.FromDate FechaAtencion, a.PCAP_ST,
     a.UDF_Ejecutada, a.ItemCode, a.PRNum, p.FullName Medico, p.UDF_TIPO_MEDICO,
     p.UDF_ISR, p.UDF_IVA, ms.MSDescription_ES Especialidad,
-    pt.FullName Paciente, so.SO_ST, t.TariffCount, t.Fee, t.Description,
-    rt.MinVatRate, rt.MaxVatRate, rt.ItemGroupName,
+    pt.FullName Paciente, so.SO_ST, so.PCNum OrderPCNum, t.TariffCount, t.Fee, t.Description,
+    rt.MinVatRate, rt.MaxVatRate, COALESCE(rt.ItemGroupName, item.ItemGroupName) ItemGroupName,
     CASE WHEN a.PTID IS NULL AND a.PTNum IS NULL THEN 1 ELSE 0 END MissingPatient,
     (SELECT COUNT(*) FROM PCAP x
       WHERE x.PCAPNum<>a.PCAPNum AND x.PRNum=a.PRNum
@@ -42,17 +44,23 @@ const APPOINTMENT_RECOVERY_SQL = `
   LEFT JOIN SO so ON so.SONum=a.SONum
   LEFT JOIN Tariff t ON t.ITEMCODE=a.ItemCode
   LEFT JOIN RecordedTax rt ON rt.Medico=p.FullName AND rt.ItemCode=a.ItemCode
+  OUTER APPLY (SELECT MIN(v.ItemGroupName) ItemGroupName FROM V_IT v WHERE v.ItemCode=a.ItemCode) item
   WHERE a.FromDate >= @startDate AND a.FromDate < DATEADD(day,1,CAST(@endDate AS date))
     AND NULLIF(LTRIM(RTRIM(a.ItemCode)),'') IS NOT NULL
+    AND (COALESCE(rt.ItemGroupName, item.ItemGroupName) IS NULL
+      OR LTRIM(RTRIM(COALESCE(rt.ItemGroupName, item.ItemGroupName))) COLLATE Latin1_General_CI_AI
+        NOT IN ('ALMACEN GENERAL', 'FARMACIA', 'LABORATORIO', 'ESTUDIOS DE LABORATORIO', 'IMAGENOLOGIA'))
     AND NOT EXISTS (SELECT 1 FROM SOLN l WHERE l.SONum=a.SONum)
     AND NOT EXISTS (SELECT 1 FROM UDR_HON_PAGO v WHERE v.UDRKey=CONCAT('CITA-',a.PCAPNum))
   ORDER BY a.FromDate,a.PCAPNum`;
 
 function mergeRecoveredAppointments(originalRows, candidates) {
-  const rows = originalRows.map(row => ({ ...row, FuenteHonorario: 'Liquidación clínica' }));
-  const coverage = { candidates: candidates.length, recoveredAppointments: 0, recoveredBase: 0, pendingAppointments: 0, duplicateCandidates: 0 };
+  const rows = originalRows.filter(row => !isExcludedHonorariosService(row))
+    .map(row => ({ ...row, FuenteHonorario: 'Liquidación clínica' }));
+  const scopedCandidates = candidates.filter(candidate => !isExcludedHonorariosService(candidate));
+  const coverage = { candidates: scopedCandidates.length, recoveredAppointments: 0, recoveredBase: 0, pendingAppointments: 0, duplicateCandidates: 0 };
   const seen = new Set();
-  for (const candidate of candidates) {
+  for (const candidate of scopedCandidates) {
     const key = `CITA-${candidate.PCAPNum}`;
     const existing = rows.filter(row => String(row.UDRKey) === key);
     // Un renglón con concepto ya está representado: no agregar otro ni cambiarlo.
@@ -91,7 +99,9 @@ function mergeRecoveredAppointments(originalRows, candidates) {
       : `${issues.join('. ') || 'Revisar identidad y realización de la cita'}. Requiere decisión del revisor.`;
     const row = {
       ...original, UDRKey: key, RenglonAuditoria: original?.RenglonAuditoria ?? 1,
-      FolioAtencion: candidate.PCAPNum, FolioCita: candidate.PCAPNum,
+      FolioReferenciaOrigen: candidate.PCAPNum,
+      FolioAtencion: numberOrNull(candidate.PCNum) || numberOrNull(candidate.OrderPCNum) || null,
+      FolioCita: candidate.PCAPNum,
       FechaAtencion: candidate.FechaAtencion, FolioOrdenVenta: candidate.SONum,
       OrigenRenglon: 'CITA_REALIZADA_SIN_ORDEN', FuenteHonorario: 'Cita sin orden de venta',
       EstadoVertical: null,

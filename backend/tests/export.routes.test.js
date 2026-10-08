@@ -24,7 +24,7 @@ describe('POST /api/export/convert-json', () => {
   test('400 si falta la URL', async () => {
     const res = await request(app).post('/api/export/convert-json').send({});
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/URL es requerida/i);
+    expect(res.body.error).toMatch(/Pega el enlace de los datos/i);
   });
 
   test('400 si la URL apunta a red interna (SSRF bloqueado)', async () => {

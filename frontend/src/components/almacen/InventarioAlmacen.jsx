@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../../api/config';
@@ -49,13 +50,13 @@ export default function InventarioAlmacen() {
       const json = await response.json();
       
       if (!response.ok || !json.ok) {
-        throw new Error(json.error || 'Error al obtener inventario desde SAP');
+        throw new Error(userMessage(json.error || 'Error al obtener inventario desde SAP'));
       }
       
       setItems(json.data || []);
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      setError(userMessage(err.message));
     } finally {
       setLoading(false);
     }
@@ -75,7 +76,7 @@ export default function InventarioAlmacen() {
       if (response.ok && json.ok) {
         setHistoryData(json.data || []);
       } else {
-        alert('Error al cargar historial: ' + (json.error || 'Revise que la vista exista en SAP.'));
+        alert(userMessage('Error al cargar historial: ' + (json.error || 'Intenta de nuevo en unos minutos.')));
       }
     } catch (err) {
       console.error(err);
@@ -96,7 +97,7 @@ export default function InventarioAlmacen() {
       if (response.ok && json.ok) {
         setLocations(json.data || []);
       } else {
-        alert('Error al cargar ubicaciones: ' + json.error);
+        alert(userMessage('Error al cargar ubicaciones: ' + json.error));
       }
     } catch (err) {
       console.error(err);
@@ -133,7 +134,7 @@ export default function InventarioAlmacen() {
     const cols = [
       { header: 'ItemCode', key: 'ItemCode', width: 100 },
       { header: 'Descripción', key: 'ItemName', width: 300 },
-      { header: 'Stock Actual', key: 'QuantityOnStock', width: 100, align: 'center' },
+      { header: 'Existencias actuales', key: 'QuantityOnStock', width: 100, align: 'center' },
       { header: 'Costo Unitario ($)', key: 'PurchaseCost', width: 120, align: 'right' }
     ];
 
@@ -151,7 +152,7 @@ export default function InventarioAlmacen() {
   .critico{color:#dc2626;font-weight:bold;}
 </style></head><body>
 <table>
-  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN - PLATAFORMA BI</td></tr>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
   <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte: Sugerencias de Reabastecimiento - Almacén</td></tr>
   <tr class="info-row"><td colspan="${cols.length}">Fecha de exportación: ${fechaReporte} &nbsp;|&nbsp; Artículos Críticos: ${lowStockItems.length}</td></tr>
   <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
@@ -218,14 +219,14 @@ export default function InventarioAlmacen() {
               transition: 'background 0.2s'
             }}
           >
-            {loading ? 'Sincronizando...' : '↻ Refrescar SAP'}
+            {loading ? 'Actualizando…' : '↻ Actualizar inventario'}
           </button>
         </div>
       </header>
 
       {error && (
         <div style={{ padding: '1rem', background: '#fef2f2', borderLeft: '4px solid #ef4444', color: '#991b1b', marginBottom: '2rem', borderRadius: '4px' }}>
-          <strong>Error de Conexión: </strong> {error}
+          <strong>Error de Conexión: </strong> {userMessage(error)}
         </div>
       )}
 
@@ -238,7 +239,7 @@ export default function InventarioAlmacen() {
             Catálogo Activo (Top 500)
           </h3>
           <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#0f172a' }}>
-            {loading ? '...' : totalItems.toLocaleString()} <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 'normal' }}>SKUs</span>
+            {loading ? '...' : totalItems.toLocaleString()} <span style={{ fontSize: '1rem', color: '#94a3b8', fontWeight: 'normal' }}>código de producto</span>
           </div>
         </div>
 
@@ -349,11 +350,11 @@ export default function InventarioAlmacen() {
                 <th style={{ padding: '1rem 1.25rem', borderBottom: '2px solid #e2e8f0' }}>ItemCode</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem' }}>Descripción SAP</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem' }}>Grupo / Laboratorio</th>
-                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Stock Actual</th>
+                <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Existencias actuales</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Costo Compra</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Precio Venta</th>
                 <th style={{ padding: '1rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '600', fontSize: '0.85rem', textAlign: 'right' }}>Margen / Utilidad</th>
-                <th style={{ padding: '1rem 1.25rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center' }}>Estatus</th>
+                <th style={{ padding: '1rem 1.25rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center' }}>Estado</th>
                 <th style={{ padding: '1rem 1.25rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center' }}>Acciones</th>
                 <th style={{ padding: 0, minWidth: '2rem', borderBottom: '2px solid #e2e8f0' }}></th>
               </tr>
@@ -364,7 +365,7 @@ export default function InventarioAlmacen() {
                   <td colSpan="9" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                       <div className="spinner" style={{ border: '4px solid #f3f3f3', borderTop: '4px solid #3b82f6', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }}></div>
-                      Conectando con SAP Service Layer...
+                      Cargando inventario…
                     </div>
                   </td>
                 </tr>
@@ -533,13 +534,13 @@ export default function InventarioAlmacen() {
                   <tr>
                     <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569' }}>ItemCode</th>
                     <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569' }}>Descripción</th>
-                    <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Stock Actual</th>
+                    <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Existencias actuales</th>
                   </tr>
                 </thead>
                 <tbody>
                   {lowStockItems.length === 0 ? (
                     <tr>
-                      <td colSpan="3" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No hay artículos bajo stock. ¡Todo excelente!</td>
+                      <td colSpan="3" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No hay productos con pocas existencias.</td>
                     </tr>
                   ) : (
                     lowStockItems.map((item, i) => (
@@ -579,7 +580,7 @@ export default function InventarioAlmacen() {
                   <thead style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
                     <tr>
                       <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569' }}>Código Almacén</th>
-                      <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Stock Disponible</th>
+                      <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Existencias disponibles</th>
                     </tr>
                   </thead>
                   <tbody>

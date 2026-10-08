@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend } from 'recharts';
+import DashboardChart from './DashboardChart';
 import { apiFetch } from '../../api/client';
 import PremiumLoader from '../shared/PremiumLoader';
 import DashboardSitiCirugias from './DashboardSitiCirugias';
@@ -79,7 +80,7 @@ export default function DashboardSiti() {
   );
 
   return (
-    <div className="dashboard-container fade-in">
+    <div className="dashboard-container fade-in dashboard-view">
       <header className="dashboard-header" style={{ marginBottom: '2rem' }}>
         <h1 className="text-4xl font-bold" style={{ color: '#09152b' }}>
           Legado SITI <span className="text-xl font-normal text-slate-500">(2010 - 2025)</span>
@@ -280,34 +281,34 @@ export default function DashboardSiti() {
             />
           </div>
           {/* KPIs Rápidos */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #2563EB' }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresos Históricos</h3>
-          <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatMoney(totalIngresos)}</p>
+        <div className="dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #2563EB' }}>
+          <h3 className="dashboard-metric-label" style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresos Históricos</h3>
+          <p className="dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatMoney(totalIngresos)}</p>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #10B981' }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Utilidad Operativa (Real)</h3>
-          <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatMoney(totalUtilidad)}</p>
+        <div className="dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #10B981' }}>
+          <h3 className="dashboard-metric-label" style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Utilidad Operativa (Real)</h3>
+          <p className="dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatMoney(totalUtilidad)}</p>
           <p style={{ fontSize: '0.85rem', color: '#10B981', marginTop: '0.2rem' }}>
             {((totalUtilidad / totalIngresos) * 100).toFixed(1)}% Margen Promedio
           </p>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #8B5CF6' }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pacientes Atendidos</h3>
-          <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{new Intl.NumberFormat().format(totalPacientes)}</p>
+        <div className="dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #8B5CF6' }}>
+          <h3 className="dashboard-metric-label" style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pacientes Atendidos</h3>
+          <p className="dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{new Intl.NumberFormat().format(totalPacientes)}</p>
         </div>
 
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+      <div className="dashboard-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
         {/* Gráfica Financiera SITI */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Crecimiento Financiero (SITI)</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
               <AreaChart data={aggregatedAnualFinanzas}>
                 <defs>
                   <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
@@ -327,15 +328,15 @@ export default function DashboardSiti() {
                 <Area type="monotone" dataKey="Ingresos" stroke="#2563EB" strokeWidth={3} fillOpacity={1} fill="url(#colorIngresos)" />
                 <Area type="monotone" dataKey="Utilidad" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorUtilidad)" />
               </AreaChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Gráfica de Pacientes SITI */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Volumen de Pacientes por Género</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
               <BarChart data={aggregatedAnualPacientes}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                 <XAxis dataKey="Yr" tick={{fontSize: 10}} tickMargin={10} minTickGap={30} />
@@ -345,7 +346,7 @@ export default function DashboardSiti() {
                 <Bar dataKey="mujeres" name="Mujeres" stackId="a" fill="#EC4899" radius={[0, 0, 4, 4]} />
                 <Bar dataKey="hombres" name="Hombres" stackId="a" fill="#3B82F6" radius={[4, 4, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
       </div>

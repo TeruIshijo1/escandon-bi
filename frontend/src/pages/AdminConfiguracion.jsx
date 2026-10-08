@@ -1,3 +1,4 @@
+import { userMessage } from '../utils/userMessages';
 /**
  * AdminConfiguracion.jsx — Configuración del sistema
  * Hospital Escandón BI Platform v4.0
@@ -46,15 +47,15 @@ function JsonUploader({ label, onUpload }) {
 
       if (!res.ok) {
         const errorJson = await res.json().catch(() => ({}));
-        throw new Error(errorJson.error || `Error del servidor (${res.status})`);
+        throw new Error(userMessage(errorJson.error || `Error del servidor (${res.status})`));
       }
 
       const json = await res.json();
       if (json.ok) onUpload(json.filePath);
-      else alert('Error al subir: ' + json.error);
+      else alert(userMessage('Error al subir: ' + json.error));
     } catch (err) {
       console.error('Upload error:', err);
-      alert('Error al subir archivo JSON: ' + err.message);
+      alert(userMessage('No se pudo cargar el archivo de datos: ' + err.message));
     } finally {
       setUploading(false);
     }
@@ -90,15 +91,15 @@ function FileUploader({ label, value, onUpload, accept }) {
 
       if (!res.ok) {
         const errorJson = await res.json().catch(() => ({}));
-        throw new Error(errorJson.error || `Error del servidor (${res.status})`);
+        throw new Error(userMessage(errorJson.error || `Error del servidor (${res.status})`));
       }
 
       const json = await res.json();
       if (json.ok) onUpload(json.filename);
-      else alert('Error al subir: ' + json.error);
+      else alert(userMessage('Error al subir: ' + json.error));
     } catch (err) {
       console.error('Upload error:', err);
-      alert('Error al subir archivo: ' + err.message);
+      alert(userMessage('Error al subir archivo: ' + err.message));
     } finally {
       setUploading(false);
     }
@@ -211,7 +212,7 @@ export default function AdminConfiguracion() {
         setTimeout(() => setToast(''), 3000);
       }
     } catch (err) {
-      alert(err.message);
+      alert(userMessage(err.message));
     } finally {
       setKPISaving(false);
     }
@@ -306,7 +307,7 @@ export default function AdminConfiguracion() {
       <div style={{ background: '#FFFFFF', borderRadius: 16, padding: '1.75rem 1.5rem', marginBottom: '2rem', border: '1px solid rgba(0,70,135,0.05)', boxShadow: 'var(--shadow-xs)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.65rem', borderBottom: '1px solid rgba(0,70,135,0.06)' }}>
           <div>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-azul-fuerte)', margin: 0, letterSpacing: '-0.01em' }}>🎛️ Configuración de KPIs e Indicadores</h2>
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-azul-fuerte)', margin: 0, letterSpacing: '-0.01em' }}>🎛️ Configuración de Indicadores e Indicadores</h2>
             <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: '0.2rem 0 0', fontFamily: 'var(--font-body)', fontWeight: 500 }}>Alinee títulos personalizados y reportes interactivos correspondientes a cada celda de datos.</p>
           </div>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-azul-claro)', background: 'rgba(0,136,201,0.08)', padding: '0.25rem 0.75rem', borderRadius: 100, fontFamily: 'var(--font-mono)' }}>
@@ -412,12 +413,12 @@ export default function AdminConfiguracion() {
                             type="url"
                             value={kpiEditForm.jsonApiUrl}
                             onChange={e => setKPIEditForm(f => ({ ...f, jsonApiUrl: e.target.value }))}
-                            placeholder="JSON API URL: https://..."
+                            placeholder="Enlace de los datos: https://…"
                             className="config-input-field"
                             style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: 8, padding: '0.45rem 0.75rem', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', outline: 'none', background: '#F8FAFC' }}
                           />
                           <JsonUploader 
-                            label="O subir Archivo JSON (Data estática):" 
+                            label="O carga un archivo de datos (.json):"
                             onUpload={(path) => setKPIEditForm(f => ({...f, jsonFilePath: path}))} 
                           />
                           {kpiEditForm.jsonFilePath && (
@@ -439,17 +440,17 @@ export default function AdminConfiguracion() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             {jsonApiUrl && (
                               <span style={{ color: 'var(--color-azul-fuerte)', fontSize: '0.74rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'var(--font-body)' }}>
-                                <span style={{ fontSize: '0.8rem' }}>✓</span> API JSON
+                                <span style={{ fontSize: '0.8rem' }}>✓</span> Datos desde un enlace
                               </span>
                             )}
                             {jsonFilePath && (
                               <span style={{ color: 'var(--color-naranja-e)', fontSize: '0.74rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'var(--font-body)' }}>
-                                <span style={{ fontSize: '0.8rem' }}>✓</span> Archivo JSON
+                                <span style={{ fontSize: '0.8rem' }}>✓</span> Archivo de datos (.json)
                               </span>
                             )}
                             {multiPagina && (
                               <span style={{ fontSize: '0.65rem', color: 'var(--color-azul-fuerte)', fontWeight: 700, paddingLeft: '1.1rem' }}>
-                                (Multinavegación activa)
+                                (Varias páginas)
                               </span>
                             )}
                           </div>

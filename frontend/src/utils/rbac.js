@@ -1,3 +1,5 @@
+import REPORT_QUERY_PERMISSIONS from './reportQueryPermissions.json';
+
 /**
  * rbac.js — Mapa de permisos por rol
  * Hospital Escandón BI Platform v4.0
@@ -49,6 +51,7 @@ export const ROUTE_PERMISSIONS = {
   '/auditoria/inventarios': [ROLES.ADMIN, ROLES.DIRECTOR],
   '/auditoria/cargos':      [ROLES.ADMIN, ROLES.DIRECTOR],
   '/auditoria/cargos-reversas': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
+  '/auditoria/reapertura-cuentas': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
   '/farmacia/devoluciones': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
   '/farmacia/cargos-sap':   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
   '/farmacia/resumen-maestro': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
@@ -92,6 +95,7 @@ export const ROUTE_TO_PERMISSION = {
   '/auditoria/inventarios': 'auditoria-inventarios',
   '/auditoria/cargos':      'auditoria-cargos',
   '/auditoria/cargos-reversas': 'auditoria-cargos-reversas',
+  '/auditoria/reapertura-cuentas': 'auditoria-reapertura-cuentas',
   '/calidad-datos':         'calidad-datos',
   '/farmacia/devoluciones': 'farmacia-devoluciones',
   '/farmacia/cargos-sap':   'farmacia-cargos-sap',
@@ -338,7 +342,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     {
       section: 'Dirección',
       icon:    '📊',
-      label:   'Dashboard Directivo',
+      label:   'Tablero directivo',
       path:    '/dashboard/directivo',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
@@ -382,7 +386,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     {
       section: 'Históricos SITI',
       icon:    '⏳',
-      label:   'Dashboard SITI',
+      label:   'Reportes históricos',
       path:    '/siti/dashboard',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
@@ -414,6 +418,13 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
       label:   'Rastreo de Órdenes e Insumos',
       path:    '/rastreo-ordenes',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
+    },
+    {
+      section: 'Auditoría',
+      icon:    '🧾',
+      label:   'Facturas y reapertura de cuentas',
+      path:    '/auditoria/reapertura-cuentas',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
     },
     {
       section: 'Farmacia',
@@ -533,7 +544,7 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     {
       section: 'Administración',
       icon:    '🛡️',
-      label:   'Log de Auditoría',
+      label:   'Historial de actividad',
       path:    '/admin/auditoria-log',
       roles:   [ROLES.ADMIN],
     },
@@ -649,35 +660,7 @@ export function getPermissionSections(user) {
   return sections.filter(s => userPerms.includes(s.id));
 }
 
-export const SAP_QUERY_PERMISSIONS = [
-  // ── INVENTARIOS Y STOCK ──
-  { id: 'sap-query-inventory', name: 'Inventario y Stock por Almacén', icon: '📦', entity: 'inventory', category: '📦 Consultas SAP — Inventarios y Stock' },
-
-  // ── CONTROL DE CADUCIDADES ──
-  { id: 'sap-query-batches', name: 'Lotes y Caducidades de Insumos', icon: '⏳', entity: 'batches', category: '⏳ Consultas SAP — Control de Caducidades' },
-
-  // ── COMPRAS Y PROVEEDORES ──
-  { id: 'sap-query-purchase_invoices', name: 'Facturas de Proveedores (Compras)', icon: '🧾', entity: 'purchase_invoices', category: '🧾 Consultas SAP — Compras y Proveedores' },
-  { id: 'sap-query-purchase_orders', name: 'Órdenes de Compra a Proveedores', icon: '📋', entity: 'purchase_orders', category: '🧾 Consultas SAP — Compras y Proveedores' },
-  { id: 'sap-query-goods_receipts_po', name: 'Recepciones de Mercancía (Entradas)', icon: '📥', entity: 'goods_receipts_po', category: '🧾 Consultas SAP — Compras y Proveedores' },
-  { id: 'sap-query-goods_returns', name: 'Devoluciones a Proveedores', icon: '🔄', entity: 'goods_returns', category: '🧾 Consultas SAP — Compras y Proveedores' },
-  { id: 'sap-query-purchase_requests', name: 'Requisiciones y Solicitudes de Compra', icon: '📑', entity: 'purchase_requests', category: '🧾 Consultas SAP — Compras y Proveedores' },
-
-  // ── MOVIMIENTOS DE ALMACÉN ──
-  { id: 'sap-query-stock_transfers', name: 'Traslados entre Almacenes Realizados', icon: '🚚', entity: 'stock_transfers', category: '🚚 Consultas SAP — Movimientos de Almacén' },
-  { id: 'sap-query-transfer_requests', name: 'Solicitudes de Traslado entre Almacenes', icon: '⏳', entity: 'transfer_requests', category: '🚚 Consultas SAP — Movimientos de Almacén' },
-  { id: 'sap-query-goods_issues', name: 'Salidas de Inventario (Mermas / Bajas)', icon: '📉', entity: 'goods_issues', category: '🚚 Consultas SAP — Movimientos de Almacén' },
-  { id: 'sap-query-goods_receipts_inv', name: 'Entradas Directas y Ajustes Positivos', icon: '📈', entity: 'goods_receipts_inv', category: '🚚 Consultas SAP — Movimientos de Almacén' },
-
-  // ── FACTURACIÓN E INGRESOS ──
-  { id: 'sap-query-sales_invoices', name: 'Facturación e Ingresos Hospitalarios', icon: '💰', entity: 'sales_invoices', category: '💰 Consultas SAP — Facturación e Ingresos' },
-  { id: 'sap-query-credit_memos', name: 'Notas de Crédito a Clientes (Devoluciones)', icon: '🧾', entity: 'credit_memos', category: '💰 Consultas SAP — Facturación e Ingresos' },
-
-  // ── CATÁLOGOS MAESTROS ──
-  { id: 'sap-query-business_partners', name: 'Directorio de Proveedores y Socios', icon: '👥', entity: 'business_partners', category: '🧬 Consultas SAP — Catálogos Maestros' },
-  { id: 'sap-query-item_prices', name: 'Listas de Precios y Costos', icon: '🏷️', entity: 'item_prices', category: '🧬 Consultas SAP — Catálogos Maestros' },
-  { id: 'sap-query-item_master_data', name: 'Maestro de Artículos y Clasif. Sanitaria', icon: '🧬', entity: 'item_master_data', category: '🧬 Consultas SAP — Catálogos Maestros' }
-];
+export const SAP_QUERY_PERMISSIONS = REPORT_QUERY_PERMISSIONS;
 
 /**
  * Verifica si un usuario tiene permiso para acceder a un módulo específico de SAP Query Builder.

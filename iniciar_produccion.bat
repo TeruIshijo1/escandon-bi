@@ -1,4 +1,6 @@
 @echo off
+cd /d "%~dp0"
+if exist "%~dp0.runtime\node.exe" set "PATH=%~dp0.runtime;%PATH%"
 title Hospital Escandon BI - SERVIDOR
 color 0a
 
@@ -14,6 +16,6 @@ cd /d "%~dp0"
 cd backend
 set NODE_ENV=production
 set PORT=5173
-node server.js
+node scripts/start-server.js
 
 pause

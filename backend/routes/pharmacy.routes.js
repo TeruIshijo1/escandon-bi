@@ -149,7 +149,7 @@ router.get('/lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA'])
   try {
     const requestedWarehouses = normalizeWarehouseFilter(req.query.warehouse || 'FAR');
     
-    if (!itemCode) return res.status(400).json({ ok: false, error: 'ItemCode requerido' });
+    if (!itemCode) return res.status(400).json({ ok: false, error: "Selecciona un producto para continuar." });
 
     await sapInventoryService.ensureInventoryData();
 
@@ -170,16 +170,16 @@ router.get('/lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA'])
 
 /**
  * GET /api/pharmacy/historial-lotes/:itemCode
- * Extrae el historial de movimientos de inventario desde Vertical (Cirrus) cruzando PCPRBT y UDR_CUENTAS_SERVICIOS
+ * Extrae el historial de movimientos de inventario desde Vertical cruzando PCPRBT y UDR_CUENTAS_SERVICIOS
  */
 router.get('/historial-lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     const itemCode = req.query.itemCode;
-    if (!itemCode) return res.status(400).json({ ok: false, error: 'ItemCode requerido' });
+    if (!itemCode) return res.status(400).json({ ok: false, error: "Selecciona un producto para continuar." });
 
     const pool = await connectRemoteDB();
     
-    // Consulta directa a la base de datos de Vertical (Cirrus) KH_HE
+    // Consulta directa a la base de datos de Vertical KH_HE
     const sqlText = `
       SELECT TOP 200
         b.CreatedOn AS Fecha,
@@ -222,7 +222,7 @@ router.get('/historial-lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
  */
 router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   const itemCode = req.query.itemCode;
-  if (!itemCode) return res.status(400).json({ ok: false, error: 'ItemCode requerido' });
+  if (!itemCode) return res.status(400).json({ ok: false, error: "Selecciona un producto para continuar." });
   
   await sapInventoryService.ensureInventoryData();
 
@@ -240,7 +240,7 @@ router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
   }
 
   // Si no hay caché, error
-  res.status(503).json({ ok: false, error: 'El caché de inventario aún no está listo. Intente de nuevo en unos segundos.' });
+  res.status(503).json({ ok: false, error: "El inventario se está actualizando. Intenta de nuevo en unos segundos." });
 });
 
 // ==========================================
@@ -563,7 +563,7 @@ router.get('/surgical-kits', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
     res.json({ ok: true, data: pgRes.rows, totalKits: pgRes.rows.length });
   } catch (err) {
     console.error('Error en surgical-kits:', err);
-    res.status(500).json({ ok: false, error: 'Error interno al consultar kits desde DW' });
+    res.status(500).json({ ok: false, error: "No se pudieron consultar los paquetes quirúrgicos. Intenta de nuevo." });
   }
 });
 
@@ -608,7 +608,7 @@ router.get('/surgical-events', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
     res.json({ ok: true, data: result, days: clampedDays });
   } catch (err) {
     console.error('Error en surgical-events:', err);
-    res.status(500).json({ ok: false, error: 'Error interno al consultar eventos quirúrgicos desde DW' });
+    res.status(500).json({ ok: false, error: "No se pudo consultar la agenda de cirugías. Intenta de nuevo." });
   }
 });
 
@@ -668,7 +668,7 @@ router.get('/doctor-variations', authenticate, authorize(['ADMIN', 'DIRECTOR', '
     res.json({ ok: true, data: result, months: clampedMonths });
   } catch (err) {
     console.error('Error en doctor-variations:', err);
-    res.status(500).json({ ok: false, error: 'Error interno al consultar variaciones por médico desde DW' });
+    res.status(500).json({ ok: false, error: "No se pudo comparar el consumo por médico. Intenta de nuevo." });
   }
 });
 /**
@@ -1212,7 +1212,7 @@ router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
 
   } catch (err) {
     console.error('[GET ML Dataset Error]', err);
-    res.status(500).json({ ok: false, error: 'Error al consultar el dataset analítico de ML' });
+    res.status(500).json({ ok: false, error: "No se pudo cargar el análisis de existencias. Intenta de nuevo." });
   }
 });
 
@@ -1225,10 +1225,10 @@ router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
   try {
     const { syncMLDataset } = require('../services/mlDataset.service');
     const count = await syncMLDataset();
-    res.json({ ok: true, message: `Dataset analítico sincronizado con éxito. ${count} registros calculados.` });
+    res.json({ ok: true, message: `Análisis de existencias actualizado. ${count} registros calculados.` });
   } catch (err) {
     console.error('[POST Sync ML Dataset Error]', err);
-    res.status(500).json({ ok: false, error: 'Error al sincronizar el dataset analítico: ' + err.message });
+    res.status(500).json({ ok: false, error: "No se pudo actualizar el análisis de existencias. Intenta de nuevo. " + err.message });
   }
 });
 
@@ -1270,7 +1270,7 @@ router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
 
   } catch (err) {
     console.error('[GET ML History Error]', err);
-    res.status(500).json({ ok: false, error: 'Error al consultar el historial analítico de ML' });
+    res.status(500).json({ ok: false, error: "No se pudo cargar el historial de consumo. Intenta de nuevo." });
   }
 });
 
@@ -1361,7 +1361,7 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
 
   } catch (err) {
     console.error('[GET ML Predictions Error]', err);
-    res.status(500).json({ ok: false, error: 'Error al consultar predicciones de Machine Learning' });
+    res.status(500).json({ ok: false, error: "No se pudieron cargar las alertas de productos. Intenta de nuevo." });
   }
 });
 
@@ -1409,7 +1409,7 @@ router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR',
       return res.status(500).json({
         ok: false,
         jobId: jobResult.jobId,
-        error: jobResult.error_message || 'Error al ejecutar modelo predictivo',
+        error: jobResult.error_message || "No se pudieron calcular las alertas de productos. Intenta de nuevo.",
         stderr: jobResult.stderr || ''
       });
     }
@@ -1417,7 +1417,7 @@ router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR',
     res.json({
       ok: true,
       jobId: jobResult.jobId,
-      message: 'Predicciones de Machine Learning ejecutadas y guardadas correctamente.',
+      message: "Alertas de productos actualizadas.",
       duration_seconds: jobResult.duration_seconds,
       stdout: jobResult.stdout
     });
@@ -1425,7 +1425,7 @@ router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR',
     console.error('[POST Run ML Predictions Error]', error);
     res.status(500).json({
       ok: false,
-      error: 'Error al procesar job de predicciones: ' + error.message
+      error: "No se pudieron calcular las alertas de productos. Intenta de nuevo. " + error.message
     });
   }
 });
@@ -1522,7 +1522,7 @@ router.post('/config-dinamica/apply', authenticate, authorize(['ADMIN', 'DIRECTO
       applied: result.applied,
       errors: result.errors,
       mlSynced,
-      message: `Configuración aplicada a ${result.applied} SKUs. ${syncMl !== false ? 'Dataset de IA regenerado.' : ''}`
+      message: `Configuración aplicada a ${result.applied} productos. ${syncMl !== false ? "Alertas de productos actualizadas." : ''}`
     });
   } catch (err) {
     console.error('[POST Config Dinamica Apply Error]', err);

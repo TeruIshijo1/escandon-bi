@@ -5,10 +5,14 @@
  */
 import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { formatStatistic } from '../../utils/statisticsPresentation';
+import { userMessage } from '../../utils/userMessages';
 
 const COLUMN_LABELS = {
   FolioAtencion: 'Folio Atención',
   FolioCuenta: 'Folio Cuenta',
+  FolioEstancia: 'Folio de estancia',
+  NumeroCargo: 'Número de cargo',
   FolioSolicitud: 'Folio Solicitud',
   NoCita: 'No. Cita',
   NoPaciente: 'No. Paciente',
@@ -56,7 +60,15 @@ const COLUMN_LABELS = {
   EstadoCuenta: 'Estado Cuenta',
   TipoEgreso: 'Tipo Egreso',
   Estatus: 'Estatus',
-  Cantidad: 'Cantidad',
+  Cantidad: 'Cantidad neta',
+  CantidadOriginal: 'Cantidad original',
+  Devuelto: 'Cantidad devuelta',
+  GrupoCodigo: 'Código de grupo',
+  ClasificacionesCatalogo: 'Clasificaciones del servicio',
+  IngresoTotal: 'Importe de órdenes de venta',
+  IngresoNeto: 'Importe sin IVA',
+  Cuentas: 'Atenciones',
+  Ordenes: 'Órdenes de venta',
   HorasSalaChoque: 'Horas Sala Choque',
   OrdenesDeVenta: 'Órdenes de Venta',
   TotalCobrado: 'Total Cobrado',
@@ -67,6 +79,15 @@ const COLUMN_LABELS = {
   Telefono: 'Teléfono'
 };
 
+const MONEY_COLUMNS = new Set(['TotalCobrado', 'TotalCuenta', 'TotalMonto', 'Saldo', 'Monto', 'Importe', 'Ingreso', 'ImporteNeto', 'ImporteVenta', 'TotalOrdenVenta', 'TotalLinea', 'PrecioUnitario']);
+const isMoneyColumn = key => MONEY_COLUMNS.has(key) || /^(Importe|Monto|Ingreso)/.test(key);
+const readableValue = (key, value) => {
+  if (key === 'TipoAtencion') return ({ IP: 'Hospitalización', ER: 'Urgencias', OP: 'Consulta externa' })[value] || value;
+  if (key === 'EstadoCuenta') return ({ OP: 'Abierta', CL: 'Cerrada', PD: 'Pendiente', CA: 'Cancelada' })[value] || value;
+  return value;
+};
+const columnLabel = key => COLUMN_LABELS[key] || key.replace(/([a-záéíóúñ])([A-ZÁÉÍÓÚÑ])/g, '$1 $2').replace(/_/g, ' ');
+
 export default function ModalDetalleEstadisticas({
   isOpen,
   onClose,
@@ -75,9 +96,17 @@ export default function ModalDetalleEstadisticas({
   year,
   mesNombre,
   data = [],
-  loading = false
+  loading = false,
+  error = '',
+  warnings = [],
+  quantity = null,
+  unit = '',
+  criterion = '',
 }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [exportError, setExportError] = useState('');
+
+  useEffect(() => { setSearchTerm(''); setExportError(''); }, [isOpen, seccionId, year, mesNombre]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -102,17 +131,17 @@ export default function ModalDetalleEstadisticas({
   // Columnas dinámicas presentes en el dataset
   const columns = useMemo(() => {
     if (!data || data.length === 0) return [];
-    return Object.keys(data[0]);
+    return [...new Set(data.flatMap(row => Object.keys(row)))];
   }, [data]);
 
   if (!isOpen) return null;
 
   // Función para formatear valores en la tabla
   const formatCellValue = (key, val) => {
-    if (val === null || val === undefined || val === '') return '-';
+    if (val === null || val === undefined || val === '') return 'No disponible';
 
     // Formatear montos
-    if (key.includes('Total') || key.includes('Saldo') || key.includes('Monto')) {
+    if (isMoneyColumn(key)) {
       const num = parseFloat(val);
       if (!isNaN(num)) {
         return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -124,58 +153,61 @@ export default function ModalDetalleEstadisticas({
       if (typeof val === 'string' && val.length === 8 && /^\d{8}$/.test(val)) {
         return `${val.substring(6, 8)}/${val.substring(4, 6)}/${val.substring(0, 4)}`;
       }
+      if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+        return `${val.slice(8, 10)}/${val.slice(5, 7)}/${val.slice(0, 4)}`;
+      }
       const d = new Date(val);
       if (!isNaN(d.getTime())) {
         if (key.includes('Inicio') || key.includes('Fin') || key.includes('Cargo') || key.includes('Solicitud') || key.includes('Atencion')) {
-          return d.toLocaleString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+          return d.toLocaleString('es-MX', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         }
-        return d.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        return d.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' });
       }
     }
 
     if (key === 'Hora' && typeof val === 'string' && val.includes('T')) {
       const d = new Date(val);
       if (!isNaN(d.getTime())) {
-        return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' });
       }
     }
 
-    return String(val);
+    return String(readableValue(key, val));
   };
 
   // Exportar a Excel
   const handleExportExcel = () => {
+    setExportError('');
     try {
-      if (!data || data.length === 0) return;
+      if (!filteredData.length || error) return;
 
-      const excelRows = data.map((row, idx) => {
+      const excelRows = filteredData.map((row, idx) => {
         const item = { '#': idx + 1 };
         columns.forEach(col => {
-          const header = COLUMN_LABELS[col] || col;
-          let val = row[col];
+          const header = columnLabel(col);
+          let val = readableValue(col, row[col]);
 
           // Formateo para Excel
           if (val instanceof Date) {
-            val = val.toISOString().split('T')[0];
-          } else if (typeof val === 'string' && val.length === 8 && /^\d{8}$/.test(val)) {
+            val = val.toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
+          } else if (col.startsWith('Fecha') && typeof val === 'string' && val.length === 8 && /^\d{8}$/.test(val)) {
             val = `${val.substring(6, 8)}/${val.substring(4, 6)}/${val.substring(0, 4)}`;
-          } else if (typeof val === 'string' && val.includes('T') && !isNaN(new Date(val).getTime())) {
-            val = new Date(val).toLocaleString('es-MX');
+          } else if (col.startsWith('Fecha') && typeof val === 'string' && val.includes('T') && !isNaN(new Date(val).getTime())) {
+            val = new Date(val).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
           }
-          item[header] = val !== null && val !== undefined ? val : '';
+          item[header] = val !== null && val !== undefined ? val : 'No disponible';
         });
         return item;
       });
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(excelRows);
+      XLSX.utils.sheet_add_aoa(ws, [[], ['Criterio', criterion], ['Total del periodo', quantity ?? 'No disponible', unit],
+        ['Registros exportados', filteredData.length], ...warnings.map(warning => ['Observación', userMessage(warning)])], { origin: excelRows.length + 2 });
 
       // Auto-ancho de columnas
       const colWidths = Object.keys(excelRows[0] || {}).map(key => {
-        const maxLen = Math.max(
-          key.length,
-          ...excelRows.map(r => String(r[key] || '').length)
-        );
+        const maxLen = excelRows.reduce((maximum, row) => Math.max(maximum, String(row[key] ?? '').length), key.length);
         return { wch: Math.min(Math.max(maxLen + 3, 10), 45) };
       });
       ws['!cols'] = colWidths;
@@ -188,7 +220,7 @@ export default function ModalDetalleEstadisticas({
       XLSX.utils.book_append_sheet(wb, ws, 'Detalle');
       XLSX.writeFile(wb, `${safeName}_${mesNombre}_${year}.xlsx`);
     } catch (err) {
-      console.error('Error al exportar Excel detallado:', err);
+      setExportError('No se pudo exportar el detalle. Intenta de nuevo.');
     }
   };
 
@@ -202,7 +234,7 @@ export default function ModalDetalleEstadisticas({
       padding: '1.5rem',
       animation: 'fadeIn 0.2s ease-out'
     }}>
-      <div style={{
+      <div role="dialog" aria-modal="true" aria-label={`${seccionLabel}, ${mesNombre} ${year}`} style={{
         background: '#FFFFFF',
         borderRadius: '20px',
         width: '95%',
@@ -237,7 +269,7 @@ export default function ModalDetalleEstadisticas({
               color: 'rgba(255,255,255,0.7)',
               marginBottom: '0.2rem'
             }}>
-              Desglose Granular &middot; {mesNombre} {year}
+              Detalle del estadístico &middot; {mesNombre} {year}
             </div>
             <h2 style={{
               fontFamily: 'var(--font-display)',
@@ -253,7 +285,7 @@ export default function ModalDetalleEstadisticas({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
               onClick={handleExportExcel}
-              disabled={loading || data.length === 0}
+              disabled={loading || Boolean(error) || filteredData.length === 0}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -272,11 +304,12 @@ export default function ModalDetalleEstadisticas({
                 transition: 'all 0.2s'
               }}
             >
-              <span>📥</span> Exportar a Excel ({data.length})
+              <span>📥</span> Exportar a Excel ({filteredData.length})
             </button>
 
             <button
               onClick={onClose}
+              aria-label="Cerrar detalle"
               style={{
                 width: 38,
                 height: 38,
@@ -300,6 +333,14 @@ export default function ModalDetalleEstadisticas({
           </div>
         </div>
 
+        <div style={{ padding: '0.75rem 2rem', borderBottom: '1px solid #E2E8F0', fontSize: '0.82rem' }}>
+          {!loading && !error && <p style={{ margin: '0 0 0.4rem', fontWeight: 700 }}>Total del periodo: {formatStatistic(quantity, unit === 'MXN')} {unit === 'MXN' ? '' : unit}</p>}
+          {!loading && !error && quantity == null && data.length > 0 && <p style={{ margin: '0.4rem 0', color: '#92400E' }}>Estas filas se muestran para revisión. Aún no hay un total confirmado para este estadístico.</p>}
+          {criterion && <p style={{ margin: '0.4rem 0', color: '#475569' }}>{criterion}</p>}
+          {warnings.map((warning, index) => <p key={index} role="status" style={{ margin: '0.4rem 0', color: '#92400E' }}>{userMessage(warning)}</p>)}
+          {(error || exportError) && <p role="alert" style={{ margin: '0.4rem 0', color: '#B91C1C' }}>{error || exportError}</p>}
+        </div>
+
         {/* Toolbar & Search Filter */}
         <div style={{
           padding: '0.85rem 2rem',
@@ -318,7 +359,7 @@ export default function ModalDetalleEstadisticas({
               fontWeight: 700,
               color: 'var(--text-primary)'
             }}>
-              Registros encontrados:
+              Filas de detalle:
             </span>
             <span style={{
               background: '#E2E8F0',
@@ -336,6 +377,7 @@ export default function ModalDetalleEstadisticas({
           <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
             <input
               type="text"
+              aria-label="Buscar en el detalle"
               placeholder="Buscar por paciente, médico, folio, etc..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
@@ -381,6 +423,8 @@ export default function ModalDetalleEstadisticas({
                 Consultando registros en vivo...
               </span>
             </div>
+          ) : error ? (
+            <p style={{ color: '#64748B' }}>Cierra el detalle y vuelve a consultarlo.</p>
           ) : filteredData.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '0.5rem', color: '#64748B' }}>
               <span style={{ fontSize: '2.5rem' }}>📋</span>
@@ -414,7 +458,7 @@ export default function ModalDetalleEstadisticas({
                         whiteSpace: 'nowrap'
                       }}
                     >
-                      {COLUMN_LABELS[col] || col}
+                      {columnLabel(col)}
                     </th>
                   ))}
                 </tr>
@@ -473,7 +517,7 @@ export default function ModalDetalleEstadisticas({
           color: '#64748B',
           fontFamily: 'var(--font-body)'
         }}>
-          <span>Fuente: Conexión directa en vivo con {seccionId === '01_VIDAS SALVADAS' ? 'SAP Business One' : 'HIS (SQL Server)'}</span>
+          <span>Los registros mostrados corresponden al criterio y periodo indicados.</span>
           <button
             onClick={onClose}
             style={{

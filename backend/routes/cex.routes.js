@@ -32,7 +32,7 @@ router.post('/sync', authorizeCapability('gestionCEX'), async (req, res, next) =
 
     // 2. Replicar a cex_citas y cex_pacientes
     const result = await syncCexFromDW();
-    res.json({ ok: true, message: 'Sincronización completada exitosamente con VERTICAL', result });
+    res.json({ ok: true, message: "Agenda actualizada.", result });
   } catch (error) {
     next(error);
   }
@@ -149,7 +149,7 @@ router.post('/citas', authorizeCapability('gestionCEX'), async (req, res, next) 
     const ModificadoPor = req.user.username;
 
     if (!NoExpediente || !FechaHoraCita) {
-      return res.status(400).json({ error: 'NoExpediente y FechaHoraCita son obligatorios' });
+      return res.status(400).json({ error: "Indica el expediente del paciente y la fecha y hora de la cita." });
     }
 
     // Asegurar que el paciente exista (si no, se crea como LOCAL para no violar la FK)
@@ -251,7 +251,7 @@ router.post('/consultas', authorizeCapability('gestionCEX'), async (req, res, ne
     const { CitaId, NoExpediente, SignosVitales, MotivoConsulta, Diagnostico, NotasAtencion, ProximaCita } = req.body;
     const RegistradoPor = req.user.username;
 
-    if (!CitaId) return res.status(400).json({ error: 'CitaId es obligatorio' });
+    if (!CitaId) return res.status(400).json({ error: "Selecciona una cita para continuar." });
 
     // Asumimos que el médico es el mismo de la cita o el usuario actual
     const citaActual = await pool.query('SELECT Medico, NoExpediente FROM cex_citas WHERE CitaId = $1', [CitaId]);

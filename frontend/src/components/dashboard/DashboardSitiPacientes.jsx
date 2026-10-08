@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import DashboardChart from './DashboardChart';
 import { API_BASE } from '../../api/config';
 import PremiumLoader from '../shared/PremiumLoader';
 import ExportToolbar from '../shared/ExportToolbar';
@@ -55,7 +54,7 @@ export default function DashboardSitiPacientes() {
   };
 
   return (
-    <div id="dashboard-pacientes-siti">
+    <div className="dashboard-view" id="dashboard-pacientes-siti">
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
         <ExportToolbar 
           targetId="dashboard-pacientes-siti" 
@@ -65,39 +64,39 @@ export default function DashboardSitiPacientes() {
       </div>
 
       {/* KPIs Rápidos */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <div className="siti-card" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: 'white' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Pacientes Únicos</h3>
-          <p style={{ margin: '10px 0 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
+      <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+        <div className="siti-card dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: 'white' }}>
+          <h3 className="dashboard-metric-label" style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Pacientes Únicos</h3>
+          <p className="dashboard-metric-value" style={{ margin: '10px 0 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
             {formatNumber(resumen.pacientes_unicos)}
           </p>
         </div>
-        <div className="siti-card" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Total Admisiones</h3>
-          <p style={{ margin: '10px 0 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
+        <div className="siti-card dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white' }}>
+          <h3 className="dashboard-metric-label" style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Total Admisiones</h3>
+          <p className="dashboard-metric-value" style={{ margin: '10px 0 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
             {formatNumber(resumen.total_admisiones)}
           </p>
         </div>
-        <div className="siti-card" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Nuevos (1 Ingreso)</h3>
-          <p style={{ margin: '10px 0 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
+        <div className="siti-card dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
+          <h3 className="dashboard-metric-label" style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Nuevos (1 Ingreso)</h3>
+          <p className="dashboard-metric-value" style={{ margin: '10px 0 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
             {formatNumber(retencion?.pacientes_nuevos)}
           </p>
         </div>
-        <div className="siti-card" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', color: 'white' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Recurrentes (2+ Ingresos)</h3>
-          <p style={{ margin: '10px 0 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
+        <div className="siti-card dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', color: 'white' }}>
+          <h3 className="dashboard-metric-label" style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Recurrentes (2+ Ingresos)</h3>
+          <p className="dashboard-metric-value" style={{ margin: '10px 0 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
             {formatNumber(retencion?.pacientes_recurrentes)}
           </p>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '2rem', marginBottom: '2rem' }}>
+      <div className="dashboard-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '2rem', marginBottom: '2rem' }}>
         {/* Gráfica Género */}
-        <div className="siti-card">
+        <div className="siti-card dashboard-panel">
           <h3 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Por Género</h3>
-          <div style={{ height: 250 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 250 }}>
+            <DashboardChart width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={genero}
@@ -116,15 +115,15 @@ export default function DashboardSitiPacientes() {
                 <Tooltip formatter={(value) => formatNumber(value)} />
                 <Legend verticalAlign="bottom" height={36}/>
               </PieChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Gráfica Retención (Nuevos vs Recurrentes) */}
-        <div className="siti-card">
+        <div className="siti-card dashboard-panel">
           <h3 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Nuevos vs Recurrentes</h3>
-          <div style={{ height: 250 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 250 }}>
+            <DashboardChart width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={retencionData}
@@ -143,15 +142,15 @@ export default function DashboardSitiPacientes() {
                 <Tooltip formatter={(value) => formatNumber(value)} />
                 <Legend verticalAlign="bottom" height={36}/>
               </PieChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Gráfica Motivos Ingreso */}
-        <div className="siti-card">
+        <div className="siti-card dashboard-panel">
           <h3 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Top 10 Motivos de Ingreso</h3>
-          <div style={{ height: 250 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 250 }}>
+            <DashboardChart width="100%" height="100%">
               <BarChart data={topMotivos} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" tickFormatter={(v) => formatNumber(v)} />
@@ -159,7 +158,7 @@ export default function DashboardSitiPacientes() {
                 <Tooltip formatter={(value) => formatNumber(value)} cursor={{fill: '#f1f5f9'}} />
                 <Bar dataKey="cantidad" name="Admisiones" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
               </BarChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
       </div>

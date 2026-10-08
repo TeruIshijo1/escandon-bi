@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect } from 'react';
 import PremiumLoader from './PremiumLoader';
 import useEscapeKey from '../../hooks/useEscapeKey';
@@ -22,7 +23,7 @@ export default function FacturaProveedorModal({ docNum, onClose }) {
         if (json.success) {
           setData(json.data);
         } else {
-          setError(json.error || 'No se pudo cargar el detalle de la factura.');
+          setError(userMessage(json.error || 'No se pudo cargar el detalle de la factura.'));
         }
       } catch (err) {
         setError('Error al consultar el servidor.');
@@ -76,8 +77,8 @@ export default function FacturaProveedorModal({ docNum, onClose }) {
 
         {/* Content */}
         <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
-          {loading && <PremiumLoader text="Consultando factura en SAP Service Layer..." style={{ height: '200px' }} />}
-          {error && <div style={{ padding: '1.5rem', background: '#FEE2E2', color: '#991B1B', borderRadius: '12px' }}>{error}</div>}
+          {loading && <PremiumLoader text="Cargando factura…" style={{ height: '200px' }} />}
+          {error && <div style={{ padding: '1.5rem', background: '#FEE2E2', color: '#991B1B', borderRadius: '12px' }}>{userMessage(error)}</div>}
 
           {!loading && !error && data && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

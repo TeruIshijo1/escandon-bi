@@ -132,7 +132,7 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
             }}>📊</div>
             <div>
               <div style={{ fontSize: '0.62rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                Reporte Power BI
+                Reporte
               </div>
               <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'white' }}>
                 {title}

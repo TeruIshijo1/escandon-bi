@@ -8,8 +8,8 @@
  */
 
 const LLM_API_KEY = process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
-const LLM_MODEL = process.env.GEMINI_MODEL || process.env.DEEPSEEK_MODEL || process.env.OPENAI_MODEL ||
-  (process.env.GEMINI_API_KEY ? 'gemini-2.0-flash' : (process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o'));
+const LLM_MODEL = process.env.GEMINI_API_KEY ? (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite') :
+  (process.env.DEEPSEEK_API_KEY ? (process.env.DEEPSEEK_MODEL || 'deepseek-chat') : (process.env.OPENAI_MODEL || 'gpt-4o'));
 const LLM_BASE = process.env.LLM_BASE_URL ||
   (process.env.GEMINI_API_KEY ? 'https://generativelanguage.googleapis.com/v1beta/openai' :
   (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' :

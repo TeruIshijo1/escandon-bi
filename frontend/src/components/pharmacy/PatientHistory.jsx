@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
@@ -24,7 +25,7 @@ export default function PatientHistory() {
       })
       .then(json => {
         if (json.ok) setData(json.data);
-        else setError(json.error || 'Error al obtener datos');
+        else setError(userMessage(json.error || 'Error al obtener datos'));
         setLoading(false);
       })
       .catch(err => {
@@ -57,7 +58,7 @@ export default function PatientHistory() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '2rem' }}>Buscando...</div>
       ) : error ? (
-        <div style={{ textAlign: 'center', padding: '2rem', color: '#dc2626', fontWeight: 'bold' }}>{error}</div>
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#dc2626', fontWeight: 'bold' }}>{userMessage(error)}</div>
       ) : searched && data.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
           No se encontraron consumos de farmacia para "{search}".

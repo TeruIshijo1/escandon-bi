@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
+import DashboardChart from './DashboardChart';
 import { API_BASE } from '../../api/config';
 import PremiumLoader from '../shared/PremiumLoader';
 import ExportToolbar from '../shared/ExportToolbar';
@@ -57,14 +58,14 @@ export default function DashboardSitiCirugias() {
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-      <PremiumLoader text="Sincronizando Módulo Quirófanos..." />
+      <PremiumLoader text="Cargando información de cirugías…" />
     </div>
   );
 
 
 
   return (
-    <div id="dashboard-cirugias-siti">
+    <div className="dashboard-view" id="dashboard-cirugias-siti">
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
         <ExportToolbar 
           targetId="dashboard-cirugias-siti" 
@@ -77,26 +78,26 @@ export default function DashboardSitiCirugias() {
         />
       </div>
       {/* KPIs Rápidos */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #2563EB' }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Volumen de Cirugías (Histórico)</h3>
-          <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatNumber(totalVolumen)}</p>
+        <div className="dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #2563EB' }}>
+          <h3 className="dashboard-metric-label" style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Volumen de Cirugías (Histórico)</h3>
+          <p className="dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatNumber(totalVolumen)}</p>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #10B981' }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresos por Cirugías</h3>
-          <p style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatMoney(totalIngresos)}</p>
+        <div className="dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', borderLeft: '5px solid #10B981' }}>
+          <h3 className="dashboard-metric-label" style={{ fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresos por Cirugías</h3>
+          <p className="dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#111827', marginTop: '0.5rem' }}>{formatMoney(totalIngresos)}</p>
         </div>
 
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', marginBottom: '2rem' }}>
+      <div className="dashboard-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', marginBottom: '2rem' }}>
         {/* Gráfica de Tendencia Anual */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Tendencia de Cirugías e Ingresos por Año</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
               <AreaChart data={aggregatedAnual}>
                 <defs>
                   <linearGradient id="colorIngresosQx" x1="0" y1="0" x2="0" y2="1">
@@ -118,17 +119,17 @@ export default function DashboardSitiCirugias() {
                 <Bar yAxisId="left" dataKey="volumen" name="Volumen de Cirugías" fill="#2563EB" radius={[4, 4, 0, 0]} />
                 <Area yAxisId="right" type="monotone" dataKey="ingresos" name="Ingresos" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorIngresosQx)" />
               </AreaChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+      <div className="dashboard-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
         {/* Top Médicos */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Top 10 Cirujanos (Volumen de Procedimientos)</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
               <BarChart layout="vertical" data={data.topMedicos} margin={{ left: 50 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
                 <XAxis type="number" tick={{fontSize: 10}} />
@@ -140,15 +141,15 @@ export default function DashboardSitiCirugias() {
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Top Cirugías */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Top 10 Procedimientos Quirúrgicos</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
               <BarChart layout="vertical" data={data.topCirugias} margin={{ left: 50 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
                 <XAxis type="number" tick={{fontSize: 10}} />
@@ -160,7 +161,7 @@ export default function DashboardSitiCirugias() {
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
       </div>

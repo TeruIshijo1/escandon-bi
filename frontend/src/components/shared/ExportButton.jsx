@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 /**
  * ExportButton.jsx — Botones de exportación PDF y Excel
  * Hospital Escandón BI Platform v4.0
@@ -114,7 +115,7 @@ export default function ExportButton({
           pdf.setFont('helvetica', 'bold');
           pdf.text('Hospital Escandón', 6, 11);
           pdf.setFontSize(9);
-          pdf.text('Reporte de BI - ' + new Date().toLocaleDateString('es-MX'), pdfW - 6, 11, { align: 'right' });
+          pdf.text('Reporte del hospital - ' + new Date().toLocaleDateString('es-MX'), pdfW - 6, 11, { align: 'right' });
 
           const imgProps = pdf.getImageProperties(dataUrl);
           const m = 3;
@@ -148,7 +149,7 @@ export default function ExportButton({
 
       if (!res.ok) {
         if (res.status === 401) {
-          alert('Su sesión ha caducado o el token es inválido. Por favor recargue la página o vuelva a iniciar sesión.');
+          alert('Tu sesión terminó. Inicia sesión de nuevo para descargar el archivo.');
           setLoading(false);
           return;
         }
@@ -175,7 +176,7 @@ export default function ExportButton({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('[ExportButton]', err);
-      alert('Error al generar la descarga: ' + err.message);
+      alert(userMessage('Error al generar la descarga: ' + err.message));
     } finally {
       setLoading(false);
     }

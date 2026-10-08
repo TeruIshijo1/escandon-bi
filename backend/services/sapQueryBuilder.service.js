@@ -8,6 +8,8 @@
 const sapService = require('./sap.service');
 const sapInventoryService = require('./sapInventory.service');
 const { pool } = require('../config/pg-db');
+const sapReportCatalog = require('./sapReportCatalog.service');
+const verticalReportCatalog = require('./verticalReportCatalog.service');
 
 /* ══════════════════════════════════════════════════════════════
    DICCIONARIO DE ENTIDADES Y CAMPOS (LENGUAJE HOSPITALARIO)
@@ -16,7 +18,7 @@ const ENTITY_CATALOG = {
   // ── INVENTARIOS Y STOCK ──
   inventory: {
     id: 'inventory',
-    title: 'Inventario y Stock por Almacén',
+    title: "Inventario por almacén",
     icon: '📦',
     category: 'Inventarios y Stock',
     description: 'Existencias actuales, costos y precios en Farmacia, Quirófano, Carro Rojo y Almacén General.',
@@ -28,7 +30,7 @@ const ENTITY_CATALOG = {
       { key: 'ItemName', label: 'Descripción del Insumo / Medicamento', type: 'string', width: 280 },
       { key: 'WhsCode', label: 'Cód. Almacén', type: 'string', width: 90 },
       { key: 'WhsName', label: 'Nombre del Almacén', type: 'string', width: 180 },
-      { key: 'QuantityOnStock', label: 'Stock en Existencia', type: 'number', width: 110, align: 'center' },
+      { key: 'QuantityOnStock', label: "Existencias disponibles", type: 'number', width: 110, align: 'center' },
       { key: 'PurchaseCost', label: 'Último Costo Compra ($)', type: 'money', width: 140, align: 'right' },
       { key: 'AvgCost', label: 'Costo Promedio ($)', type: 'money', width: 130, align: 'right' },
       { key: 'PriceHos', label: 'Precio Hospitalización ($)', type: 'money', width: 150, align: 'right' },
@@ -36,8 +38,8 @@ const ENTITY_CATALOG = {
       { key: 'ProfitMargin', label: 'Margen Teórico (%)', type: 'percent', width: 120, align: 'right' },
       { key: 'ItemGroupName', label: 'Grupo de Artículos', type: 'string', width: 160 },
       { key: 'ManufacturerName', label: 'Laboratorio / Tipo', type: 'string', width: 160 },
-      { key: 'MedicalClassification', label: 'Clasif. Médica (CON/ANTI/REFRI)', type: 'string', width: 150, align: 'center' },
-      { key: 'SecondaryClassification', label: 'Clasif. Secundaria', type: 'string', width: 130, align: 'center' }
+      { key: 'MedicalClassification', label: "Tipo de medicamento", type: 'string', width: 150, align: 'center' },
+      { key: 'SecondaryClassification', label: "Clasificación adicional", type: 'string', width: 130, align: 'center' }
     ]
   },
 
@@ -69,13 +71,13 @@ const ENTITY_CATALOG = {
     title: 'Facturas de Proveedores (Compras)',
     icon: '🧾',
     category: 'Compras y Proveedores',
-    description: 'Facturas recibidas de proveedores, precios unitarios de compra, IVA, totales y fechas de contabilización.',
+    description: "Consulta las facturas de proveedores, los precios de compra, los impuestos y las fechas de registro.",
     requiresDateFilter: true,
-    dateFieldLabel: 'Fecha de Contabilización',
+    dateFieldLabel: "Fecha de registro",
     defaultFields: ['DocNum', 'DocDate', 'CardName', 'ItemCode', 'Dscription', 'Quantity', 'Price', 'LineTotal', 'DocTotal'],
     fields: [
       { key: 'DocNum', label: 'Folio Factura SAP', type: 'string', width: 120, align: 'center' },
-      { key: 'DocDate', label: 'Fecha Contabilización', type: 'date', width: 130, align: 'center' },
+      { key: 'DocDate', label: "Fecha de registro", type: 'date', width: 130, align: 'center' },
       { key: 'DocDueDate', label: 'Fecha Vencimiento', type: 'date', width: 130, align: 'center' },
       { key: 'CardCode', label: 'Cód. Proveedor', type: 'string', width: 110 },
       { key: 'CardName', label: 'Proveedor / Razón Social', type: 'string', width: 260 },
@@ -148,7 +150,7 @@ const ENTITY_CATALOG = {
     title: 'Devoluciones a Proveedores',
     icon: '🔄',
     category: 'Compras y Proveedores',
-    description: 'Medicamentos e insumos devueltos a laboratorios por caducidad, daño de empaque o sobre-stock.',
+    description: "Consulta los productos devueltos a proveedores por caducidad, daño o exceso de existencias.",
     requiresDateFilter: true,
     dateFieldLabel: 'Fecha de Devolución',
     defaultFields: ['DocNum', 'DocDate', 'CardName', 'ItemCode', 'Dscription', 'Quantity', 'Price', 'LineTotal', 'DocTotal', 'Comments'],
@@ -393,8 +395,8 @@ const ENTITY_CATALOG = {
       { key: 'ItemName', label: 'Descripción Insumo / Medicamento', type: 'string', width: 280 },
       { key: 'ItemGroupName', label: 'Grupo / Familia SAP', type: 'string', width: 160 },
       { key: 'ManufacturerName', label: 'Laboratorio / Fabricante', type: 'string', width: 160 },
-      { key: 'MedicalClassification', label: 'Clasif. Médica (CON/ANTI/REFRI)', type: 'string', width: 160, align: 'center' },
-      { key: 'SecondaryClassification', label: 'Clasif. Secundaria', type: 'string', width: 140, align: 'center' },
+      { key: 'MedicalClassification', label: "Tipo de medicamento", type: 'string', width: 160, align: 'center' },
+      { key: 'SecondaryClassification', label: "Clasificación adicional", type: 'string', width: 140, align: 'center' },
       { key: 'PurchaseCost', label: 'Último Costo Compra ($)', type: 'money', width: 140, align: 'right' },
       { key: 'AvgCost', label: 'Costo Promedio ($)', type: 'money', width: 130, align: 'right' },
       { key: 'PriceHos', label: 'Precio Hospitalización ($)', type: 'money', width: 150, align: 'right' },
@@ -405,6 +407,20 @@ const ENTITY_CATALOG = {
     ]
   }
 };
+
+// Conserva los identificadores existentes para las plantillas y permisos.
+for (const definition of Object.values(ENTITY_CATALOG)) {
+  definition.source = 'SAP';
+  definition.grain = definition.id === 'inventory' ? 'Una fila por artículo y almacén.'
+    : definition.id === 'batches' ? 'Una fila por lote, artículo y almacén.'
+    : definition.id === 'business_partners' ? 'Una fila por socio de negocio.'
+    : 'Una fila por línea de documento. El total del documento se repite en sus líneas; utiliza el subtotal de línea para sumar.';
+  definition.filters = [];
+  if (definition.fields.some(f => ['WhsCode', 'Filler', 'ToWhsCode'].includes(f.key))) definition.filters.push('almacen');
+  if (definition.fields.some(f => ['DocStatus', 'Status'].includes(f.key))) definition.filters.push('estatusDoc');
+  if (definition.fields.some(f => f.key === 'MedicalClassification')) definition.filters.push('clasificacionMedica');
+}
+Object.assign(ENTITY_CATALOG, sapReportCatalog.catalog, verticalReportCatalog.catalog);
 
 const WAREHOUSE_NAMES = {
   'FAR': 'Farmacia Central',
@@ -532,7 +548,9 @@ async function executeSapSqlList(sqlCode, queryParams = {}) {
 
   try {
     const res = await sapService.get(`/SQLQueries('${sqlCode}')/List${paramStr}`, { 'Prefer': 'odata.maxpagesize=5000' });
-    return res.data?.value || [];
+    const rows = res.data?.value || [];
+    rows.truncated = rows.length >= 5000 || Boolean(res.data?.['@odata.nextLink'] || res.data?.['odata.nextLink']);
+    return rows;
   } catch (err) {
     const errMsg = (err.message || '').toLowerCase();
     const isNoRecords = err.status === 404 || String(err.code) === '-2028' || errMsg.includes('no matching records') || errMsg.includes('-2028');
@@ -570,6 +588,7 @@ async function fetchAllODataDocs(endpoint, filterStr, selectFields = '', maxDocs
       throw err;
     }
   }
+  allDocs.truncated = Boolean(nextUrl);
   return allDocs;
 }
 
@@ -588,11 +607,24 @@ async function executeQuery({
   clasificacionMedica,
   limit = 10000
 }) {
-  const entityDef = ENTITY_CATALOG[entity];
+  const entityDef = typeof entity === 'string' && Object.hasOwn(ENTITY_CATALOG, entity) ? ENTITY_CATALOG[entity] : null;
   if (!entityDef) {
     throw new Error(`Entidad '${entity}' no reconocida en el catálogo.`);
   }
 
+  if (!Array.isArray(selectedFields) || selectedFields.some(key => typeof key !== 'string')) {
+    throw new Error('La selección de columnas no es válida.');
+  }
+  for (const value of [almacen, proveedor, busqueda, estatusDoc, clasificacionMedica]) {
+    if (value != null && typeof value !== 'string') throw new Error('Los filtros deben ser texto.');
+  }
+  if (estatusDoc && estatusDoc !== 'ALL' && (!entityDef.filters.includes('estatusDoc') || !(entityDef.statusOptions?.map(option => option.value) || ['ALL', 'OPEN', 'CLOSED']).includes(estatusDoc))) throw new Error('El estado elegido no está disponible para este reporte.');
+  const isCalendarDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(Date.parse(`${value}T00:00:00Z`))
+    && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+  if ((fechaDesde && !isCalendarDate(fechaDesde)) || (fechaHasta && !isCalendarDate(fechaHasta))) {
+    throw new Error('El formato de fechas es inválido. Use YYYY-MM-DD y fechas existentes.');
+  }
   // 1. Validar filtro obligatorio de fechas
   if (entityDef.requiresDateFilter) {
     if (!fechaDesde || !fechaHasta) {
@@ -616,17 +648,13 @@ async function executeQuery({
   }
 
   // Clave de caché para evitar consultas idénticas concurrentes a SAP
-  const fieldsKey = (selectedFields || []).slice().sort().join(',');
+  const fieldsKey = JSON.stringify([...new Set(selectedFields)]);
   const searchKey = (busqueda || '').trim().toLowerCase();
-  const effectiveLimit = ['inventory', 'item_prices', 'item_master_data', 'batches'].includes(entity) ? 10000 : Math.max(limit || 5000, 10000);
-  const cacheKey = `${entity}_${fechaDesde || ''}_${fechaHasta || ''}_${almacen || 'ALL'}_${estatusDoc || 'ALL'}_${clasificacionMedica || 'ALL'}_${fieldsKey}_${searchKey}_${effectiveLimit}`;
+  const effectiveLimit = Number.isFinite(Number(limit)) ? Math.min(10000, Math.max(1, Math.floor(Number(limit)))) : 10000;
+  const cacheKey = JSON.stringify([entity, fechaDesde, fechaHasta, almacen, proveedor, estatusDoc, clasificacionMedica, fieldsKey, searchKey, effectiveLimit]);
   const cached = queryResultsCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < QUERY_CACHE_TTL_MS)) {
-    let data = cached.data;
-    if (busqueda && busqueda.trim()) {
-      const q = busqueda.toLowerCase().trim();
-      data = data.filter(r => Object.values(r).some(val => val != null && String(val).toLowerCase().includes(q)));
-    }
+    const data = cached.data;
     return {
       ...cached.resultMeta,
       totalRegistros: data.length,
@@ -637,12 +665,12 @@ async function executeQuery({
   const dateParams = (fechaDesde && fechaHasta) ? { startDate: fechaDesde, endDate: fechaHasta } : {};
 
   let rawRows = [];
+  let sourceTruncated = false;
 
   // 2. Ejecutar según el módulo seleccionado
   switch (entity) {
     case 'inventory':
-    case 'item_prices':
-    case 'item_master_data': {
+    {
       await sapInventoryService.ensureInventoryData();
       let inv = sapInventoryService.getInventoryCache() || [];
       
@@ -697,6 +725,7 @@ async function executeQuery({
 
     case 'purchase_invoices': {
       const items = await executeSapSqlList('sq_v6_pinv', dateParams);
+      sourceTruncated = items.truncated;
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -712,6 +741,7 @@ async function executeQuery({
 
     case 'purchase_orders': {
       const items = await executeSapSqlList('sq_v6_por', dateParams);
+      sourceTruncated = items.truncated;
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -728,6 +758,7 @@ async function executeQuery({
 
     case 'goods_receipts_po': {
       const items = await executeSapSqlList('sq_v6_grpo', dateParams);
+      sourceTruncated = items.truncated;
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -742,6 +773,7 @@ async function executeQuery({
 
     case 'goods_returns': {
       const items = await executeSapSqlList('sq_v6_gret', dateParams);
+      sourceTruncated = items.truncated;
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -763,6 +795,7 @@ async function executeQuery({
       );
 
       rawRows = [];
+      sourceTruncated = transfers.truncated;
       for (const doc of transfers) {
         const lines = doc.StockTransferLines || [{}];
         for (const line of lines) {
@@ -795,6 +828,7 @@ async function executeQuery({
       );
 
       rawRows = [];
+      sourceTruncated = requests.truncated;
       for (const doc of requests) {
         const lines = doc.StockTransferLines || [{}];
         for (const line of lines) {
@@ -830,6 +864,7 @@ async function executeQuery({
       );
 
       rawRows = [];
+      sourceTruncated = exits.truncated;
       for (const doc of exits) {
         const lines = doc.DocumentLines || [{}];
         for (const line of lines) {
@@ -859,6 +894,7 @@ async function executeQuery({
       );
 
       rawRows = [];
+      sourceTruncated = entries.truncated;
       for (const doc of entries) {
         const lines = doc.DocumentLines || [{}];
         for (const line of lines) {
@@ -880,6 +916,7 @@ async function executeQuery({
 
     case 'purchase_requests': {
       const items = await executeSapSqlList('sq_v6_prq', dateParams);
+      sourceTruncated = items.truncated;
       rawRows = items.map(r => ({
         ...r,
         DocDate: formatSapDateStr(r.DocDate),
@@ -892,6 +929,7 @@ async function executeQuery({
 
     case 'sales_invoices': {
       const items = await executeSapSqlList('sq_v6_sinv', dateParams);
+      sourceTruncated = items.truncated;
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -907,6 +945,7 @@ async function executeQuery({
 
     case 'credit_memos': {
       const items = await executeSapSqlList('sq_v6_scrm', dateParams);
+      sourceTruncated = items.truncated;
       rawRows = items.map(p => ({
         ...p,
         DocDate: formatSapDateStr(p.DocDate),
@@ -920,6 +959,7 @@ async function executeQuery({
 
     case 'business_partners': {
       const items = await executeSapSqlList('sq_v6_bp');
+      sourceTruncated = items.truncated;
       rawRows = items.map(b => ({
         ...b,
         CardType: b.CardType === 'S' ? 'Proveedor' : 'Cliente',
@@ -929,13 +969,18 @@ async function executeQuery({
       break;
     }
 
-    default:
-      throw new Error(`Módulo '${entity}' no configurado.`);
+    default: {
+      const service = entityDef.source === 'Vertical' ? verticalReportCatalog : sapReportCatalog;
+      const result = await service.execute(entity, { fechaDesde, fechaHasta, almacen, proveedor, busqueda,
+        estatusDoc, clasificacionMedica, limit: effectiveLimit });
+      rawRows = result.rows;
+      sourceTruncated = result.truncated;
+    }
   }
 
   // 3. Aplicar filtros en memoria de forma segura (sin descartar entidades que no tienen el campo)
   const hasWhsField = rawRows.length > 0 && ('WhsCode' in rawRows[0] || 'FillerCode' in rawRows[0] || 'Filler' in rawRows[0] || 'ToWhsCode' in rawRows[0]);
-  if (almacen && almacen !== 'ALL' && hasWhsField) {
+  if (almacen && almacen !== 'ALL' && hasWhsField && entityDef.filters.includes('almacen')) {
     rawRows = rawRows.filter(r => (
       r.WhsCode === almacen || 
       r.FillerCode === almacen || 
@@ -949,7 +994,7 @@ async function executeQuery({
   }
 
   const hasStatusField = rawRows.length > 0 && ('DocStatus' in rawRows[0] || 'Status' in rawRows[0]);
-  if (estatusDoc && estatusDoc !== 'ALL' && hasStatusField) {
+  if (estatusDoc && estatusDoc !== 'ALL' && hasStatusField && entityDef.filters.includes('estatusDoc')) {
     rawRows = rawRows.filter(r => {
       if (!r.DocStatus && !r.Status) return true;
       const s = String(r.DocStatus || r.Status).toUpperCase();
@@ -964,23 +1009,23 @@ async function executeQuery({
   }
 
   const hasMedClassField = rawRows.length > 0 && ('MedicalClassification' in rawRows[0]);
-  if (clasificacionMedica && clasificacionMedica !== 'ALL' && hasMedClassField) {
+  if (clasificacionMedica && clasificacionMedica !== 'ALL' && hasMedClassField && entityDef.filters.includes('clasificacionMedica')) {
     rawRows = rawRows.filter(r => {
-      const c = String(r.MedicalClassification || '').toUpperCase();
+      const c = `${r.MedicalClassification || ''} ${r.SecondaryClassification || ''}`.toUpperCase();
       if (clasificacionMedica === 'CON') return c.includes('CON') || c.includes('CONTROL');
       if (clasificacionMedica === 'ANTI') return c.includes('ANTI') || c.includes('ANTIBIOT');
       if (clasificacionMedica === 'REFRI') return c.includes('REFRI') || c.includes('FRIO');
       return true;
     });
   }
-  if (proveedor && proveedor.trim()) {
+  if (proveedor && proveedor.trim() && !sapReportCatalog.catalog[entity] && entityDef.source !== 'Vertical') {
     const p = proveedor.toLowerCase().trim();
     rawRows = rawRows.filter(r => 
       String(r.CardName || '').toLowerCase().includes(p) || 
       String(r.CardCode || '').toLowerCase().includes(p)
     );
   }
-  if (busqueda && busqueda.trim()) {
+  if (busqueda && busqueda.trim() && !sapReportCatalog.catalog[entity] && entityDef.source !== 'Vertical') {
     const q = busqueda.toLowerCase().trim();
     rawRows = rawRows.filter(row => {
       return Object.values(row).some(val => 
@@ -989,40 +1034,54 @@ async function executeQuery({
     });
   }
 
-  // 4. Calcular KPIs dinámicos de resumen
+  const truncated = Boolean(sourceTruncated || rawRows.length > effectiveLimit);
+  rawRows = rawRows.slice(0, effectiveLimit);
+  // Los indicadores corresponden a las filas entregadas y a su granularidad.
   let totalImporte = 0;
   let totalPiezas = 0;
   let docAbiertosCount = 0;
+  const openDocuments = new Set();
   let lotesAlertaCount = 0;
 
   rawRows.forEach(r => {
-    if (r.LineTotal != null) totalImporte += Number(r.LineTotal || 0);
-    else if (r.DocTotal != null) totalImporte += Number(r.DocTotal || 0);
-    else if (r.Balance != null) totalImporte += Number(r.Balance || 0);
+    if (entityDef.summary?.amountField) totalImporte += Number(r[entityDef.summary.amountField] || 0);
+    else if (!sapReportCatalog.catalog[entity] && entityDef.source !== 'Vertical') {
+      if (r.LineTotal != null) totalImporte += Number(r.LineTotal || 0);
+      else if (r.Balance != null) totalImporte += Number(r.Balance || 0);
+    }
+    if (entityDef.summary?.quantityField) totalPiezas += Number(r[entityDef.summary.quantityField] || 0);
+    else if (!sapReportCatalog.catalog[entity] && entityDef.source !== 'Vertical') {
+      if (r.Quantity != null) totalPiezas += Number(r.Quantity || 0);
+      else if (r.QuantityOnStock != null) totalPiezas += Number(r.QuantityOnStock || 0);
+    }
 
-    if (r.Quantity != null) totalPiezas += Number(r.Quantity || 0);
-    else if (r.QuantityOnStock != null) totalPiezas += Number(r.QuantityOnStock || 0);
-
-    if (r.DocStatus === 'Abierta' || r.DocStatus === 'O') docAbiertosCount++;
+    if (r.DocStatus === 'Abierta' || r.DocStatus === 'O') {
+      openDocuments.add(r.DocEntry ?? JSON.stringify([r.DocNum, r.DocDate, r.CardCode || r.CardName]));
+    }
     if (r.Status === 'Vencido' || r.Status === 'Próximo a Vencer') lotesAlertaCount++;
   });
+  docAbiertosCount = openDocuments.size;
 
   const kpis = [
     { label: 'Total Registros', value: rawRows.length.toLocaleString('es-MX'), color: '#004687' }
   ];
 
-  if (totalImporte > 0) {
+  const currencies = entityDef.summary?.currencyField
+    ? [...new Set(rawRows.map(row => row[entityDef.summary.currencyField]).filter(Boolean))] : [];
+  const hasIncompleteAmounts = entityDef.summary?.amountField
+    && rawRows.some(row => row[entityDef.summary.amountField] == null);
+  if (totalImporte !== 0 && currencies.length <= 1 && !hasIncompleteAmounts) {
     kpis.push({
-      label: 'Importe Total ($)',
-      value: `$${Math.round(totalImporte).toLocaleString('es-MX')}`,
+      label: `${entityDef.summary?.amountLabel || 'Importe Total'}${currencies.length ? ` (${currencies[0]})` : ' ($)'}`,
+      value: totalImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       color: '#15803D'
     });
   }
 
-  if (totalPiezas > 0) {
+  if (totalPiezas !== 0) {
     kpis.push({
-      label: 'Piezas / Cantidad Total',
-      value: Math.round(totalPiezas).toLocaleString('es-MX'),
+      label: entityDef.summary?.quantityLabel || 'Piezas / Cantidad Total',
+      value: totalPiezas.toLocaleString('es-MX', { maximumFractionDigits: 4 }),
       color: '#0088C9'
     });
   }
@@ -1044,12 +1103,13 @@ async function executeQuery({
   }
 
   // 5. Definición de columnas activas según selección (o default)
-  const activeFields = (selectedFields.length > 0 ? selectedFields : entityDef.defaultFields);
-  const activeColsDef = entityDef.fields.filter(f => activeFields.includes(f.key));
+  const validSelected = [...new Set(selectedFields.filter(key => entityDef.fields.some(field => field.key === key)))];
+  const activeFields = validSelected.length ? validSelected : entityDef.defaultFields;
+  const activeColsDef = activeFields.map(key => entityDef.fields.find(field => field.key === key));
 
   // Preservar todos los campos del registro para que el frontend pueda activar/desactivar columnas al instante
   const projectedData = rawRows.slice(0, effectiveLimit).map(row => {
-    return { ...row };
+    return Object.fromEntries(entityDef.fields.map(field => [field.key, row[field.key] ?? null]));
   });
 
   const finalResult = {
@@ -1057,6 +1117,11 @@ async function executeQuery({
     entityTitle: entityDef.title,
     ejecutadoEn: new Date().toISOString(),
     totalRegistros: projectedData.length,
+    source: entityDef.source,
+    grain: entityDef.grain,
+    limit: effectiveLimit,
+    truncated,
+    message: truncated ? 'El reporte alcanzó el límite de consulta. Reduce el periodo o ajusta los filtros para revisar el resto.' : null,
     kpis,
     columnas: activeColsDef,
     data: projectedData
@@ -1070,10 +1135,17 @@ async function executeQuery({
       entity: entityDef.id,
       entityTitle: entityDef.title,
       ejecutadoEn: finalResult.ejecutadoEn,
+      source: finalResult.source,
+      grain: finalResult.grain,
+      limit: finalResult.limit,
+      truncated: finalResult.truncated,
+      message: finalResult.message,
       kpis,
       columnas: activeColsDef
     }
   });
+  // Evita crecimiento indefinido con periodos y filtros distintos.
+  while (queryResultsCache.size > 100) queryResultsCache.delete(queryResultsCache.keys().next().value);
 
   return finalResult;
 }
@@ -1117,9 +1189,15 @@ async function getSavedQueries(user) {
 }
 
 async function saveQuery(user, { title, description, entity, selectedFields, filters, isPublic }) {
-  if (!title || !entity) {
+  const definition = typeof entity === 'string' && Object.hasOwn(ENTITY_CATALOG, entity) ? ENTITY_CATALOG[entity] : null;
+  if (typeof title !== 'string' || !title.trim() || !definition) {
     throw new Error('El título y la entidad son obligatorios para guardar la consulta.');
   }
+  if (!Array.isArray(selectedFields) || (description != null && typeof description !== 'string')
+    || (filters != null && (typeof filters !== 'object' || Array.isArray(filters)))) {
+    throw new Error('La configuración del reporte no es válida.');
+  }
+  const fields = selectedFields.filter(key => definition.fields.some(field => field.key === key));
 
   const res = await pool.query(`
     INSERT INTO usersapqueries (userid, username, titulo, descripcion, entidad, camposseleccionados, filtrosaplicados, espublico, fechacreacion)
@@ -1131,7 +1209,7 @@ async function saveQuery(user, { title, description, entity, selectedFields, fil
     title.trim(),
     description ? description.trim() : null,
     entity,
-    JSON.stringify(selectedFields || []),
+    JSON.stringify(fields.length ? fields : definition.defaultFields),
     JSON.stringify(filters || {}),
     isPublic ? 1 : 0
   ]);
@@ -1158,11 +1236,10 @@ async function deleteQuery(user, queryId) {
 
 module.exports = {
   getEntityCatalog: () => Object.values(ENTITY_CATALOG),
-  getEntityDefinition: (id) => ENTITY_CATALOG[id],
+  getEntityDefinition: (id) => Object.hasOwn(ENTITY_CATALOG, id) ? ENTITY_CATALOG[id] : undefined,
   initSapQueryBuilderQueries,
   executeQuery,
   getSavedQueries,
   saveQuery,
   deleteQuery
 };
-

@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
@@ -62,13 +63,13 @@ export default function InventarioFarmacia() {
       const json = await response.json();
       
       if (!response.ok || !json.ok) {
-        throw new Error(json.error || 'Error al obtener inventario desde SAP');
+        throw new Error(userMessage(json.error || 'Error al obtener inventario desde SAP'));
       }
       
       setItems(json.data || []);
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      setError(userMessage(err.message));
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ export default function InventarioFarmacia() {
       if (response.ok && json.ok) {
         setBatches(json.data || []);
       } else {
-        alert('Error al cargar lotes: ' + json.error);
+        alert(userMessage('Error al cargar lotes: ' + json.error));
       }
     } catch (err) {
       console.error(err);
@@ -108,7 +109,7 @@ export default function InventarioFarmacia() {
       if (response.ok && json.ok) {
         setHistoryData(json.data || []);
       } else {
-        alert('Error al cargar historial: ' + (json.error || 'Revise que la vista exista en SAP.'));
+        alert(userMessage('Error al cargar historial: ' + (json.error || 'Intenta de nuevo en unos minutos.')));
       }
     } catch (err) {
       console.error(err);
@@ -129,7 +130,7 @@ export default function InventarioFarmacia() {
       if (response.ok && json.ok) {
         setLocations(json.data || []);
       } else {
-        alert('Error al cargar ubicaciones: ' + json.error);
+        alert(userMessage('Error al cargar ubicaciones: ' + json.error));
       }
     } catch (err) {
       console.error(err);
@@ -242,13 +243,13 @@ export default function InventarioFarmacia() {
       { header: 'Grupo', key: 'ItemGroupName', width: 150, align: 'left' },
       { header: 'Laboratorio / Tipo', key: 'ManufacturerName', width: 150, align: 'left' },
       { header: 'Clasificación SAP', key: 'MedicalClassification', width: 140, align: 'center' },
-      { header: 'Stock Actual', key: 'QuantityOnStock', width: 120, align: 'right' },
+      { header: 'Existencias actuales', key: 'QuantityOnStock', width: 120, align: 'right' },
       { header: 'Costo Unitario ($)', key: 'PurchaseCost', width: 130, align: 'right' },
       { header: 'Precio PG ($)', key: 'PricePG', width: 130, align: 'right' },
       { header: 'Precio Hos ($)', key: 'PriceHos', width: 130, align: 'right' },
       { header: 'Margen PG (%)', key: 'ProfitMargin', width: 120, align: 'right' },
       { header: 'Utilidad Esperada ($)', key: 'ExpectedUtility', width: 140, align: 'right' },
-      { header: 'Estatus', key: 'Estatus', width: 100, align: 'center' }
+      { header: 'Estado', key: 'Estatus', width: 100, align: 'center' }
     ];
 
     let html = `
@@ -266,7 +267,7 @@ export default function InventarioFarmacia() {
   .ok{color:#059669;font-weight:bold;}
 </style></head><body>
 <table>
-  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN - PLATAFORMA BI</td></tr>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
   <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte: Inventario de Farmacia (SAP) &nbsp;|&nbsp; Almacén: ${warehouseName}</td></tr>
   <tr class="info-row"><td colspan="${cols.length}">Fecha de exportación: ${fechaReporte} &nbsp;|&nbsp; Registros filtrados: ${filteredItems.length} ${searchTerm ? `&nbsp;|&nbsp; Filtro búsqueda: "${searchTerm}"` : ''}</td></tr>
   <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
@@ -318,7 +319,7 @@ export default function InventarioFarmacia() {
       { header: 'ItemCode', key: 'ItemCode', width: 100 },
       { header: 'Descripción', key: 'ItemName', width: 300 },
       { header: 'Clasificación SAP', key: 'MedicalClassification', width: 130 },
-      { header: 'Stock Actual', key: 'QuantityOnStock', width: 110, align: 'right' },
+      { header: 'Existencias actuales', key: 'QuantityOnStock', width: 110, align: 'right' },
       { header: 'Costo Unitario ($)', key: 'PurchaseCost', width: 120, align: 'right' },
       { header: 'Precio PG ($)', key: 'PricePG', width: 120, align: 'right' },
       { header: 'Precio Hos ($)', key: 'PriceHos', width: 120, align: 'right' }
@@ -338,7 +339,7 @@ export default function InventarioFarmacia() {
   .critico{color:#dc2626;font-weight:bold;}
 </style></head><body>
 <table>
-  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN - PLATAFORMA BI</td></tr>
+  <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
   <tr><td colspan="${cols.length}" class="subtitle-bar">Reporte: Sugerencias de Reabastecimiento - Farmacia</td></tr>
   <tr class="info-row"><td colspan="${cols.length}">Fecha de exportación: ${fechaReporte} &nbsp;|&nbsp; Artículos Críticos: ${lowStockItems.length}</td></tr>
   <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
@@ -428,13 +429,13 @@ export default function InventarioFarmacia() {
             transition: 'background 0.2s'
           }}
         >
-          {loading ? 'Sincronizando...' : '↻ Refrescar SAP'}
+          {loading ? 'Actualizando…' : '↻ Actualizar inventario'}
         </button>
       </header>
 
       {error && (
         <div style={{ padding: '1rem', background: '#fef2f2', borderLeft: '4px solid #ef4444', color: '#991b1b', marginBottom: '2rem', borderRadius: '4px' }}>
-          <strong>Error de Conexión: </strong> {error}
+          <strong>Error de Conexión: </strong> {userMessage(error)}
         </div>
       )}
 
@@ -445,7 +446,7 @@ export default function InventarioFarmacia() {
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div style={{ fontSize: '0.875rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold' }}>Catálogo Activo (Top 500)</div>
           <div style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#0f172a', marginTop: '0.5rem', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-            {totalItems} <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 'normal' }}>SKUs</span>
+            {totalItems} <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 'normal' }}>código de producto</span>
           </div>
         </div>
 
@@ -460,7 +461,7 @@ export default function InventarioFarmacia() {
         {/* Artículos Bajo Stock */}
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', cursor: 'pointer' }} onClick={() => setShowReplenishmentModal(true)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '0.875rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold' }}>Artículos Bajo Stock</div>
+            <div style={{ fontSize: '0.875rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold' }}>Productos con pocas existencias</div>
             {lowStockCount > 0 && (
               <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#d97706', textDecoration: 'underline' }}>
                 Ver sugerencias →
@@ -673,12 +674,12 @@ export default function InventarioFarmacia() {
                 <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'center', width: '80px' }}>Ubicación</th>
                 <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', width: '135px' }}>Grupo / Lab</th>
                 <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'center', width: '120px' }}>Clasificación SAP</th>
-                <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'right', width: '95px' }}>Stock</th>
+                <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'right', width: '95px' }}>Existencias</th>
                 <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'right', width: '85px' }}>Costo</th>
                 <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'right', width: '85px' }}>Precio PG</th>
                 <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'right', width: '85px' }}>Precio Hos</th>
                 <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', color: '#64748b', fontWeight: '700', textAlign: 'center', width: '100px' }}>Margen / Utilidad</th>
-                <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center', width: '65px' }}>Estatus</th>
+                <th style={{ padding: '0.75rem 0.4rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center', width: '65px' }}>Estado</th>
                 <th style={{ padding: '0.75rem 0.5rem', borderBottom: '2px solid #e2e8f0', textAlign: 'center', width: '115px' }}>Acciones</th>
               </tr>
             </thead>
@@ -688,7 +689,7 @@ export default function InventarioFarmacia() {
                   <td colSpan="12" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                       <div className="spinner" style={{ border: '4px solid #f3f3f3', borderTop: '4px solid #3b82f6', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }}></div>
-                      Conectando con SAP Service Layer...
+                      Cargando inventario…
                     </div>
                   </td>
                 </tr>
@@ -972,13 +973,13 @@ export default function InventarioFarmacia() {
                   <tr>
                     <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569' }}>ItemCode</th>
                     <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569' }}>Descripción</th>
-                    <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Stock Actual</th>
+                    <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Existencias actuales</th>
                   </tr>
                 </thead>
                 <tbody>
                   {lowStockItems.length === 0 ? (
                     <tr>
-                      <td colSpan="3" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No hay artículos bajo stock. ¡Todo excelente!</td>
+                      <td colSpan="3" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No hay productos con pocas existencias.</td>
                     </tr>
                   ) : (
                     lowStockItems.map((item, i) => (
@@ -1018,7 +1019,7 @@ export default function InventarioFarmacia() {
                   <thead style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
                     <tr>
                       <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569' }}>Código Almacén</th>
-                      <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Stock Disponible</th>
+                      <th style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Existencias disponibles</th>
                     </tr>
                   </thead>
                   <tbody>

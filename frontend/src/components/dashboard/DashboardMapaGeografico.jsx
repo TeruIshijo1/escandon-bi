@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
+import DashboardChart from './DashboardChart';
 import ExportToolbar from '../shared/ExportToolbar';
 
 // Highcharts TopoJSON de México
@@ -133,7 +134,7 @@ export default function DashboardMapaGeografico({
   const formatNumber = (num) => new Intl.NumberFormat('es-MX').format(num || 0);
 
   return (
-    <div id={targetId}>
+    <div className="dashboard-view" id={targetId}>
       {/* Barra superior con Título, Filtros y Botón de Exportar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
@@ -149,18 +150,18 @@ export default function DashboardMapaGeografico({
 
       {/* KPIs si existen */}
       {kpis && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
           {kpis.map((kpi, idx) => (
-            <div key={idx} className="siti-card" style={{ background: kpi.bg || '#ffffff', color: kpi.color || '#1e293b', padding: '1rem 1.25rem' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600, opacity: 0.85 }}>{kpi.title}</div>
-              <div style={{ fontSize: '1.75rem', fontWeight: 'bold', marginTop: '0.25rem' }}>{kpi.value}</div>
-              {kpi.subtitle && <div style={{ fontSize: '0.75rem', opacity: 0.75, marginTop: '0.25rem' }}>{kpi.subtitle}</div>}
+            <div key={idx} className="siti-card dashboard-metric-card" style={{ background: kpi.bg || '#ffffff', color: kpi.color || '#1e293b', padding: '1rem 1.25rem' }}>
+              <div className="dashboard-metric-label" style={{ fontSize: '0.85rem', fontWeight: 600, opacity: 0.85 }}>{kpi.title}</div>
+              <div className="dashboard-metric-value" style={{ fontSize: '1.75rem', fontWeight: 'bold', marginTop: '0.25rem' }}>{kpi.value}</div>
+              {kpi.subtitle && <div className="dashboard-metric-note" style={{ fontSize: '0.75rem', opacity: 0.75, marginTop: '0.25rem' }}>{kpi.subtitle}</div>}
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="dashboard-chart-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
         {/* Mapa de México */}
         <div className="siti-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '480px' }}>
@@ -247,10 +248,10 @@ export default function DashboardMapaGeografico({
         {/* Gráficas de Barras */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
-          <div className="siti-card" style={{ flex: 1, minHeight: '230px' }}>
+          <div className="siti-card dashboard-panel" style={{ flex: 1, minHeight: '230px' }}>
             <h3 style={{ marginBottom: '1rem', color: '#1e293b', fontWeight: 600 }}>Top 10 Estados</h3>
-            <div style={{ height: 'calc(100% - 2.5rem)', minHeight: 180 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="dashboard-chart-host" style={{ height: 'calc(100% - 2.5rem)', minHeight: 180 }}>
+              <DashboardChart width="100%" height="100%">
                 <BarChart data={estados} layout="vertical" margin={{ top: 5, right: 30, left: 90, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                   <XAxis type="number" tickFormatter={(v) => formatNumber(v)} stroke="#94a3b8" />
@@ -262,14 +263,14 @@ export default function DashboardMapaGeografico({
                   />
                   <Bar dataKey="cantidad" name="Pacientes" fill="#2563eb" radius={[0, 4, 4, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
+              </DashboardChart>
             </div>
           </div>
 
-          <div className="siti-card" style={{ flex: 1, minHeight: '230px' }}>
+          <div className="siti-card dashboard-panel" style={{ flex: 1, minHeight: '230px' }}>
             <h3 style={{ marginBottom: '1rem', color: '#1e293b', fontWeight: 600 }}>Top 15 Municipios / Alcaldías</h3>
-            <div style={{ height: 'calc(100% - 2.5rem)', minHeight: 180 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="dashboard-chart-host" style={{ height: 'calc(100% - 2.5rem)', minHeight: 180 }}>
+              <DashboardChart width="100%" height="100%">
                 <BarChart data={ciudades} layout="vertical" margin={{ top: 5, right: 30, left: 110, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                   <XAxis type="number" tickFormatter={(v) => formatNumber(v)} stroke="#94a3b8" />
@@ -281,7 +282,7 @@ export default function DashboardMapaGeografico({
                   />
                   <Bar dataKey="cantidad" name="Pacientes" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
+              </DashboardChart>
             </div>
           </div>
 

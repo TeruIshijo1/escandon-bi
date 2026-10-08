@@ -63,14 +63,14 @@ describe('POST /api/auth/login', () => {
     __mocks.getMock.mockResolvedValue(undefined);
     const res = await request(app).post('/api/auth/login').send({ username: 'fantasma', password: 'x' });
     expect(res.status).toBe(401);
-    expect(res.body.message).toMatch(/no existe/i);
+    expect(res.body.message).toMatch(/usuario o la contraseña son incorrectos/i);
   });
 
   test('401 si la contraseña es incorrecta', async () => {
     __mocks.getMock.mockResolvedValue(__mocks.mockUser);
     const res = await request(app).post('/api/auth/login').send({ username: 'jefatura', password: 'mala' });
     expect(res.status).toBe(401);
-    expect(res.body.message).toMatch(/Credenciales incorrectas/i);
+    expect(res.body.message).toMatch(/usuario o la contraseña son incorrectos/i);
   });
 
   test('200 y devuelve token + usuario con credenciales válidas', async () => {

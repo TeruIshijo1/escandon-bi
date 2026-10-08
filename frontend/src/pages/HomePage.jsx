@@ -217,7 +217,7 @@ export default function HomePage() {
             lineHeight:   1.2,
             letterSpacing: '-0.01em',
           }}>
-            Dashboard Principal
+            Resumen del hospital
           </h1>
           <p style={{
             fontFamily: 'var(--font-body)',

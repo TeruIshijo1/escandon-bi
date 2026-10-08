@@ -177,7 +177,7 @@ export default function EditableKPIWrapper({
             <style>{`@keyframes kpiSlideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`}</style>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Vincular a Power BI</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Vincular un reporte</div>
                 <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, marginTop: '0.15rem' }}>
                   {form.icono} {kpi.nombreDefault}
                 </h3>
@@ -258,7 +258,7 @@ export default function EditableKPIWrapper({
             </div>
 
             <div style={{ marginBottom: '1.75rem' }}>
-              <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem', letterSpacing: '0.05em' }}>URL DEL REPORTE POWER BI</label>
+              <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem', letterSpacing: '0.05em' }}>ENLACE DEL REPORTE</label>
               <input 
                 type="url" 
                 value={form.pbiUrl} 

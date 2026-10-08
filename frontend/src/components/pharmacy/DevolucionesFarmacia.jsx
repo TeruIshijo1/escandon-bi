@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import PremiumLoader from '../shared/PremiumLoader';
 import ExportButton from '../shared/ExportButton';
@@ -72,7 +73,7 @@ export default function DevolucionesFarmacia() {
         setData(json);
         setPage(1);
       } catch (err) {
-        setError(err.message);
+        setError(userMessage(err.message));
       } finally {
         setLoading(false);
       }
@@ -459,7 +460,7 @@ export default function DevolucionesFarmacia() {
 
       {error && (
         <div style={{ background: '#FEF2F2', color: '#DC2626', padding: '1rem', borderRadius: 8, border: '1px solid #FECACA' }}>
-          <strong>Error:</strong> {error}
+          <strong>Error:</strong> {userMessage(error)}
         </div>
       )}
 

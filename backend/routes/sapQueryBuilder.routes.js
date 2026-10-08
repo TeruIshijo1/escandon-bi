@@ -8,7 +8,16 @@
 const express = require('express');
 const router = express.Router();
 const sapQueryBuilderService = require('../services/sapQueryBuilder.service');
+const reportAssistant = require('../services/reportAssistant.service');
+const rateLimit = require('express-rate-limit');
 const { authenticate } = require('../middleware/auth.middleware');
+
+const assistantLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false,
+  validate: { xForwardedForHeader: false, trustProxy: false },
+  keyGenerator: req => String(req.user?.id || req.user?.username || req.ip),
+  message: { ok: false, error: 'Has enviado varias solicitudes seguidas. Espera un minuto y vuelve a intentarlo.' },
+});
 
 /**
  * Función auxiliar para verificar si el usuario tiene permiso para consultar un módulo específico de SAP.
@@ -47,6 +56,24 @@ router.get('/catalog', authenticate, (req, res) => {
   }
 });
 
+// POST /api/sap-query/assistant
+// Prepare a bounded report configuration without reading any clinical records.
+router.post('/assistant', authenticate, assistantLimiter, async (req, res) => {
+  const { message, history = [], context, pending } = req.body || {};
+  if (typeof message !== 'string' || message.trim().length < 2 || message.length > 1500) return res.status(400).json({ ok: false, error: 'Describe tu reporte con un texto de entre 2 y 1500 caracteres.' });
+  if (!Array.isArray(history) || history.length > 8 || history.some(item => !item || !['user', 'assistant'].includes(item.role) || typeof item.content !== 'string' || item.content.length > 1500)) return res.status(400).json({ ok: false, error: 'No pude leer la conversación. Inicia una nueva solicitud e intenta de nuevo.' });
+  if (pending != null && (typeof pending !== 'object' || Array.isArray(pending) || typeof pending.request !== 'string' || pending.request.length > 1500 || !Array.isArray(pending.answers) || pending.answers.length > 4 || pending.answers.some(answer => typeof answer !== 'string' || answer.length > 1500))) return res.status(400).json({ ok: false, error: 'No pude continuar la solicitud anterior. Inicia una nueva conversación e intenta de nuevo.' });
+  try {
+    const catalog = sapQueryBuilderService.getEntityCatalog().filter(entity => checkSapModuleAccess(req.user, entity.id));
+    if (!catalog.length) return res.status(403).json({ ok: false, error: 'No tienes temas disponibles para crear reportes. Solicita acceso al área de Sistemas.' });
+    const result = await reportAssistant.prepareReport({ message: message.trim(), history, context, pending, catalog });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.warn('[Report Assistant] Could not prepare report.');
+    res.status(503).json({ ok: false, error: 'No pude preparar el reporte en este momento. Intenta de nuevo o elige un tema manualmente.' });
+  }
+});
+
 // POST /api/sap-query/execute
 // Ejecuta consulta contra Service Layer / SQL nativo verificando permisos
 router.post('/execute', authenticate, async (req, res) => {
@@ -69,7 +96,7 @@ router.post('/execute', authenticate, async (req, res) => {
       estatusDoc,
       clasificacionMedica,
       busqueda,
-      limit: limit ? parseInt(limit, 10) : 2000
+      limit: limit ?? 10000
     });
     res.json({ ok: true, ...result });
   } catch (err) {
@@ -82,7 +109,7 @@ router.post('/execute', authenticate, async (req, res) => {
 router.get('/saved', authenticate, async (req, res) => {
   try {
     const queries = await sapQueryBuilderService.getSavedQueries(req.user);
-    res.json({ ok: true, queries });
+    res.json({ ok: true, queries: queries.filter(query => checkSapModuleAccess(req.user, query.entity)) });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -93,6 +120,12 @@ router.get('/saved', authenticate, async (req, res) => {
 router.post('/saved', authenticate, async (req, res) => {
   try {
     const { title, description, entity, selectedFields, filters, isPublic } = req.body;
+    if (!sapQueryBuilderService.getEntityDefinition(entity)) {
+      return res.status(400).json({ ok: false, error: 'El módulo seleccionado no existe.' });
+    }
+    if (!checkSapModuleAccess(req.user, entity)) {
+      return res.status(403).json({ ok: false, error: 'No tienes permiso para guardar reportes de este módulo.' });
+    }
     const saved = await sapQueryBuilderService.saveQuery(req.user, {
       title,
       description,

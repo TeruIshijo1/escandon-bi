@@ -146,7 +146,7 @@ router.post('/usuarios', async (req, res, next) => {
 
     if (!username || !nombre || !email || !password || !rolId) {
       return res.status(400).json({
-        error: 'Campos requeridos: username, nombre, email, password, rolId',
+        error: "Completa el usuario, nombre, correo, contraseña y perfil de acceso.",
       });
     }
 
@@ -163,7 +163,7 @@ router.post('/usuarios', async (req, res, next) => {
     // Verificar duplicados
     const existe = await db.prepare('SELECT UsuarioId FROM Usuarios WHERE Username = ? OR Email = ?')
       .get(username.toLowerCase(), email.toLowerCase());
-    if (existe) return res.status(409).json({ error: 'El username o email ya existe' });
+    if (existe) return res.status(409).json({ error: "Ese usuario o correo ya está registrado. Usa uno diferente." });
 
     const hash = await bcrypt.hash(password, 12);
 
@@ -624,7 +624,7 @@ router.put('/kpi-config/:elementoId', async (req, res, next) => {
     const db = getDb();
 
     const kpi = await db.prepare('SELECT KPIId FROM KPIConfig WHERE ElementoId = ?').get(req.params.elementoId);
-    if (!kpi) return res.status(404).json({ error: 'KPI no encontrado' });
+    if (!kpi) return res.status(404).json({ error: "No se encontró el indicador seleccionado." });
 
     const updates = [];
     const params  = [];
@@ -644,7 +644,7 @@ router.put('/kpi-config/:elementoId', async (req, res, next) => {
     params.push(req.params.elementoId);
 
     await db.prepare(`UPDATE KPIConfig SET ${updates.join(', ')} WHERE ElementoId = ?`).run(...params);
-    res.json({ ok: true, message: 'KPI actualizado correctamente' });
+    res.json({ ok: true, message: "Indicador actualizado." });
   } catch (err) { next(err); }
 });
 
@@ -667,7 +667,7 @@ router.post('/sync-dw-full', async (req, res, next) => {
 
     res.json({
       ok: true,
-      message: 'Re-sincronización completa de DW finalizada con éxito.',
+      message: "Información actualizada.",
       detalle: {
         trasladosSincronizados: countT || 0
       }

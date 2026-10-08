@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
@@ -114,7 +115,7 @@ export default function CargosReversasPaciente() {
       setData(json);
     } catch (err) {
       console.error('[CargosReversasPaciente Error]', err);
-      setError(err.message);
+      setError(userMessage(err.message));
     } finally {
       setLoading(false);
     }
@@ -266,7 +267,7 @@ export default function CargosReversasPaciente() {
 </style></head><body>
 <table>
   <tr><td colspan="${cols.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
-  <tr><td colspan="${cols.length}" class="subtitle-bar">Auditoría: Reporte Consolidado de Cargos y Reversas por Paciente (Costos SAP vs Venta Cirrus y Unidad de Servicio)</td></tr>
+  <tr><td colspan="${cols.length}" class="subtitle-bar">Auditoría: Reporte Consolidado de Cargos y Reversas por Paciente (Costos SAP vs Venta Vertical y Unidad de Servicio)</td></tr>
   <tr class="info-row"><td colspan="${cols.length}">Período: ${fechaDesde} al ${fechaHasta} &nbsp;|&nbsp; Movimientos: ${tipoMovimiento} &nbsp;|&nbsp; Unidad: ${unidadServicio} &nbsp;|&nbsp; Total Registros: ${filtered.length} &nbsp;|&nbsp; Generado: ${fechaReporte}</td></tr>
   <tr><td colspan="${cols.length}" style="height:6px;border:none"></td></tr>
   <tr>${cols.map(c => `<th style="width:${c.width}px">${c.header}</th>`).join('')}</tr>
@@ -570,7 +571,7 @@ export default function CargosReversasPaciente() {
           background: '#FEE2E2', border: '1px solid #F87171', color: '#991B1B',
           padding: '1rem', borderRadius: '8px', marginBottom: '1rem', fontWeight: 600
         }}>
-          ⚠️ Error al consultar movimientos: {error}
+          ⚠️ Error al consultar movimientos: {userMessage(error)}
         </div>
       )}
 

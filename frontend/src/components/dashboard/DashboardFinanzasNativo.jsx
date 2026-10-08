@@ -1,5 +1,7 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect } from 'react';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
+import DashboardChart from './DashboardChart';
 import EstadoCuentaModal from '../shared/EstadoCuentaModal';
 import FacturaProveedorModal from '../shared/FacturaProveedorModal';
 import ReciboIngresoModal from '../shared/ReciboIngresoModal';
@@ -52,7 +54,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
       if (json.success) {
         setData(json.data);
       } else {
-        setError(json.error || 'Error al cargar datos');
+        setError(userMessage(json.error || 'Error al cargar datos'));
       }
     } catch (err) {
       setError('Error de conexión con el servidor.');
@@ -89,7 +91,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
   };
 
   if (loading) return <PremiumLoader text="Cargando datos financieros..." style={{ height: '400px' }} />;
-  if (error) return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{error}</div>;
+  if (error) return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{userMessage(error)}</div>;
   if (!data || !data.metodosData) return <div style={{ textAlign: 'center', color: '#64748b' }}>Sin registros en las fechas seleccionadas...</div>;
 
   const { metodosData, transacciones, kpis } = data;
@@ -185,7 +187,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
   ];
 
   return (
-    <div id="dashboard-finanzas-container" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <div className="dashboard-view" id="dashboard-finanzas-container" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Hidden export buttons triggered by DashboardDirectivo header */}
       <div style={{ display: 'none' }}>
@@ -223,11 +225,11 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
       {activeTab === 'HISTORIAL' ? (
         <>
       {/* KPIs Section */}
-      <div style={{
+      <div className="dashboard-metric-grid" style={{
         display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem'
       }}>
         {kpiCards.map((kpi, i) => (
-          <div key={i} style={{
+          <div className="dashboard-metric-card" key={i} style={{
             background: 'var(--surface-raised)',
             borderRadius: 'var(--radius-md)',
             padding: '1.2rem 1.25rem',
@@ -239,14 +241,14 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
             justifyContent: 'center',
             boxSizing: 'border-box'
           }}>
-            <div style={{
+            <div className="dashboard-metric-label" style={{
               fontFamily: 'var(--font-display)',
               fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em',
               textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.4rem'
             }}>
               {kpi.label}
             </div>
-            <div style={{
+            <div className="dashboard-metric-value" style={{
               fontFamily: 'var(--font-mono)', fontSize: '1.75rem', fontWeight: 600,
               color: 'var(--text-primary)', lineHeight: 1, marginBottom: '0.35rem',
               letterSpacing: '-0.02em'
@@ -254,7 +256,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
               {kpi.value}
             </div>
             {kpi.delta && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', fontWeight: 600 }}>
+              <div className="dashboard-metric-note" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', fontWeight: 600 }}>
                 {kpi.up !== null && (
                   <span style={{ color: kpi.up ? '#10B981' : '#EF4444', fontSize: '1rem' }}>
                     {kpi.up ? '▲' : '▼'}
@@ -267,11 +269,11 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: 'var(--shadow-sm)', border: '1px solid rgba(0,70,135,0.05)', display: 'flex', flexDirection: 'column' }}>
+      <div className="dashboard-chart-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+        <div className="dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: 'var(--shadow-sm)', border: '1px solid rgba(0,70,135,0.05)', display: 'flex', flexDirection: 'column' }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#0f172a', fontSize: '1.1rem', fontWeight: 700 }}>Distribución por Método de Pago</h3>
-          <div style={{ flex: 1, minHeight: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ flex: 1, minHeight: '300px' }}>
+            <DashboardChart width="100%" height="100%">
               <PieChart>
                 <Pie data={metodosData} dataKey="monto" nameKey="metodo" cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={3}>
                   {metodosData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
@@ -279,7 +281,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
                 <Tooltip formatter={(value) => formatCurrency(value)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Legend verticalAlign="bottom" height={36} />
               </PieChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
@@ -480,7 +482,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
           </div>
           
           {loadingMl ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Cargando modelo predictivo...</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Calculando estimaciones…</div>
           ) : mlData.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No hay proyecciones generadas. Haz clic en recalcular.</div>
           ) : (

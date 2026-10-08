@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import { useState, useEffect } from 'react';
 import PremiumLoader from '../shared/PremiumLoader';
 import { API_BASE } from '../../api/config';
@@ -35,7 +36,7 @@ export default function DashboardVidasSalvadas({ periodo }) {
       const json = await res.json();
       
       if (!json.ok) {
-        throw new Error(json.error || 'Error al obtener vidas salvadas');
+        throw new Error(userMessage(json.error || 'Error al obtener vidas salvadas'));
       }
 
       let listData = json.data || [];
@@ -51,7 +52,7 @@ export default function DashboardVidasSalvadas({ periodo }) {
 
     } catch (err) {
       console.error('[DashboardVidasSalvadas]', err);
-      setError(err.message);
+      setError(userMessage(err.message));
     } finally {
       setLoading(false);
     }
@@ -69,7 +70,7 @@ export default function DashboardVidasSalvadas({ periodo }) {
       if (json.ok) {
         setDetailData(json);
       } else {
-        alert(json.error || 'Error al cargar detalle');
+        alert(userMessage(json.error || 'Error al cargar detalle'));
         setSelectedAtencion(null);
       }
     } catch (e) {
@@ -128,11 +129,11 @@ export default function DashboardVidasSalvadas({ periodo }) {
   }
 
   if (error) {
-    return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{error}</div>;
+    return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{userMessage(error)}</div>;
   }
 
   return (
-    <div style={{ padding: '0', fontFamily: "'Inter', sans-serif" }}>
+    <div className="dashboard-view" style={{ padding: '0', fontFamily: "'Inter', sans-serif" }}>
       {/* Tabla de Detalles */}
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,70,135,0.1)' }}>
         <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Detalle de Atenciones - SAP B1</h3>

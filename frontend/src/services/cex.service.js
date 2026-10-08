@@ -1,3 +1,4 @@
+import { userMessage } from '../utils/userMessages';
 const API_BASE = '/api/cex';
 
 const getHeaders = () => {
@@ -10,7 +11,7 @@ const getHeaders = () => {
 
 const handleResponse = async (res) => {
   const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Error en la petición');
+  if (!res.ok) throw new Error(userMessage(json.error || 'Error en la petición'));
   return json;
 };
 

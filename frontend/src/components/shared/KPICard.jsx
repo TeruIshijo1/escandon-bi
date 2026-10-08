@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 /**
  * KPICard.jsx — Tarjeta de indicador clickeable con edición inline (solo Admin)
  * Hospital Escandón BI Platform v4.0
@@ -14,6 +15,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useKPIConfig } from '../../hooks/useKPIConfig';
 import useEscapeKey from '../../hooks/useEscapeKey';
 import { useAuth } from '../../context/AuthContext';
+import '../dashboard/DashboardVisuals.css';
 
 const ICONOS_RAPIDOS = ['📊','🏥','❤️','🔪','📅','🚪','📦','💼','⚙️','🎯','⭐','📋','👤','♀️','📉','👶','✅','⚠️','💰','🛏️','🔄'];
 
@@ -98,7 +100,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
       });
       if (!res.ok) {
         const data = await res.json().catch(()=>({}));
-        throw new Error(data.error || 'Error al exportar');
+        throw new Error(userMessage(data.error || 'Error al exportar'));
       }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -111,7 +113,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
       window.URL.revokeObjectURL(url);
       showToast('✅ Excel descargado');
     } catch (err) {
-      showToast(`❌ ${err.message}`);
+      showToast(userMessage(`❌ ${err.message}`));
     }
   };
 
@@ -119,6 +121,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
     <>
       {/* ── Tarjeta principal ── */}
       <div
+        className={`dashboard-metric-card${value == null || value === '' ? ' dashboard-metric-card--link' : ''}`}
         onClick={handleCardClick}
         title={hasPBI ? `Ver reporte: ${kpi.nombre}` : (isAdmin ? 'Sin reporte configurado. Haga click en ✏️ para configurar.' : '')}
         style={{
@@ -156,7 +159,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
         }}
       >
         {/* Ícono de fondo decorativo */}
-        <div style={{
+        <div aria-hidden="true" style={{
           position: 'absolute', right: 12, top: 14,
           fontSize: '1.8rem', opacity: 0.08, userSelect: 'none',
           pointerEvents: 'none',
@@ -167,7 +170,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
           <button
             className="kpi-edit-btn"
             onClick={openEdit}
-            title="Editar nombre, ícono y URL de Power BI"
+            title="Editar nombre, ícono y enlace del reporte"
             style={{
               position:  'absolute', top: 8, right: 8,
               width: 26, height: 26,
@@ -193,7 +196,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
         )}
 
         {/* Etiqueta */}
-        <div style={{
+        <div className="dashboard-metric-label" style={{
           fontFamily: 'var(--font-display)',
           fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em',
           textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: value != null && value !== '' ? '0.4rem' : 0,
@@ -204,7 +207,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
 
         {/* Valor */}
         {value != null && value !== '' && (
-          <div style={{
+          <div className="dashboard-metric-value" style={{
             fontFamily: 'var(--font-mono)', fontSize: '1.75rem', fontWeight: 600,
             color: 'var(--text-primary)', lineHeight: 1, marginBottom: '0.35rem',
             letterSpacing: '-0.02em'
@@ -215,7 +218,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
 
         {/* Subtítulo */}
         {value != null && value !== '' && subtitle && (
-          <div style={{ fontFamily: 'var(--font-body)', fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+          <div className="dashboard-metric-note" style={{ fontFamily: 'var(--font-body)', fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
             ● {subtitle}
           </div>
         )}
@@ -225,7 +228,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
           
           {/* Indicador PBI (solo si tiene URL) */}
           {kpi.pbiUrl ? (
-            <div style={{
+            <div className="dashboard-metric-report" style={{
               fontFamily: 'var(--font-body)',
               fontSize: '0.62rem', fontWeight: 700,
               color: hasPBI ? accentColor : 'var(--text-muted)',
@@ -359,7 +362,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
             {/* Campo: URL Power BI */}
             <div style={{ marginBottom: '1.75rem' }}>
               <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem', letterSpacing: '0.05em' }}>
-                URL DEL REPORTE POWER BI
+                ENLACE DEL REPORTE
               </label>
               <input
                 type="url"

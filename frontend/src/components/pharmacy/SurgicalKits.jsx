@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
@@ -33,7 +34,7 @@ export default function SurgicalKits() {
         if (json.ok) {
           setData(json.data);
         } else {
-          setError(json.error || 'Error al obtener datos');
+          setError(userMessage(json.error || 'Error al obtener datos'));
         }
         setLoading(false);
       })
@@ -288,7 +289,7 @@ export default function SurgicalKits() {
         </div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '12px', fontWeight: 'bold' }}>
-          ⚠️ {error}
+          ⚠️ {userMessage(error)}
         </div>
       ) : filteredKits.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted, #64748b)' }}>

@@ -333,7 +333,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 2. Tabla Cirrus Censo
+    // 2. Tabla de censo de Vertical
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_cirrus_censo (
         cuentahospitalaria VARCHAR(100) PRIMARY KEY,
@@ -344,7 +344,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 3. Tabla Cirrus Consumo
+    // 3. Tabla de consumos de Vertical
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_cirrus_consumo (
         idcargo SERIAL PRIMARY KEY,

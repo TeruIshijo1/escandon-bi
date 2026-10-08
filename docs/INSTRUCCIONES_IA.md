@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/React-18-blue.svg" alt="React" />
     <img src="https://img.shields.io/badge/Node.js-20-green.svg" alt="Node.js" />
     <img src="https://img.shields.io/badge/Vite-5-purple.svg" alt="Vite" />
-    <img src="https://img.shields.io/badge/SQLite-3-lightgrey.svg" alt="SQLite" />
+    <img src="https://img.shields.io/badge/PostgreSQL-BI-blue.svg" alt="PostgreSQL" />
     <img src="https://img.shields.io/badge/PowerBI-Embedded-yellow.svg" alt="PowerBI" />
   </p>
 </div>
@@ -37,7 +37,7 @@ La plataforma unifica información proveniente de **3 ecosistemas distintos** de
 
 - 🔐 **Control de Acceso (RBAC):** Sistema robusto con Autenticación JWT y roles personalizables (Superadmin, Directivo, Auditor, Médico Jefe).
 - 📊 **PowerBI Embedded:** Dashboards interactivos incrustados sin necesidad de salir de la aplicación.
-- 🤖 **Asistente ARIA (IA - RAG):** Asistente virtual impulsado por OpenAI (GPT-4o) para consultas analíticas instantáneas vía chat.
+- 🤖 **Asistentes de IA:** MAR-IA y el chat de reportes utilizan el proveedor configurado (Gemini, DeepSeek u OpenAI), además de la interpretación local y los permisos del usuario. El modelo Gemini predeterminado es `gemini-3.5-flash-lite`.
 - 🏥 **Módulos Clínicos y Operativos:** Monitorización del Quirófano, UCI, Consulta Externa e Inventarios.
 - 📄 **Exportación Dinámica:** Generación de reportes en formatos PDF interactivo y hojas de cálculo (Excel).
 
@@ -48,10 +48,10 @@ La plataforma unifica información proveniente de **3 ecosistemas distintos** de
 | **Frontend**| React + Vite + React Router DOM   | 18 / 5 / 6|
 | **Estilos** | CSS Vanilla (Variables, Módulos)  | —         |
 | **Backend** | Node.js + Express                 | 20 / 4    |
-| **Base Datos**| SQLite 3 (better-sqlite3)       | 3         |
+| **Base Datos**| PostgreSQL (persistencia BI)       | Servidor configurado |
 | **Auth**    | JWT (jsonwebtoken) + bcryptjs     | 9         |
 | **BI Embed**| PowerBI REST API                  | v1.0      |
-| **IA/RAG**  | OpenAI API / Azure OpenAI (GPT-4o)| —         |
+| **IA**      | Gemini / DeepSeek / OpenAI según configuración | — |
 | **Reportes**| pdfkit + exceljs                  | —         |
 
 ## 🚀 Inicio Rápido (Instalación Local)
@@ -83,7 +83,7 @@ npm install
 > Antes de inicializar la base de datos, asegúrate de configurar la variable `SEED_ADMIN_PASSWORD` en el archivo `backend/.env`. Esto establecerá la contraseña de la primera cuenta administradora (`admin`).
 
 ```bash
-# Inicializa la base de datos SQLite y pobla roles
+# Inicializa PostgreSQL y los roles en una instalación nueva
 npm run db:init
 
 # Inicia el servidor de desarrollo
@@ -111,7 +111,7 @@ El frontend estará disponible en `http://localhost:5173`
 
 El sistema usa variables de entorno para proteger secretos. En la carpeta `backend`, consulta `.env.example`. Las más críticas a rellenar:
 
-- `DB_PATH`: Ruta al archivo de SQLite (por defecto: `../database/escandon_bi.db`)
+- `PGUSER`, `PGHOST`, `PGPASSWORD`, `PGDATABASE`, `PGPORT`: conexión PostgreSQL de BI
 - `JWT_SECRET`: Llave criptográfica (mínimo 64 caracteres)
 - `SEED_ADMIN_PASSWORD`: Contraseña para crear el Admin en `npm run db:init`
 - `OPENAI_API_KEY`: API Key para activar el Asistente ARIA

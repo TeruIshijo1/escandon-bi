@@ -367,7 +367,7 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
                     <ColumnFilter columnKey="paciente" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="PACIENTE" />
                     <ColumnFilter columnKey="area" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="ÁREA" />
                     <ColumnFilter columnKey="categoria" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="CATEGORÍA" />
-                    <ColumnFilter columnKey="codigo" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="CÓDIGO / SKU" />
+                    <ColumnFilter columnKey="codigo" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="Código de producto" />
                     <ColumnFilter columnKey="insumo" data={rows} colFilters={colFilters} setColFilters={setColFilters} label="INSUMO / MEDICAMENTO" />
                     <th style={{ textAlign: 'right' }}>P. UNITARIO ($)</th>
                     <th style={{ textAlign: 'center' }}>SALIDA FÍSICA</th>

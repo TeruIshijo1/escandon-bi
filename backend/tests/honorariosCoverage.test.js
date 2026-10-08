@@ -29,3 +29,24 @@ test('never duplicates a represented source or invents missing tariffs and VAT',
   expect(result.rows[2].IvaLinea).toBeNull();
   expect(result.coverage.duplicateCandidates).toBe(1);
 });
+
+test('keeps appointment, attention and sales order identifiers separate', () => {
+  const result = mergeRecoveredAppointments([], [
+    candidate({ PCAPNum: 10, PCNum: null, SONum: 80 }),
+    candidate({ PCAPNum: 11, PCNum: 20, SONum: 81 }),
+    candidate({ PCAPNum: 12, PCNum: null, OrderPCNum: 22, SONum: 82 })
+  ]);
+  expect(result.rows[0]).toMatchObject({ FolioReferenciaOrigen: 10, FolioCita: 10, FolioAtencion: null, FolioOrdenVenta: 80 });
+  expect(result.rows[1]).toMatchObject({ FolioReferenciaOrigen: 11, FolioCita: 11, FolioAtencion: 20, FolioOrdenVenta: 81 });
+  expect(result.rows[2]).toMatchObject({ FolioReferenciaOrigen: 12, FolioCita: 12, FolioAtencion: 22, FolioOrdenVenta: 82 });
+});
+
+test('excluded groups cannot return through appointment recovery or affect coverage totals', () => {
+  const groups = ['FARMACIA', 'Laboratorio', ' Estudios de Laboratorio ', 'imagenología', ' Almacén   General '];
+  const original = groups.map((GrupoServicio, i) => ({ UDRKey: `PC-${i}`, GrupoServicio }));
+  const candidates = groups.map((ItemGroupName, i) => candidate({ PCAPNum: i + 2, ItemGroupName }));
+  const result = mergeRecoveredAppointments(original, [...candidates, candidate({ ItemGroupName: 'CONSULTA EXTERNA' })]);
+  expect(result.rows).toHaveLength(1);
+  expect(result.rows[0].GrupoServicio).toBe('CONSULTA EXTERNA');
+  expect(result.coverage).toMatchObject({ candidates: 1, recoveredAppointments: 1, recoveredBase: 225 });
+});

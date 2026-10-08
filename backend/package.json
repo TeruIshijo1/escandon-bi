@@ -4,8 +4,9 @@
   "description": "Plataforma BI Hospital Escandón — Backend API",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node scripts/start-server.js",
+    "dev": "node scripts/start-server.js --watch",
+    "runtime:check": "node scripts/start-server.js --check",
     "test": "jest --coverage",
     "lint": "eslint . --ext .js",
     "db:init": "node config/init-db.js"

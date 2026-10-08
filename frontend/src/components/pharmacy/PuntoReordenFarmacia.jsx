@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 /* @refresh reset */
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
@@ -92,11 +93,11 @@ export default function PuntoReordenFarmacia() {
         headers: authHeaders()
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Error al obtener punto de reorden');
+      if (!res.ok || !json.ok) throw new Error(userMessage(json.error || 'Error al obtener punto de reorden'));
       setItems(json.data || []);
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      setError(userMessage(err.message));
     } finally {
       setLoading(false);
     }
@@ -177,7 +178,7 @@ export default function PuntoReordenFarmacia() {
       document.body.removeChild(link);
     })
     .catch(err => {
-      alert(err.message);
+      alert(userMessage(err.message));
     });
   };
 
@@ -212,7 +213,7 @@ export default function PuntoReordenFarmacia() {
         alert('Predicciones calculadas y guardadas correctamente.');
         fetchMLPredictions();
       } else {
-        alert('Error al ejecutar predicciones: ' + (json.error || 'Desconocido'));
+        alert(userMessage('Error al ejecutar predicciones: ' + (json.error || 'Desconocido')));
       }
     } catch (err) {
       console.error('Error running ML predictions:', err);
@@ -266,11 +267,11 @@ export default function PuntoReordenFarmacia() {
       if (res.ok && json.ok) {
         fetchMLDataset();
       } else {
-        alert('Error al sincronizar: ' + (json.error || 'Desconocido'));
+        alert(userMessage('No se pudo actualizar la información: ' + (json.error || 'Desconocido')));
       }
     } catch (err) {
       console.error('Error syncing ML dataset:', err);
-      alert('Error de red al sincronizar.');
+      alert('No se pudo actualizar la información. Revisa tu conexión e intenta de nuevo.');
     } finally {
       setSyncingML(false);
     }
@@ -287,7 +288,7 @@ export default function PuntoReordenFarmacia() {
       if (res.ok && json.ok) {
         setConfigData(json);
       } else {
-        showConfigToast('error', json.error || 'Error al cargar la configuración dinámica');
+        showConfigToast('error', userMessage(json.error || 'Error al cargar la configuración dinámica'));
       }
     } catch (err) {
       console.error('Error loading config dinamica:', err);
@@ -311,10 +312,10 @@ export default function PuntoReordenFarmacia() {
       });
       const json = await res.json();
       if (res.ok && json.ok) {
-        showConfigToast('ok', json.message || 'Excel cargado correctamente');
+        showConfigToast('ok', userMessage(json.message || 'Excel cargado correctamente'));
         fetchConfigDinamica();
       } else {
-        showConfigToast('error', json.error || 'Error al procesar el Excel');
+        showConfigToast('error', userMessage(json.error || 'Error al procesar el Excel'));
       }
     } catch (err) {
       console.error('Error uploading excel:', err);
@@ -337,11 +338,11 @@ export default function PuntoReordenFarmacia() {
       });
       const json = await res.json();
       if (res.ok && json.ok) {
-        showConfigToast('ok', json.message || `Configuración aplicada a ${json.applied} SKUs`);
+        showConfigToast('ok', userMessage(json.message || `Configuración aplicada a ${json.applied} SKUs`));
         fetchConfigDinamica();
         fetchReorderData();
       } else {
-        showConfigToast('error', json.error || 'Error al aplicar la configuración');
+        showConfigToast('error', userMessage(json.error || 'Error al aplicar la configuración'));
       }
     } catch (err) {
       console.error('Error applying config:', err);
@@ -387,7 +388,7 @@ export default function PuntoReordenFarmacia() {
         setLinkModal(null);
         fetchConfigDinamica();
       } else {
-        showConfigToast('error', json.error || 'Error al guardar el vínculo');
+        showConfigToast('error', userMessage(json.error || 'Error al guardar el vínculo'));
       }
     } catch (err) {
       console.error('Error linking product:', err);
@@ -479,7 +480,7 @@ export default function PuntoReordenFarmacia() {
         })
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Error al guardar notita');
+      if (!res.ok || !json.ok) throw new Error(userMessage(json.error || 'Error al guardar notita'));
 
       // Actualizar estado local
       setItems(prev => prev.map(i => {
@@ -511,7 +512,7 @@ export default function PuntoReordenFarmacia() {
 
       setEditingItem(null);
     } catch (err) {
-      alert('Error guardando cambios: ' + err.message);
+      alert(userMessage('Error guardando cambios: ' + err.message));
     } finally {
       setSavingNote(false);
     }
@@ -532,7 +533,7 @@ export default function PuntoReordenFarmacia() {
         })
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Error al guardar solicitud');
+      if (!res.ok || !json.ok) throw new Error(userMessage(json.error || 'Error al guardar solicitud'));
 
       setItems(prev => prev.map(i => {
         if (i.ItemCode === item.ItemCode) {
@@ -550,7 +551,7 @@ export default function PuntoReordenFarmacia() {
       }));
       setInlineEditCode(null);
     } catch (err) {
-      alert('Error al guardar solicitud: ' + err.message);
+      alert(userMessage('Error al guardar solicitud: ' + err.message));
     }
   };
 
@@ -812,7 +813,7 @@ export default function PuntoReordenFarmacia() {
   .pedido{color:#0284c7;font-weight:bold;}
 </style></head><body>
 <table>
-  <tr><td colspan="9" class="title-bar">HOSPITAL ESCANDÓN - PLATAFORMA BI</td></tr>
+  <tr><td colspan="9" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
   <tr><td colspan="9" class="subtitle-bar">Farmacia - Punto de Reorden y Pedidos SAP</td></tr>
   <tr><td colspan="9" style="font-size:9pt;color:#64748b;padding:6px 0">Fecha de reporte: ${fechaReporte} | Insumos Requeridos: ${stats.reordenCount}</td></tr>
   <tr>
@@ -1029,7 +1030,7 @@ export default function PuntoReordenFarmacia() {
 
       {error && (
         <div style={{ padding: '1rem', background: '#fef2f2', borderLeft: '4px solid #ef4444', color: '#991b1b', marginBottom: '2rem', borderRadius: '8px' }}>
-          <strong>Error de Carga: </strong> {error}
+          <strong>Error de Carga: </strong> {userMessage(error)}
         </div>
       )}
 
@@ -1043,9 +1044,9 @@ export default function PuntoReordenFarmacia() {
               <span className="skeleton-pulse" style={{ width: '70px' }}></span>
             ) : (
               stats.reordenCount
-            )} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 'normal' }}>SKUs</span>
+            )} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 'normal' }}>código de producto</span>
           </div>
-          <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: '600' }}>⚠️ Stock por debajo del Mínimo</span>
+          <span style={{ fontSize: '0.8rem', color: '#ef4444', fontWeight: '600' }}>⚠️ Existencias por debajo del Mínimo</span>
         </div>
 
         <div className="reorder-kpi-card" style={{ borderTop: '4px solid #0284c7' }}>
@@ -1055,7 +1056,7 @@ export default function PuntoReordenFarmacia() {
               <span className="skeleton-pulse" style={{ width: '70px' }}></span>
             ) : (
               stats.pedidosCount
-            )} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 'normal' }}>SKUs</span>
+            )} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 'normal' }}>código de producto</span>
           </div>
           <span style={{ fontSize: '0.8rem', color: '#0369a1', fontWeight: '600' }}>🚚 Evita duplicados entre turnos</span>
         </div>
@@ -1079,7 +1080,7 @@ export default function PuntoReordenFarmacia() {
               <span className="skeleton-pulse" style={{ width: '70px' }}></span>
             ) : (
               items.length
-            )} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 'normal' }}>SKUs</span>
+            )} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 'normal' }}>código de producto</span>
           </div>
           <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: '600' }}>⚙️ Configuración Dinámica de Reorden</span>
         </div>
@@ -1169,7 +1170,7 @@ export default function PuntoReordenFarmacia() {
                 {loading ? (
                   <tr>
                     <td colSpan="10" style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
-                      Cargando matriz de reorden y sincronizando stock SAP...
+                      Cargando existencias y cantidades sugeridas para compra…
                     </td>
                   </tr>
                 ) : filteredItems.length === 0 ? (
@@ -1407,7 +1408,7 @@ onClick={() => fetchPedidosData(true)}
           </div>
 
           {loadingPedidos ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)' }}>Consultando pedidos activos desde SAP Service Layer...</div>
+            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)' }}>Cargando pedidos pendientes…</div>
           ) : pedidos.length === 0 ? (
             <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)' }}>No hay ordenes de compra ni solicitudes abiertas en SAP actualmente.</div>
           ) : (
@@ -1487,10 +1488,10 @@ onClick={() => fetchPedidosData(true)}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
             <div>
               <h2 style={{ margin: 0, color: 'var(--text-primary, #0f172a)', fontSize: '1.35rem', fontWeight: 'bold' }}>
-                🔮 Diagnóstico Inteligente de Stock y Alertas de Desabasto (IA)
+                🔮 Disponibilidad y alertas de productos
               </h2>
               <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary, #64748b)', fontSize: '0.9rem' }}>
-                Cálculo automatizado del riesgo de desabasto basado en el inventario disponible y el promedio de consumo histórico de los artículos.
+                Revisa qué productos podrían agotarse según las existencias y el consumo reciente.
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -1550,7 +1551,7 @@ onClick={() => fetchPedidosData(true)}
                     opacity: mlDataset.length === 0 ? 0.6 : 1
                   }}
                 >
-                  📥 Exportar Foto de Hoy (CSV)
+                  📥 Descargar inventario de hoy (CSV)
                 </button>
               ) : mlViewMode === 'history' ? (
                 <button
@@ -1642,7 +1643,7 @@ onClick={() => fetchPedidosData(true)}
           {/* Barra de Filtros */}
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', background: 'var(--color-bg-base, #f8fafc)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color, #e2e8f0)' }}>
             <div style={{ flex: '1', minWidth: '250px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary, #475569)', marginBottom: '0.35rem' }}>Buscar por SKU o Descripción</label>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary, #475569)', marginBottom: '0.35rem' }}>Buscar por código de producto o Descripción</label>
               <input 
                 type="text"
                 placeholder="Ej. ALG0028 o CEFTRIAXONA..."
@@ -1667,7 +1668,7 @@ onClick={() => fetchPedidosData(true)}
               </select>
             </div>
             <div style={{ width: '220px' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary, #475569)', marginBottom: '0.35rem' }}>Filtrar por Stock</label>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-secondary, #475569)', marginBottom: '0.35rem' }}>Filtrar por Existencias</label>
               <select
                 value={mlStockFilter}
                 onChange={(e) => setMlStockFilter(e.target.value)}
@@ -1677,7 +1678,7 @@ onClick={() => fetchPedidosData(true)}
                 <option value="FAR">Farmacia (FAR)</option>
                 <option value="QX">Quirófano (QX)</option>
                 <option value="QXCR">Carro Rojo (QXCR)</option>
-                <option value="SIN_STOCK">Sin stock operativo</option>
+                <option value="SIN_STOCK">Sin existencias disponibles</option>
               </select>
             </div>
           </div>
@@ -1700,14 +1701,14 @@ onClick={() => fetchPedidosData(true)}
                     <tr style={{ background: 'var(--color-bg-base, #f1f5f9)', borderBottom: '2px solid var(--border-color, #cbd5e1)', color: 'var(--text-secondary, #475569)', fontWeight: 'bold' }}>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Código</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Descripción</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Disponible</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Ubicación Stock</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Mín / Máx</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Existencias disponibles</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Ubicación Existencias</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Existencias Mín / Máx</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Pedido en Camino</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo (7d / 15d / 30d)</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Variación de Consumo</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock Restante</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Existencias Restante</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo de Desabasto</th>
                     </tr>
                   </thead>
@@ -1789,11 +1790,11 @@ onClick={() => fetchPedidosData(true)}
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Fecha de Registro</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Código</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Descripción</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock en la Fecha</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Existencias en la Fecha</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Ubicación Actual</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo 30 días</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Existencias</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo de Desabasto</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>¿Se agotó a los 7 días?</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>¿Se agotó a los 15 días?</th>
@@ -1895,13 +1896,13 @@ onClick={() => fetchPedidosData(true)}
                     <tr style={{ background: 'var(--color-bg-base, #f1f5f9)', borderBottom: '2px solid var(--border-color, #cbd5e1)', color: 'var(--text-secondary, #475569)', fontWeight: 'bold' }}>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Código</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem' }}>Descripción</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Stock Disponible</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Ubicación Stock</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Existencias disponibles</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Ubicación Existencias</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Consumo Promedio Diario</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Stock Restante</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo Base por Stock</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Días de Existencias Restante</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Riesgo Base por Existencias</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'right' }}>Riesgo de Agotarse (Próximos 7 días)</th>
-                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Diagnóstico Inteligente (IA)</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Alertas de disponibilidad</th>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-bg-base, #f1f5f9)', zIndex: 2, padding: '0.75rem 1rem', textAlign: 'center' }}>Fecha</th>
                     </tr>
                   </thead>
@@ -1937,7 +1938,7 @@ onClick={() => fetchPedidosData(true)}
                       const daysRemainingNum = Number(row.dias_stock_restante);
                       const sinConsumo = daysRemainingNum >= 9999;
                       const displayDate = isYaDesabasto ? (desabastoDate || '-') : (sinConsumo ? '∞' : (estAgotDateStr || '-'));
-                      const dateLabel = isYaDesabasto ? 'Sin stock desde' : (sinConsumo ? 'Consumo nulo' : 'Se agota aprox.');
+                      const dateLabel = isYaDesabasto ? 'Sin existencias desde' : (sinConsumo ? 'Consumo nulo' : 'Se agota aprox.');
 
                       return (
                         <tr key={idx} style={{ borderBottom: '1px solid var(--border-color, #e2e8f0)', background: idx % 2 === 0 ? 'var(--color-bg-white, white)' : 'var(--color-bg-base, #f8fafc)' }}>
@@ -2103,7 +2104,7 @@ onClick={() => fetchPedidosData(true)}
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#0284c7', textTransform: 'uppercase' }}>Editar Parámetros de Reorden</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#0284c7', textTransform: 'uppercase' }}>Ajustar cantidades para compra</span>
                 <h3 style={{ margin: '0.2rem 0 0 0', color: '#0f172a', fontSize: '1.2rem' }}>
                   {editingItem.ItemCode} - {editingItem.ItemDescription}
                 </h3>
@@ -2208,7 +2209,7 @@ onClick={() => fetchPedidosData(true)}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#0284c7', textTransform: 'uppercase' }}>
-                  Estatus de Pedido en SAP
+                  Estado de Pedido en SAP
                 </span>
                 <h3 style={{ margin: '0.2rem 0 0 0', color: '#0f172a', fontSize: '1.2rem' }}>
                   {selectedItemOrders.item.ItemCode} - {selectedItemOrders.item.ItemDescription}

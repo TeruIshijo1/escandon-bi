@@ -235,7 +235,7 @@ async function exportJsonToExcel(res, type, id) {
     }
 
     if (!config || (!config.JsonApiUrl && !config.JsonFilePath)) {
-      return res.status(404).json({ error: 'Configuración JSON no encontrada para este elemento.' });
+      return res.status(404).json({ error: "Este reporte aún no tiene datos configurados. Solicita ayuda al responsable de la plataforma." });
     }
 
     let jsonData = null;
@@ -247,7 +247,7 @@ async function exportJsonToExcel(res, type, id) {
         const raw = fs.readFileSync(fullPath, 'utf8');
         jsonData = JSON.parse(raw);
       } else {
-        return res.status(404).json({ error: 'El archivo JSON configurado ya no existe.' });
+        return res.status(404).json({ error: "El archivo de datos ya no está disponible. Solicita que se cargue de nuevo." });
       }
     } else if (config.JsonApiUrl) {
       const response = await fetch(config.JsonApiUrl);
@@ -265,7 +265,7 @@ async function exportJsonToExcel(res, type, id) {
     }
 
     if (rows.length === 0) {
-      return res.status(400).json({ error: 'El JSON no es un array válido o está vacío.' });
+      return res.status(400).json({ error: "El archivo no contiene una lista de datos. Revisa su contenido e intenta de nuevo." });
     }
 
     // 2. Generar Excel con estilo institucional
@@ -298,7 +298,7 @@ async function exportJsonToExcel(res, type, id) {
     res.end();
   } catch (err) {
     console.error('[Export JSON error]', err);
-    res.status(500).json({ error: 'Error al exportar JSON a Excel.' });
+    res.status(500).json({ error: "No se pudo crear el archivo Excel. Intenta de nuevo." });
   }
 }
 
@@ -961,7 +961,7 @@ router.post(
   async (req, res, next) => {
     try {
       const { url } = req.body;
-      if (!url) return res.status(400).json({ error: 'URL es requerida' });
+      if (!url) return res.status(400).json({ error: "Pega el enlace de los datos para continuar." });
 
       // Validar contra SSRF (solo URLs públicas http/https)
       const { assertSafeFetchUrl } = require('../utils/urlSafety');
@@ -998,7 +998,7 @@ router.post(
       }
 
       if (rows.length === 0) {
-        return res.status(400).json({ error: 'El JSON devuelto por la API está vacío o no contiene una lista de datos.' });
+        return res.status(400).json({ error: "El enlace no contiene datos para descargar. Revisa el enlace e intenta de nuevo." });
       }
 
       const workbook = new ExcelJS.Workbook();
@@ -1050,7 +1050,7 @@ router.post(
       res.end();
     } catch (err) {
       console.error('Error convirtiendo JSON a Excel:', err);
-      res.status(500).json({ error: 'Error conectando con la API: ' + err.message });
+      res.status(500).json({ error: 'No se pudo descargar la información del enlace. Revisa el enlace e intenta de nuevo.' });
     }
   }
 );

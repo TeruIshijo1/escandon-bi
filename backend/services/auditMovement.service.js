@@ -216,7 +216,7 @@ async function getMovimientosPaciente({
       uServicio = 'Farmacia Central (FAR)';
     }
 
-    // Normalizar caducidad si falta en Cirrus pero existe lote en SAP
+    // Normalizar caducidad si falta en Vertical pero existe lote en SAP
     let lote = row.Lote;
     let caducidad = row.Caducidad;
     if ((!lote || !caducidad) && sapBatches.length > 0) {

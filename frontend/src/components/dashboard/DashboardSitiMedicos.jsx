@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import DashboardChart from './DashboardChart';
 import { API_BASE } from '../../api/config';
 import PremiumLoader from '../shared/PremiumLoader';
 import ExportToolbar from '../shared/ExportToolbar';
@@ -54,7 +53,7 @@ export default function DashboardSitiMedicos() {
   };
 
   return (
-    <div id="dashboard-medicos-siti">
+    <div className="dashboard-view" id="dashboard-medicos-siti">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <label style={{ fontWeight: 'bold', color: '#1e293b' }}>Filtrar por Año:</label>
@@ -82,26 +81,26 @@ export default function DashboardSitiMedicos() {
       </div>
 
       {/* KPIs Rápidos */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <div className="siti-card" style={{ background: 'linear-gradient(135deg, #0891b2, #0e7490)', color: 'white' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Total de Médicos ({year})</h3>
-          <p style={{ margin: '10px 0 0', fontSize: '2rem', fontWeight: 'bold' }}>
+      <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+        <div className="siti-card dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #0891b2, #0e7490)', color: 'white' }}>
+          <h3 className="dashboard-metric-label" style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Total de Médicos ({year})</h3>
+          <p className="dashboard-metric-value" style={{ margin: '10px 0 0', fontSize: '2rem', fontWeight: 'bold' }}>
             {formatNumber(resumen.total_medicos)}
           </p>
         </div>
-        <div className="siti-card" style={{ background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: 'white' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Ingreso Promedio por Médico</h3>
-          <p style={{ margin: '10px 0 0', fontSize: '2rem', fontWeight: 'bold' }}>
+        <div className="siti-card dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: 'white' }}>
+          <h3 className="dashboard-metric-label" style={{ margin: 0, fontSize: '1rem', opacity: 0.9 }}>Ingreso Promedio por Médico</h3>
+          <p className="dashboard-metric-value" style={{ margin: '10px 0 0', fontSize: '2rem', fontWeight: 'bold' }}>
             {formatCurrency(resumen.promedio_ingreso_medico)}
           </p>
         </div>
       </div>
 
       {/* Gráfica Top Médicos */}
-      <div className="siti-card" style={{ marginBottom: '2rem' }}>
+      <div className="siti-card dashboard-panel" style={{ marginBottom: '2rem' }}>
         <h3 style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Top 15 Médicos por Ingresos Generados</h3>
-        <div style={{ height: 450 }}>
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="dashboard-chart-host" style={{ height: 450 }}>
+          <DashboardChart width="100%" height="100%">
             <BarChart data={topMedicos} layout="vertical" margin={{ top: 5, right: 30, left: 150, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
               <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} />
@@ -113,7 +112,7 @@ export default function DashboardSitiMedicos() {
               <Legend />
               <Bar dataKey="ingresos_generados" name="Ingresos (MXN)" fill="#0891b2" radius={[0, 4, 4, 0]} />
             </BarChart>
-          </ResponsiveContainer>
+          </DashboardChart>
         </div>
       </div>
       

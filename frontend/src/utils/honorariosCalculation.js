@@ -1,8 +1,13 @@
 // Una sola fuente para pantalla, ficha, PDF y Excel. Los importes de facturas
 // SAP nunca entran en este cálculo de servicios ni se recalculan.
+import { multiplyHonorario } from './honorariosMoney.js';
 export const roundMoney = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const numberOrNull = value => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
 export const doctorKey = row => String(row.Medico || 'Médico No Asignado').trim();
+export const hasPhysicianChange = (currentProviderId, nextProviderId) => {
+  const next = String(nextProviderId ?? '').trim();
+  return !!next && String(currentProviderId ?? '').trim() !== next;
+};
 
 const GENERIC_CONCEPT_WORDS = new Set(['CUOTA', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'RECUPERACION',
   'CONSULTA', 'CONSULTAS', 'EXTERNA', 'SERVICIO', 'SERVICIOS', 'HONORARIO', 'HONORARIOS', 'MEDICO', 'MEDICOS']);
@@ -40,24 +45,36 @@ export function annotateSapInvoiceCoverage(invoice, doctor, verticalRows = []) {
   };
 }
 export function honorarioRowId(row, index = 0) {
+  if (row.SourceIdentity) return row.SourceIdentity;
   if (row.TipoCalculo === 'SAP_DOCUMENTO') return `SAP_FACTURA|${row.SapDocumento?.docEntry}`;
+  // La vista antes etiquetaba citas y órdenes como FolioAtencion. Conservar
+  // su referencia original evita perder las decisiones BI al corregir el folio visible.
+  const sourceReference = row.FolioReferenciaOrigen ?? row.FolioAtencion;
   return row.UDRKey
-    ? [row.UDRKey, row.RenglonAuditoria, row.FolioAtencion, row.CodigoServicio, row.OrigenRenglon, row.Medico].map(v => String(v ?? '').trim()).join('|')
-    : `${row.FolioAtencion || '0'}_${row.CodigoServicio || '0'}_${row.FechaAtencion || '0'}_${index}`;
+    ? [row.UDRKey, row.RenglonAuditoria, sourceReference, row.CodigoServicio, row.OrigenRenglon, row.Medico].map(v => String(v ?? '').trim()).join('|')
+    : `${sourceReference || '0'}_${row.CodigoServicio || '0'}_${row.FechaAtencion || '0'}_${index}`;
 }
 
 // La decisión pierde vigencia si cambian los datos que se revisaron.
 export function reviewFingerprint(row) {
-  return JSON.stringify([row.UDRKey, row.RenglonAuditoria, row.Medico, row.FechaAtencion,
+  if (row._sourceFingerprint) return row._sourceFingerprint;
+  const fields = [row.UDRKey, row.RenglonAuditoria, row.Medico, row.FechaAtencion,
     row.Paciente, row.Cliente, row.FolioOrdenVenta, row.MedicoId, row.Servicio,
     row.CodigoServicio, row.Cantidad, row.BaseImporte, row.BasePropuesta, row.IvaLinea,
     row.TasaISR, row.ElegiblePago, row.EstadoVertical, row.FuenteHonorario, row.OrigenRenglon,
     row.MensajeAuditoria, row.MotivoExclusionOriginal, row.SapDocumento?.documentTotal,
     row.SapDocumento?.currency, row.SapDocumento?.cancelled, row.SapDocumento?.cfdiUuid,
-    row.SapDocumento?.retentions, row.SapDocumento?.lines]);
+    row.SapDocumento?.retentions, row.SapDocumento?.lines];
+  if (row.ModeBI) fields.push(row.SourceIdentity, row.SourceLineId, row.OccurrenceId,
+    row.RolMedico, row.Cancelado, row.EjecucionConfirmada, row.MedicoConfirmado,
+    row.CantidadConfirmada, row.CantidadOriginal, row.CantidadMaxima, row.PosibleDuplicado,
+    row.CatalogSnapshot, row.TariffSnapshot, row.FechaReferenciaTipo);
+  if (row.FixedMonthly) fields.push(row.FixedMonthlySnapshot);
+  return JSON.stringify(fields);
 }
 
 function sourceReviewStatus(row) {
+  if (row.ModeBI) return row.CatalogStatus === 'EXCLUIDO' || row.ScopeExcluded ? 'RECHAZADO' : 'PENDIENTE';
   if (row.TipoCalculo === 'SAP_DOCUMENTO' || row.FuenteHonorario !== 'Liquidación clínica'
     || row.OrigenRenglon === 'CITA_REALIZADA_SIN_ORDEN') return 'PENDIENTE';
   const status = String(row.EstadoVertical || '').toUpperCase();
@@ -100,6 +117,14 @@ function fiscalProfile(provider, date, hasVat) {
     return pending('Cálculo pendiente: no se pudo identificar al médico en SAP o falta revisar sus retenciones.');
   }
   const candidate = provider.candidates[0];
+  if (candidate.source === 'BI_INTERNO') {
+    if (!candidate.enabled || candidate.confirmed !== true || !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(String(candidate.federalTaxId || ''))
+      || !/^\d{3}$/.test(String(candidate.fiscalRegime || '')) || !candidate.validFrom || !date || candidate.validFrom > date
+      || ![0, 0.0125, 0.1].includes(candidate.isrRate) || ![0, 2 / 3].includes(candidate.vatFraction)
+      || !Number.isSafeInteger(candidate.revision) || candidate.revision <= 0) return pending('Completa la ficha fiscal y su fecha de vigencia para calcular el pago.');
+    return { isrRate: candidate.isrRate, vatFraction: candidate.vatFraction, ready: true,
+      note: 'Impuestos calculados con la ficha fiscal interna confirmada del médico.' };
+  }
   const taxes = candidate.configuredWithholdings || [];
   if (candidate.subjectToWithholding === null || candidate.subjectToWithholding === undefined
     || taxes.some(t => t.inactive === null || t.inactive === undefined)) {
@@ -147,24 +172,56 @@ function allocateTax(rows, field, unroundedCents) {
   });
 }
 
-export function calculateHonorarios(data = [], overrides = {}, providers = {}, periodStart = '') {
+export function calculateHonorarios(data = [], overrides = {}, providers = {}, periodStart = '', internalProfiles = {}) {
   const legacyCounts = new Map();
   data.forEach(r => { if (r.UDRKey) legacyCounts.set(String(r.UDRKey), (legacyCounts.get(String(r.UDRKey)) || 0) + 1); });
-  const rows = data.map((row, index) => {
+  const rows = data.map((sourceRow, index) => {
+    let row = sourceRow;
     const id = honorarioRowId(row, index);
     const legacy = legacyCounts.get(String(row.UDRKey)) === 1 ? overrides[String(row.UDRKey)] : null;
     const saved = overrides[id] || legacy;
-    const stale = !!saved && saved.fingerprint !== reviewFingerprint(row);
+    const stale = !row.LiquidacionCerrada && !!saved && (row.ReviewInvalidated || saved.fingerprint !== reviewFingerprint(row));
     const override = stale ? null : saved;
+    const approvedSnapshot = row.SnapshotCierre || override?.snapshot;
+    // Solo la constancia guardada por el servidor identifica una corrección.
+    // El cierre conserva su propia constancia, aunque después cambie la fuente.
+    const physicianCorrection = row.ModeBI
+      ? (approvedSnapshot ? approvedSnapshot.physicianCorrection : row.ReviewBeneficiary?.physicianCorrection) || null
+      : null;
+    if (row.ModeBI && approvedSnapshot) {
+      row = { ...row, Medico: approvedSnapshot.providerName, MedicoId: approvedSnapshot.providerId,
+        RolMedico: approvedSnapshot.role, Cantidad: approvedSnapshot.quantity,
+        BaseImporte: approvedSnapshot.baseAmount, PrecioUnitarioBI: approvedSnapshot.unitAmount,
+        TariffSnapshot: approvedSnapshot.tariff };
+    } else if (row.ModeBI && row.ReviewBeneficiary && row.ReviewEligibilityTariff) {
+      // Una asignación humana previa conserva el médico para la nueva revisión.
+      // Los importes siguen pendientes hasta confirmar otra vez la atención.
+      const beneficiary = row.ReviewBeneficiary;
+      const tariff = row.ReviewEligibilityTariff;
+      const quantity = numberOrNull(row.Cantidad);
+      row = { ...row, Medico: beneficiary.providerName, MedicoId: beneficiary.providerId,
+        RolMedico: beneficiary.role, TariffSnapshot: tariff, PrecioUnitarioBI: tariff.amount,
+        BaseImporte: quantity > 0 ? multiplyHonorario(Number(tariff.amount), quantity) : null };
+    }
     const verticalStatus = sourceReviewStatus(row);
-    const reviewStatus = stale ? 'PENDIENTE'
+    const reviewStatus = row.LiquidacionCerrada ? 'APROBADO' : stale ? 'PENDIENTE'
       : override?.action === 'APROBAR' ? 'APROBADO'
         : override?.action === 'EXCLUIR' ? 'RECHAZADO'
           : override?.action === 'PENDIENTE' ? 'PENDIENTE' : verticalStatus;
     const eligible = reviewStatus === 'APROBADO';
     const reviewSource = stale ? 'PENDIENTE' : override ? 'BI' : verticalStatus !== 'PENDIENTE' ? 'VERTICAL' : 'PENDIENTE';
-    const reviewMeta = { _reviewStatus: reviewStatus, _reviewSource: reviewSource, _reviewStale: stale, _reviewer: saved?.reviewer,
+    const reviewMeta = { _sourceFingerprint: reviewFingerprint(sourceRow), _reviewStatus: reviewStatus, _reviewSource: reviewSource, _reviewStale: stale, _reviewer: saved?.reviewer,
+      _physicianCorrection: physicianCorrection,
+      _previousApproval: saved?.snapshot,
       _revision: saved?.revision || 0, _separateServicesConfirmed: override?.separateServicesConfirmed === true };
+    if (row.LiquidacionCerrada && row.SnapshotCierre) {
+      const frozen = row.SnapshotCierre;
+      return { ...row, ...reviewMeta, _rowId: id, _effectiveElegible: true, _isOverridden: true,
+        _effectiveBase: frozen.baseAmount, _effectiveIVA: frozen.vat, _effectiveVatRate: frozen.vatRate, _effectiveISRRate: frozen.isrRate,
+        _effectiveISR: frozen.isr, _effectiveRetIVA: frozen.vatWithholding, _effectiveNeto: frozen.netAmount,
+        _fiscalReady: true, _fiscalNote: `Importes conservados del cierre #${row.LiquidacionCerrada}. ${row.CambiosTrasCierre ? 'Cambió la fuente clínica después del cierre; revisar un ajuste.' : ''}`,
+        _effectiveMotivo: frozen.reason, _overrideMotivo: frozen.reason, _reviewer: frozen.reviewer };
+    }
     if (row.TipoCalculo === 'SAP_DOCUMENTO') {
       const invoice = row.SapDocumento;
       const ready = !invoice.cancelled && invoice.currency === 'MXN' && numberOrNull(invoice.documentTotal) !== null;
@@ -195,7 +252,9 @@ export function calculateHonorarios(data = [], overrides = {}, providers = {}, p
       : base === originalBase ? originalVat
       : originalBase > 0 && originalVat !== null ? roundMoney(base * originalVat / originalBase) : null;
     const iva = rawIva === null ? null : roundMoney(rawIva);
-    const profile = fiscalProfile(providers[doctorKey(row)], String(row.FechaAtencion || periodStart).slice(0, 10), iva !== 0);
+    const savedInternal = internalProfiles[row.MedicoId];
+    const internal = savedInternal?.enabled && String(savedInternal.providerId) !== String(row.MedicoId) ? { ...savedInternal, confirmed: false } : savedInternal;
+    const profile = fiscalProfile(internal?.enabled ? { linkStatus: 'candidato_unico', candidates: [internal] } : providers[doctorKey(row)], String(row.FechaAtencion || periodStart).slice(0, 10), iva !== 0);
     const isrRate = profile.isrRate ?? numberOrNull(row.TasaISR);
     const validAmounts = base !== null && base > 0 && iva !== null && iva >= 0 && !!String(row.Medico || '').trim();
     const ready = !eligible || (validAmounts && profile.ready);
@@ -205,7 +264,7 @@ export function calculateHonorarios(data = [], overrides = {}, providers = {}, p
       _overrideTimestamp: override?.timestamp || null,
       _effectiveMotivo: override?.motivo || row.MensajeAuditoria || row.MotivoExclusionOriginal || '',
       _effectiveElegible: eligible, _effectiveBase: base === null ? null : roundMoney(base), _effectiveIVA: iva,
-      _effectiveISRRate: isrRate, _effectiveISR: eligible ? null : 0,
+      _effectiveVatRate: explicitVat, _effectiveISRRate: isrRate, _effectiveISR: eligible ? null : 0,
       _effectiveRetIVA: !eligible || iva === 0 ? 0 : null,
       _effectiveNeto: eligible ? null : 0, _fiscalReady: ready,
       _fiscalNote: !eligible ? 'No se incluye en el total.' : !validAmounts ? 'Cálculo pendiente: falta el importe del honorario o el IVA para calcular el total.' : profile.note,
@@ -214,14 +273,14 @@ export function calculateHonorarios(data = [], overrides = {}, providers = {}, p
   });
   const isrGroups = new Map();
   const vatGroups = new Map();
-  for (const row of rows.filter(r => r._effectiveElegible && r.TipoCalculo !== 'SAP_DOCUMENTO')) {
+  for (const row of rows.filter(r => r._effectiveElegible && r.TipoCalculo !== 'SAP_DOCUMENTO' && !r.LiquidacionCerrada)) {
     if (row._effectiveBase !== null && row._effectiveISRRate !== null && row._effectiveISRRate >= 0 && row._effectiveISRRate <= 1) {
-      const key = `${doctorKey(row)}|${row._effectiveISRRate}`;
+      const key = `${row.MedicoId || doctorKey(row)}|${row._effectiveISRRate}`;
       if (!isrGroups.has(key)) isrGroups.set(key, []);
       isrGroups.get(key).push(row);
     }
     if (row._fiscalReady && row._effectiveIVA !== null) {
-      const key = `${doctorKey(row)}|${row._vatFraction}`;
+      const key = `${row.MedicoId || doctorKey(row)}|${row._vatFraction}`;
       if (!vatGroups.has(key)) vatGroups.set(key, []);
       vatGroups.get(key).push(row);
     }
@@ -229,7 +288,7 @@ export function calculateHonorarios(data = [], overrides = {}, providers = {}, p
   for (const group of isrGroups.values()) allocateTax(group, '_effectiveISR', r => Math.round(r._effectiveBase * 100) * r._effectiveISRRate);
   for (const group of vatGroups.values()) allocateTax(group, '_effectiveRetIVA', r => Math.round(r._effectiveIVA * 100) * r._vatFraction);
   for (const row of rows) {
-    if (row.TipoCalculo !== 'SAP_DOCUMENTO' && row._effectiveElegible && row._fiscalReady && row._effectiveISR !== null && row._effectiveRetIVA !== null) {
+    if (!row.LiquidacionCerrada && row.TipoCalculo !== 'SAP_DOCUMENTO' && row._effectiveElegible && row._fiscalReady && row._effectiveISR !== null && row._effectiveRetIVA !== null) {
       row._effectiveNeto = roundMoney(row._effectiveBase + row._effectiveIVA - row._effectiveISR - row._effectiveRetIVA);
     }
   }
@@ -254,6 +313,9 @@ export function summarizeHonorarios(rows = []) {
     : list.reduce((total, row) => total + Math.round(row[field] * 100), 0) / 100;
   return {
     totalBase: sum('_effectiveBase'), totalIVA: sum('_effectiveIVA'),
+    totalServiceBase: sum('_effectiveBase', clinical.filter(row => !row.FixedMonthly)),
+    totalFixedMonthlyBase: sum('_effectiveBase', clinical.filter(row => row.FixedMonthly)),
+    fixedMonthlyCount: clinical.filter(row => row.FixedMonthly).length,
     totalISR: sum('_effectiveISR'), totalRetIVA: sum('_effectiveRetIVA'), totalNeto: sum('_effectiveNeto', included),
     clinicalNet: sum('_effectiveNeto'), sapDocumentNet: sum('_effectiveNeto', documents), approvedDocuments: documents.length,
     pendingCount: included.filter(r => r._effectiveNeto === null).length,

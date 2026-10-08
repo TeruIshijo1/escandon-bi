@@ -36,7 +36,7 @@ export const BRAND_COLORS = {
  */
 export function applySheetInstitutionalStyle(sheet, {
   titulo = 'HOSPITAL ESCANDÓN',
-  subtitulo = 'Reporte de Inteligencia de Negocios — Plataforma BI',
+  subtitulo = 'Reporte del Hospital Escandón',
   periodo = '',
   resumen = null,
   columnas = [],
@@ -205,7 +205,7 @@ export function applySheetInstitutionalStyle(sheet, {
   // ── Autofilter en la fila de encabezados ──
   sheet.autoFilter = {
     from: { row: headerRowNum, column: 1 },
-    to:   { row: headerRowNum, column: numCols },
+    to:   { row: headerRowNum + filas.length, column: numCols },
   };
 }
 
@@ -217,7 +217,7 @@ export async function downloadInstitutionalExcel({
   sheets = []
 }) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Hospital Escandón — Plataforma BI';
+  workbook.creator = 'Hospital Escandón';
   workbook.created = new Date();
 
   sheets.forEach(sheetDef => {

@@ -40,11 +40,11 @@ const executeSAPQuery = async (queryName, sqlText, params) => {
 };
 
 /**
- * Sincroniza el Censo de Pacientes de Cirrus a PostgreSQL
+ * Sincroniza el Censo de Pacientes de Vertical a PostgreSQL
  */
 async function syncCenso() {
   try {
-    console.log('[Sync] Extrayendo Censo de Pacientes de Cirrus...');
+    console.log('[Sync] Extrayendo Censo de Pacientes de Vertical...');
     const remotePool = await connectRemoteDB();
     
     // Traer los admitidos en el último mes
@@ -99,11 +99,11 @@ async function syncCenso() {
 }
 
 /**
- * Sincroniza los consumos (cargos) cruzados de Cirrus + SAP a PostgreSQL
+ * Sincroniza los consumos (cargos) cruzados de Vertical + SAP a PostgreSQL
  */
 async function syncConsumo() {
   try {
-    console.log('[Sync] Extrayendo Consumos de Cirrus y cruzando con SAP (Últimos 45 días)...');
+    console.log('[Sync] Extrayendo Consumos de Vertical y cruzando con SAP (Últimos 45 días)...');
     
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 45);
@@ -314,7 +314,7 @@ async function syncKardex() {
         currentStock,
         c.fechacargo,
         String(c.habitacion || 'Farmacia / Servicio'),
-        String(c.usuariocargo || 'Cirrus'),
+        String(c.usuariocargo || 'Vertical'),
         -Math.abs(Number(c.cantidad || 0)),
         totalValue
       ]);

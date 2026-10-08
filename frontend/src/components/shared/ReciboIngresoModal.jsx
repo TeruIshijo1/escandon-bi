@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect } from 'react';
 import PremiumLoader from './PremiumLoader';
 import useEscapeKey from '../../hooks/useEscapeKey';
@@ -22,7 +23,7 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
         if (json.success) {
           setData(json.data);
         } else {
-          setError(json.error || 'No se pudo cargar el detalle del recibo.');
+          setError(userMessage(json.error || 'No se pudo cargar el detalle del recibo.'));
         }
       } catch (err) {
         setError('Error al consultar el servidor.');
@@ -76,8 +77,8 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
 
         {/* Content */}
         <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
-          {loading && <PremiumLoader text="Consultando recibo en SAP Service Layer..." style={{ height: '200px' }} />}
-          {error && <div style={{ padding: '1.5rem', background: '#FEE2E2', color: '#991B1B', borderRadius: '12px' }}>{error}</div>}
+          {loading && <PremiumLoader text="Cargando recibo…" style={{ height: '200px' }} />}
+          {error && <div style={{ padding: '1.5rem', background: '#FEE2E2', color: '#991B1B', borderRadius: '12px' }}>{userMessage(error)}</div>}
 
           {!loading && !error && data && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -129,7 +130,7 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                       <thead>
                         <tr style={{ background: '#F1F5F9', color: '#475569', textAlign: 'left' }}>
-                          <th style={{ padding: '0.75rem 1rem' }}>DocEntry (Factura)</th>
+                          <th style={{ padding: '0.75rem 1rem' }}>Número interno de factura</th>
                           <th style={{ padding: '0.75rem 1rem' }}>Tipo</th>
                           <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Monto Aplicado</th>
                         </tr>

@@ -30,7 +30,7 @@ export default function ExportToolbar({ targetId, excelData, fileNamePrefix = 'D
         if (data && data.length > 0) {
           const keys = Object.keys(data[0]);
           html += `<table>
-            <tr><td colspan="${keys.length}" class="title-bar">HOSPITAL ESCANDÓN - PLATAFORMA BI</td></tr>
+            <tr><td colspan="${keys.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
             <tr><td colspan="${keys.length}" class="subtitle-bar">Reporte: ${fileNamePrefix} — ${sheetName}</td></tr>
             <tr class="info-row"><td colspan="${keys.length}">Fecha de exportación: ${fechaReporte} &nbsp;|&nbsp; Registros: ${data.length}</td></tr>
             <tr><td colspan="${keys.length}" style="height:6px;border:none"></td></tr>
@@ -114,7 +114,7 @@ export default function ExportToolbar({ targetId, excelData, fileNamePrefix = 'D
   };
 
   return (
-    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+    <div className="dashboard-export-toolbar" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
       <button
         onClick={handleExportExcel}
         disabled={isExportingExcel || !excelData}

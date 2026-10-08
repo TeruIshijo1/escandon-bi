@@ -1,0 +1,450 @@
+[
+  {
+    "id": "sap-query-inventory",
+    "name": "Inventario por almacén",
+    "icon": "📦",
+    "entity": "inventory",
+    "category": "SAP · Inventarios y Stock"
+  },
+  {
+    "id": "sap-query-batches",
+    "name": "Lotes y Caducidades de Insumos",
+    "icon": "⏳",
+    "entity": "batches",
+    "category": "SAP · Control de Caducidades"
+  },
+  {
+    "id": "sap-query-purchase_invoices",
+    "name": "Facturas de Proveedores (Compras)",
+    "icon": "🧾",
+    "entity": "purchase_invoices",
+    "category": "SAP · Compras y Proveedores"
+  },
+  {
+    "id": "sap-query-purchase_orders",
+    "name": "Órdenes de Compra a Proveedores",
+    "icon": "📋",
+    "entity": "purchase_orders",
+    "category": "SAP · Compras y Proveedores"
+  },
+  {
+    "id": "sap-query-goods_receipts_po",
+    "name": "Recepciones de Mercancía (Entradas)",
+    "icon": "📥",
+    "entity": "goods_receipts_po",
+    "category": "SAP · Compras y Proveedores"
+  },
+  {
+    "id": "sap-query-goods_returns",
+    "name": "Devoluciones a Proveedores",
+    "icon": "🔄",
+    "entity": "goods_returns",
+    "category": "SAP · Compras y Proveedores"
+  },
+  {
+    "id": "sap-query-stock_transfers",
+    "name": "Traslados entre Almacenes Realizados",
+    "icon": "🚚",
+    "entity": "stock_transfers",
+    "category": "SAP · Movimientos de Almacén"
+  },
+  {
+    "id": "sap-query-transfer_requests",
+    "name": "Solicitudes de Traslado entre Almacenes",
+    "icon": "⏳",
+    "entity": "transfer_requests",
+    "category": "SAP · Movimientos de Almacén"
+  },
+  {
+    "id": "sap-query-goods_issues",
+    "name": "Salidas de Inventario (Mermas / Bajas)",
+    "icon": "📉",
+    "entity": "goods_issues",
+    "category": "SAP · Movimientos de Almacén"
+  },
+  {
+    "id": "sap-query-goods_receipts_inv",
+    "name": "Entradas Directas y Ajustes Positivos",
+    "icon": "📈",
+    "entity": "goods_receipts_inv",
+    "category": "SAP · Movimientos de Almacén"
+  },
+  {
+    "id": "sap-query-purchase_requests",
+    "name": "Requisiciones y Solicitudes de Compra",
+    "icon": "📑",
+    "entity": "purchase_requests",
+    "category": "SAP · Compras y Proveedores"
+  },
+  {
+    "id": "sap-query-sales_invoices",
+    "name": "Facturación e Ingresos Hospitalarios",
+    "icon": "💰",
+    "entity": "sales_invoices",
+    "category": "SAP · Facturación e Ingresos"
+  },
+  {
+    "id": "sap-query-credit_memos",
+    "name": "Notas de Crédito a Clientes (Devoluciones)",
+    "icon": "🧾",
+    "entity": "credit_memos",
+    "category": "SAP · Facturación e Ingresos"
+  },
+  {
+    "id": "sap-query-business_partners",
+    "name": "Directorio de Proveedores y Socios",
+    "icon": "👥",
+    "entity": "business_partners",
+    "category": "SAP · Catálogos Maestros"
+  },
+  {
+    "id": "sap-query-item_prices",
+    "name": "Precios y costos por artículo y lista",
+    "icon": "🏷️",
+    "entity": "item_prices",
+    "category": "SAP · Catálogos Maestros"
+  },
+  {
+    "id": "sap-query-item_master_data",
+    "name": "Maestro de artículos y clasificación sanitaria",
+    "icon": "🧬",
+    "entity": "item_master_data",
+    "category": "SAP · Catálogos Maestros"
+  },
+  {
+    "id": "sap-query-sales_invoice_summary",
+    "name": "Facturas de clientes · resumen por documento",
+    "icon": "🧾",
+    "entity": "sales_invoice_summary",
+    "category": "SAP · Facturación e Ingresos"
+  },
+  {
+    "id": "sap-query-purchase_invoice_summary",
+    "name": "Facturas de proveedores · resumen por documento",
+    "icon": "🧾",
+    "entity": "purchase_invoice_summary",
+    "category": "SAP · Compras y Proveedores"
+  },
+  {
+    "id": "sap-query-accounts_receivable",
+    "name": "Cuentas por cobrar · facturas abiertas",
+    "icon": "🧾",
+    "entity": "accounts_receivable",
+    "category": "SAP · Cartera y Saldos"
+  },
+  {
+    "id": "sap-query-accounts_payable",
+    "name": "Cuentas por pagar · facturas abiertas",
+    "icon": "🧾",
+    "entity": "accounts_payable",
+    "category": "SAP · Cartera y Saldos"
+  },
+  {
+    "id": "sap-query-sales_down_payments",
+    "name": "Anticipos de clientes",
+    "icon": "🧾",
+    "entity": "sales_down_payments",
+    "category": "SAP · Tesorería y Pagos"
+  },
+  {
+    "id": "sap-query-purchase_down_payments",
+    "name": "Anticipos a proveedores",
+    "icon": "🧾",
+    "entity": "purchase_down_payments",
+    "category": "SAP · Tesorería y Pagos"
+  },
+  {
+    "id": "sap-query-sales_order_summary",
+    "name": "Órdenes de venta SAP · resumen por orden",
+    "icon": "📋",
+    "entity": "sales_order_summary",
+    "category": "SAP · Ventas y Servicios"
+  },
+  {
+    "id": "sap-query-sales_orders",
+    "name": "Pedidos de clientes y aseguradoras",
+    "icon": "📑",
+    "entity": "sales_orders",
+    "category": "SAP · Ventas y Servicios"
+  },
+  {
+    "id": "sap-query-sales_quotations",
+    "name": "Cotizaciones de servicios y ventas",
+    "icon": "📑",
+    "entity": "sales_quotations",
+    "category": "SAP · Ventas y Servicios"
+  },
+  {
+    "id": "sap-query-sales_deliveries",
+    "name": "Entregas a clientes",
+    "icon": "📑",
+    "entity": "sales_deliveries",
+    "category": "SAP · Ventas y Servicios"
+  },
+  {
+    "id": "sap-query-sales_returns",
+    "name": "Devoluciones de clientes",
+    "icon": "📑",
+    "entity": "sales_returns",
+    "category": "SAP · Ventas y Servicios"
+  },
+  {
+    "id": "sap-query-purchase_credit_memos",
+    "name": "Notas de crédito de proveedores",
+    "icon": "📑",
+    "entity": "purchase_credit_memos",
+    "category": "SAP · Compras y Proveedores"
+  },
+  {
+    "id": "sap-query-purchase_quotations",
+    "name": "Cotizaciones de proveedores",
+    "icon": "📑",
+    "entity": "purchase_quotations",
+    "category": "SAP · Compras y Proveedores"
+  },
+  {
+    "id": "sap-query-incoming_payments",
+    "name": "Cobros recibidos · medios de pago",
+    "icon": "💳",
+    "entity": "incoming_payments",
+    "category": "SAP · Tesorería y Pagos"
+  },
+  {
+    "id": "sap-query-outgoing_payments",
+    "name": "Pagos efectuados a proveedores",
+    "icon": "💳",
+    "entity": "outgoing_payments",
+    "category": "SAP · Tesorería y Pagos"
+  },
+  {
+    "id": "sap-query-journal_entries",
+    "name": "Asientos y movimientos contables",
+    "icon": "📒",
+    "entity": "journal_entries",
+    "category": "SAP · Contabilidad y Centros de Costo"
+  },
+  {
+    "id": "sap-query-chart_accounts",
+    "name": "Catálogo de cuentas contables",
+    "icon": "📚",
+    "entity": "chart_accounts",
+    "category": "SAP · Contabilidad y Centros de Costo"
+  },
+  {
+    "id": "sap-query-cost_centers",
+    "name": "Centros de costo y dimensiones",
+    "icon": "🏷️",
+    "entity": "cost_centers",
+    "category": "SAP · Contabilidad y Centros de Costo"
+  },
+  {
+    "id": "sap-query-warehouses",
+    "name": "Catálogo de almacenes",
+    "icon": "🏬",
+    "entity": "warehouses",
+    "category": "SAP · Catálogos Maestros"
+  },
+  {
+    "id": "sap-query-item_groups",
+    "name": "Grupos de artículos y servicios",
+    "icon": "🗂️",
+    "entity": "item_groups",
+    "category": "SAP · Catálogos Maestros"
+  },
+  {
+    "id": "sap-query-customers",
+    "name": "Directorio de clientes y aseguradoras",
+    "icon": "👥",
+    "entity": "customers",
+    "category": "SAP · Catálogos Maestros"
+  },
+  {
+    "id": "sap-query-suppliers",
+    "name": "Directorio de proveedores",
+    "icon": "👥",
+    "entity": "suppliers",
+    "category": "SAP · Catálogos Maestros"
+  },
+  {
+    "id": "sap-query-stock_availability",
+    "name": "Disponibilidad, comprometido y en pedido",
+    "icon": "📦",
+    "entity": "stock_availability",
+    "category": "SAP · Inventarios y Stock"
+  },
+  {
+    "id": "sap-query-vertical_accounts",
+    "name": "Cuentas y atenciones hospitalarias",
+    "icon": "🏥",
+    "entity": "vertical_accounts",
+    "category": "Vertical · Hospitalización y Cuentas"
+  },
+  {
+    "id": "sap-query-vertical_account_charges",
+    "name": "Detalle de cargos de cuentas",
+    "icon": "🧾",
+    "entity": "vertical_account_charges",
+    "category": "Vertical · Hospitalización y Cuentas"
+  },
+  {
+    "id": "sap-query-vertical_service_charges",
+    "name": "Cargos por unidad de servicio",
+    "icon": "💳",
+    "entity": "vertical_service_charges",
+    "category": "Vertical · Servicios Clínicos"
+  },
+  {
+    "id": "sap-query-vertical_consultation_schedule",
+    "name": "Agenda de consulta externa",
+    "icon": "📅",
+    "entity": "vertical_consultation_schedule",
+    "category": "Vertical · Consulta Externa"
+  },
+  {
+    "id": "sap-query-vertical_consultations_day",
+    "name": "Consulta del día y órdenes vinculadas",
+    "icon": "🩺",
+    "entity": "vertical_consultations_day",
+    "category": "Vertical · Consulta Externa"
+  },
+  {
+    "id": "sap-query-vertical_study_requests",
+    "name": "Solicitudes de estudios y auxiliares",
+    "icon": "🔬",
+    "entity": "vertical_study_requests",
+    "category": "Vertical · Estudios y Auxiliares"
+  },
+  {
+    "id": "sap-query-vertical_auxiliary_charges",
+    "name": "Cobros de imagenología y auxiliares",
+    "icon": "🧪",
+    "entity": "vertical_auxiliary_charges",
+    "category": "Vertical · Estudios y Auxiliares"
+  },
+  {
+    "id": "sap-query-vertical_surgeries",
+    "name": "Cirugías y uso de quirófano",
+    "icon": "🏥",
+    "entity": "vertical_surgeries",
+    "category": "Vertical · Quirófano"
+  },
+  {
+    "id": "sap-query-vertical_physician_productivity",
+    "name": "Productividad médica diaria",
+    "icon": "📊",
+    "entity": "vertical_physician_productivity",
+    "category": "Vertical · Productividad e Indicadores"
+  },
+  {
+    "id": "sap-query-vertical_operational_indicators",
+    "name": "Indicadores operativos por periodo",
+    "icon": "⏱️",
+    "entity": "vertical_operational_indicators",
+    "category": "Vertical · Productividad e Indicadores"
+  },
+  {
+    "id": "sap-query-vertical_fee_reference",
+    "name": "Honorarios: cálculo de referencia Vertical",
+    "icon": "💼",
+    "entity": "vertical_fee_reference",
+    "category": "Vertical · Honorarios Médicos"
+  },
+  {
+    "id": "sap-query-vertical_fee_audit",
+    "name": "Honorarios: universo y auditoría Vertical",
+    "icon": "🔎",
+    "entity": "vertical_fee_audit",
+    "category": "Vertical · Honorarios Médicos"
+  },
+  {
+    "id": "sap-query-vertical_sales_orders",
+    "name": "Órdenes de venta Vertical · resumen por orden",
+    "icon": "📋",
+    "entity": "vertical_sales_orders",
+    "category": "Vertical · Servicios Clínicos"
+  },
+  {
+    "id": "sap-query-vertical_service_orders",
+    "name": "Órdenes de venta de servicios",
+    "icon": "📋",
+    "entity": "vertical_service_orders",
+    "category": "Vertical · Servicios Clínicos"
+  },
+  {
+    "id": "sap-query-vertical_physicians",
+    "name": "Directorio de médicos y especialidades",
+    "icon": "👨‍⚕️",
+    "entity": "vertical_physicians",
+    "category": "Vertical · Catálogos Clínicos"
+  },
+  {
+    "id": "sap-query-vertical_service_catalog",
+    "name": "Catálogo de servicios de Vertical",
+    "icon": "📚",
+    "entity": "vertical_service_catalog",
+    "category": "Vertical · Catálogos Clínicos"
+  },
+  {
+    "id": "sap-query-vertical_receivables",
+    "name": "Cartera y saldos de cuentas hospitalarias",
+    "icon": "💰",
+    "entity": "vertical_receivables",
+    "category": "Vertical · Hospitalización y Cuentas"
+  },
+  {
+    "id": "sap-query-vertical_discharges",
+    "name": "Altas y egresos hospitalarios",
+    "icon": "🚪",
+    "entity": "vertical_discharges",
+    "category": "Vertical · Hospitalización y Cuentas"
+  },
+  {
+    "id": "sap-query-vertical_room_stays",
+    "name": "Habitaciones y estancias",
+    "icon": "🛏️",
+    "entity": "vertical_room_stays",
+    "category": "Vertical · Hospitalización y Cuentas"
+  },
+  {
+    "id": "sap-query-vertical_returns_monthly",
+    "name": "Devoluciones clínicas por mes",
+    "icon": "↩️",
+    "entity": "vertical_returns_monthly",
+    "category": "Vertical · Servicios Clínicos"
+  },
+  {
+    "id": "sap-query-vertical_prescriptions",
+    "name": "Recetas y tratamientos indicados",
+    "icon": "💊",
+    "entity": "vertical_prescriptions",
+    "category": "Vertical · Farmacia Clínica"
+  },
+  {
+    "id": "sap-query-vertical_physician_revenue_monthly",
+    "name": "Consultas e ingresos médicos por mes",
+    "icon": "📈",
+    "entity": "vertical_physician_revenue_monthly",
+    "category": "Vertical · Productividad e Indicadores"
+  },
+  {
+    "id": "sap-query-vertical_subcontracted_services",
+    "name": "Servicios subrogados: importes de referencia",
+    "icon": "🤝",
+    "entity": "vertical_subcontracted_services",
+    "category": "Vertical · Servicios Clínicos"
+  },
+  {
+    "id": "sap-query-vertical_clinical_supply_tickets",
+    "name": "Tickets de insumos y lotes por atención",
+    "icon": "📦",
+    "entity": "vertical_clinical_supply_tickets",
+    "category": "Vertical · Farmacia Clínica"
+  },
+  {
+    "id": "sap-query-vertical_clinical_return_tickets",
+    "name": "Tickets de devolución de insumos clínicos",
+    "icon": "🔄",
+    "entity": "vertical_clinical_return_tickets",
+    "category": "Vertical · Farmacia Clínica"
+  }
+]

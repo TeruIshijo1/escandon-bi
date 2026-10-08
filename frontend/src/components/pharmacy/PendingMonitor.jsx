@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
@@ -129,7 +130,7 @@ export default function PendingMonitor() {
            setData(json.data || []);
            setError(null);
         } else {
-           setError(json.error || 'Error al cargar recetas');
+           setError(userMessage(json.error || 'Error al cargar recetas'));
         }
         setLoading(false);
       })
@@ -334,7 +335,7 @@ export default function PendingMonitor() {
       {loading && data.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>Cargando recetas pendientes...</div>
       ) : error && data.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#dc2626', fontWeight: 'bold' }}>{error}</div>
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#dc2626', fontWeight: 'bold' }}>{userMessage(error)}</div>
       ) : filteredData.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem', background: '#f8fafc', borderRadius: '12px', color: '#94a3b8', border: '1px dashed #cbd5e1' }}>
           <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🎉</div>
@@ -439,7 +440,7 @@ export default function PendingMonitor() {
               </div>
               <div>
                 <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Capturó Solicitud</span>
-                <strong style={{ fontSize: '0.9rem', color: '#334155' }}>{selectedPrescription.UsuarioSolicito || 'Cirrus'}</strong>
+                <strong style={{ fontSize: '0.9rem', color: '#334155' }}>{selectedPrescription.UsuarioSolicito || 'Vertical'}</strong>
               </div>
             </div>
 
@@ -494,7 +495,7 @@ export default function PendingMonitor() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px border #e0f2fe', fontSize: '0.85rem' }}>
                 <span style={{ color: '#0369a1' }}>Disponibilidad en Farmacia (SAP):</span>
                 <span style={{ fontWeight: 'bold', color: selectedPrescription.StockActual >= selectedPrescription.Solicitado ? '#16a34a' : '#dc2626' }}>
-                  {selectedPrescription.StockActual >= selectedPrescription.Solicitado ? '🟢 Stock Suficiente' : '🔴 Stock Insuficiente'} ({selectedPrescription.StockActual || 0} disponibles)
+                  {selectedPrescription.StockActual >= selectedPrescription.Solicitado ? '🟢 Existencias suficientes' : '🔴 Existencias insuficientes'} ({selectedPrescription.StockActual || 0} disponibles)
                 </span>
               </div>
             </div>

@@ -5,7 +5,7 @@
     <img src="https://img.shields.io/badge/React-18-blue.svg" alt="React" />
     <img src="https://img.shields.io/badge/Node.js-20-green.svg" alt="Node.js" />
     <img src="https://img.shields.io/badge/Vite-5-purple.svg" alt="Vite" />
-    <img src="https://img.shields.io/badge/SQLite-3-lightgrey.svg" alt="SQLite" />
+    <img src="https://img.shields.io/badge/PostgreSQL-BI-blue.svg" alt="PostgreSQL" />
     <img src="https://img.shields.io/badge/PowerBI-Embedded-yellow.svg" alt="PowerBI" />
   </p>
 </div>
@@ -35,14 +35,15 @@ La plataforma unifica la información de 3 sistemas clave dentro de la instituci
 
 - **Frontend:** React.js, Vite, React Router, y CSS nativo modularizado.
 - **Backend:** Node.js, Express.
-- **Base de Datos:** SQLite (motor local, con integraciones remotas a SQL Server y HANA).
+- **Base de Datos:** PostgreSQL (persistencia BI e histórico, con lecturas de SQL Server/Vertical y SAP).
 - **Autenticación:** JSON Web Tokens (JWT) y cifrado con bcrypt.
 - **Reportes:** pdfkit y exceljs.
 
 ## 🚀 Instalación y Despliegue Local
 
 ### Prerrequisitos
-- Node.js (v20 o superior recomendado)
+- Node.js 20 o superior con npm. En Windows se incluye el runtime 24.21.0; consulta README_PRODUCCION.md.
+- PostgreSQL disponible con las variables PG* configuradas
 - Git
 
 ### 1. Clonar el repositorio

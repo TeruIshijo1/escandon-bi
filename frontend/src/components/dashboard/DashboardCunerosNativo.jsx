@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell, PieChart, Pie, Legend } from 'recharts';
+import DashboardChart from './DashboardChart';
 import PremiumLoader from '../shared/PremiumLoader';
 
 const COLORS = ['#F472B6', '#60A5FA', '#34D399', '#A78BFA', '#FBBF24', '#F87171', '#34D399', '#38BDF8'];
@@ -49,77 +48,77 @@ export default function DashboardCunerosNativo({ globalFilters, globalTrigger })
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-      <PremiumLoader text="Cargando Módulo de Cuneros..." />
+      <PremiumLoader text="Cargando información de cuneros..." />
     </div>
   );
 
   return (
-    <div style={{ padding: '1rem', background: '#F8FAFC', borderRadius: '16px' }}>
+    <div className="area-native-dashboard dashboard-view" style={{ padding: '1rem', background: '#F8FAFC', borderRadius: '16px' }}>
       
       {/* KPIs Principales */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #F472B6` }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #F472B6` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recién Nacidos</span>
+            <span className="area-metric-label dashboard-metric-label" style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recién Nacidos</span>
             <span style={{ fontSize: '24px' }}>👶</span>
           </div>
-          <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)' }}>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.5rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)' }}>
             {formatNumber(data.totalRN)}
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#10B981', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.85rem', color: '#10B981', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             Pacientes Únicos
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #60A5FA` }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #60A5FA` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Biberones (Fórmulas)</span>
+            <span className="area-metric-label dashboard-metric-label" style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Biberones (Fórmulas)</span>
             <span style={{ fontSize: '24px' }}>🍼</span>
           </div>
-          <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)' }}>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.5rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)' }}>
             {formatNumber(data.totalFormulas)}
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             Fórmulas administradas
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #10B981` }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #10B981` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingreso Cuneros (SAP)</span>
+            <span className="area-metric-label dashboard-metric-label" style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingresos de Cuneros</span>
             <span style={{ fontSize: '24px' }}>💰</span>
           </div>
-          <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)' }}>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.5rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)' }}>
             {formatCurrency(data.ingresosSAP || 0)}
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#10B981', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            Contabilidad Oficial Grupo 109 (CUNEROS)
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.85rem', color: '#10B981', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            Ingresos registrados por servicios de cuneros
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #A78BFA` }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #A78BFA` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ingreso UCIN (Vertical)</span>
+            <span className="area-metric-label dashboard-metric-label" style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cargos de terapia neonatal</span>
             <span style={{ fontSize: '24px' }}>📋</span>
           </div>
-          <div style={{ fontSize: '2.5rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)' }}>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.5rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)' }}>
             {formatCurrency(data.totalIngresos || 0)}
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#A78BFA', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            Complemento — UCIN Vertical
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.85rem', color: '#A78BFA', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            Cargos registrados en las cuentas de pacientes
           </div>
         </div>
 
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
+      <div className="area-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
         
         {/* Top Insumos */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="area-panel dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Top 10 Insumos y Medicamentos</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
               <BarChart data={data.topInsumos} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} />
                 <XAxis type="number" />
@@ -136,15 +135,15 @@ export default function DashboardCunerosNativo({ globalFilters, globalTrigger })
                   }
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
-          </div>
+            </DashboardChart>
+          </div></div>
         </div>
 
         {/* Distribucion de Servicios */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="area-panel dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Distribución de Servicios Neonatales</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={data.topServicios}
@@ -162,7 +161,7 @@ export default function DashboardCunerosNativo({ globalFilters, globalTrigger })
                 <RechartsTooltip formatter={(value) => [formatNumber(value), 'Frecuencia']} />
                 <Legend />
               </PieChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 

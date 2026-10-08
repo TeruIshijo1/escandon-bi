@@ -177,7 +177,7 @@ export default function DashboardSitiMapa() {
   };
 
   return (
-    <div style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+    <div className="dashboard-view" style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
       <DashboardMapaGeografico 
         estados={data.estados || []} 
         ciudades={data.ciudades || []} 

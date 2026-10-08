@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { userMessage } from '../../utils/userMessages';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { authHeaders } from '../../api/auth';
 import { API_BASE } from '../../api/config';
@@ -6,15 +7,30 @@ import useEscapeKey from '../../hooks/useEscapeKey';
 import { generateDoctorHonorariosPdf, generateAllDoctorsHonorariosPdf } from '../../utils/honorariosPdfGenerator';
 import { downloadInstitutionalExcel } from '../../utils/excelInstitutionalGenerator';
 import { formatConfiguredWithholdings, formatHonorariosRate, formatHonorariosRates } from '../../utils/honorariosSapDisplay';
-import { calculateHonorarios, summarizeHonorarios, reviewFingerprint, sapDocumentsToRows, annotateSapInvoiceCoverage } from '../../utils/honorariosCalculation';
+import { calculateHonorarios, summarizeHonorarios, reviewFingerprint, annotateSapInvoiceCoverage, hasPhysicianChange } from '../../utils/honorariosCalculation';
+import { isHonorarioReviewEligible } from '../../utils/honorariosEligibility';
+import { formatHonorarioReference, formatHonorarioSalesOrder } from '../../utils/honorariosIdentifiers';
+import { isExcludedHonorariosGroup, isExcludedHonorariosService } from '../../utils/honorariosScope';
+import HonorariosCatalogPanel from './HonorariosCatalogPanel';
+import HonorariosDoctorReviewCard, { HonorariosPhysicianCorrection } from './HonorariosDoctorReviewCard';
+import HonorariosLiquidationsPanel from './HonorariosLiquidationsPanel';
+import HonorariosFiscalPanel from './HonorariosFiscalPanel';
+import HonorariosVerticalAuditPanel from './HonorariosVerticalAuditPanel';
+import HonorariosMonthlyFixedPanel from './HonorariosMonthlyFixedPanel';
+import { apiFetch } from '../../api/client';
+import { HonorariosHeader, HonorariosPeriod, HonorariosSummary, HonorariosResultsToolbar } from './HonorariosReviewToolbar';
 
 const roundCents = value => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 const HONORARIOS_PAGE_SIZE = 100;
+const canSelectService = row => row.ModeBI && !row.FixedMonthly && !row.LiquidacionCerrada && !row.Cancelado
+  && row._reviewStatus === 'PENDIENTE' && row.CatalogStatus === 'INCLUIDO' && Number(row.Cantidad) > 0;
+const doctorGroupKey = row => `${String(row.Medico || 'Médico No Asignado').trim()}${row.ModeBI && row.MedicoId ? ` · #${row.MedicoId}` : ''}`;
 const readQuantity = value => {
   if (value === null || value === undefined || value === '') return 1;
   const quantity = Number(value);
   return Number.isFinite(quantity) ? quantity : 1;
 };
+const quantityForTotals = row => row.ModeBI && row.Cantidad == null ? 0 : readQuantity(row.Cantidad);
 
 export default function HonorariosAuditView() {
   const { user } = useAuth();
@@ -23,6 +39,21 @@ export default function HonorariosAuditView() {
   const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
   const [startDate, setStartDate] = useState(firstDayOfMonth);
+  const [workspace, setWorkspace] = useState('review');
+  const [catalogVisited, setCatalogVisited] = useState(false);
+  const [paymentProviderId, setPaymentProviderId] = useState('');
+  const [fiscalProviderId, setFiscalProviderId] = useState('');
+  const [fiscalProfiles, setFiscalProfiles] = useState({});
+  const [fiscalError, setFiscalError] = useState('');
+  const loadFiscalProfiles = async () => {
+    try { const result = await apiFetch('/honorarios/fiscal-profiles'); setFiscalProfiles(result.profiles || {}); setFiscalError(''); }
+    catch (failure) { setFiscalError(userMessage(failure.message)); }
+  };
+  useEffect(() => { loadFiscalProfiles(); }, []);
+  const canManage = String(user?.username || '').toLowerCase() === 'amendoza'
+    || user?.permisos?.includes('interconsultas-jornadas') === true;
+  const [providers, setProviders] = useState([]);
+  const [providerError, setProviderError] = useState(null);
   const [endDate, setEndDate] = useState(today);
   
   const [data, setData] = useState([]);
@@ -33,9 +64,14 @@ export default function HonorariosAuditView() {
   const [sapReconciliation, setSapReconciliation] = useState(null);
   const [error, setError] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const reportRequest = useRef({ id: 0, controller: null });
+  const catalogChanged = useRef(false);
+  const sapRequests = useRef(0);
+  const pendingSapDoctors = useRef(new Set());
+  useEffect(() => () => { reportRequest.current.controller?.abort(); reportRequest.current.id += 1; }, []);
 
   // Filtros reactivos en memoria
-  const [statusTab, setStatusTab] = useState('todos');
+  const [statusTab, setStatusTab] = useState('pendientes');
   const [grupoFilter, setGrupoFilter] = useState('TODOS');
   const [medicoFilter, setMedicoFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,21 +112,52 @@ export default function HonorariosAuditView() {
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewError, setReviewError] = useState(null);
   const [canReview, setCanReview] = useState(false);
+  const [selectedServices, setSelectedServices] = useState({});
+  const [bulkMessage, setBulkMessage] = useState('');
+  const [bulkDialog, setBulkDialog] = useState({ open: false, rows: [], action: 'APROBAR', providerId: '', motivo: '', evidenceReference: '', vatRate: '', confirmed: false, duplicateConfirmed: false, preview: null, error: null });
+  const overridePhysicianChanged = overrideModal.action === 'APROBAR' && overrideModal.row?.ModeBI && !overrideModal.row.FixedMonthly
+    && hasPhysicianChange(overrideModal.row.MedicoId, overrideModal.providerId);
+  const bulkPhysicianChanged = bulkDialog.action === 'APROBAR'
+    && bulkDialog.rows.some(row => hasPhysicianChange(row.providerId, bulkDialog.providerId));
+  const overrideChangeReasonMissing = overridePhysicianChanged && !String(overrideModal.evidenceReference || '').trim();
+  const bulkChangeReasonMissing = bulkPhysicianChanged && !bulkDialog.evidenceReference.trim();
+  useEscapeKey(() => setBulkDialog(previous => ({ ...previous, open: false })), bulkDialog.open);
+  useEffect(() => {
+    fetch(API_BASE + '/honorarios/providers', { headers: authHeaders() }).then(async response => {
+      const result = await response.json();
+      if (!response.ok) throw new Error(userMessage(result.error || 'No se pudo consultar el directorio de médicos.'));
+      setProviders(result.providers || []);
+    }).catch(failure => setProviderError(userMessage(failure.message)));
+  }, []);
   useEffect(() => {
     setDetailPage(0);
     setDoctorPages({});
   }, [debouncedSearchTerm, statusTab, grupoFilter, medicoFilter, startDate, endDate]);
-  const allRows = useMemo(() => [...data, ...sapDocumentsToRows(sapReconciliation, data)], [data, sapReconciliation]);
-  const effectiveData = useMemo(() => calculateHonorarios(allRows, overrides, sapReconciliation?.providers, startDate),
-    [allRows, overrides, sapReconciliation, startDate]);
+  const effectiveData = useMemo(() => calculateHonorarios(data, overrides, sapReconciliation?.providers, startDate, fiscalProfiles)
+    .filter(isHonorarioReviewEligible), [data, overrides, sapReconciliation, startDate, fiscalProfiles]);
   useEffect(() => {
     setSelectedRow(previous => previous ? effectiveData.find(row => row._rowId === previous._rowId) || null : null);
   }, [effectiveData]);
 
+  const suggestedVatFor = row => {
+    const profile = fiscalProfiles[row.MedicoId];
+    return profile?.enabled && profile.confirmed && String(profile.providerId) === String(row.MedicoId)
+      && profile.validFrom <= String(row.FechaAtencion).slice(0, 10) && [0, 0.08, 0.16].includes(profile.defaultVatRate)
+      ? String(profile.defaultVatRate) : '';
+  };
   const handleOpenOverrideDialog = (row, action) => {
+    if (action === 'APROBAR' && row._reviewStatus !== 'PENDIENTE') return;
     const base = Number(row.BaseImporte) > 0 ? row.BaseImporte : row.BasePropuesta;
+    const previousProvider = row._previousApproval?.providerId || row.MedicoId;
+    const mustReprice = row.ModeBI && (row._reviewStale || previousProvider !== row.MedicoId);
     setOverrideModal({ isOpen: true, row, action, customAmount: base > 0 ? String(base) : '',
-      vatRate: '', separateServicesConfirmed: false, motivo: '', error: null });
+      providerId: previousProvider ? String(previousProvider) : '', quantity: row._previousApproval?.quantity ?? row.Cantidad ?? '',
+      quotedTariffId: mustReprice ? null : row.TariffSnapshot?.id,
+      quotedTariffRevision: mustReprice ? null : row.TariffSnapshot?.revision,
+      role: row.RolMedico || 'TRATANTE',
+      executionConfirmed: action === 'APROBAR', evidenceReference: '', duplicateConfirmed: false,
+      vatRate: suggestedVatFor({ ...row, MedicoId: previousProvider }), separateServicesConfirmed: false,
+      motivo: action === 'APROBAR' ? row.FixedMonthly ? 'Pago fijo mensual completo autorizado por quien revisa.' : 'Servicio e IVA confirmados al aprobar el honorario.' : '', error: null });
   };
   const persistReview = async (row, decision) => {
     if (!reviewReady || !canReview || reviewSaving) throw new Error('Actualiza el reporte antes de revisar honorarios.');
@@ -101,16 +168,64 @@ export default function HonorariosAuditView() {
         decision: { ...decision, fingerprint: reviewFingerprint(row), sourceType: row.TipoCalculo || 'CLINICO' } })
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'No se pudo guardar la decisión.');
+    if (!response.ok) throw new Error(userMessage(result.error || 'No se pudo guardar la decisión.'));
     setOverrides(previous => ({ ...previous, [row._rowId]: result.review }));
+    setSelectedServices(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => id !== row._rowId)));
+    if (decision.action === 'APROBAR') {
+      setBulkMessage('Servicio aprobado. Puedes verlo y descargar su PDF en Pagos y PDF.');
+      if (workspace === 'review') setStatusTab('pendientes');
+    }
+    refreshSapForReviews({ [row._rowId]: result.review });
+    if (result.review.snapshot?.providerName) setExpandedMedicos(previous => previous[doctorGroupKey(row)]
+      ? { ...previous, [doctorGroupKey({ ModeBI: true, Medico: result.review.snapshot.providerName, MedicoId: result.review.snapshot.providerId })]: true }
+      : previous);
+    setData(previous => previous.map(source => (source.SourceIdentity || source.UDRKey) === row._rowId
+      ? { ...source, ReviewInvalidated: false } : source));
+  };
+  const refreshSapForReviews = reviews => {
+    const names = [...new Set(Object.values(reviews || {}).map(review => review.snapshot?.providerName).filter(Boolean))]
+      .filter(name => !sapReconciliation?.providers?.[name] && !pendingSapDoctors.current.has(name));
+    if (!names.length) return;
+    const { id, controller } = reportRequest.current;
+    names.forEach(name => pendingSapDoctors.current.add(name));
+    sapRequests.current += 1; setSapLoading(true);
+    fetch(API_BASE + '/honorarios/sap-reconciliation', { method: 'POST', signal: controller?.signal,
+      headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ startDate, endDate, doctors: names })
+    }).then(async response => {
+      const result = await response.json();
+      if (!response.ok) throw new Error(userMessage(result.error));
+      if (reportRequest.current.id !== id || controller?.signal.aborted) return;
+      setSapReconciliation(previous => ({ ...previous, ...result,
+        providers: { ...previous?.providers, ...result.providers },
+        additionalProviders: result.additionalProviders || previous?.additionalProviders || [] }));
+    }).catch(failure => {
+      if (reportRequest.current.id === id && !controller?.signal.aborted) setSapError(userMessage(failure.message));
+    }).finally(() => {
+      if (reportRequest.current.id !== id) return;
+      names.forEach(name => pendingSapDoctors.current.delete(name));
+      sapRequests.current = Math.max(0, sapRequests.current - 1); setSapLoading(sapRequests.current > 0);
+    });
   };
   const handleConfirmOverride = async () => {
     const row = overrideModal.row;
     if (!row || reviewSaving) return;
+    if (overrideChangeReasonMissing) {
+      setOverrideModal(previous => ({ ...previous, error: 'Escribe el motivo del cambio de médico antes de aprobar.' })); return;
+    }
     const amount = Number(overrideModal.customAmount);
-    if (overrideModal.action === 'APROBAR' && row.TipoCalculo !== 'SAP_DOCUMENTO'
+    if (!row.ModeBI && overrideModal.action === 'APROBAR' && row.TipoCalculo !== 'SAP_DOCUMENTO'
       && (!Number.isFinite(amount) || amount <= 0 || !String(row.Medico || '').trim())) {
-      setOverrideModal(previous => ({ ...previous, error: 'Se requiere médico identificado y base positiva de honorarios. El precio al paciente no sustituye el tabulador.' })); return;
+      setOverrideModal(previous => ({ ...previous, error: 'Selecciona un médico y registra un honorario mayor a cero. Usa la tarifa autorizada para el médico; el importe cobrado al paciente puede ser diferente.' })); return;
+    }
+    if (row.ModeBI && overrideModal.action === 'APROBAR' && (!overrideModal.providerId
+      || !(Number(overrideModal.quantity) > 0) || !overrideModal.executionConfirmed)) {
+      setOverrideModal(previous => ({ ...previous, error: 'Selecciona el médico, confirma la cantidad y la realización del servicio.' })); return;
+    }
+    if (row.ModeBI && !row.FixedMonthly && overrideModal.action === 'APROBAR' && !overrideModal.quotedTariffId) {
+      setOverrideModal(previous => ({ ...previous, error: 'Calcula el honorario con la tarifa que corresponde a la fecha del servicio antes de confirmar.' })); return;
+    }
+    if (row.ModeBI && overrideModal.action === 'APROBAR' && overrideModal.vatRate === '') {
+      setOverrideModal(previous => ({ ...previous, error: 'Selecciona el IVA antes de aprobar.' })); return;
     }
     if (!overrideModal.motivo.trim()) {
       setOverrideModal(previous => ({ ...previous, error: 'Registra el motivo y la evidencia de tu decisión.' })); return;
@@ -119,31 +234,138 @@ export default function HonorariosAuditView() {
     try {
       await persistReview(row, { action: overrideModal.action, customAmount: roundCents(amount),
         vatRate: overrideModal.vatRate === '' ? null : Number(overrideModal.vatRate),
+        providerId: Number(overrideModal.providerId) || null, quantity: Number(overrideModal.quantity),
+        role: overrideModal.role,
+        quotedTariffId: overrideModal.quotedTariffId, quotedTariffRevision: overrideModal.quotedTariffRevision,
+        executionConfirmed: overrideModal.executionConfirmed, confirmationMode: row.ModeBI ? 'DIRECT_APPROVAL' : null,
+        evidenceReference: overridePhysicianChanged ? '' : String(overrideModal.evidenceReference || '').trim(),
+        physicianChangeReason: overridePhysicianChanged ? overrideModal.evidenceReference.trim() : undefined,
+        duplicateConfirmed: overrideModal.duplicateConfirmed,
         separateServicesConfirmed: overrideModal.separateServicesConfirmed, motivo: overrideModal.motivo.trim() });
       setOverrideModal(previous => ({ ...previous, isOpen: false }));
-    } catch (error) { setOverrideModal(previous => ({ ...previous, error: error.message })); }
+
+    } catch (error) { setOverrideModal(previous => ({ ...previous, error: userMessage(error.message) })); }
     finally { setReviewSaving(false); }
   };
+  useEffect(() => {
+    if (!overrideModal.isOpen || overrideModal.action !== 'APROBAR' || !overrideModal.row?.ModeBI || overrideModal.row.FixedMonthly
+      || overrideModal.quotedTariffId || !overrideModal.providerId || !(Number(overrideModal.quantity) > 0)) return;
+    const controller = new AbortController();
+    setOverrideModal(previous => ({ ...previous, pricing: true }));
+    fetch(API_BASE + '/honorarios/approval-preview', { method: 'POST', signal: controller.signal,
+      headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({
+        rowId: overrideModal.row._rowId, serviceDate: String(overrideModal.row.FechaAtencion).slice(0, 10),
+        providerId: Number(overrideModal.providerId), quantity: Number(overrideModal.quantity), role: overrideModal.role })
+    }).then(async response => {
+      const result = await response.json();
+      if (!response.ok) throw new Error(userMessage(result.error));
+      if (!(result.row.BaseImporte > 0) || !result.row.TariffSnapshot) throw new Error('Falta configurar una tarifa vigente para este médico y servicio.');
+      if (!controller.signal.aborted) setOverrideModal(previous => ({ ...previous,
+        customAmount: String(result.row.BaseImporte), quotedTariffId: result.row.TariffSnapshot.id,
+        quotedTariffRevision: result.row.TariffSnapshot.revision, pricing: false, error: null }));
+    }).catch(failure => {
+      if (!controller.signal.aborted) setOverrideModal(previous => ({ ...previous, pricing: false, error: userMessage(failure.message) }));
+    });
+    return () => controller.abort();
+  }, [overrideModal.isOpen, overrideModal.action, overrideModal.row?._rowId, overrideModal.providerId,
+    overrideModal.quantity, overrideModal.role, overrideModal.quotedTariffId]);
+
   const handleRestoreRow = async row => {
     if (reviewSaving) return;
     setReviewSaving(true);
     try { await persistReview(row, { action: 'PENDIENTE', motivo: 'Devuelto a revisión', customAmount: null, vatRate: null }); }
-    catch (error) { setReviewError(error.message); }
+    catch (error) { setReviewError(userMessage(error.message)); }
     finally { setReviewSaving(false); }
   };
   const reviewButtons = row => <>
-    <button disabled={!reviewReady || !canReview || reviewSaving || sapLoading || (row.TipoCalculo === 'SAP_DOCUMENTO' && (row.SapDocumento?.cancelled || row.SapDocumento?.currency !== 'MXN' || row.SapDocumento?.documentTotal === null || row.SapDocumento?.documentTotal === undefined))}
+    {row._reviewStatus === 'PENDIENTE' && <>
+    {row.ModeBI && !row.FixedMonthly && !row.LiquidacionCerrada && <input type="checkbox" aria-label={`Seleccionar servicio ${row.SourceLineId}`}
+      title="Seleccionar para una decisión conjunta" checked={!!selectedServices[row._rowId]} disabled={!reviewReady || !canReview || !canSelectService(row)}
+      onChange={event => setSelectedServices(previous => ({ ...previous, [row._rowId]: event.target.checked }))} />}
+    <button disabled={!!row.LiquidacionCerrada || row.Cancelado || (row.ModeBI && !row.FixedMonthly && row.CatalogStatus !== 'INCLUIDO') || !reviewReady || !canReview || reviewSaving || (row.TipoCalculo === 'SAP_DOCUMENTO' && (row.SapDocumento?.cancelled || row.SapDocumento?.currency !== 'MXN' || row.SapDocumento?.documentTotal === null || row.SapDocumento?.documentTotal === undefined))}
       title={row.TipoCalculo === 'SAP_DOCUMENTO' && row.SapDocumento?.cancelled ? 'La factura está cancelada y no se puede aprobar.' : row.TipoCalculo === 'SAP_DOCUMENTO' && row.SapDocumento?.currency !== 'MXN' ? 'La factura no está en pesos mexicanos y requiere revisión.' : row.TipoCalculo === 'SAP_DOCUMENTO' && (row.SapDocumento?.documentTotal === null || row.SapDocumento?.documentTotal === undefined) ? 'Falta el total de la factura y requiere revisión.' : 'Aprobar'}
-      className="hon-btn-override-approve" onClick={() => handleOpenOverrideDialog(row, 'APROBAR')}>Aprobar</button>
-    <button disabled={!reviewReady || !canReview || reviewSaving || sapLoading} className="hon-btn-override-exclude" onClick={() => handleOpenOverrideDialog(row, 'EXCLUIR')}>Rechazar</button>
+      className="hon-btn-override-approve" onClick={() => handleOpenOverrideDialog(row, 'APROBAR')}>{row.FixedMonthly ? 'Incluir pago mensual' : 'Aprobar'}</button>
+    </>}
+    {row._reviewStatus !== 'RECHAZADO' && <button disabled={!!row.LiquidacionCerrada || !reviewReady || !canReview || reviewSaving} className="hon-btn-override-exclude" onClick={() => handleOpenOverrideDialog(row, 'EXCLUIR')}>Excluir</button>}
   </>;
-  const reviewLabel = row => row._reviewStale ? 'Pendiente: cambiaron los datos de origen'
+  const openBulk = (action, directRows) => {
+    const selected = (directRows || effectiveData.filter(row => selectedServices[row._rowId])).filter(canSelectService);
+    setReviewError(null);
+    if (!selected.length || selected.length > 100) { setReviewError('Selecciona entre 1 y 100 servicios para cada revisión conjunta.'); return; }
+    const suggestedRates = [...new Set(selected.map(suggestedVatFor))];
+    setBulkDialog({ open: true, action, providerId: '', motivo: action === 'APROBAR' ? 'Servicios e IVA confirmados en aprobación múltiple.' : '', evidenceReference: '', vatRate: suggestedRates.length === 1 ? suggestedRates[0] : '', confirmed: false,
+      duplicateConfirmed: false, preview: null, pricing: action === 'APROBAR', error: null, rows: selected.map(row => ({ rowId: row._rowId,
+        sourceLineId: row.SourceLineId, expectedRevision: row._revision || 0, fingerprint: reviewFingerprint(row),
+        providerId: row.MedicoId, providerName: row.Medico, role: row.RolMedico, quantity: row.Cantidad,
+        salesOrder: row.FolioOrdenVenta, description: row.Servicio, serviceDate: String(row.FechaAtencion).slice(0, 10),
+        possibleDuplicate: row.PosibleDuplicado })) });
+  };
+  const bulkRequest = async (endpoint, body, signal) => {
+    const response = await fetch(API_BASE + endpoint, { method: 'POST', signal, headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
+    const result = await response.json(); if (!response.ok) throw new Error(userMessage(result.error || 'No se pudo completar la revisión conjunta.')); return result;
+  };
+  useEffect(() => {
+    if (!bulkDialog.open || bulkDialog.action !== 'APROBAR') return;
+    const controller = new AbortController();
+    setBulkDialog(previous => ({ ...previous, pricing: true, preview: null, error: null }));
+    bulkRequest('/honorarios/reviews/bulk-preview', { startDate, endDate, rows: bulkDialog.rows,
+      providerId: bulkDialog.providerId || null }, controller.signal).then(result => {
+      if (!controller.signal.aborted) setBulkDialog(previous => ({ ...previous, preview: result.rows, pricing: false }));
+    }).catch(failure => {
+      if (!controller.signal.aborted) setBulkDialog(previous => ({ ...previous, pricing: false, error: userMessage(failure.message) }));
+    });
+    return () => controller.abort();
+  }, [bulkDialog.open, bulkDialog.action, bulkDialog.providerId, bulkDialog.rows, startDate, endDate]);
+  const selectRows = rows => {
+    const selectable = rows.filter(canSelectService);
+    setSelectedServices(Object.fromEntries(selectable.slice(0, 100).map(row => [row._rowId, true])));
+    setReviewError(null);
+    setBulkMessage(selectable.length > 100 ? 'Se seleccionaron los primeros 100 servicios de estos filtros. Después puedes continuar con los siguientes.' : '');
+  };
+  const saveBulk = async () => {
+    if (reviewSaving) return;
+    if (bulkChangeReasonMissing) {
+      setBulkDialog(previous => ({ ...previous, error: 'Escribe el motivo del cambio de médico antes de aprobar la selección.' })); return;
+    }
+    const approving = bulkDialog.action === 'APROBAR';
+    if (!bulkDialog.motivo.trim() || (approving ? (!bulkDialog.preview || bulkDialog.pricing || bulkDialog.vatRate === '') : !bulkDialog.confirmed)) {
+      setBulkDialog(previous => ({ ...previous, error: approving ? 'Espera el cálculo y selecciona el IVA para aprobar.' : 'Registra el motivo y confirma la exclusión.' })); return;
+    }
+    if (approving && bulkDialog.rows.some(row => row.possibleDuplicate) && !bulkDialog.duplicateConfirmed) {
+      setBulkDialog(previous => ({ ...previous, error: 'Revisa los posibles duplicados antes de aprobar.' })); return;
+    }
+    setReviewSaving(true);
+    try {
+      const result = await bulkRequest('/honorarios/reviews/bulk', { startDate, endDate,
+        rows: bulkDialog.action === 'APROBAR' ? bulkDialog.preview : bulkDialog.rows,
+        decision: { action: bulkDialog.action, motivo: bulkDialog.motivo.trim(), executionConfirmed: approving || bulkDialog.confirmed,
+          confirmationMode: approving ? 'DIRECT_APPROVAL' : null,
+          evidenceReference: bulkPhysicianChanged ? '' : bulkDialog.evidenceReference.trim(),
+          physicianChangeReason: bulkPhysicianChanged ? bulkDialog.evidenceReference.trim() : undefined,
+          duplicateConfirmed: bulkDialog.duplicateConfirmed,
+          vatRate: bulkDialog.vatRate === '' ? null : Number(bulkDialog.vatRate) } });
+      setOverrides(previous => ({ ...previous, ...result.reviews }));
+      refreshSapForReviews(result.reviews);
+      const savedIds = new Set(Object.keys(result.reviews || {}));
+      setData(previous => previous.map(row => savedIds.has(row.SourceIdentity || row.UDRKey) ? { ...row, ReviewInvalidated: false } : row));
+      setBulkDialog(previous => ({ ...previous, open: false }));
+      setSelectedServices(previous => Object.fromEntries(Object.entries(previous).filter(([id]) => !savedIds.has(id))));
+      setBulkMessage(`${result.savedCount} servicios ${approving ? 'aprobados' : 'excluidos'}.${result.errors.length ? ` ${result.errors.length} requieren otra revisión.` : ''}`);
+      if (approving && result.savedCount > 0 && workspace === 'review') setStatusTab('pendientes');
+      if (result.errors.length) setReviewError(userMessage(result.errors.slice(0, 3).map(item => item.message).join(' · ')));
+    } catch (failure) { setBulkDialog(previous => ({ ...previous, error: userMessage(failure.message) })); }
+    finally { setReviewSaving(false); }
+  };
+  const reviewLabel = row => row.LiquidacionCerrada ? `Cierre #${row.LiquidacionCerrada}${row.CambiosTrasCierre ? ' · Revisar cambio clínico' : ''}` : row.ReviewInvalidated ? 'Pendiente: cambió la tarifa del médico aprobado' : row._reviewStale ? 'Pendiente: cambiaron los datos o la tarifa'
     : row._reviewSource === 'VERTICAL' && row._reviewStatus === 'APROBADO' ? 'Aprobado en el sistema de atenciones'
       : row._reviewSource === 'VERTICAL' && row._reviewStatus === 'RECHAZADO' ? 'Rechazado en el sistema de atenciones'
-        : ({ APROBADO: 'Aprobado', RECHAZADO: 'Rechazado', PENDIENTE: 'Pendiente de revisión' })[row._reviewStatus];
+        : row.ModeBI && row._reviewStatus === 'PENDIENTE' ? (row.BIStatusReasons || []).join(' · ') || 'Pendiente de aprobación'
+          : ({ APROBADO: 'Aprobado', RECHAZADO: 'Excluido', PENDIENTE: 'Pendiente de revisión' })[row._reviewStatus];
   const sourceLabel = row => row.TipoCalculo === 'SAP_DOCUMENTO'
     ? row.SapDocumento?.cancelled ? 'Factura cancelada · no se puede aprobar' : 'Factura adicional · no relacionada con una atención'
-    : row.FuenteHonorario === 'Cita sin orden de venta' ? 'Cita recuperada de la agenda' : 'Atención registrada';
+    : row.FuenteHonorario === 'Cita sin orden de venta' ? 'Cita recuperada de la agenda'
+      : row.FolioAtencion ? 'Atención registrada' : row.FolioCita ? 'Cita registrada'
+        : row.FolioOrdenVenta ? 'Orden de venta registrada' : 'Registro clínico';
   const renderSapLineDetails = row => row.TipoCalculo === 'SAP_DOCUMENTO' && row.SapDocumento?.lines?.length > 0 && (
     <div style={{ marginTop: '0.25rem', color: '#6b21a8', fontSize: '0.72rem', fontWeight: '500' }}>
       {row.SapDocumento.lines.map((line, index) => (
@@ -193,6 +415,13 @@ export default function HonorariosAuditView() {
   };
 
   const fetchReport = async () => {
+    reportRequest.current.controller?.abort();
+    const controller = new AbortController();
+    const id = reportRequest.current.id + 1;
+    reportRequest.current = { id, controller };
+    const current = () => reportRequest.current.id === id && !controller.signal.aborted;
+    catalogChanged.current = false;
+    sapRequests.current = 0; pendingSapDoctors.current.clear();
     setLoading(true);
     setError(null);
     setData([]);
@@ -203,72 +432,92 @@ export default function HonorariosAuditView() {
     setReviewReady(false);
     setReviewError(null);
     setOverrides({});
+    setSelectedServices({}); setBulkMessage('');
     setSapReconciliation(null);
     setSapError(null);
     setSapLoading(false);
     setHasSearched(true);
-    setStatusTab('todos');
     
+    let loadedReviews = {};
     try {
       const query = new URLSearchParams({
         startDate,
         endDate
       });
       
-      const response = await fetch(`${API_BASE}/honorarios/audit?${query.toString()}`, {
-        headers: authHeaders()
-      });
+      const [response, reviewResponse] = await Promise.all([
+        fetch(`${API_BASE}/honorarios/audit?${query.toString()}`, { headers: authHeaders(), signal: controller.signal }),
+        fetch(API_BASE + '/honorarios/reviews?' + query, { headers: authHeaders(), signal: controller.signal }).catch(() => null)
+      ]);
       
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || result.message || 'Error al consultar Vertical (Cirrus)');
+      if (!current()) return;
+      if (!response.ok) throw new Error(userMessage(result.error || result.message || 'Error al consultar Vertical'));
       
-      const reportRows = result.data || [];
-      setData(reportRows);
+      const reportRows = (result.data || []).filter(row => (row.FixedMonthly === true || !isExcludedHonorariosService(row)) && isHonorarioReviewEligible(row));
       setCoverage(result.coverage || null);
       try {
-        const reviewQuery = new URLSearchParams({ startDate, endDate });
-        const reviewResponse = await fetch(API_BASE + '/honorarios/reviews?' + reviewQuery, { headers: authHeaders() });
+        if (!reviewResponse) throw new Error('No se pudieron consultar las revisiones guardadas. Actualiza e intenta de nuevo.');
         const reviewResult = await reviewResponse.json();
-        if (!reviewResponse.ok) throw new Error(reviewResult.error || 'No se pudieron leer las revisiones.');
-        setOverrides(reviewResult.reviews || {}); setCanReview(reviewResult.canReview === true); setReviewReady(true);
-      } catch (error) { setReviewError(error.message); }
+        if (!current()) return;
+        if (!reviewResponse.ok) throw new Error(userMessage(reviewResult.error || 'No se pudieron leer las revisiones.'));
+        loadedReviews = reviewResult.reviews || {};
+        setData(reportRows);
+        setOverrides(loadedReviews); setCanReview(reviewResult.canReview === true); setReviewReady(true);
+      } catch (error) { if (!current()) return; setReviewError(userMessage(error.message)); }
 
       setLoading(false);
 
       // El reporte principal permanece disponible si SAP no responde; la conciliación es una lectura aparte.
-      const doctorNames = [...new Set(reportRows.map(row => String(row.Medico || '').trim()).filter(Boolean))];
-      {
+      const doctorNames = [...new Set(reportRows.flatMap(row => [String(row.Medico || '').trim(),
+        row.ReviewBeneficiary?.providerName, loadedReviews[row.SourceIdentity || row.UDRKey]?.snapshot?.providerName]).filter(Boolean))];
+      if (doctorNames.length) {
+        sapRequests.current += 1;
         setSapLoading(true);
         try {
           const sapResponse = await fetch(`${API_BASE}/honorarios/sap-reconciliation`, {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
+            signal: controller.signal,
             body: JSON.stringify({ startDate, endDate, doctors: doctorNames })
           });
           const sapResult = await sapResponse.json();
-          if (!sapResponse.ok) throw new Error(sapResult.error || 'No se pudieron consultar las facturas de SAP.');
-          setSapReconciliation(sapResult);
-          const invoiceDates = sapDocumentsToRows(sapResult).map(row => row.FechaAtencion).filter(Boolean);
-          const firstReviewDate = [startDate, ...invoiceDates].sort()[0];
-          const lastReviewDate = [endDate, sapResult.period?.endDate || endDate, ...invoiceDates].sort().at(-1);
-          // Las facturas localizadas por pagos pueden ser anteriores al corte.
-          try {
-            const reviewResponse = await fetch(`${API_BASE}/honorarios/reviews?${new URLSearchParams({startDate:firstReviewDate,endDate:lastReviewDate})}`, {headers:authHeaders()});
-            const reviewResult = await reviewResponse.json();
-            if (!reviewResponse.ok) throw new Error(reviewResult.error || 'No se pudieron leer las revisiones.');
-            setOverrides(reviewResult.reviews || {}); setCanReview(reviewResult.canReview === true); setReviewReady(true);
-          } catch (error) { setReviewReady(false); setReviewError(error.message); }
+          if (!current()) return;
+          if (!sapResponse.ok) throw new Error(userMessage(sapResult.error || 'No se pudieron consultar las facturas de SAP.'));
+          setSapReconciliation(previous => ({ ...previous, ...sapResult, providers: { ...previous?.providers, ...sapResult.providers } }));
         } catch (sapErr) {
-          setSapError(sapErr.message || 'No se pudo consultar SAP.');
+          if (!current()) return;
+          setSapError(userMessage(sapErr.message || 'No se pudo consultar SAP.'));
         } finally {
-          setSapLoading(false);
+          if (current()) { sapRequests.current = Math.max(0, sapRequests.current - 1); setSapLoading(sapRequests.current > 0); }
         }
       }
     } catch (err) {
-      setError(err.message);
+      if (current()) setError(userMessage(err.message));
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
+  };
+
+  const onCatalogChanged = () => {
+    catalogChanged.current = true;
+    reportRequest.current.controller?.abort();
+    reportRequest.current.id += 1;
+    setData([]); setSapReconciliation(null); setReviewReady(false); setSelectedServices({});
+    setLoading(false); setSapLoading(false); setReviewError(null); setError(null); setSapError(null);
+  };
+  const changeWorkspace = next => {
+    if (next === 'liquidations') setPaymentProviderId('');
+    if (next === 'catalog') setCatalogVisited(true);
+    if (next === 'approved') { setStatusTab('elegibles'); setViewMode('medicos'); setSelectedServices({}); }
+    if (next === 'review' && workspace === 'approved') setStatusTab('pendientes');
+    setWorkspace(next);
+    if (['review', 'approved'].includes(next) && catalogChanged.current) fetchReport();
+  };
+  const reviewCatalogService = item => {
+    setStatusTab('todos'); setGrupoFilter('TODOS'); setMedicoFilter('');
+    setSearchTerm(item.itemCode); setDebouncedSearchTerm(item.itemCode);
+    setWorkspace('review'); fetchReport();
   };
 
   // Formateadores
@@ -298,13 +547,12 @@ export default function HonorariosAuditView() {
     return str;
   };
 
-  // Lista única de Grupos de Servicio (excluyendo Almacén General y Farmacia)
+  // Lista única de los grupos incluidos en Honorarios Médicos.
   const uniqueGrupos = useMemo(() => {
     const set = new Set();
-    const excluded = ['ALMACEN GENERAL', 'FARMACIA'];
     effectiveData.forEach(item => {
       const g = item.GrupoServicio;
-      if (g && g.trim() && !excluded.includes(g.trim().toUpperCase())) {
+      if (g && g.trim() && !isExcludedHonorariosGroup(g)) {
         set.add(g.trim());
       }
     });
@@ -318,9 +566,8 @@ export default function HonorariosAuditView() {
       const med = item.Medico;
       if (med && med.trim()) set.add(med.trim());
     });
-    (sapReconciliation?.additionalProviders || []).forEach(provider => set.add(provider.medico));
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [effectiveData, sapReconciliation]);
+  }, [effectiveData]);
 
   // Filtros de búsqueda compartidos por las pestañas de estado.
   const filteredByCriteria = useMemo(() => {
@@ -338,6 +585,8 @@ export default function HonorariosAuditView() {
         String(r.Medico || '').toLowerCase().includes(q) ||
         String(r.Paciente || '').toLowerCase().includes(q) ||
         String(r.FolioAtencion || '').toLowerCase().includes(q) ||
+        String(r.FolioCita || '').toLowerCase().includes(q) ||
+        String(r.FolioOrdenVenta || '').toLowerCase().includes(q) ||
         String(r.Servicio || '').toLowerCase().includes(q) ||
         String(r.CodigoServicio || '').toLowerCase().includes(q) ||
         String(r.Cliente || '').toLowerCase().includes(q) ||
@@ -372,7 +621,7 @@ export default function HonorariosAuditView() {
     return counts;
   }, { approved: 0, rejected: 0, pending: 0, total: 0 }), [filteredByCriteria]);
   const hasNarrowFilters = !!debouncedSearchTerm.trim() || !!medicoFilter || grupoFilter !== 'TODOS';
-  const activeStatusLabel = ({ pendientes: 'Por revisar', elegibles: 'Aprobados', exclusiones: 'Rechazados' })[statusTab] || 'Todos';
+  const activeStatusLabel = ({ pendientes: 'Por revisar', elegibles: 'Aprobados', exclusiones: 'Excluidos' })[statusTab] || 'Todos';
 
   // Cálculos de KPIs unificados
   const kpis = useMemo(() => {
@@ -412,20 +661,21 @@ export default function HonorariosAuditView() {
     const rowsByMedico = new Map();
     const sourceRowsByMedico = new Map();
     data.forEach(row => {
-      const medicoKey = (row.Medico || 'Médico No Asignado').trim();
+      const medicoKey = doctorGroupKey(row);
       if (!sourceRowsByMedico.has(medicoKey)) sourceRowsByMedico.set(medicoKey, []);
       sourceRowsByMedico.get(medicoKey).push(row);
     });
     filteredByCriteria.forEach(row => {
-      const medicoKey = (row.Medico || 'Médico No Asignado').trim();
+      const medicoKey = doctorGroupKey(row);
       if (!rowsByMedico.has(medicoKey)) rowsByMedico.set(medicoKey, []);
       rowsByMedico.get(medicoKey).push(row);
     });
     filteredData.forEach(row => {
-      const medicoKey = (row.Medico || 'Médico No Asignado').trim();
+      const medicoKey = doctorGroupKey(row);
       if (!groups[medicoKey]) {
         groups[medicoKey] = {
           medico: medicoKey,
+          providerName: String(row.Medico || '').trim(),
           especialidad: row.Especialidad || 'Sin Especialidad',
           tipoMedico: row.TipoMedico || 'HN',
           tasaISR: row._effectiveISRRate,
@@ -438,7 +688,7 @@ export default function HonorariosAuditView() {
           filas: []
         };
       }
-      const cant = readQuantity(row.Cantidad);
+      const cant = quantityForTotals(row);
       if (row._effectiveElegible) {
           groups[medicoKey].approvedCount += 1;
       } else if (row._reviewStatus === 'RECHAZADO') {
@@ -461,13 +711,13 @@ export default function HonorariosAuditView() {
       g.rejectedCount = allMatchingRows.filter(row => row._reviewStatus === 'RECHAZADO').length;
       g.excludedCount = g.rejectedCount;
       g.pendingReviewCount = allMatchingRows.filter(row => row._reviewStatus === 'PENDIENTE').length;
-      g.serviciosCount = allMatchingRows.reduce((sum, row) => sum + readQuantity(row.Cantidad), 0);
+      g.serviciosCount = allMatchingRows.reduce((sum, row) => sum + quantityForTotals(row), 0);
       g.tasasISR = [...new Set(allMatchingRows.map(row => row._effectiveISRRate).filter(rate => rate !== null))].sort((a, b) => a - b);
       g.tasaISR = g.tasasISR.length === 1 ? g.tasasISR[0] : null;
       Object.assign(g, summarizeHonorarios(allMatchingRows));
-      const sapProvider = sapReconciliation?.providers?.[g.medico] || sapReconciliation?.additionalProviders?.find(provider => provider.medico === g.medico) || null;
+      const sapProvider = sapReconciliation?.providers?.[g.providerName || g.medico] || sapReconciliation?.additionalProviders?.find(provider => provider.medico === (g.providerName || g.medico)) || null;
       g.sap = sapProvider ? { ...sapProvider, invoices: (sapProvider.invoices || []).map(invoice =>
-        annotateSapInvoiceCoverage(invoice, g.medico, sourceRowsByMedico.get(g.medico) || [])) } : null;
+        annotateSapInvoiceCoverage(invoice, g.providerName || g.medico, sourceRowsByMedico.get(g.medico) || [])) } : null;
       g.sapPeriod = sapReconciliation?.period;
     });
 
@@ -476,20 +726,21 @@ export default function HonorariosAuditView() {
   const expandAllVisibleRows = groupedByMedico.reduce((sum, group) => sum + Math.min(group.filas.length, HONORARIOS_PAGE_SIZE), 0);
   const allowExpandAll = expandAllVisibleRows <= 500;
 
-  // Los PDF y el Excel unificado siempre incluyen todos los estados que coinciden
-  // con los filtros. La pestaña activa sólo limita el detalle visible en pantalla.
+  // El PDF de revisión conserva el contexto de todos los estados coincidentes.
+  // El Excel usa filteredData y respeta también la pestaña activa.
   const exportGroups = useMemo(() => {
     const groups = new Map();
     const sourceRowsByMedico = new Map();
     data.forEach(row => {
-      const medicoKey = (row.Medico || 'Médico No Asignado').trim();
+      const medicoKey = doctorGroupKey(row);
       if (!sourceRowsByMedico.has(medicoKey)) sourceRowsByMedico.set(medicoKey, []);
       sourceRowsByMedico.get(medicoKey).push(row);
     });
     filteredByCriteria.forEach(row => {
-      const medicoKey = (row.Medico || 'Médico No Asignado').trim();
+      const medicoKey = doctorGroupKey(row);
       if (!groups.has(medicoKey)) groups.set(medicoKey, {
         medico: medicoKey,
+        providerName: String(row.Medico || '').trim(),
         especialidad: row.Especialidad || 'Sin Especialidad',
         tipoMedico: row.TipoMedico || 'HN',
         tasasISR: new Set(),
@@ -504,7 +755,7 @@ export default function HonorariosAuditView() {
       const group = groups.get(medicoKey);
       group.filas.push(row);
       group.filasRevision.push(row);
-      group.serviciosCount += readQuantity(row.Cantidad);
+      group.serviciosCount += quantityForTotals(row);
       if (row._effectiveElegible) group.approvedCount += 1;
       else if (row._reviewStatus === 'RECHAZADO') {
         group.rejectedCount += 1;
@@ -517,14 +768,18 @@ export default function HonorariosAuditView() {
       group.tasasISR = [...group.tasasISR].sort((a, b) => a - b);
       group.tasaISR = group.tasasISR.length === 1 ? group.tasasISR[0] : null;
       Object.assign(group, summarizeHonorarios(group.filasRevision));
-      const sapProvider = sapReconciliation?.providers?.[group.medico]
-        || sapReconciliation?.additionalProviders?.find(provider => provider.medico === group.medico) || null;
+      const sapProvider = sapReconciliation?.providers?.[group.providerName || group.medico]
+        || sapReconciliation?.additionalProviders?.find(provider => provider.medico === (group.providerName || group.medico)) || null;
       group.sap = sapProvider ? { ...sapProvider, invoices: (sapProvider.invoices || []).map(invoice =>
-        annotateSapInvoiceCoverage(invoice, group.medico, sourceRowsByMedico.get(group.medico) || [])) } : null;
+        annotateSapInvoiceCoverage(invoice, group.providerName || group.medico, sourceRowsByMedico.get(group.medico) || [])) } : null;
       group.sapPeriod = sapReconciliation?.period;
       return group;
     }).sort((a, b) => (Number(b.totalNeto) || 0) - (Number(a.totalNeto) || 0));
   }, [filteredByCriteria, sapReconciliation, data]);
+
+  const approvedExportGroups = exportGroups.filter(group => group.approvedCount > 0);
+  const pdfExportGroups = workspace === 'approved' ? approvedExportGroups : exportGroups;
+  const downloadApprovedPdf = (group, detailed = true) => generateDoctorHonorariosPdf(group, startDate, endDate, detailed, pdfGeneratedBy, true);
 
   const sapSummary = useMemo(() => {
     const providers = [...Object.values(sapReconciliation?.providers || {}), ...(sapReconciliation?.additionalProviders || [])];
@@ -540,11 +795,24 @@ export default function HonorariosAuditView() {
 
   // Exportación a Excel completa y unificada con Estilo Institucional Escandón
   const exportToExcel = async () => {
-    if (exportGroups.length === 0) return;
+    if (!filteredData.length || searchTerm !== debouncedSearchTerm || loading || sapLoading || !reviewReady) return;
 
     try {
-      const exportData = filteredByCriteria;
-      const periodoTexto = `Del ${formatDate(startDate)} al ${formatDate(endDate)} | Estados incluidos: todos`;
+      const exportData = filteredData;
+      const excelGroups = groupedByMedico.map(group => ({ ...group,
+        ...summarizeHonorarios(group.filas),
+        tasaISR: null,
+        tasasISR: [...new Set(group.filas.map(row => row._effectiveISRRate).filter(rate => rate !== null))].sort((a, b) => a - b),
+        serviciosCount: group.filas.reduce((sum, row) => sum + quantityForTotals(row), 0),
+        approvedCount: group.filas.filter(row => row._effectiveElegible).length,
+        excludedCount: group.filas.filter(row => row._reviewStatus === 'RECHAZADO').length,
+        pendingReviewCount: group.filas.filter(row => row._reviewStatus === 'PENDIENTE').length
+      }));
+      const appliedFilters = [`Estado: ${activeStatusLabel}`,
+        grupoFilter !== 'TODOS' && `Grupo: ${grupoFilter}`,
+        medicoFilter && `Médico: ${medicoFilter}`,
+        debouncedSearchTerm.trim() && `Búsqueda: ${debouncedSearchTerm.trim()}`].filter(Boolean).join(' | ');
+      const periodoTexto = `Del ${formatDate(startDate)} al ${formatDate(endDate)} | ${appliedFilters}`;
       const summary = summarizeHonorarios(exportData);
       const filteredTotals = { base: summary.totalBase, iva: summary.totalIVA, isr: summary.totalISR,
         retIVA: summary.totalRetIVA, net: summary.totalNeto };
@@ -560,9 +828,15 @@ export default function HonorariosAuditView() {
           UDRKey: row.UDRKey || '',
           RenglonAuditoria: Number(row.RenglonAuditoria) || '',
           OrigenRenglon: row.OrigenRenglon || '',
+          SourceLineId: row.SourceLineId || '', RolMedico: row.RolMedico || '', MedicoId: row.MedicoId || '',
+          PrecioUnitarioBI: row.PrecioUnitarioBI ?? '', FechaReferenciaTipo: row.FechaReferenciaTipo || '',
+          Realizacion: overrides[row._rowId]?.snapshot?.execution?.reference || row.EvidenciaEjecucion || '',
+          TariffId: row.TariffSnapshot?.id || '', LiquidacionCerrada: row.LiquidacionCerrada || '',
+          ConciliacionVertical: row.ModeBI ? `Auditoría: ${row.EnVistaAuditoria ? 'presente' : 'ausente'}; pago: ${row.EnVistaPago ? 'presente' : 'ausente'}` : '',
           FuenteHonorario: row.FuenteHonorario || 'Liquidación clínica',
           ObservacionCobertura: row.ObservacionCobertura || '',
-          FolioAtencion: row.FolioAtencion,
+          FolioAtencion: row.TipoCalculo === 'SAP_DOCUMENTO' ? 'No aplica' : row.FolioAtencion ?? (row.ModeBI ? '' : 'Sin atención vinculada'),
+          FolioCita: row.TipoCalculo === 'SAP_DOCUMENTO' ? 'No aplica' : row.FolioCita ?? (row.ModeBI ? '' : 'Sin cita vinculada'),
           FechaAtencion: formatDate(row.FechaAtencion),
           Medico: row.Medico || 'NO ESPECIFICADO',
           Especialidad: row.Especialidad || 'GENERAL',
@@ -571,7 +845,7 @@ export default function HonorariosAuditView() {
           Cliente: row.Cliente || 'VENTA GENERAL',
           GrupoServicio: row.GrupoServicio || '',
           Servicio: row.Servicio || '',
-          Cantidad: readQuantity(row.Cantidad),
+          Cantidad: row.ModeBI && row.Cantidad == null ? 'Pendiente' : readQuantity(row.Cantidad),
           PrecioCobradoPaciente: row.PrecioCobradoPaciente ?? 'No disponible',
           BaseImporte: row._effectiveBase ?? 'Pendiente',
           IvaLinea: row._effectiveIVA ?? 'Pendiente',
@@ -580,7 +854,7 @@ export default function HonorariosAuditView() {
           RetencionIVA: row._effectiveRetIVA ?? 'Pendiente',
           CriterioFiscal: row._fiscalNote,
           NetoAPagar: row._effectiveNeto ?? 'Pendiente',
-          FolioOrdenVenta: row.FolioOrdenVenta ? String(row.FolioOrdenVenta) : 'S/O',
+          FolioOrdenVenta: row.TipoCalculo === 'SAP_DOCUMENTO' ? 'No aplica' : row.FolioOrdenVenta ?? (row.ModeBI ? '' : 'Sin orden de venta'),
           Elegibilidad: reviewLabel(row), Revisor: row._reviewer || '', MonedaOrigen: row.SapDocumento?.currency || 'MXN', TotalDocumentoSAP: row.SapDocumento?.documentTotal ?? '', FacturaSAP: row.SapDocumento?.docNum || '',
           FechaDecision: row._overrideTimestamp || '',
           AjusteManual: ajusteTexto,
@@ -592,9 +866,20 @@ export default function HonorariosAuditView() {
         { header: 'Clave de registro', key: 'UDRKey', width: 22 },
         { header: 'Número de registro', key: 'RenglonAuditoria', width: 16, type: 'number' },
         { header: 'Origen del registro', key: 'OrigenRenglon', width: 20 },
+        { header: 'Línea o cargo origen', key: 'SourceLineId', width: 20 },
+        { header: 'Número de médico', key: 'MedicoId', width: 15 },
+        { header: 'Rol médico', key: 'RolMedico', width: 18 },
+        { header: 'Fecha utilizada para corte', key: 'FechaReferenciaTipo', width: 28 },
+        { header: 'Honorario por servicio', key: 'PrecioUnitarioBI', width: 24, type: 'currency' },
+        { header: 'Número de tarifa', key: 'TariffId', width: 16 },
+        { header: 'Referencia realización', key: 'Realizacion', width: 35 },
+        { header: 'Cierre', key: 'LiquidacionCerrada', width: 16 },
+        { header: 'Comparación de registros del servicio', key: 'ConciliacionVertical', width: 38 },
         { header: 'Fuente del honorario', key: 'FuenteHonorario', width: 26 },
         { header: 'Atención relacionada', key: 'ObservacionCobertura', width: 50 },
-        { header: 'Folio Atención', key: 'FolioAtencion', width: 14, align: 'center' },
+        { header: 'Folio Atención (Vertical)', key: 'FolioAtencion', width: 24, align: 'center' },
+        { header: 'Folio Cita (Vertical)', key: 'FolioCita', width: 22, align: 'center' },
+        { header: 'Folio Orden Venta', key: 'FolioOrdenVenta', width: 22, align: 'center' },
         { header: 'Fecha', key: 'FechaAtencion', width: 13, align: 'center' },
         { header: 'Médico', key: 'Medico', width: 30 },
         { header: 'Especialidad', key: 'Especialidad', width: 22 },
@@ -612,7 +897,6 @@ export default function HonorariosAuditView() {
         { header: 'Retención IVA estimada', key: 'RetencionIVA', width: 23, type: 'currency' },
         { header: 'Cómo se calculó', key: 'CriterioFiscal', width: 65 },
         { header: 'Importe final aprobado MXN', key: 'NetoAPagar', width: 27, type: 'currency' },
-        { header: 'Orden de venta', key: 'FolioOrdenVenta', width: 13, align: 'center' },
         { header: 'Estado del cálculo', key: 'Elegibilidad', width: 24 },
         { header: 'Revisor', key: 'Revisor', width: 32 },
         { header: 'Fecha decisión', key: 'FechaDecision', width: 26 },
@@ -625,7 +909,7 @@ export default function HonorariosAuditView() {
 
       const totalesDetalle = {
         Medico: 'TOTALES GENERALES',
-        Cantidad: exportData.reduce((acc, r) => acc + readQuantity(r.Cantidad), 0),
+        Cantidad: exportData.reduce((acc, r) => acc + quantityForTotals(r), 0),
         PrecioCobradoPaciente: exportData.reduce((acc, r) => acc + (Number(r.PrecioCobradoPaciente) || 0), 0),
         BaseImporte: filteredTotals.base ?? 'Pendiente',
         IvaLinea: filteredTotals.iva ?? 'Pendiente',
@@ -645,11 +929,11 @@ export default function HonorariosAuditView() {
         'Rechazados en filtro': `${exportData.filter(row => row._reviewStatus === 'RECHAZADO').length}`,
         'Pendientes de revisión': `${exportData.filter(row => row._reviewStatus === 'PENDIENTE').length}`,
         'Cambios hechos durante la revisión': `${exportData.filter(row => row._isOverridden).length}`,
-        'Total Médicos en filtro': `${exportGroups.length}`
+        'Total Médicos en filtro': `${excelGroups.length}`
       };
 
       // 2. Datos para Hoja 2: Resumen por Médico
-      const filasMedicos = exportGroups.map(g => ({
+      const filasMedicos = excelGroups.map(g => ({
         medico: g.medico,
         especialidad: g.especialidad,
         tipoMedico: g.tipoMedico,
@@ -686,9 +970,9 @@ export default function HonorariosAuditView() {
 
       const totalesMedicos = {
         medico: 'TOTAL CONCENTRADO',
-        serviciosCount: exportGroups.reduce((acc, g) => acc + g.serviciosCount, 0),
-        approvedCount: exportGroups.reduce((acc, g) => acc + g.approvedCount, 0),
-        excludedCount: exportGroups.reduce((acc, g) => acc + g.excludedCount, 0),
+        serviciosCount: excelGroups.reduce((acc, g) => acc + g.serviciosCount, 0),
+        approvedCount: excelGroups.reduce((acc, g) => acc + g.approvedCount, 0),
+        excludedCount: excelGroups.reduce((acc, g) => acc + g.excludedCount, 0),
         totalBase: filteredTotals.base ?? 'Pendiente',
         totalIVA: filteredTotals.iva ?? 'Pendiente',
         totalISR: filteredTotals.isr ?? 'Pendiente',
@@ -697,7 +981,7 @@ export default function HonorariosAuditView() {
         totalNeto: filteredTotals.net ?? 'Pendiente'
       };
 
-      const filasSAP = exportGroups.flatMap(grupo => {
+      const filasSAP = excelGroups.flatMap(grupo => {
         const provider = grupo.sap;
         const base = { medicoKH: grupo.medico };
         if (!provider) return [{ ...base, estadoVinculo: sapLoading ? 'Consultando facturas' : (sapError || 'Sin información de facturas') }];
@@ -827,7 +1111,7 @@ export default function HonorariosAuditView() {
       });
     } catch (err) {
       console.error('Error al exportar Excel institucional:', err);
-      alert('Ocurrió un error al generar el archivo Excel institucional: ' + err.message);
+      alert(userMessage('Ocurrió un error al generar el archivo Excel institucional: ' + err.message));
     }
   };
 
@@ -835,6 +1119,10 @@ export default function HonorariosAuditView() {
     setSelectedRow(row);
     setModalOpen(true);
   };
+
+  const selectedServiceCount = effectiveData.filter(row => selectedServices[row._rowId] && canSelectService(row)).length;
+  const configuredRows = filteredData.filter(canSelectService);
+  const selectionAvailable = reviewReady && canReview && !reviewSaving;
 
   return (
     <div className="hon-page-container">
@@ -1282,350 +1570,66 @@ export default function HonorariosAuditView() {
         }
       `}</style>
       
-      {/* 1. Header */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.9rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '2.2rem' }}>🩺</span>
-            <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: '800', letterSpacing: '-0.5px' }}>
-              Honorarios Médicos
-            </h1>
-          </div>
-          <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.92rem', margin: '0.35rem 0 0 0' }}>
-            Revisa las atenciones registradas. SAP (sistema de contabilidad) ayuda a encontrar facturas de servicios que podrían faltar.
-          </p>
-        </div>
+      <HonorariosHeader workspace={workspace} onWorkspaceChange={changeWorkspace}
+        canExport={pdfExportGroups.length > 0 && !loading && !sapLoading && reviewReady && searchTerm === debouncedSearchTerm}
+        canExportExcel={filteredData.length > 0 && !loading && !sapLoading && reviewReady && searchTerm === debouncedSearchTerm}
+        onExportSummary={() => generateAllDoctorsHonorariosPdf(pdfExportGroups, startDate, endDate, false, pdfGeneratedBy, workspace === 'approved')}
+        onExportDetail={() => generateAllDoctorsHonorariosPdf(pdfExportGroups, startDate, endDate, true, pdfGeneratedBy, workspace === 'approved')}
+        onExportExcel={exportToExcel} />
+      {['catalog', 'fiscal', 'monthly-fixed'].includes(workspace) && <div className="hon-friendly-actions" style={{ marginBottom: '1rem' }}>
+        <button type="button" className="hon-friendly-button" aria-pressed={workspace === 'fiscal'} onClick={() => { setFiscalProviderId(''); changeWorkspace('fiscal'); }}>Datos fiscales</button>
+        <button type="button" className="hon-friendly-button" aria-pressed={workspace === 'catalog'} onClick={() => changeWorkspace('catalog')}>Catálogo y precios</button>
+        <button type="button" className="hon-friendly-button" aria-pressed={workspace === 'monthly-fixed'} onClick={() => changeWorkspace('monthly-fixed')}>Jefes de área</button>
+      </div>}
+      {workspace === 'audit' && <HonorariosVerticalAuditPanel />}
+      {workspace === 'monthly-fixed' && <HonorariosMonthlyFixedPanel canManage={canManage} referenceMonth={startDate.slice(0, 7)} onChanged={onCatalogChanged} />}
+      {fiscalError && <p role="alert" className="hon-friendly-message error">No se pudieron consultar las fichas fiscales internas. {fiscalError} <button type="button" onClick={loadFiscalProfiles}>Reintentar</button></p>}
+      {workspace === 'fiscal' && <HonorariosFiscalPanel key={fiscalProviderId} providers={providers} profiles={fiscalProfiles} initialProviderId={fiscalProviderId} referenceDate={startDate} canManage={canManage}
+        onSaved={profile => { setFiscalProfiles(previous => ({ ...previous, [profile.providerId]: profile })); setFiscalError(''); }}
+        onBack={paymentProviderId ? () => setWorkspace('liquidations') : undefined} />}
+      {catalogVisited && <div hidden={workspace !== 'catalog'}><HonorariosCatalogPanel canManage={canManage} onChanged={onCatalogChanged} onReviewServices={reviewCatalogService} /></div>}
+      {workspace === 'liquidations' && <HonorariosLiquidationsPanel canManage={canManage} startDate={startDate} endDate={endDate} initialProviderId={paymentProviderId}
+        onViewApproved={() => changeWorkspace('approved')} onEditFiscal={id => { setFiscalProviderId(String(id || '')); setWorkspace('fiscal'); }}
+        onDownloadApproved={paymentProviderId && approvedExportGroups.find(group => String(group.filasRevision[0]?.MedicoId) === paymentProviderId)
+          ? () => downloadApprovedPdf(approvedExportGroups.find(group => String(group.filasRevision[0]?.MedicoId) === paymentProviderId)) : null}
+        onChanged={() => { if (hasSearched) fetchReport(); }} />}
+      <div style={{ display: ['review', 'approved'].includes(workspace) ? 'block' : 'none' }}>
+        <HonorariosPeriod startDate={startDate} endDate={endDate} loading={loading}
+          onStartDateChange={value => { setStartDate(value); setData([]); setSapReconciliation(null); setHasSearched(false); setSelectedServices({}); }}
+          onEndDateChange={value => { setEndDate(value); setData([]); setSapReconciliation(null); setHasSearched(false); setSelectedServices({}); }}
+          onSearch={fetchReport} coverage={coverage} error={error} />
 
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Botones para descargar los resúmenes en PDF */}
-          <button 
-            onClick={() => generateAllDoctorsHonorariosPdf(exportGroups, startDate, endDate, false, pdfGeneratedBy)}
-            disabled={exportGroups.length === 0 || sapLoading || !reviewReady}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.55rem 0.95rem',
-              background: exportGroups.length === 0 || sapLoading ? '#64748b' : 'linear-gradient(135deg, #334155 0%, #475569 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: '700',
-              fontSize: '0.88rem',
-              cursor: exportGroups.length === 0 || sapLoading ? 'wait' : 'pointer',
-              boxShadow: exportGroups.length === 0 || sapLoading ? 'none' : '0 4px 12px rgba(51, 65, 85, 0.35)',
-              transition: 'all 0.2s'
-            }}
-            title="Descarga el resumen en PDF. Espera a que termine la consulta de facturas en SAP para incluir esos datos."
-          >
-            <span>📄</span> Todos (Resumido)
-          </button>
-          
-          <button 
-            onClick={() => generateAllDoctorsHonorariosPdf(exportGroups, startDate, endDate, true, pdfGeneratedBy)}
-            disabled={exportGroups.length === 0 || sapLoading || !reviewReady}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.55rem 0.95rem',
-              background: exportGroups.length === 0 || sapLoading ? '#64748b' : 'linear-gradient(135deg, #004687 0%, #0284c7 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: '700',
-              fontSize: '0.88rem',
-              cursor: exportGroups.length === 0 || sapLoading ? 'wait' : 'pointer',
-              boxShadow: exportGroups.length === 0 || sapLoading ? 'none' : '0 4px 12px rgba(0, 70, 135, 0.35)',
-              transition: 'all 0.2s'
-            }}
-            title="Descarga el resumen detallado en PDF. Espera a que termine la consulta de facturas en SAP para incluir esos datos."
-          >
-            <span>📄</span> Todos (Detallado)
-          </button>
+        {hasSearched && sapError && <div role="alert" className="hon-sap-notice">
+          No se pudieron consultar las facturas y los impuestos. Puedes revisar los servicios; los importes que dependen de esa información quedan pendientes. Vuelve a buscar para intentar de nuevo.
+        </div>}
 
-          {/* Botón Descargar Excel Unificado */}
-          <button 
-            onClick={exportToExcel}
-            disabled={exportGroups.length === 0 || sapLoading || !reviewReady}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.55rem 0.95rem',
-              background: exportGroups.length === 0 || sapLoading ? '#64748b' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: '700',
-              fontSize: '0.88rem',
-              cursor: exportGroups.length === 0 || sapLoading ? 'wait' : 'pointer',
-              boxShadow: filteredData.length === 0 ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.35)',
-              transition: 'all 0.2s'
-            }}
-          >
-            <span>📥</span> Descargar Excel Unificado
-          </button>
-        </div>
-      </header>
-
-      {/* 2. Filtros de Fecha y Ejecución */}
-      <div className="hon-card" style={{ padding: '0.9rem 1.2rem', marginBottom: '0.9rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem', alignItems: 'flex-end' }}>
-          <div style={{ flex: '1 1 200px' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-secondary, #475569)', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              📅 Servicios Desde
-            </label>
-            <input 
-              type="date" 
-              value={startDate} 
-              disabled={loading || sapLoading}
-              onChange={e => { setStartDate(e.target.value); setData([]); setSapReconciliation(null); setHasSearched(false); }}
-              className="hon-input"
-            />
-          </div>
-
-          <div style={{ flex: '1 1 200px' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-secondary, #475569)', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              📅 Servicios Hasta
-            </label>
-            <input 
-              type="date" 
-              value={endDate} 
-              disabled={loading || sapLoading}
-              onChange={e => { setEndDate(e.target.value); setData([]); setSapReconciliation(null); setHasSearched(false); }}
-              className="hon-input"
-            />
-          </div>
-
-          <button 
-            onClick={fetchReport} 
-            disabled={loading || sapLoading}
-            style={{ 
-              flex: '1 1 220px',
-              background: loading || sapLoading ? '#64748b' : 'linear-gradient(135deg, #004687 0%, #0284c7 100%)', 
-              color: 'white', 
-              padding: '0.62rem 1.2rem', 
-              borderRadius: '8px', 
-              border: 'none',
-              fontWeight: '700',
-              fontSize: '0.92rem',
-              cursor: loading || sapLoading ? 'wait' : 'pointer',
-              boxShadow: '0 4px 10px rgba(0, 70, 135, 0.35)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            {loading ? (
-              <><span>⏳</span> Generando reporte...</>
-            ) : sapLoading ? (
-              <><span>⏳</span> Generando reporte...</>
-            ) : (
-              <><span>🔍</span> Generar Reporte</>
-            )}
-          </button>
-        </div>
-
-        <div style={{ marginTop: '0.45rem', color: 'var(--text-muted, #64748b)', fontSize: '0.78rem' }}>
-          Vertical aporta las atenciones y sus estados. También buscamos en SAP facturas registradas hasta 30 días después del periodo.
-        </div>
-
-        {error && (
-          <div style={{ marginTop: '1rem', padding: '0.9rem 1.25rem', background: 'rgba(239, 68, 68, 0.12)', borderLeft: '4px solid #ef4444', color: '#f87171', borderRadius: '6px', fontSize: '0.9rem', fontWeight: '600' }}>
-            ⚠️ <strong>Error en la consulta:</strong> {error}
+        {hasSearched && !loading && effectiveData.length > 0 && <>
+          <HonorariosSummary approvedView={workspace === 'approved'} kpis={kpis} loading={sapLoading} reviewReady={reviewReady} formatMoney={formatMoney} />
+          <HonorariosResultsToolbar approvedView={workspace === 'approved'} onViewApproved={() => changeWorkspace('approved')} kpis={kpis} statusTab={statusTab} onStatusChange={status => { if (status === 'elegibles') changeWorkspace('approved'); else setStatusTab(status); }}
+            searchTerm={searchTerm} onSearchChange={setSearchTerm} searchUpdating={searchTerm !== debouncedSearchTerm}
+            medicoFilter={medicoFilter} onMedicoChange={setMedicoFilter} uniqueMedicos={uniqueMedicos}
+            grupoFilter={grupoFilter} onGrupoChange={setGrupoFilter} uniqueGrupos={uniqueGrupos}
+            viewMode={viewMode} onViewChange={setViewMode} allowExpandAll={allowExpandAll}
+            onExpandAll={expandAllMedicos} onCollapseAll={collapseAllMedicos}
+            canSelect={selectionAvailable} configuredCount={configuredRows.length}
+            onSelectConfigured={() => selectRows(filteredData)}
+            selectedCount={selectedServiceCount} onApproveSelection={() => openBulk('APROBAR')}
+            onExcludeSelection={() => openBulk('EXCLUIR')} onClearSelection={() => setSelectedServices({})}
+            bulkMessage={bulkMessage} resultsCount={filteredData.length} />
+        </>}
+        {reviewError && <div role="alert" className="hon-card" style={{ padding: 16, color: '#b91c1c', marginBottom: '1rem' }}>{userMessage(reviewError)}
+          {!reviewReady && <button type="button" className="hon-friendly-button" style={{ marginLeft: 12 }}
+            disabled={loading} onClick={fetchReport}>Reintentar consulta</button>}
+        </div>}
+        {workspace !== 'approved' && hasSearched && !loading && hasNarrowFilters && statusTab !== 'todos' && matchingReviewCounts.total > 0 && (
+          <div className="hon-card" style={{ padding: '0.85rem 1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', borderLeft: '3px solid #0088C9' }}>
+            <div style={{ color: 'var(--text-secondary, #475569)', fontSize: '0.84rem' }}>
+              La lista muestra <strong>{activeStatusLabel.toLowerCase()}</strong>. Estos filtros también encuentran
+              {' '}{matchingReviewCounts.approved.toLocaleString()} aprobados, {matchingReviewCounts.rejected.toLocaleString()} excluidos y {matchingReviewCounts.pending.toLocaleString()} por revisar.
+            </div>
+            <button type="button" onClick={() => setStatusTab('todos')} className="hon-friendly-button subtle">Ver todos ({matchingReviewCounts.total.toLocaleString()})</button>
           </div>
         )}
-      </div>
-
-
-
-      {/* 3. Tarjetas de KPIs Unificados */}
-      {hasSearched && !loading && effectiveData.length > 0 && (
-        <section className="hon-summary-grid">
-          <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', padding: '0.9rem 1.1rem', borderRadius: '12px', color: 'white', boxShadow: '0 3px 10px rgba(15, 23, 42, 0.16)' }}>
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Importe final aprobado (MXN)</div>
-            <div style={{ fontSize: '1.65rem', lineHeight: 1.2, fontWeight: '800', marginTop: '0.15rem', color: '#38bdf8' }}>
-              {sapLoading ? 'Calculando…' : formatMoney(reviewReady ? kpis.totalNeto : null)}
-            </div>
-            <div style={{ marginTop: '0.25rem', color: '#cbd5e1', fontSize: '0.74rem' }}>
-              {sapLoading ? 'Revisando impuestos en SAP' : kpis.pendingCount ? `${kpis.pendingCount.toLocaleString()} aprobados tienen el cálculo pendiente` : `${kpis.totalElegibles.toLocaleString()} registros aprobados`}
-            </div>
-          </div>
-          <div className="hon-card hon-summary-breakdown" style={{ padding: '0.75rem 0.9rem' }}>
-            {[
-              ['Honorario', kpis.totalBase], ['IVA', kpis.totalIVA], ['ISR estimado', kpis.totalISR], ['Retención de IVA', kpis.totalRetIVA]
-            ].map(([label, amount], index) => (
-              <div key={label} style={{ minWidth: 0, borderLeft: index ? '1px solid var(--table-border, #e2e8f0)' : 'none', paddingLeft: index ? '0.65rem' : 0 }}>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #64748b)', whiteSpace: 'nowrap' }}>{label}</div>
-                <div style={{ fontSize: '0.95rem', fontWeight: '700', color: index > 1 ? '#dc2626' : 'var(--text-primary, #0f172a)', whiteSpace: 'nowrap' }}>
-                  {sapLoading && index > 1 ? '…' : `${index > 1 ? '−' : ''}${formatMoney(amount)}`}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {reviewError && <div role="alert" className="hon-card" style={{ padding: 16, color: '#b91c1c' }}>{reviewError}</div>}
-
-      {/* 4. Barra de Pestañas de Estado, Filtros y Modos de Vista */}
-      {hasSearched && !loading && effectiveData.length > 0 && (
-        <div className="hon-card" style={{ padding: '0.85rem 1rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-          {/* Fila 1: Pestañas Principales (Aprobados vs Exclusiones vs Todos) y Selector de Vista */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'center' }}>
-            
-            {/* Decisiones de revisión */}
-            <div className="hon-status-tabs-container">
-              <button onClick={() => setStatusTab('pendientes')} className={'hon-status-btn ' + (statusTab === 'pendientes' ? 'active-todos' : '')}>Por revisar ({kpis.totalPendientes.toLocaleString()})</button>
-              <button
-                onClick={() => setStatusTab('elegibles')}
-                className={`hon-status-btn ${statusTab === 'elegibles' ? 'active-elegibles' : ''}`}
-              >
-                <span>💳</span> Aprobados ({kpis.totalElegibles.toLocaleString()})
-              </button>
-
-              <button
-                onClick={() => setStatusTab('exclusiones')}
-                className={`hon-status-btn ${statusTab === 'exclusiones' ? 'active-exclusiones' : ''}`}
-              >
-                <span>⚠️</span> Rechazados ({kpis.totalExclusiones.toLocaleString()})
-              </button>
-
-              <button
-                onClick={() => setStatusTab('todos')}
-                className={`hon-status-btn ${statusTab === 'todos' ? 'active-todos' : ''}`}
-              >
-                <span>📂</span> Todos ({kpis.totalGeneral.toLocaleString()})
-              </button>
-            </div>
-
-            {/* Selector de Modo de Vista */}
-            <div className="hon-view-switcher">
-              <span className="hon-view-switcher-label">
-                VISTA:
-              </span>
-              <button
-                onClick={() => setViewMode('medicos')}
-                className={`hon-view-btn ${viewMode === 'medicos' ? 'active' : ''}`}
-              >
-                <span>👥</span> Por Médico
-              </button>
-
-              <button
-                onClick={() => setViewMode('inteligente')}
-                className={`hon-view-btn ${viewMode === 'inteligente' ? 'active' : ''}`}
-              >
-                <span>📊</span> Detallada
-              </button>
-
-              <button
-                onClick={() => setViewMode('plana')}
-                className={`hon-view-btn ${viewMode === 'plana' ? 'active' : ''}`}
-              >
-                <span>📋</span> Matriz Completa
-              </button>
-            </div>
-
-          </div>
-
-          {/* Fila 2: Filtros desplegables y Buscador */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-            
-            {/* Buscador */}
-            <div style={{ flex: '2 1 300px', position: 'relative' }}>
-              <span style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted, #94a3b8)', fontSize: '1rem' }}>
-                🔍
-              </span>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Buscar por médico, paciente, atención #, servicio, aseguradora..."
-                className="hon-input"
-                style={{ paddingLeft: '2.4rem' }}
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', color: 'var(--text-muted, #94a3b8)', cursor: 'pointer', fontSize: '0.9rem' }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-            {searchTerm !== debouncedSearchTerm && <span role="status" style={{ color: '#0369a1', fontSize: '0.75rem' }}>Actualizando resultados…</span>}
-
-            {/* Filtro por Grupo de Servicio */}
-            <div style={{ flex: '1 1 220px' }}>
-              <select
-                value={grupoFilter}
-                onChange={e => setGrupoFilter(e.target.value)}
-                className="hon-select"
-              >
-                <option value="TODOS">🏥 Todos los Grupos ({uniqueGrupos.length})</option>
-                {uniqueGrupos.map(g => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Filtro por Médico */}
-            <div style={{ flex: '1 1 220px' }}>
-              <select
-                value={medicoFilter}
-                onChange={e => setMedicoFilter(e.target.value)}
-                className="hon-select"
-              >
-                <option value="">👨‍⚕️ Todos los Médicos ({uniqueMedicos.length})</option>
-                {uniqueMedicos.map(med => (
-                  <option key={med} value={med}>{med}</option>
-                ))}
-              </select>
-            </div>
-
-            {viewMode === 'medicos' && (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  onClick={expandAllMedicos}
-                  disabled={!allowExpandAll}
-                  title={allowExpandAll ? 'Expandir los médicos de este resultado' : 'Abre cada médico por separado para mantener ágil el reporte.'}
-                  className="hon-view-btn"
-                  style={{ border: '1px solid var(--table-border, #cbd5e1)', padding: '0.5rem 0.8rem', fontSize: '0.8rem', opacity: allowExpandAll ? 1 : 0.55, cursor: allowExpandAll ? 'pointer' : 'not-allowed' }}
-                >
-                  Expandir Todos
-                </button>
-                <button
-                  onClick={collapseAllMedicos}
-                  className="hon-view-btn"
-                  style={{ border: '1px solid var(--table-border, #cbd5e1)', padding: '0.5rem 0.8rem', fontSize: '0.8rem' }}
-                >
-                  Colapsar Todos
-                </button>
-                {!allowExpandAll && <span style={{ alignSelf: 'center', color: 'var(--text-muted, #64748b)', fontSize: '0.75rem' }}>
-                  Abre cada médico por separado en reportes grandes.
-                </span>}
-              </div>
-            )}
-
-          </div>
-
-        </div>
-      )}
-
-      {hasSearched && !loading && hasNarrowFilters && statusTab !== 'todos' && matchingReviewCounts.total > 0 && (
-        <div className="hon-card" style={{ padding: '0.85rem 1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', borderLeft: '4px solid #0284c7' }}>
-          <div style={{ color: 'var(--text-secondary, #475569)', fontSize: '0.84rem' }}>
-            Con estos filtros hay <strong>{matchingReviewCounts.total.toLocaleString()} registros</strong>:
-            {' '}{matchingReviewCounts.approved.toLocaleString()} aprobados, {matchingReviewCounts.rejected.toLocaleString()} rechazados y {matchingReviewCounts.pending.toLocaleString()} por revisar.
-            {' '}La lista muestra solo <strong>{activeStatusLabel}</strong>.
-          </div>
-          <button onClick={() => setStatusTab('todos')} className="hon-view-btn" style={{ border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', padding: '0.45rem 0.75rem', fontWeight: '700' }}>
-            Ver todos ({matchingReviewCounts.total.toLocaleString()})
-          </button>
-        </div>
-      )}
 
       {/* 5. Área Principal de Contenido */}
       <div className="hon-card" style={{ overflow: 'hidden' }}>
@@ -1639,7 +1643,7 @@ export default function HonorariosAuditView() {
               borderRadius: '50%', animation: 'spin 0.8s linear infinite'
             }} />
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <h3 style={{ fontWeight: '700', margin: '0 0 0.5rem 0' }}>Generando el reporte de honorarios...</h3>
+            <h3 style={{ fontWeight: '700', margin: '0 0 0.5rem 0' }}>Buscando servicios...</h3>
             <p style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.9rem', margin: 0 }}>
               Buscando médicos para el reporte y sus revisiones guardadas.
             </p>
@@ -1651,25 +1655,28 @@ export default function HonorariosAuditView() {
           <div style={{ padding: '5rem 2rem', textAlign: 'center', color: 'var(--text-muted, #64748b)' }}>
             <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>📋</div>
             <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.3rem', color: 'var(--text-primary)' }}>
-              Reporte Unificado de Honorarios Médicos
+              Elige el periodo que quieres revisar
             </h3>
             <p style={{ maxWidth: '600px', margin: '0 auto', fontSize: '0.95rem' }}>
-              Selecciona las fechas que quieres revisar (por ejemplo, del 1 al 31 de agosto) y haz clic en <strong>"Generar reporte"</strong> para ver las atenciones, las facturas encontradas en SAP y los servicios excluidos.
+              Selecciona las fechas y pulsa <strong>Buscar servicios</strong>. Verás las atenciones de los servicios aprobados en el catálogo, con la tarifa que corresponde a cada médico.
             </p>
           </div>
         )}
 
         {/* Estado Vacío */}
-        {hasSearched && !loading && filteredData.length === 0 && (
+        {hasSearched && !loading && reviewReady && filteredData.length === 0 && (
           <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-muted, #64748b)' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
             <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>No se encontraron registros</h3>
             <p style={{ fontSize: '0.95rem', margin: 0 }}>
-              {statusTab === 'pendientes'
+              {effectiveData.length === 0 ? 'Para aparecer aquí, el servicio debe estar en Aprobados del catálogo y tener una tarifa que corresponda al médico y a la fecha de la atención.' : statusTab === 'pendientes'
                 ? 'No hay registros pendientes por revisar con estos filtros. Puedes consultar los aprobados o ver todo el historial.'
-                : 'No hay atenciones ni facturas de SAP que coincidan con los filtros seleccionados en este periodo.'}
+                : 'No hay servicios aprobados del catálogo que coincidan con estos filtros en el periodo.'}
             </p>
+            {statusTab === 'pendientes' && !bulkMessage && matchingReviewCounts.approved > 0 && <button type="button" className="hon-friendly-button primary" style={{ margin: '.75rem' }} onClick={() => changeWorkspace('approved')}>Ir a Pagos y PDF</button>}
             {statusTab === 'pendientes' && <button onClick={() => setStatusTab('todos')} style={{ marginTop: '0.75rem', padding: '0.55rem 0.9rem', borderRadius: '8px', border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', fontWeight: '700', cursor: 'pointer' }}>Ver todo el historial</button>}
+            {effectiveData.length === 0 && <button type="button" className="hon-friendly-button primary" style={{ margin: '.75rem' }}
+              onClick={() => setWorkspace('catalog')}>Configurar servicios y tarifas</button>}
           </div>
         )}
 
@@ -1679,23 +1686,17 @@ export default function HonorariosAuditView() {
         {!loading && hasSearched && filteredData.length > 0 && viewMode === 'medicos' && (
           <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid var(--table-border, #f1f5f9)', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-muted, #64748b)', fontWeight: '600' }}>
-                Mostrando {groupedByMedico.length} médicos ({filteredData.length.toLocaleString()} registros en este filtro)
-              </span>
-              <span style={{ fontSize: '0.85rem', color: '#0284c7', fontWeight: '600' }}>
-                💡 El PDF muestra el resumen de honorarios. Cuando encontramos facturas en SAP, también aparecen en el mismo documento para su revisión.
-              </span>
-            </div>
+            <p className="hon-review-next-step">{workspace === 'approved' ? <>Aquí están los servicios aprobados. Pulsa <strong>Preparar pago y PDF</strong> junto al médico. Para consultar la lista, pulsa <strong>Ver servicios</strong>.</> : <>Busca al médico y pulsa <strong>Aprobar pendientes</strong>. Elige el IVA y guarda. Si necesitas revisar o elegir solo algunos servicios, abre <strong>Ver servicios</strong>.</>}</p>
 
             {groupedByMedico.map((grupo) => {
               const isExpanded = !!expandedMedicos[grupo.medico];
+              const pendingDoctorRows = grupo.filas.filter(row => canSelectService(row) && row._reviewStatus === 'PENDIENTE');
+              const selectedDoctorRows = grupo.filas.filter(row => canSelectService(row) && selectedServices[row._rowId]);
               const doctorPageCount = Math.max(1, Math.ceil(grupo.filas.length / HONORARIOS_PAGE_SIZE));
               const activeDoctorPage = Math.min(doctorPages[grupo.medico] || 0, doctorPageCount - 1);
               const visibleDoctorRows = grupo.filas.slice(activeDoctorPage * HONORARIOS_PAGE_SIZE,
                 (activeDoctorPage + 1) * HONORARIOS_PAGE_SIZE);
               const sapDoctor = grupo.sap;
-              const mxnSapTotals = (sapDoctor?.totalsByCurrency || []).find(total => total.currency === 'MXN');
               const sapLinkLabel = sapDoctor?.linkStatus === 'solo_sap'
                 ? 'Hay facturas en SAP, pero no están relacionadas con estas atenciones'
                 : sapDoctor?.linkStatus === 'candidato_unico'
@@ -1706,299 +1707,20 @@ export default function HonorariosAuditView() {
                     ? 'No se encontró al médico en SAP'
                     : 'Consulta SAP pendiente';
               const rateText = formatHonorariosRates(grupo);
-              return (
-                <div 
-                  key={grupo.medico}
-                  className={`hon-doc-item ${isExpanded ? 'expanded' : ''}`}
-                >
-                  {/* Encabezado Médico */}
-                  <div 
-                    onClick={() => toggleMedico(grupo.medico)}
-                    className="hon-doc-header"
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      <div style={{
-                        width: '44px', height: '44px', borderRadius: '10px',
-                        background: '#004687', color: 'white',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '1.3rem'
-                      }}>
-                        👨‍⚕️
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                          <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '700' }}>
-                            {grupo.medico}
-                          </h3>
-                          <span className="hon-badge-specialty" style={{ background: '#e0e7ff', color: '#3730a3', fontSize: '0.75rem', padding: '0.15rem 0.5rem', borderRadius: '6px', fontWeight: '700' }}>
-                            {grupo.especialidad}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.82rem', color: 'var(--text-muted, #64748b)', flexWrap: 'wrap' }}>
-                          <span>Total en estos filtros: <strong>{grupo.filasRevision.length}</strong> ({grupo.pendingReviewCount} por revisar, {grupo.approvedCount} aprobados, {grupo.rejectedCount} rechazados); mostrando {grupo.filas.length}</span>
-                          <span>ISR estimada: <strong>{rateText}</strong></span>
-                          {sapDoctor && (
-                            <span style={{ color: '#0f766e' }}>
-                              SAP: <strong>{sapLinkLabel}</strong>
-                              {` | ${sapDoctor.invoices?.filter(invoice => !invoice.cancelled).length || 0} facturas`}
-                              {mxnSapTotals && ` | saldo pendiente ${formatSapMoney(mxnSapTotals.openBalance, 'MXN')}`}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>
-                          Importe final aprobado (MXN)
-                        </div>
-                        <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#059669' }}>
-                          {formatMoney(grupo.totalNeto)}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
-                          Honorario: {formatMoney(grupo.totalBase)} | IVA: {formatMoney(grupo.totalIVA)} | Retención de ISR: -{formatMoney(grupo.totalISR)} | Retención de IVA: -{formatMoney(grupo.totalRetIVA)}
-                        </div>
-                        {grupo.approvedDocuments > 0 && <div style={{ fontSize: '0.78rem', color: '#0f766e' }}>
-                          Atenciones aprobadas: {formatMoney(grupo.clinicalNet)} | Facturas aprobadas: {formatMoney(grupo.sapDocumentNet)}.
-                          Los descuentos anteriores corresponden solo a atenciones; las facturas conservan los importes que aparecen en SAP.
-                        </div>}
-                      </div>
-
-                      {/* PDF de preliquidación consolidada del médico */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            generateDoctorHonorariosPdf(exportGroups.find(item => item.medico === grupo.medico) || grupo, startDate, endDate, false, pdfGeneratedBy);
-                          }}
-                          disabled={sapLoading || !reviewReady}
-                          className="hon-view-btn"
-                          style={{
-                            background: 'linear-gradient(135deg, #334155 0%, #475569 100%)',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '0.45rem 0.85rem',
-                            borderRadius: '8px',
-                            fontSize: '0.85rem',
-                            fontWeight: '700',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            boxShadow: '0 2px 6px rgba(51, 65, 85, 0.25)'
-                          }}
-                          title="Descargar resumen de honorarios con los datos disponibles de las facturas en SAP"
-                        >
-                          <span>📄</span> PDF Resumido
-                        </button>
-                        
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            generateDoctorHonorariosPdf(exportGroups.find(item => item.medico === grupo.medico) || grupo, startDate, endDate, true, pdfGeneratedBy);
-                          }}
-                          disabled={sapLoading || !reviewReady}
-                          className="hon-view-btn"
-                          style={{
-                            background: 'linear-gradient(135deg, #004687 0%, #0284c7 100%)',
-                            color: '#ffffff',
-                            border: 'none',
-                            padding: '0.45rem 0.85rem',
-                            borderRadius: '8px',
-                            fontSize: '0.85rem',
-                            fontWeight: '700',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            boxShadow: '0 2px 6px rgba(0, 70, 135, 0.25)'
-                          }}
-                          title="Descargar resumen detallado con los datos disponibles de las facturas en SAP"
-                        >
-                          <span>📄</span> PDF Detallado
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleMedico(grupo.medico); }}
-                        className="hon-view-btn"
-                        style={{
-                          background: isExpanded ? '#0284c7' : 'var(--surface-raised, #ffffff)',
-                          color: isExpanded ? '#ffffff' : 'var(--text-secondary, #475569)',
-                          border: '1px solid var(--table-border, #cbd5e1)',
-                          padding: '0.45rem 0.85rem',
-                          borderRadius: '8px',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        {isExpanded ? 'Ocultar' : 'Ver detalles'} 
-                        <span>{isExpanded ? '▲' : '▼'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Tabla Desplegable */}
-                  {isExpanded && (
-                    <div className="hon-table-wrapper" style={{ borderTop: '1px solid var(--table-border, #e2e8f0)' }}>
-                      <div style={{ padding: '0.55rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', background: 'var(--surface-1, #eff6ff)', borderBottom: '1px solid var(--table-border, #bfdbfe)', color: 'var(--text-secondary, #1e3a8a)', fontSize: '0.78rem' }}>
-                        <span>
-                          {sapLoading ? 'Consultando SAP…' : sapDoctor && sapDoctor.invoices?.some(invoice => !invoice.cancelled)
-                            ? `${sapDoctor.invoices.filter(invoice => !invoice.cancelled).length} facturas SAP en la lista; confirma que no dupliquen atenciones.`
-                            : sapDoctor ? 'No hay facturas activas para este médico.' : 'Revisa el estado de cada registro antes de decidir.'}
-                          {grupo.pendingCount > 0 && ` ${grupo.pendingCount} aprobados con el cálculo pendiente.`}
-                        </span>
-                        <details className="hon-optional-details" onClick={event => event.stopPropagation()}>
-                          <summary style={{ cursor: 'pointer', color: '#0369a1', fontWeight: '600' }}>Notas de cálculo</summary>
-                          <div style={{ maxWidth: '720px', padding: '0.45rem 0', color: 'var(--text-secondary, #475569)' }}>
-                            {grupo.fiscalNotes.map(note => <div key={note}>{note}</div>)}
-                            <div>El total suma solo lo aprobado. Para las facturas se usa el importe registrado en SAP, sin volver a descontar impuestos.</div>
-                          </div>
-                        </details>
-                      </div>
-                      <table className="hon-table" style={{ fontSize: '0.88rem' }}>
-                        <thead className="hon-thead">
-                          <tr>
-                            <th style={{ padding: '0.75rem 1rem' }}>Fecha</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Estado</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Grupo / Servicio</th>
-            <th style={{ padding: '0.75rem 1rem' }}>Paciente o documento</th>
-            <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Honorario ($)</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>ISR ($)</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>IVA ($)</th>
-            <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Retención de IVA ($)</th>
-            <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Importe final aprobado ($ MXN)</th>
-            <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Acción de revisión</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Ficha</th>
-                          </tr>
-                        </thead>
-                        <tbody className="hon-tbody">
-                          {visibleDoctorRows.map((row, rIdx) => (
-                            <tr 
-                              key={row._rowId || rIdx}
-                              onClick={() => handleOpenDetail(row)}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>
-                                {formatDate(row.FechaAtencion)}
-                              </td>
-
-                              <td style={{ padding: '0.75rem 1rem' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'flex-start' }}>
-                                  <span className={row._reviewStatus === 'APROBADO' ? 'hon-badge-approved' : row._reviewStatus === 'RECHAZADO' ? 'hon-badge-excluded' : 'hon-badge-pending'} style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem',
-                                    ...reviewBadgeStyle(row),
-                                    padding: '0.2rem 0.55rem',
-                                    borderRadius: '6px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: '700'
-                                  }}>
-                                    {reviewLabel(row)}
-                                  </span>
-
-                                  {row._isOverridden && (
-                                    <span className="hon-badge-manual" style={{
-                                      fontSize: '0.7rem',
-                                      padding: '0.1rem 0.4rem',
-                                      borderRadius: '4px',
-                                      fontWeight: '700',
-                                      background: '#ede9fe',
-                                      color: '#6d28d9'
-                                    }}>
-                                      👤 Ajuste Manual
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-
-                              <td style={{ padding: '0.75rem 1rem' }}>
-                                <div style={{ fontWeight: '600' }}>{row.Servicio}</div>
-                                <div style={{ color: row.TipoCalculo === 'SAP_DOCUMENTO' ? '#7c3aed' : '#0369a1', fontSize: '0.72rem', fontWeight: '700' }}>{sourceLabel(row)}</div>
-                                {renderSapLineDetails(row)}
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
-                                  <span style={{ color: '#0088C9', fontWeight: '600' }}>{row.GrupoServicio}</span>
-                                </div>
-                              </td>
-
-                              <td style={{ padding: '0.75rem 1rem' }}>
-                                <div style={{ fontWeight: '600' }}>{row.Paciente}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#0088C9' }}>
-                                  {row.TipoCalculo === 'SAP_DOCUMENTO' ? `Factura SAP #${row.FolioAtencion}` : `Atención #${row.FolioAtencion}`} {row.Cliente && ` | ${row.Cliente}`}
-                                </div>
-                              </td>
-
-                              {/* Base Honorario */}
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                                <div style={{ fontWeight: '700' }}>
-                                  {row.TipoCalculo === 'SAP_DOCUMENTO' ? 'Según factura' : formatMoney(row._effectiveElegible ? row._effectiveBase : Number(row.BaseImporte) > 0 ? row.BaseImporte : row.BasePropuesta)}
-                                </div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)' }}>
-                                  Cant: {row.Cantidad}
-                                </div>
-                              </td>
-
-                              {/* Retención ISR */}
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#dc2626' }}>
-                                <div style={{ fontWeight: '600' }}>
-                                  -{formatMoney(row._effectiveISR)}
-                                </div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)' }}>
-                                  {formatHonorariosRate(row._effectiveISRRate)}
-                                </div>
-                              </td>
-
-                              {/* Neto Liquidable */}
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>{formatMoney(row._effectiveIVA)}</td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#dc2626' }}>{row._effectiveRetIVA === null ? row.TipoCalculo === 'SAP_DOCUMENTO' ? 'Sin desglose' : 'Pendiente' : '-' + formatMoney(row._effectiveRetIVA)}</td>
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                                <div style={{ fontWeight: '800', color: row._effectiveElegible ? '#10b981' : 'var(--text-muted, #64748b)', fontSize: '0.95rem' }}>
-                                  {formatMoney(row._effectiveNeto)}
-                                </div>
-                              </td>
-
-                              {/* Columna de Acción de Auditoría (Aprobar / Excluir) */}
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                                <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
-                                  {reviewButtons(row)}
-                                  {row._isOverridden && (
-                                    <button
-                                      disabled={reviewSaving || !reviewReady || !canReview}
-                                      onClick={() => handleRestoreRow(row)}
-                                      className="hon-btn-override-restore"
-                                      title="Devolver a pendiente de revisión"
-                                    >
-                                      ↩️
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-
-                              <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleOpenDetail(row); }}
-                                  className="hon-view-btn"
-                                  style={{
-                                    border: '1px solid var(--table-border, #cbd5e1)',
-                                    padding: '0.35rem 0.65rem',
-                                    fontSize: '0.78rem',
-                                    color: '#0088C9'
-                                  }}
-                                >
-                                  👁️ Detalle
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {isExpanded && renderPagination({
-                    page: activeDoctorPage, pageCount: doctorPageCount, total: grupo.filas.length,
-                    onPageChange: page => setDoctorPages(previous => ({ ...previous, [grupo.medico]: page }))
-                  })}
-                </div>
-              );
+              return <HonorariosDoctorReviewCard key={grupo.medico} group={grupo} rows={visibleDoctorRows}
+                onEditFiscal={() => { setFiscalProviderId(String(grupo.providerId || grupo.filasRevision[0]?.MedicoId || '')); setWorkspace('fiscal'); }}
+                approvedView={workspace === 'approved'} onDownloadApproved={detailed => downloadApprovedPdf(exportGroups.find(item => item.medico === grupo.medico) || grupo, detailed)}
+                pendingRows={pendingDoctorRows} selectedRows={selectedDoctorRows} expanded={isExpanded} onToggle={() => toggleMedico(grupo.medico)}
+                onApprove={() => openBulk('APROBAR', selectedDoctorRows.length ? selectedDoctorRows : pendingDoctorRows.slice(0, 100))}
+                onSelectRows={() => selectRows(grupo.filas)} canSelect={selectionAvailable}
+                canExport={(!sapLoading || fiscalProfiles[grupo.providerId || grupo.filasRevision[0]?.MedicoId]?.enabled) && reviewReady} sapLoading={sapLoading} rateText={rateText} sapLinkLabel={sapLinkLabel}
+                onPreparePayment={() => { setPaymentProviderId(String(grupo.providerId || grupo.filasRevision[0]?.MedicoId || '')); setWorkspace('liquidations'); }}
+                onExportSummary={() => generateDoctorHonorariosPdf(exportGroups.find(item => item.medico === grupo.medico) || grupo, startDate, endDate, false, pdfGeneratedBy)}
+                onExportDetail={() => generateDoctorHonorariosPdf(exportGroups.find(item => item.medico === grupo.medico) || grupo, startDate, endDate, true, pdfGeneratedBy)}
+                formatMoney={formatMoney} formatSapMoney={formatSapMoney} formatDate={formatDate} reviewButtons={reviewButtons} reviewLabel={reviewLabel}
+                onOpenDetail={handleOpenDetail} onRestore={handleRestoreRow} canRestore={!reviewSaving && reviewReady && canReview}
+                pagination={renderPagination({ page: activeDoctorPage, pageCount: doctorPageCount, total: grupo.filas.length,
+                  onPageChange: page => setDoctorPages(previous => ({ ...previous, [grupo.medico]: page })) })} />;
             })}
           </div>
         )}
@@ -2062,8 +1784,9 @@ export default function HonorariosAuditView() {
                         {row.Paciente}
                       </div>
                       <div style={{ fontSize: '0.78rem', color: '#0088C9', marginTop: '0.15rem' }}>
-                        {row.TipoCalculo === 'SAP_DOCUMENTO' ? `Factura SAP #${row.FolioAtencion}` : `Atención #${row.FolioAtencion}`} | {formatDate(row.FechaAtencion)}
+                        {formatHonorarioReference(row)} | {formatDate(row.FechaAtencion)}
                       </div>
+                      {row.TipoCalculo !== 'SAP_DOCUMENTO' && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #64748b)', marginTop: '0.15rem' }}>{formatHonorarioSalesOrder(row)}</div>}
                     </td>
 
                     {/* Estado Auditoría */}
@@ -2082,7 +1805,7 @@ export default function HonorariosAuditView() {
                           {reviewLabel(row)}
                         </span>
 
-                        {row._isOverridden && (
+                        {row._isOverridden && !row.LiquidacionCerrada && (
                           <span className="hon-badge-manual" style={{
                             fontSize: '0.7rem',
                             padding: '0.15rem 0.45rem',
@@ -2100,6 +1823,7 @@ export default function HonorariosAuditView() {
                             {row._effectiveMotivo}
                           </div>
                         )}
+                        <HonorariosPhysicianCorrection correction={row._physicianCorrection} />
                       </div>
                     </td>
 
@@ -2133,7 +1857,7 @@ export default function HonorariosAuditView() {
                     <td style={{ padding: '1rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
                         {reviewButtons(row)}
-                                  {row._isOverridden && (
+                                  {row._isOverridden && !row.LiquidacionCerrada && (
                           <button
                             disabled={reviewSaving || !reviewReady || !canReview}
                                       onClick={() => handleRestoreRow(row)}
@@ -2183,6 +1907,8 @@ export default function HonorariosAuditView() {
               <thead className="hon-thead" style={{ position: 'sticky', top: 0, zIndex: 5 }}>
                 <tr>
                   <th style={{ padding: '0.85rem 0.75rem' }}>Folio o factura</th>
+                  <th style={{ padding: '0.85rem 0.75rem' }}>Folio Cita</th>
+                  <th style={{ padding: '0.85rem 0.75rem' }}>Folio Orden Venta</th>
                   <th style={{ padding: '0.85rem 0.75rem' }}>Fecha</th>
                   <th style={{ padding: '0.85rem 0.75rem' }}>Médico</th>
                   <th style={{ padding: '0.85rem 0.75rem' }}>Especialidad</th>
@@ -2210,7 +1936,9 @@ export default function HonorariosAuditView() {
                     onClick={() => handleOpenDetail(row)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <td style={{ padding: '0.75rem', fontWeight: 'bold', color: '#0088C9' }}>{row.TipoCalculo === 'SAP_DOCUMENTO' ? `SAP #${row.FolioAtencion}` : `#${row.FolioAtencion}`}</td>
+                    <td style={{ padding: '0.75rem', fontWeight: 'bold', color: '#0088C9' }}>{row.TipoCalculo === 'SAP_DOCUMENTO' ? formatHonorarioReference(row) : row.FolioAtencion ? `#${row.FolioAtencion}` : 'Sin atención vinculada'}</td>
+                    <td style={{ padding: '0.75rem' }}>{row.TipoCalculo === 'SAP_DOCUMENTO' ? 'No aplica' : row.FolioCita ?? 'Sin cita vinculada'}</td>
+                    <td style={{ padding: '0.75rem' }}>{row.TipoCalculo === 'SAP_DOCUMENTO' ? 'No aplica' : row.FolioOrdenVenta ?? 'Sin orden de venta'}</td>
                     <td style={{ padding: '0.75rem' }}>{formatDate(row.FechaAtencion)}</td>
                     <td style={{ padding: '0.75rem', fontWeight: '600' }}>{row.Medico}</td>
                     <td style={{ padding: '0.75rem' }}>{row.Especialidad}</td>
@@ -2218,7 +1946,7 @@ export default function HonorariosAuditView() {
                     <td style={{ padding: '0.75rem' }}>{row.Cliente}</td>
                     <td style={{ padding: '0.75rem' }}>{row.GrupoServicio}</td>
                     <td style={{ padding: '0.75rem' }}>{row.Servicio}<div style={{ color: row.TipoCalculo === 'SAP_DOCUMENTO' ? '#7c3aed' : '#0369a1', fontSize: '0.72rem', fontWeight: '700' }}>{sourceLabel(row)}</div>{renderSapLineDetails(row)}</td>
-                    <td style={{ padding: '0.75rem' }}>{row.Cantidad}</td>
+                    <td style={{ padding: '0.75rem' }}>{row.Cantidad ?? 'Pendiente'}</td>
                     <td style={{ padding: '0.75rem' }}>{formatMoney(row.PrecioCobradoPaciente)}</td>
                     <td style={{ padding: '0.75rem', fontWeight: '600' }}>{row.TipoCalculo === 'SAP_DOCUMENTO' ? 'Según factura' : formatMoney(row._effectiveElegible ? row._effectiveBase : Number(row.BaseImporte) > 0 ? row.BaseImporte : row.BasePropuesta)}</td>
                     <td style={{ padding: '0.75rem' }}>{formatHonorariosRate(row._effectiveISRRate)}</td>
@@ -2241,11 +1969,12 @@ export default function HonorariosAuditView() {
                       ) : (
                         <span style={{ color: 'var(--text-muted, #94a3b8)', fontSize: '0.75rem' }}>Sistema</span>
                       )}
+                      <HonorariosPhysicianCorrection correction={row._physicianCorrection} />
                     </td>
                     <td style={{ padding: '0.75rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center' }}>
                         {reviewButtons(row)}
-                                  {row._isOverridden && (
+                                  {row._isOverridden && !row.LiquidacionCerrada && (
                           <button
                             disabled={reviewSaving || !reviewReady || !canReview}
                                       onClick={() => handleRestoreRow(row)}
@@ -2274,6 +2003,61 @@ export default function HonorariosAuditView() {
       {/* ========================================================================= */}
       {/* 6. MODAL DIÁLOGO DE AJUSTE MANUAL (APROBAR O EXCLUIR) */}
       {/* ========================================================================= */}
+      </div>
+      {bulkDialog.open && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+        <section role="dialog" aria-modal="true" aria-label="Revisar selección" className="hon-card" style={{ width: '100%', maxWidth: 680, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', padding: '1.25rem' }}>
+          <h2>{bulkDialog.action === 'APROBAR' ? 'Aprobar' : 'Excluir'} {bulkDialog.rows.length} servicios</h2>
+          {bulkDialog.action === 'APROBAR' && <>
+            <p>Elige el IVA una sola vez para todos los servicios seleccionados.</p>
+            <div className="hon-bulk-summary" style={{ padding: '1rem', margin: '1rem 0', background: 'var(--surface-1, #f8fafc)', borderRadius: 10 }}>
+              <strong>{[...new Set((bulkDialog.preview || bulkDialog.rows).map(row => row.providerName || 'Médico pendiente'))].join(' · ')}</strong>
+              <p style={{ margin: '.4rem 0 0' }}>{bulkDialog.rows.length} servicios · Total antes de impuestos: <strong>{bulkDialog.pricing ? 'Calculando…' : bulkDialog.preview ? formatMoney(bulkDialog.preview.reduce((sum, row) => sum + roundCents(row.customAmount), 0)) : 'Pendiente de cálculo'}</strong></p>
+            </div>
+            <label>IVA para toda la selección<select aria-label="IVA de la selección" className="hon-input" value={bulkDialog.vatRate} disabled={reviewSaving}
+              onChange={event => setBulkDialog(previous => ({ ...previous, vatRate: event.target.value }))}>
+              <option value="">Selecciona el IVA</option><option value="0">Sin IVA, confirmado por el responsable</option><option value="0.16">16%</option><option value="0.08">8% con soporte del tratamiento aplicable</option>
+            </select></label>
+            <p style={{ fontSize: '.85rem', color: 'var(--text-muted, #64748b)' }}>Al guardar confirmas que los médicos indicados realizaron estos servicios. El mismo IVA se aplicará a todos; si requieren IVA distinto, apruébalos en grupos separados.</p>
+            <details style={{ margin: '.8rem 0' }}><summary>Corregir médico de la selección (opcional)</summary>
+              <label>Médico para toda la selección
+                <select aria-label="Médico de la selección" className="hon-input" value={bulkDialog.providerId} disabled={reviewSaving}
+                  onChange={event => setBulkDialog(previous => ({ ...previous, providerId: event.target.value, preview: null, pricing: true }))}>
+                  <option value="">Conservar el médico mostrado en cada servicio</option>
+                  {providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name} · #{provider.id}</option>)}
+                </select>
+              </label>
+              <label>{bulkPhysicianChanged ? 'Motivo del cambio de médico (obligatorio)' : 'Nota o referencia (opcional)'}
+                <input aria-label={bulkPhysicianChanged ? 'Motivo del cambio de médico' : 'Referencia de la selección'} className="hon-input"
+                  value={bulkDialog.evidenceReference} maxLength={1000} disabled={reviewSaving} required={bulkPhysicianChanged}
+                  aria-describedby={bulkPhysicianChanged ? 'hon-bulk-physician-reason-help' : undefined}
+                  onChange={event => setBulkDialog(previous => ({ ...previous, evidenceReference: event.target.value, error: null }))} />
+              </label>
+              {bulkPhysicianChanged && <p id="hon-bulk-physician-reason-help" className={`hon-friendly-message${bulkChangeReasonMissing ? ' error' : ''}`}>
+                El motivo y tu usuario quedarán registrados en los servicios cuyo médico cambie. Escribe el motivo para aprobar.</p>}
+            </details>
+            {bulkDialog.rows.some(row => row.possibleDuplicate) && <label><input type="checkbox" checked={bulkDialog.duplicateConfirmed} disabled={reviewSaving} onChange={event => setBulkDialog(previous => ({ ...previous, duplicateConfirmed: event.target.checked }))} /> Revisé las coincidencias y confirmé que son servicios distintos.</label>}
+          </>}
+          <details style={{ margin: '1rem 0' }}><summary>Ver los {bulkDialog.rows.length} servicios seleccionados</summary>
+            <div style={{ overflowX: 'auto', maxHeight: 300, margin: '.8rem 0' }}><table style={{ width: '100%', textAlign: 'left', fontSize: '.8rem' }}>
+              <thead><tr><th>Fecha / orden</th><th>Servicio</th><th>Médico</th><th>Cantidad</th><th>Honorario</th></tr></thead>
+              <tbody>{(bulkDialog.preview || bulkDialog.rows).map(row => <tr key={row.rowId}><td>{row.serviceDate}<br />Orden {row.salesOrder || 'sin vínculo'}</td><td>{row.description}</td><td>{row.providerName || 'Pendiente'}</td><td>{row.quantity ?? 'Pendiente'}</td><td>{row.customAmount ? formatMoney(row.customAmount) : 'Por calcular'}</td></tr>)}</tbody>
+            </table></div>
+          </details>
+          {bulkDialog.action === 'EXCLUIR' && <>
+            <label>Motivo de la selección<input aria-label="Motivo de la selección" className="hon-input" value={bulkDialog.motivo} maxLength={2000} onChange={event => setBulkDialog(previous => ({ ...previous, motivo: event.target.value }))} /></label>
+            <label style={{ display: 'block', margin: '1rem 0' }}><input type="checkbox" checked={bulkDialog.confirmed} onChange={event => setBulkDialog(previous => ({ ...previous, confirmed: event.target.checked }))} /> Revisé los servicios seleccionados y confirmo su exclusión.</label>
+          </>}
+          {bulkDialog.error && <p role="alert" style={{ color: '#b91c1c' }}>{userMessage(bulkDialog.error)}</p>}
+          <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
+            <button className="hon-view-btn" disabled={reviewSaving} onClick={() => setBulkDialog(previous => ({ ...previous, open: false }))}>Cancelar</button>
+            <button className="hon-friendly-button primary" disabled={reviewSaving || bulkChangeReasonMissing || (bulkDialog.action === 'APROBAR'
+              ? (bulkDialog.pricing || !bulkDialog.preview || bulkDialog.vatRate === '' || (bulkDialog.rows.some(row => row.possibleDuplicate) && !bulkDialog.duplicateConfirmed))
+              : !bulkDialog.confirmed)} onClick={saveBulk}>
+              {reviewSaving ? 'Guardando…' : bulkDialog.action === 'APROBAR' ? 'Aprobar servicios' : 'Guardar exclusión de la selección'}
+            </button>
+          </div>
+        </section>
+      </div>}
       {overrideModal.isOpen && overrideModal.row && (
         <div style={{
           position: 'fixed',
@@ -2286,13 +2070,14 @@ export default function HonorariosAuditView() {
           zIndex: 1100,
           padding: '1.5rem'
         }}>
-          <div className="hon-modal-content" style={{
+          <div className="hon-modal-content" role="dialog" aria-modal="true" aria-label={overrideModal.action === 'APROBAR' ? 'Aprobar honorario' : 'Excluir honorario'} style={{
             background: 'var(--surface-raised, #ffffff)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '560px',
+            maxHeight: 'calc(100dvh - 3rem)',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-            overflow: 'hidden'
+            overflowY: 'auto'
           }}>
             <div style={{
               padding: '1.25rem 1.75rem',
@@ -2310,10 +2095,10 @@ export default function HonorariosAuditView() {
                 </span>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '800', color: 'white' }}>
-                        {overrideModal.action === 'APROBAR' ? 'Aprobar honorario' : 'Rechazar honorario'}
+                        {overrideModal.action === 'APROBAR' ? overrideModal.row.FixedMonthly ? 'Incluir pago fijo mensual' : 'Aprobar honorario' : 'Excluir honorario'}
                   </h3>
                   <span style={{ fontSize: '0.78rem', color: '#e2e8f0' }}>
-                    Decisión interna guardada en BI con responsable, fecha y motivo
+                    Se guarda quién hizo la revisión, cuándo y por qué.
                   </span>
                 </div>
               </div>
@@ -2333,12 +2118,52 @@ export default function HonorariosAuditView() {
                   {overrideModal.row.Servicio}
                 </div>
                 <div style={{ color: 'var(--text-muted, #64748b)', marginTop: '0.2rem' }}>
-                  👨‍⚕️ <strong>{overrideModal.row.Medico}</strong> | {overrideModal.row.TipoCalculo === 'SAP_DOCUMENTO' ? `Documento de SAP #${overrideModal.row.FolioAtencion}` : `Paciente: ${overrideModal.row.Paciente} | Atención #${overrideModal.row.FolioAtencion}`}
+                  👨‍⚕️ <strong>{overrideModal.row.ModeBI && overrideModal.action === 'APROBAR' ? providers.find(provider => String(provider.id) === String(overrideModal.providerId))?.name || (String(overrideModal.providerId) === String(overrideModal.row.MedicoId) ? overrideModal.row.Medico : `Médico #${overrideModal.providerId}`) : overrideModal.row.Medico}</strong> | {overrideModal.row.FixedMonthly ? `Mes: ${overrideModal.row.FeeMonth}` : overrideModal.row.TipoCalculo === 'SAP_DOCUMENTO' ? formatHonorarioReference(overrideModal.row) : `Paciente: ${overrideModal.row.Paciente} | ${formatHonorarioReference(overrideModal.row)} | ${formatHonorarioSalesOrder(overrideModal.row)}`}
                 </div>
               </div>
 
               {/* Si se va a aprobar, capturar o validar el Monto Base */}
-              {overrideModal.action === 'APROBAR' && overrideModal.row.TipoCalculo !== 'SAP_DOCUMENTO' && (
+              {overrideModal.action === 'APROBAR' && overrideModal.row.ModeBI && !overrideModal.row.FixedMonthly && <details open={overridePhysicianChanged || undefined}>
+                <summary>Corregir médico o cantidad (opcional)</summary>
+                <label>Médico beneficiario
+                  <select aria-label="Médico beneficiario" className="hon-input" value={overrideModal.providerId}
+                    onChange={event => setOverrideModal(previous => ({ ...previous, providerId: event.target.value, customAmount: '', quotedTariffId: null, error: null }))}>
+                    <option value="">Selecciona el médico</option>
+                    {providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name} · #{provider.id}</option>)}
+                  </select>
+                </label>
+                {providerError && <div role="alert">{userMessage(providerError)}</div>}
+                <label>Rol médico
+                  <select aria-label="Rol médico" className="hon-input" value={overrideModal.role}
+                    onChange={event => setOverrideModal(previous => ({ ...previous, role: event.target.value, customAmount: '', quotedTariffId: null, error: null }))}>
+                    <option value="TRATANTE">Tratante / consulta</option><option value="AN">Anestesiólogo</option>
+                    <option value="SURGEON">Cirujano</option><option value="AY">Ayudante</option>
+                  </select>
+                </label>
+                <label>Cantidad reconocida (máximo {overrideModal.row.CantidadMaxima ?? overrideModal.row.CantidadOriginal ?? overrideModal.row.Cantidad})
+                  <input aria-label="Cantidad reconocida" type="number" min="0.001" step="0.001" className="hon-input" value={overrideModal.quantity}
+                    onChange={event => setOverrideModal(previous => ({ ...previous, quantity: event.target.value, customAmount: '', quotedTariffId: null, error: null }))} />
+                </label>
+                <label>{overridePhysicianChanged ? 'Motivo del cambio de médico (obligatorio)' : 'Nota o referencia (opcional)'}
+                  <input aria-label={overridePhysicianChanged ? 'Motivo del cambio de médico' : 'Referencia de realización'} className="hon-input" value={overrideModal.evidenceReference}
+                    maxLength={1000} required={!!overridePhysicianChanged} aria-describedby={overridePhysicianChanged ? 'hon-physician-reason-help' : undefined}
+                    onChange={event => setOverrideModal(previous => ({ ...previous, evidenceReference: event.target.value, error: null }))} />
+                </label>
+                {overridePhysicianChanged && <p id="hon-physician-reason-help" className={`hon-friendly-message${overrideChangeReasonMissing ? ' error' : ''}`}>
+                  El motivo y tu usuario quedarán registrados en este servicio. Escribe el motivo para aprobar.</p>}
+              </details>}
+              {overrideModal.action === 'APROBAR' && overrideModal.row.FixedMonthly && <>
+                <p style={{ margin: 0 }}><strong>Pago mensual completo antes de impuestos: {formatMoney(overrideModal.row.BaseImporte)}</strong></p>
+                <p style={{ margin: 0 }}>Este pago es adicional a sus servicios. Al guardarlo autorizas el importe completo del mes indicado, aunque hayas consultado sólo parte del mes. Se incluye una sola vez por médico y mes.</p>
+              </>}
+              {overrideModal.action === 'APROBAR' && overrideModal.row.ModeBI && !overrideModal.row.FixedMonthly && <>
+                <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>Honorario: {overrideModal.pricing ? 'Calculando…' : formatMoney(overrideModal.customAmount || null)}</strong>
+                  <br />Cantidad: {overrideModal.quantity} · Función: {({ TRATANTE: 'Tratante / consulta', AN: 'Anestesiólogo', SURGEON: 'Cirujano', AY: 'Ayudante' })[overrideModal.role]}</p>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>Al guardar la aprobación confirmas que este médico realizó el servicio indicado.</p>
+                {overrideModal.row.PosibleDuplicado && <label><input type="checkbox" checked={overrideModal.duplicateConfirmed === true}
+                  onChange={event => setOverrideModal(previous => ({ ...previous, duplicateConfirmed: event.target.checked }))} /> Revisé las coincidencias y confirmo que se trata de un servicio distinto, sin repetir cantidad.</label>}
+              </>}
+              {overrideModal.action === 'APROBAR' && !overrideModal.row.ModeBI && overrideModal.row.TipoCalculo !== 'SAP_DOCUMENTO' && (
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem', color: 'var(--text-secondary, #475569)' }}>
                     💵 Importe del honorario antes de impuestos ($ MXN):
@@ -2347,10 +2172,11 @@ export default function HonorariosAuditView() {
                     type="number"
                     step="0.01"
                     value={overrideModal.customAmount}
+                    readOnly={overrideModal.row.ModeBI}
                     onChange={e => setOverrideModal(prev => ({ ...prev, customAmount: e.target.value, error: null }))}
                     className="hon-input"
                     style={{ fontSize: '1.1rem', fontWeight: '700', color: '#059669' }}
-                    placeholder="Ej. 225.00"
+                    placeholder={overrideModal.row.ModeBI ? 'Calcula el honorario para ver el importe' : 'Ej. 225.00'}
                   />
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)', marginTop: '0.3rem', display: 'flex', justifyContent: 'space-between' }}>
                     <span>Precio Cobrado: {formatMoney(overrideModal.row.PrecioCobradoPaciente)}</span>
@@ -2364,7 +2190,7 @@ export default function HonorariosAuditView() {
                 Confirma el IVA de este honorario
                 <select aria-label="IVA confirmado" className="hon-input" value={overrideModal.vatRate ?? ''}
                   onChange={event => setOverrideModal(previous => ({ ...previous, vatRate: event.target.value }))}>
-                  <option value="">Conservar el IVA registrado; si falta, quedará pendiente</option>
+                  <option value="">{overrideModal.row.ModeBI ? 'Selecciona el IVA' : 'Conservar el IVA registrado; si falta, quedará pendiente'}</option>
                   <option value="0">Sin IVA, confirmado por quien revisa</option>
                   <option value="0.16">16%</option>
                   <option value="0.08">8% (requiere soporte del tratamiento aplicable)</option>
@@ -2380,6 +2206,8 @@ export default function HonorariosAuditView() {
                   Revisé que esta factura corresponde a servicios distintos de las atenciones aprobadas de este médico. Si incluye una atención ya aprobada, aprobar solo una vez.
                 </label>}
               </div>}
+              {overrideModal.error && <div role="alert" style={{ color: '#b91c1c', fontSize: '0.85rem' }}>{userMessage(overrideModal.error)}</div>}
+              {!(overrideModal.row.ModeBI && overrideModal.action === 'APROBAR') && <>
               <div style={{ fontSize: '0.8rem', color: '#92400e' }}>{overrideModal.row.MensajeAuditoria}</div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', marginBottom: '0.4rem', color: 'var(--text-secondary, #475569)' }}>
@@ -2394,7 +2222,7 @@ export default function HonorariosAuditView() {
                 />
                 {overrideModal.error && (
                   <div role="alert" style={{ color: '#b91c1c', fontSize: '0.8rem', fontWeight: '700', marginTop: '0.4rem' }}>
-                    {overrideModal.error}
+                    {userMessage(overrideModal.error)}
                   </div>
                 )}
 
@@ -2427,6 +2255,7 @@ export default function HonorariosAuditView() {
                   )}
                 </div>
               </div>
+              </>}
 
             </div>
 
@@ -2441,7 +2270,8 @@ export default function HonorariosAuditView() {
 
               <button
                 onClick={handleConfirmOverride}
-                disabled={reviewSaving || !reviewReady || !canReview}
+                disabled={reviewSaving || !reviewReady || !canReview || overrideChangeReasonMissing || (overrideModal.action === 'APROBAR' && overrideModal.row.ModeBI
+                  && (overrideModal.pricing || (!overrideModal.row.FixedMonthly && !overrideModal.quotedTariffId) || overrideModal.vatRate === '' || (overrideModal.row.PosibleDuplicado && !overrideModal.duplicateConfirmed)))}
                 style={{
                   background: overrideModal.action === 'APROBAR' ? '#059669' : '#dc2626',
                   color: 'white',
@@ -2454,7 +2284,7 @@ export default function HonorariosAuditView() {
                   boxShadow: overrideModal.action === 'APROBAR' ? '0 4px 10px rgba(5, 150, 105, 0.3)' : '0 4px 10px rgba(220, 38, 38, 0.3)'
                 }}
               >
-                {overrideModal.action === 'APROBAR' ? 'Guardar aprobación' : 'Guardar rechazo'}
+                {overrideModal.action === 'APROBAR' ? 'Guardar aprobación' : 'Guardar exclusión'}
               </button>
             </div>
           </div>
@@ -2545,7 +2375,7 @@ export default function HonorariosAuditView() {
                   </div>
                   <div style={{ fontSize: '1.15rem', fontWeight: '800', color: selectedRow._effectiveElegible ? '#059669' : '#dc2626', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
                     {reviewLabel(selectedRow)}
-                    {selectedRow._isOverridden && (
+                    {selectedRow._isOverridden && !selectedRow.LiquidacionCerrada && (
                       <span style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: '#8b5cf6', color: 'white' }}>
                         Manual
                       </span>
@@ -2556,11 +2386,12 @@ export default function HonorariosAuditView() {
                       <strong>Motivo:</strong> {selectedRow._effectiveMotivo}
                     </div>
                   )}
+                  <HonorariosPhysicianCorrection correction={selectedRow._physicianCorrection} expanded />
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   {reviewButtons(selectedRow)}
-                                  {selectedRow._isOverridden && (
+                                  {selectedRow._isOverridden && !selectedRow.LiquidacionCerrada && (
                     <button
                       disabled={reviewSaving || !reviewReady || !canReview}
                                       onClick={() => handleRestoreRow(selectedRow)}
@@ -2598,7 +2429,7 @@ export default function HonorariosAuditView() {
               {/* Bloque 2: Paciente y Atención */}
               <div className="hon-modal-block-patient" style={{ background: '#f0f9ff', padding: '1.25rem', borderRadius: '12px', border: '1px solid #bae6fd' }}>
                 <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', fontWeight: '700', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  👤 Paciente & Folio de Atención
+                  👤 Paciente y folios
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', fontSize: '0.9rem' }}>
                   <div>
@@ -2606,9 +2437,19 @@ export default function HonorariosAuditView() {
                     <strong>{selectedRow.Paciente || 'N/A'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.78rem', display: 'block' }}>Folio de Atención</span>
-                    <strong style={{ color: '#0088C9', fontSize: '1.1rem' }}>#{selectedRow.FolioAtencion}</strong>
+                    <span style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.78rem', display: 'block' }}>{selectedRow.TipoCalculo === 'SAP_DOCUMENTO' ? 'Factura SAP' : 'Folio de Atención (Vertical)'}</span>
+                    <strong style={{ color: '#0088C9', fontSize: '1.1rem' }}>{selectedRow.TipoCalculo === 'SAP_DOCUMENTO' ? formatHonorarioReference(selectedRow) : selectedRow.FolioAtencion ? `#${selectedRow.FolioAtencion}` : 'Sin atención vinculada'}</strong>
                   </div>
+                  {selectedRow.TipoCalculo !== 'SAP_DOCUMENTO' && <>
+                    <div>
+                      <span style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.78rem', display: 'block' }}>Folio de Cita (Vertical)</span>
+                      <strong>{selectedRow.FolioCita ? `#${selectedRow.FolioCita}` : 'Sin cita vinculada'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.78rem', display: 'block' }}>Folio Orden Venta</span>
+                      <strong>{selectedRow.FolioOrdenVenta ? `#${selectedRow.FolioOrdenVenta}` : 'Sin orden de venta'}</strong>
+                    </div>
+                  </>}
                   <div>
                     <span style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.78rem', display: 'block' }}>Fecha de Atención</span>
                     <strong>{formatDate(selectedRow.FechaAtencion)}</strong>
@@ -2631,11 +2472,11 @@ export default function HonorariosAuditView() {
                     <strong>{selectedRow.GrupoServicio}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.78rem', display: 'block' }}>Precio Cobrado Paciente</span>
+                    <span style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.78rem', display: 'block' }}>Importe cobrado al paciente</span>
                     <strong>{formatMoney(selectedRow.PrecioCobradoPaciente)}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.78rem', display: 'block' }}>Honorario según tabulador</span>
+                    <span style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.78rem', display: 'block' }}>Honorario según tarifa</span>
                     <strong style={{ color: '#0284c7' }}>{formatMoney(selectedRow._effectiveBase)}</strong>
                   </div>
                   <div>
@@ -2661,7 +2502,7 @@ export default function HonorariosAuditView() {
               {/* Bloque 4: Motor de Auditoría y Reglas */}
               <div className={selectedRow._effectiveElegible ? 'hon-modal-block-audit-ok' : 'hon-modal-block-audit-bad'} style={{ background: selectedRow._effectiveElegible ? '#f8fafc' : '#fef2f2', padding: '1.25rem', borderRadius: '12px', border: selectedRow._effectiveElegible ? '1px solid #e2e8f0' : '1px solid #fecaca' }}>
                 <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', fontWeight: '700', color: selectedRow._effectiveElegible ? 'var(--text-primary)' : '#ef4444', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  🛡️ Diagnóstico del Motor de Reglas
+                  🛡️ Resultado de la revisión
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', fontSize: '0.85rem' }}>
                   <div>
@@ -2669,11 +2510,11 @@ export default function HonorariosAuditView() {
                     <strong>{selectedRow.PasaAtencionCerrada ? '✅ Sí' : '❌ No'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted, #64748b)', display: 'block' }}>Tipo Servicio (ItemType S):</span>
+                    <span style={{ color: 'var(--text-muted, #64748b)', display: 'block' }}>Es un servicio médico:</span>
                     <strong>{selectedRow.PasaTipoServicio ? '✅ Sí' : '❌ No'}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-muted, #64748b)', display: 'block' }}>Existe en Catálogo UT:</span>
+                    <span style={{ color: 'var(--text-muted, #64748b)', display: 'block' }}>Está en la lista de honorarios:</span>
                     <strong>{selectedRow.PasaCatalogoHonorarios ? '✅ Sí' : '❌ No'}</strong>
                   </div>
                   <div>
@@ -2695,8 +2536,8 @@ export default function HonorariosAuditView() {
               {/* Botón de descarga de PDF individual desde la Ficha */}
               <button 
                 onClick={() => {
-                  const docGroup = groupedByMedico.find(g => g.medico === selectedRow.Medico?.trim()) || {
-                    medico: selectedRow.Medico,
+                  const docGroup = exportGroups.find(g => g.medico === doctorGroupKey(selectedRow)) || {
+                    medico: doctorGroupKey(selectedRow), providerId: selectedRow.MedicoId, providerName: selectedRow.Medico,
                     especialidad: selectedRow.Especialidad,
                     tipoMedico: selectedRow.TipoMedico,
                     tasaISR: selectedRow._effectiveISRRate,
@@ -2704,7 +2545,7 @@ export default function HonorariosAuditView() {
                     sap: sapReconciliation?.providers?.[selectedRow.Medico?.trim()],
                     sapPeriod: sapReconciliation?.period,
                     filas: [selectedRow],
-                    filasRevision: effectiveData.filter(row => row.Medico?.trim() === selectedRow.Medico?.trim())
+                    filasRevision: effectiveData.filter(row => doctorGroupKey(row) === doctorGroupKey(selectedRow))
                   };
                   generateDoctorHonorariosPdf(docGroup, startDate, endDate, true, pdfGeneratedBy);
                 }}

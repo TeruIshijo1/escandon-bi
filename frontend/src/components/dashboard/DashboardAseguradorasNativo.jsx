@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell, PieChart, Pie, Legend } from 'recharts';
+import DashboardChart from './DashboardChart';
 import EstadoCuentaModal from '../shared/EstadoCuentaModal';
 import PremiumLoader from '../shared/PremiumLoader';
 
@@ -72,72 +71,72 @@ export default function DashboardAseguradorasNativo({ globalFilters, globalTrigg
   );
 
   return (
-    <div style={{ padding: '1rem', background: '#F8FAFC', borderRadius: '16px' }}>
+    <div className="area-native-dashboard dashboard-view" style={{ padding: '1rem', background: '#F8FAFC', borderRadius: '16px' }}>
       
       {/* KPIs Principales */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #3B82F6` }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #3B82F6` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pacientes (Vertical)</span>
+            <span className="area-metric-label dashboard-metric-label" style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pacientes con convenio</span>
             <span style={{ fontSize: '24px' }}>👥</span>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {formatNumber(data.kpis.totalPacientes)}
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#3B82F6', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.85rem', color: '#3B82F6', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             Cuentas con convenio activo
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #10B981` }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #10B981` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Facturado</span>
+            <span className="area-metric-label dashboard-metric-label" style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Facturado</span>
             <span style={{ fontSize: '24px' }}>💰</span>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formatCurrency(data.kpis.montoTotal)}>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formatCurrency(data.kpis.montoTotal)}>
             {formatCurrency(data.kpis.montoTotal)}
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#10B981', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.85rem', color: '#10B981', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             Montos de las cuentas
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #F59E0B` }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #F59E0B` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saldo Pendiente</span>
+            <span className="area-metric-label dashboard-metric-label" style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saldo Pendiente</span>
             <span style={{ fontSize: '24px' }}>⏳</span>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formatCurrency(data.kpis.saldoPendiente)}>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formatCurrency(data.kpis.saldoPendiente)}>
             {formatCurrency(data.kpis.saldoPendiente)}
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#F59E0B', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            Por cobrar en sistema Vertical
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.85rem', color: '#F59E0B', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            Pendiente de pago
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #8B5CF6` }}>
+        <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #8B5CF6` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cuenta Promedio</span>
+            <span className="area-metric-label dashboard-metric-label" style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cuenta Promedio</span>
             <span style={{ fontSize: '24px' }}>🧾</span>
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formatCurrency(data.kpis.cuentaPromedio)}>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '1.8rem', fontWeight: 700, color: '#0f172a', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formatCurrency(data.kpis.cuentaPromedio)}>
             {formatCurrency(data.kpis.cuentaPromedio)}
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#8B5CF6', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.85rem', color: '#8B5CF6', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             Por paciente asegurado
           </div>
         </div>
 
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
+      <div className="area-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
         
         {/* Top Aseguradoras por Pacientes */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="area-panel dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Top 10 Aseguradoras (Por Volumen)</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
               <BarChart data={data.topAseguradoras} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} />
                 <XAxis type="number" />
@@ -156,15 +155,15 @@ export default function DashboardAseguradorasNativo({ globalFilters, globalTrigg
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
-          </div>
+            </DashboardChart>
+          </div></div>
         </div>
 
         {/* Facturación por Aseguradora */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="area-panel dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Top 10 Aseguradoras (Por Monto)</h3>
-          <div style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="dashboard-chart-host" style={{ height: 350 }}>
+            <DashboardChart width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={[...data.topAseguradoras].sort((a,b) => b.totalFacturado - a.totalFacturado).slice(0, 5)}
@@ -187,20 +186,20 @@ export default function DashboardAseguradorasNativo({ globalFilters, globalTrigg
                 <RechartsTooltip formatter={(value) => [formatCurrency(value), 'Facturado']} />
                 <Legend />
               </PieChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
       </div>
 
       {/* Tabla Detallada de Pacientes */}
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="area-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div className="area-panel-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', margin: 0, fontSize: '1.2rem' }}>
-            Listado de Cuentas Recientes {selectedAseguradora && <span style={{ color: '#3B82F6', fontSize: '1rem' }}>(Filtrado)</span>}
+            Listado de Cuentas Recientes {selectedAseguradora && <span className="area-text-info" style={{ color: '#3B82F6', fontSize: '1rem' }}>(Filtrado)</span>}
           </h3>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <select 
+            <select className="area-text-primary"
               value={selectedAseguradora || ''}
               onChange={(e) => setSelectedAseguradora(e.target.value || null)}
               style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid #CBD5E1', outline: 'none', fontFamily: 'var(--font-sans)', color: '#334155', minWidth: '200px' }}
@@ -211,7 +210,7 @@ export default function DashboardAseguradorasNativo({ globalFilters, globalTrigg
               ))}
             </select>
             {selectedAseguradora && (
-              <button 
+              <button className="area-text-muted"
                 onClick={() => setSelectedAseguradora(null)}
                 style={{ background: '#F1F5F9', color: '#64748B', border: 'none', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
               >
@@ -220,10 +219,10 @@ export default function DashboardAseguradorasNativo({ globalFilters, globalTrigg
             )}
           </div>
         </div>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="area-table-scroll" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem', textTransform: 'uppercase' }}>
+              <tr className="area-text-muted" style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '0.85rem', textTransform: 'uppercase' }}>
                 <th style={{ padding: '1rem' }}>No. Cuenta</th>
                 <th style={{ padding: '1rem' }}>Paciente</th>
                 <th style={{ padding: '1rem' }}>Aseguradora</th>
@@ -243,23 +242,23 @@ export default function DashboardAseguradorasNativo({ globalFilters, globalTrigg
                   onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
-                  <td style={{ padding: '1rem', fontWeight: 600, color: '#0f172a' }}>{p.PCNum}</td>
+                  <td className="area-text-primary" style={{ padding: '1rem', fontWeight: 600, color: '#0f172a' }}>{p.PCNum}</td>
                   <td style={{ padding: '1rem' }}>{p.Paciente || 'Desconocido'}</td>
                   <td style={{ padding: '1rem' }}>
-                    <span style={{ 
+                    <span className="area-status-badge area-status-badge--info" style={{
                       background: '#DBEAFE', color: '#1E40AF', 
                       padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600 
                     }}>
                       {p.AseguradoraNombre}
                     </span>
                   </td>
-                  <td style={{ padding: '1rem', color: '#64748b' }}>{formatDate(p.FechaApertura)}</td>
+                  <td className="area-text-muted" style={{ padding: '1rem', color: '#64748b' }}>{formatDate(p.FechaApertura)}</td>
                   <td style={{ padding: '1rem', fontWeight: 600 }}>{formatCurrency(p.Total)}</td>
-                  <td style={{ padding: '1rem', color: p.Balance > 0 ? '#EF4444' : '#10B981', fontWeight: 600 }}>
+                  <td className={p.Balance > 0 ? 'area-text-danger' : 'area-text-positive'} style={{ padding: '1rem', color: p.Balance > 0 ? '#EF4444' : '#10B981', fontWeight: 600 }}>
                     {formatCurrency(p.Balance)}
                   </td>
                   <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <button 
+                    <button className="area-table-action"
                       onClick={(e) => { e.stopPropagation(); fetchAccountDetails(p.PCNum); }}
                       style={{ background: '#E0F2FE', color: '#0369A1', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.75rem' }}
                     >
@@ -270,7 +269,7 @@ export default function DashboardAseguradorasNativo({ globalFilters, globalTrigg
               ))}
               {(selectedAseguradora ? data.listaPacientes.filter(p => p.BPCode === selectedAseguradora) : data.listaPacientes).length === 0 && (
                 <tr>
-                  <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <td className="area-text-muted" colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                     No hay registros en el periodo seleccionado.
                   </td>
                 </tr>

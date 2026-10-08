@@ -1,8 +1,8 @@
+import DashboardMetricCard from './DashboardMetricCard';
+import { userMessage } from '../../utils/userMessages';
 import { useState, useEffect } from 'react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ComposedChart, Line
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, Line } from 'recharts';
+import DashboardChart from './DashboardChart';
 import { API_BASE } from '../../api/config';
 import PremiumLoader from '../shared/PremiumLoader';
 import ExportButton from '../shared/ExportButton';
@@ -32,7 +32,7 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
       if (jsonEfi.ok) {
         setData(jsonEfi.data);
       } else {
-        setError(jsonEfi.error || 'Error al cargar datos');
+        setError(userMessage(jsonEfi.error || 'Error al cargar datos'));
       }
     } catch (err) {
       setError('Error de conexión con el servidor.');
@@ -46,7 +46,7 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
   }
 
   if (error) {
-    return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{error}</div>;
+    return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{userMessage(error)}</div>;
   }
 
   const { tendenciaMensual, kpis } = data;
@@ -57,7 +57,7 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
   };
 
   return (
-    <div id="dashboard-eficiencia" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
+    <div className="dashboard-view" id="dashboard-eficiencia" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
 
       {/* 🧠 Barra Inteligente Eficiencia (Removed as we use GlobalFilterBar) */}
       <div style={{ display: 'none' }}>
@@ -78,7 +78,7 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
 
 
       {/* KPIs Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+      <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <KPICard title="Camas Ocupadas (Promedio)" value={kpis.camasOcupadas} color="#0088C9" icon="🛏️" />
         <KPICard title="Quirófanos Activos" value={kpis.quirofanosActivos} color="#8B5CF6" icon="⚕️" />
         <KPICard title="Total Urgencias (6m)" value={kpis.urgencias} color="#EF4444" icon="🚑" />
@@ -86,13 +86,13 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
       </div>
 
       {/* Gráficas Principales */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="dashboard-chart-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
         {/* Gráfica de Barras: Volumetría */}
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Volumetría de Pacientes (Urgencias vs Piso)</h3>
-          <div style={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer>
+        <div className="dashboard-panel" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Pacientes atendidos por mes</h3>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
+            <DashboardChart>
               <BarChart data={tendenciaMensual} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis dataKey="monthStr" tick={{fill: '#64748B'}} tickLine={false} />
@@ -102,15 +102,15 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
                 <Bar dataKey="Urgencias" name="Urgencias" fill="#EF4444" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Hospitalizacion" name="Hospitalización (Piso)" fill="#F59E0B" radius={[4, 4, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
         {/* Gráfica Composed: ALOS (Tiempo de Estancia) vs Meta */}
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>ALOS: Promedio Estancia Clínica (Horas)</h3>
-          <div style={{ width: '100%', height: 350 }}>
-            <ResponsiveContainer>
+        <div className="dashboard-panel" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Estancia promedio y objetivo (horas)</h3>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
+            <DashboardChart>
               <ComposedChart data={tendenciaMensual} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis dataKey="monthStr" tick={{fill: '#64748B'}} tickLine={false} />
@@ -120,14 +120,14 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
                 <Bar dataKey="EgresoHoras" name="Tiempo Real (hrs)" fill="#0088C9" radius={[4, 4, 0, 0]} />
                 <Line type="monotone" dataKey="EgresoMeta" name="Meta Institucional (hrs)" stroke="#EF4444" strokeWidth={3} strokeDasharray="5 5" dot={false} />
               </ComposedChart>
-            </ResponsiveContainer>
+            </DashboardChart>
           </div>
         </div>
 
       </div>
 
       {/* Gráficas de Tiempos de Respuesta (SLA) */}
-      <h2 style={{ fontSize: '1.25rem', color: '#0D1B2A', marginBottom: '1rem', paddingLeft: '0.5rem', borderLeft: '4px solid #0088C9' }}>Tiempos de Respuesta de Servicios (SLA en Minutos)</h2>
+      <h2 style={{ fontSize: '1.25rem', color: '#0D1B2A', marginBottom: '1rem', paddingLeft: '0.5rem', borderLeft: '4px solid #0088C9' }}>Tiempos de respuesta de los servicios (minutos)</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
         
         <SLACard title="Triaje" data={tendenciaMensual} realKey="TriajeMin" metaKey="TriajeMeta" color="#8B5CF6" />
@@ -140,33 +140,16 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
   );
 }
 
-function KPICard({ title, value, color, icon }) {
-  return (
-    <div style={{
-      background: 'white',
-      padding: '1.25rem',
-      borderRadius: 12,
-      borderLeft: `5px solid ${color}`,
-      boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '1rem'
-    }}>
-      <div style={{ fontSize: '2rem' }}>{icon}</div>
-      <div>
-        <div style={{ color: '#64748B', fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
-        <div style={{ color: '#0D1B2A', fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem' }}>{value}</div>
-      </div>
-    </div>
-  );
+function KPICard(props) {
+  return <DashboardMetricCard {...props} />;
 }
 
 function SLACard({ title, data, realKey, metaKey, color }) {
   return (
-    <div style={{ background: 'white', padding: '1rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0' }}>
+    <div className="dashboard-panel" style={{ background: 'white', padding: '1rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0' }}>
       <h4 style={{ margin: '0 0 1rem 0', color: '#475569', fontSize: '1rem', textAlign: 'center' }}>{title} (Real vs Meta)</h4>
-      <div style={{ width: '100%', height: 200 }}>
-        <ResponsiveContainer>
+      <div className="dashboard-chart-host" style={{ width: '100%', height: 200 }}>
+        <DashboardChart>
           <ComposedChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
             <XAxis dataKey="monthStr" tick={{fill: '#94A3B8', fontSize: 10}} tickLine={false} />
@@ -175,7 +158,7 @@ function SLACard({ title, data, realKey, metaKey, color }) {
             <Line type="monotone" dataKey={realKey} name="Tiempo Real" stroke={color} strokeWidth={3} dot={{r: 4, fill: color, strokeWidth: 2, stroke: '#fff'}} />
             <Line type="monotone" dataKey={metaKey} name="Meta" stroke="#EF4444" strokeWidth={2} strokeDasharray="3 3" dot={false} />
           </ComposedChart>
-        </ResponsiveContainer>
+        </DashboardChart>
       </div>
     </div>
   );

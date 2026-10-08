@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
-} from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
+import DashboardChart from './DashboardChart';
 import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function DashboardUciNativo({ data }) {
@@ -113,7 +111,7 @@ export default function DashboardUciNativo({ data }) {
   const freeBedsCount = totalBeds - occupiedBedsCount;
 
   return (
-    <div style={{ marginTop: '2rem', fontFamily: 'var(--font-body)' }}>
+    <div className="area-native-dashboard dashboard-view" style={{ marginTop: '2rem', fontFamily: 'var(--font-body)' }}>
       <style>{`
         .uci-card-glow {
           box-shadow: 0 4px 6px rgba(0,0,0,0.03);
@@ -169,54 +167,54 @@ export default function DashboardUciNativo({ data }) {
       `}</style>
 
       {/* ── SECCIÓN 1: METRICAS CLAVE ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+      <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         
         {/* KPI: Facturación Total */}
-        <div className="uci-card-glow" style={{ background: 'linear-gradient(135deg, #1E293B, #0F172A)', color: 'white', padding: '1.5rem', borderRadius: '16px', position: 'relative', overflow: 'hidden' }}>
+        <div className="uci-card-glow area-metric-card area-metric-card--highlight dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #1E293B, #0F172A)', color: 'white', padding: '1.5rem', borderRadius: '16px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-15px', bottom: '-15px', opacity: 0.08, fontSize: '6rem' }}>💰</div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94A3B8' }}>Facturación UCI (Acumulada)</div>
-          <div style={{ fontSize: '1.85rem', fontWeight: 800, fontFamily: 'var(--font-mono)', margin: '0.5rem 0' }}>
+          <div className="area-metric-label dashboard-metric-label" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94A3B8' }}>Facturación UCI (Acumulada)</div>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '1.85rem', fontWeight: 800, fontFamily: 'var(--font-mono)', margin: '0.5rem 0' }}>
             {formatCurrency(kpis.totalFacturado || 0)}
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             <span>🏥</span> <span>Cargos a {kpis.totalPacientes || 0} pacientes en el periodo</span>
           </div>
         </div>
 
         {/* KPI: Ocupación */}
-        <div className="uci-card-glow" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
+        <div className="uci-card-glow area-metric-card dashboard-metric-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-10px', bottom: '-15px', opacity: 0.05, fontSize: '6rem' }}>🛏️</div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Ocupación de Camas UCI</div>
-          <div style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: '#EF4444', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+          <div className="area-metric-label dashboard-metric-label" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Ocupación de Camas UCI</div>
+          <div className="area-metric-value area-metric-value--warning dashboard-metric-value" style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: '#EF4444', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
             {kpis.ocupacionPct || 0}%
-            <span style={{ fontSize: '0.9rem', color: '#64748B', fontWeight: 600 }}>({kpis.camasOcupadas}/{kpis.totalCamas} camas)</span>
+            <span className="area-text-muted" style={{ fontSize: '0.9rem', color: '#64748B', fontWeight: 600 }}>({kpis.camasOcupadas}/{kpis.totalCamas} camas)</span>
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <span style={{ height: 8, width: 8, borderRadius: '50%', background: '#10B981', display: 'inline-block' }}></span>
             <span>{freeBedsCount} camas libres en este momento</span>
           </div>
         </div>
 
         {/* KPI: Estancia Promedio */}
-        <div className="uci-card-glow" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
+        <div className="uci-card-glow area-metric-card dashboard-metric-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-10px', bottom: '-15px', opacity: 0.05, fontSize: '6rem' }}>⏱️</div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Estancia Promedio UCI</div>
-          <div style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: '#0F172A' }}>
-            {kpis.estanciaPromedio || 0} <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#64748B' }}>días</span>
+          <div className="area-metric-label dashboard-metric-label" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Estancia Promedio UCI</div>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: '#0F172A' }}>
+            {kpis.estanciaPromedio || 0} <span className="area-text-muted" style={{ fontSize: '1.1rem', fontWeight: 600, color: '#64748B' }}>días</span>
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             <span>⏱️</span> <span>Promedio por paciente egresado de UCI</span>
           </div>
         </div>
 
         {/* KPI: Mortalidad */}
-        <div className="uci-card-glow" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
+        <div className="uci-card-glow area-metric-card dashboard-metric-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-10px', bottom: '-15px', opacity: 0.05, fontSize: '6rem' }}>🩺</div>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Tasa de Mortalidad UCI</div>
-          <div style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: '#0F172A' }}>
+          <div className="area-metric-label dashboard-metric-label" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Tasa de Mortalidad UCI</div>
+          <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.1rem', fontWeight: 800, margin: '0.5rem 0', color: '#0F172A' }}>
             {kpis.tasaMortalidad || 0}%
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.8rem', color: '#64748B', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
             <span>⚠️</span> <span>Egresados fallecidos en Terapia Intensiva</span>
           </div>
         </div>
@@ -224,26 +222,26 @@ export default function DashboardUciNativo({ data }) {
       </div>
 
       {/* ── SECCIÓN 2: CENSO DE CAMAS EN VIVO ── */}
-      <div style={{ background: '#FFFFFF', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+      <div className="area-panel" style={{ background: '#FFFFFF', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '2rem' }}>
+        <div className="area-panel-toolbar" style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontFamily: "var(--font-display)", color: '#0F172A', fontSize: '1.2rem', fontWeight: 800 }}>Censo Clínico en Vivo — Monitor de Terapia</h3>
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
+            <h3 className="area-text-primary" style={{ margin: 0, fontFamily: "var(--font-display)", color: '#0F172A', fontSize: '1.2rem', fontWeight: 800 }}>Censo Clínico en Vivo — Monitor de Terapia</h3>
+            <p className="area-text-muted" style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
               Estado actual de los cubículos de Terapia Intensiva e Intermedia. Haz clic en una cama ocupada para ver el desglose detallado de su cuenta.
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.8rem', fontSize: '0.75rem', fontWeight: 700 }}>
-            <span style={{ padding: '0.35rem 0.75rem', background: '#ECFDF5', color: '#047857', borderRadius: '20px', border: '1px solid rgba(16,185,129,0.2)' }}>
+            <span className="area-text-positive" style={{ padding: '0.35rem 0.75rem', background: '#ECFDF5', color: '#047857', borderRadius: '20px', border: '1px solid rgba(16,185,129,0.2)' }}>
               🟢 DISPONIBLES: {freeBedsCount}
             </span>
-            <span style={{ padding: '0.35rem 0.75rem', background: '#FEF2F2', color: '#B91C1C', borderRadius: '20px', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <span className="area-text-danger" style={{ padding: '0.35rem 0.75rem', background: '#FEF2F2', color: '#B91C1C', borderRadius: '20px', border: '1px solid rgba(239,68,68,0.2)' }}>
               🔴 OCUPADAS: {occupiedBedsCount}
             </span>
           </div>
         </div>
 
         {/* Camas Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+        <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
           {censoCamas.map((bed, idx) => {
             const isOcupada = bed.Estado === 'OCUPADA';
             return (
@@ -273,7 +271,7 @@ export default function DashboardUciNativo({ data }) {
               >
                 {/* Header Camas */}
                 <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ 
+                  <div className="area-text-muted" style={{
                     fontFamily: 'var(--font-display)', 
                     fontSize: '0.8rem', 
                     fontWeight: 750, 
@@ -282,7 +280,7 @@ export default function DashboardUciNativo({ data }) {
                   }}>
                     {bed.RoomCode}
                   </div>
-                  <span style={{
+                  <span className="area-text-adaptive" style={{
                     fontSize: '0.64rem',
                     fontWeight: 800,
                     textTransform: 'uppercase',
@@ -296,7 +294,7 @@ export default function DashboardUciNativo({ data }) {
                   </span>
                 </div>
 
-                <div style={{ 
+                <div className="area-text-primary" style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: '0.98rem', 
                   fontWeight: 800, 
@@ -308,20 +306,20 @@ export default function DashboardUciNativo({ data }) {
 
                 {isOcupada ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid #F1F5F9', paddingTop: '0.6rem', marginTop: '0.2rem' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1E293B' }}>
+                    <div className="area-text-primary" style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1E293B' }}>
                       👤 {bed.Paciente}
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B', display: 'flex', gap: '0.25rem' }}>
+                    <div className="area-text-muted" style={{ fontSize: '0.78rem', color: '#64748B', display: 'flex', gap: '0.25rem' }}>
                       <span style={{ fontWeight: 600 }}>Folio:</span> 
                       <span style={{ fontFamily: 'var(--font-mono)' }}>{bed.PCNum}</span>
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                    <div className="area-text-muted" style={{ fontSize: '0.78rem', color: '#64748B' }}>
                       🩺 <span style={{ fontWeight: 600 }}>Médico:</span> {bed.Medico || 'No especificado'}
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                    <div className="area-text-muted" style={{ fontSize: '0.78rem', color: '#64748B' }}>
                       📅 <span style={{ fontWeight: 600 }}>Ingreso:</span> {formatDateStr(bed.FechaIngreso)}
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                    <div className="area-text-muted" style={{ fontSize: '0.78rem', color: '#64748B' }}>
                       ⏳ <span style={{ fontWeight: 600 }}>Estancia:</span> {getDaysBetween(bed.FechaIngreso)}
                     </div>
                     
@@ -336,13 +334,13 @@ export default function DashboardUciNativo({ data }) {
                       alignItems: 'center',
                       border: '1.5px dashed rgba(5, 150, 105, 0.2)'
                     }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cargos UCI</span>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
+                      <span className="area-text-positive" style={{ fontSize: '0.74rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cargos UCI</span>
+                      <span className="area-text-positive" style={{ fontSize: '0.9rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
                         {formatCurrency(bed.totalCargos)}
                       </span>
                     </div>
                     
-                    <div style={{ 
+                    <div className="area-text-positive" style={{
                       fontSize: '0.68rem', 
                       color: '#059669', 
                       textAlign: 'center', 
@@ -354,7 +352,7 @@ export default function DashboardUciNativo({ data }) {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ 
+                  <div className="area-text-muted" style={{
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center', 
@@ -366,7 +364,7 @@ export default function DashboardUciNativo({ data }) {
                     marginTop: '0.2rem'
                   }}>
                     <span style={{ fontSize: '1.5rem' }}>🛌</span>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8' }}>Cama disponible</span>
+                    <span className="area-text-muted" style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8' }}>Cama disponible</span>
                   </div>
                 )}
               </div>
@@ -376,14 +374,14 @@ export default function DashboardUciNativo({ data }) {
       </div>
 
       {/* ── SECCIÓN 3: GRAFICAS ANALÍTICAS ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="area-chart-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '2rem' }}>
         
         {/* Gráfica 1: Distribución Financiera */}
-        <div style={{ flex: '1 1 400px', background: 'white', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.1rem', fontWeight: 800 }}>Distribución de Cargos en UCI</h3>
-          <div style={{ width: '100%', height: 320, display: 'flex', flexDirection: 'column', justifycontent: 'center' }}>
+        <div className="area-panel dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+          <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.1rem', fontWeight: 800 }}>Distribución de Cargos en UCI</h3>
+          <div className="dashboard-chart-host" style={{ width: '100%', height: 320, display: 'flex', flexDirection: 'column', justifycontent: 'center' }}>
             {ingresosPorGrupo && ingresosPorGrupo.length > 0 ? (
-              <ResponsiveContainer width="100%" height={260}>
+              <DashboardChart width="100%" height={260}>
                 <PieChart>
                   <Pie
                     data={ingresosPorGrupo}
@@ -408,19 +406,19 @@ export default function DashboardUciNativo({ data }) {
                     wrapperStyle={{ fontSize: '0.72rem', paddingTop: '10px' }}
                   />
                 </PieChart>
-              </ResponsiveContainer>
+              </DashboardChart>
             ) : (
-              <div style={{ textAlign: 'center', color: '#64748B', fontSize: '0.85rem' }}>No hay cargos registrados en este periodo</div>
+              <div className="area-text-muted" style={{ textAlign: 'center', color: '#64748B', fontSize: '0.85rem' }}>No hay cargos registrados en este periodo</div>
             )}
           </div>
         </div>
 
         {/* Gráfica 2: Top Insumos y Medicamentos */}
-        <div style={{ flex: '1 1 400px', background: 'white', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.1rem', fontWeight: 800 }}>Top 10 Insumos y Medicamentos de Mayor Costo</h3>
-          <div style={{ width: '100%', height: 320 }}>
+        <div className="area-panel dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+          <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.1rem', fontWeight: 800 }}>Top 10 Insumos y Medicamentos de Mayor Costo</h3>
+          <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ width: '100%', height: 320 }}>
             {topInsumos && topInsumos.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <DashboardChart width="100%" height="100%">
                 <BarChart
                   layout="vertical"
                   data={topInsumos}
@@ -452,21 +450,21 @@ export default function DashboardUciNativo({ data }) {
                   />
                   <Bar dataKey="total" fill="#059669" radius={[0, 4, 4, 0]} barSize={16} />
                 </BarChart>
-              </ResponsiveContainer>
+              </DashboardChart>
             ) : (
-              <div style={{ textAlign: 'center', padding: '5rem 0', color: '#64748B', fontSize: '0.85rem' }}>No hay consumos de insumos registrados</div>
+              <div className="area-text-muted" style={{ textAlign: 'center', padding: '5rem 0', color: '#64748B', fontSize: '0.85rem' }}>No hay consumos de insumos registrados</div>
             )}
-          </div>
+          </div></div>
         </div>
 
       </div>
 
       {/* ── SECCIÓN 4: DETALLE HISTÓRICO DE PACIENTES ── */}
-      <div style={{ background: 'white', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-        <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="area-panel" style={{ background: 'white', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+        <div className="area-panel-toolbar" style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h3 style={{ margin: 0, fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.15rem', fontWeight: 800 }}>Historial Clínico y Facturación de Pacientes UCI</h3>
-            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: '#64748B' }}>
+            <h3 className="area-text-primary" style={{ margin: 0, fontFamily: 'var(--font-display)', color: '#0F172A', fontSize: '1.15rem', fontWeight: 800 }}>Historial Clínico y Facturación de Pacientes UCI</h3>
+            <p className="area-text-muted" style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem', color: '#64748B' }}>
               Muestra todas las cuentas de pacientes que recibieron atención en la UCI durante el periodo seleccionado. Haz clic en el monto de cargos para ver el desglose de su cuenta.
             </p>
           </div>
@@ -501,13 +499,13 @@ export default function DashboardUciNativo({ data }) {
                 cursor: 'pointer'
               }}
             >
-              <option value="">Todos los Estatus</option>
+              <option value="">Todos los estados</option>
               <option value="ACTIVO">Activos (En Terapia)</option>
               <option value="ALTA">Egresados (Alta)</option>
             </select>
 
             {(searchQuery || selectedStatus) && (
-              <button
+              <button className="area-text-danger"
                 onClick={() => { setSearchQuery(''); setSelectedStatus(null); }}
                 style={{
                   background: '#F1F5F9',
@@ -523,14 +521,14 @@ export default function DashboardUciNativo({ data }) {
                 Limpiar Filtros
               </button>
             )}
-            <span style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
+            <span className="area-text-muted" style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: 600 }}>
               {filteredPatients.length} pacientes
             </span>
           </div>
         </div>
 
         {/* Tabla */}
-        <div style={{ overflowX: 'auto' }}>
+        <div className="area-table-scroll" style={{ overflowX: 'auto' }}>
           {filteredPatients.length > 0 ? (
             <table className="patients-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
@@ -551,19 +549,19 @@ export default function DashboardUciNativo({ data }) {
                   const isActivo = p.status === 'OP';
                   return (
                     <tr key={idx}>
-                      <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#0F172A' }}>
+                      <td className="area-text-primary" style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#0F172A' }}>
                         {p.folio}
                       </td>
                       <td style={{ fontWeight: 600, fontSize: '0.85rem' }}>
                         {p.paciente}
                       </td>
-                      <td style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                      <td className="area-text-muted" style={{ fontSize: '0.8rem', color: '#64748B' }}>
                         {p.room ? p.room.replace('TERAPIA INTENSIVA', 'Terap. Intensiva').replace('CUBICULO', 'Cubículo') : 'UCI / Terapia'}
                       </td>
-                      <td style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                      <td className="area-text-muted" style={{ fontSize: '0.8rem', color: '#64748B' }}>
                         {formatDateStr(p.entrydate)}
                       </td>
-                      <td style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                      <td className="area-text-muted" style={{ fontSize: '0.8rem', color: '#64748B' }}>
                         {p.medicaldischargedate ? formatDateStr(p.medicaldischargedate) : '—'}
                       </td>
                       <td style={{ fontSize: '0.8rem', fontWeight: 600 }}>
@@ -572,7 +570,7 @@ export default function DashboardUciNativo({ data }) {
                       <td style={{ fontSize: '0.8rem' }}>
                         {p.medico || 'No especificado'}
                       </td>
-                      <td 
+                      <td className="area-text-positive"
                         onClick={() => setSelectedPatientDetail({
                           folio: p.folio,
                           paciente: p.paciente,
@@ -594,7 +592,7 @@ export default function DashboardUciNativo({ data }) {
                         {formatCurrency(p.total_cargos_uci)}
                       </td>
                       <td>
-                        <span style={{
+                        <span className="area-text-adaptive" style={{
                           fontSize: '0.72rem',
                           fontWeight: 750,
                           padding: '0.2rem 0.55rem',
@@ -614,7 +612,7 @@ export default function DashboardUciNativo({ data }) {
               </tbody>
             </table>
           ) : (
-            <div style={{ textAlign: 'center', padding: '3.5rem 0', color: '#94A3B8', fontSize: '0.85rem' }}>
+            <div className="area-text-muted" style={{ textAlign: 'center', padding: '3.5rem 0', color: '#94A3B8', fontSize: '0.85rem' }}>
               No se encontraron registros de pacientes que coincidan con la búsqueda.
             </div>
           )}
@@ -660,13 +658,13 @@ export default function DashboardUciNativo({ data }) {
               background: 'linear-gradient(135deg, #FFF, #F8FAFC)'
             }}>
               <div>
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>
+                <span className="area-text-muted" style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>
                   Desglose de Cuenta Hospitalaria — {selectedPatientDetail.room ? selectedPatientDetail.room.replace('CUBICULO', 'Cubículo') : 'UCI / Terapia'}
                 </span>
-                <h2 style={{ margin: '0.2rem 0 0 0', fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#0F172A' }}>
+                <h2 className="area-text-primary" style={{ margin: '0.2rem 0 0 0', fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#0F172A' }}>
                   {selectedPatientDetail.paciente}
                 </h2>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.78rem', color: '#64748B' }}>
+                <div className="area-text-muted" style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.78rem', color: '#64748B' }}>
                   <span>Cuenta: <strong style={{ fontFamily: 'var(--font-mono)' }}>{selectedPatientDetail.folio}</strong></span>
                   {selectedPatientDetail.entrydate && (
                     <span>Ingreso: <strong>{formatDateStr(selectedPatientDetail.entrydate)}</strong></span>
@@ -676,8 +674,8 @@ export default function DashboardUciNativo({ data }) {
               
               {/* Right side: Amount highlighted */}
               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94A3B8' }}>Total Cargado</span>
-                <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
+                <span className="area-text-muted" style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94A3B8' }}>Total Cargado</span>
+                <div className="area-text-positive" style={{ fontSize: '1.6rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
                   {formatCurrency(selectedPatientDetail.total)}
                 </div>
               </div>
@@ -727,7 +725,7 @@ export default function DashboardUciNativo({ data }) {
                 ))}
               </select>
               
-              <span style={{ fontSize: '0.78rem', color: '#64748B', marginLeft: 'auto', fontWeight: 600 }}>
+              <span className="area-text-muted" style={{ fontSize: '0.78rem', color: '#64748B', marginLeft: 'auto', fontWeight: 600 }}>
                 {filteredDetailItems.length} cargos mostrados
               </span>
             </div>
@@ -744,7 +742,7 @@ export default function DashboardUciNativo({ data }) {
                     borderRadius: '50%',
                     animation: 'spin 1s linear infinite'
                   }}></div>
-                  <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>Cargando estado de cuenta...</span>
+                  <span className="area-text-muted" style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600 }}>Cargando estado de cuenta...</span>
                 </div>
               ) : filteredDetailItems.length > 0 ? (
                 <table className="patients-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
@@ -762,19 +760,19 @@ export default function DashboardUciNativo({ data }) {
                   <tbody>
                     {filteredDetailItems.map((item, idx) => (
                       <tr key={idx}>
-                        <td style={{ color: '#64748B', fontSize: '0.76rem', whiteSpace: 'nowrap' }}>{formatDateStr(item.fecha)}</td>
-                        <td style={{ color: '#64748B', fontSize: '0.76rem' }}>{item.grupo}</td>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: '#64748B' }}>{item.codigo}</td>
-                        <td style={{ fontWeight: 600, color: '#0F172A' }}>{item.insumo}</td>
+                        <td className="area-text-muted" style={{ color: '#64748B', fontSize: '0.76rem', whiteSpace: 'nowrap' }}>{formatDateStr(item.fecha)}</td>
+                        <td className="area-text-muted" style={{ color: '#64748B', fontSize: '0.76rem' }}>{item.grupo}</td>
+                        <td className="area-text-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: '#64748B' }}>{item.codigo}</td>
+                        <td className="area-text-primary" style={{ fontWeight: 600, color: '#0F172A' }}>{item.insumo}</td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{item.cantidad}</td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatCurrency(item.precio_unitario)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#0F172A' }}>{formatCurrency(item.total_cobrado)}</td>
+                        <td className="area-text-primary" style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#0F172A' }}>{formatCurrency(item.total_cobrado)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <div style={{ textAlign: 'center', padding: '5rem 0', color: '#94A3B8', fontSize: '0.85rem' }}>
+                <div className="area-text-muted" style={{ textAlign: 'center', padding: '5rem 0', color: '#94A3B8', fontSize: '0.85rem' }}>
                   No se encontraron cargos para esta cuenta.
                 </div>
               )}

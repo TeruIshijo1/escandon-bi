@@ -64,7 +64,7 @@ export default function ConsultaExternaPage() {
     try {
       await cexService.syncAgenda();
       await fetchAgenda();
-      showToast("Agenda sincronizada con VERTICAL");
+      showToast("Agenda actualizada");
     } catch (error) {
       console.error("Error syncing agenda:", error);
       setLoading(false);
@@ -605,7 +605,7 @@ export default function ConsultaExternaPage() {
             }} 
             onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.2)'} 
             onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'}
-          >🔄 Sincronizar VERTICAL</button>
+          >🔄 Actualizar agenda</button>
           
           <ExportButton
             type="excel"

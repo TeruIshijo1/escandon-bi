@@ -1,3 +1,4 @@
+import { userMessage } from '../../utils/userMessages';
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
@@ -59,11 +60,11 @@ export default function TrasladosAlmacen() {
       if (response.ok && json.ok) {
         setTraslados(json.data);
       } else {
-        throw new Error(json.error || 'Error al cargar traslados');
+        throw new Error(userMessage(json.error || 'Error al cargar traslados'));
       }
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      setError(userMessage(err.message));
     } finally {
       setLoading(false);
     }
@@ -163,7 +164,7 @@ export default function TrasladosAlmacen() {
           {loading ? (
             <div style={{ padding: '4rem', textAlign: 'center', color: '#64748b' }}>Cargando solicitudes desde SAP...</div>
           ) : error ? (
-            <div style={{ padding: '4rem', textAlign: 'center', color: '#ef4444' }}>{error}</div>
+            <div style={{ padding: '4rem', textAlign: 'center', color: '#ef4444' }}>{userMessage(error)}</div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead style={{ background: '#f8fafc' }}>
@@ -172,7 +173,7 @@ export default function TrasladosAlmacen() {
                   <th style={{ padding: '1rem 1.5rem', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Fecha</th>
                   <th style={{ padding: '1rem 1.5rem', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Origen</th>
                   <th style={{ padding: '1rem 1.5rem', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Destino</th>
-                  <th style={{ padding: '1rem 1.5rem', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Estatus</th>
+                  <th style={{ padding: '1rem 1.5rem', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Estado</th>
                   <th style={{ padding: '1rem 1.5rem', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>Acciones</th>
                 </tr>
               </thead>
@@ -244,7 +245,7 @@ export default function TrasladosAlmacen() {
                   {selectedTraslado.DocEntry && <span style={{ color: '#059669', fontSize: '0.85rem', fontWeight: '500', marginTop: '0.2rem' }}>✓ Subido a SAP</span>}
                 </div>
                 <div style={{ textAlign: 'right', color: '#475569', fontSize: '0.85rem', lineHeight: '1.4' }}>
-                  <div><strong>ID SAP:</strong> {selectedTraslado.DocEntry}</div>
+                  <div><strong>Número del traslado en SAP:</strong> {selectedTraslado.DocEntry}</div>
                   <div><strong>Fecha de Creación:</strong> {formatDate(selectedTraslado.DocDate)}</div>
                   <div><strong>Fecha de Vencimiento:</strong> {formatDate(selectedTraslado.DueDate)}</div>
                 </div>
@@ -254,11 +255,11 @@ export default function TrasladosAlmacen() {
                 <div style={{ lineHeight: '1.5' }}>
                   <div><strong>Almacén Origen:</strong> {selectedTraslado.FromWarehouse}</div>
                   <div><strong>Almacén Destino:</strong> {selectedTraslado.ToWarehouse}</div>
-                  <div style={{ marginTop: '0.5rem' }}><strong>Estatus en SAP:</strong> {selectedTraslado.DocumentStatus === 'bost_Open' ? 'Abierto' : 'Cerrado'}</div>
+                  <div style={{ marginTop: '0.5rem' }}><strong>Estado en SAP:</strong> {selectedTraslado.DocumentStatus === 'bost_Open' ? 'Abierto' : 'Cerrado'}</div>
                   <div><strong>Comentarios:</strong> {selectedTraslado.Comments || 'N/A'}</div>
                 </div>
                 <div style={{ lineHeight: '1.5' }}>
-                  <div><strong>ID Solicitante:</strong> {selectedTraslado.Requester || '-'}</div>
+                  <div><strong>Número del solicitante:</strong> {selectedTraslado.Requester || '-'}</div>
                   <div><strong>Nombre Solicitante:</strong> {selectedTraslado.RequesterName || '-'}</div>
                 </div>
               </div>

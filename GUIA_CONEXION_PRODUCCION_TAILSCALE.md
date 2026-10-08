@@ -1,110 +1,58 @@
-# 🔒 Guía de Conexión a Base de Datos en Producción (Tailscale Mesh VPN)
+# Conexión de producción mediante Tailscale
 
-Esta guía detalla la arquitectura de red y los pasos exactos para configurar y desplegar la conexión segura entre el **Servidor de Producción (Backend Bitácora HES)** y el **Servidor Central de Base de Datos SQL Server (`KH_HE` en AWS)**.
+Actualizado el 2 de octubre de 2026 para Hospital Escandón BI: backend Node.js/Express, frontend React y persistencia local PostgreSQL.
 
----
+## Conexiones utilizadas
 
-## 📌 1. Arquitectura de Red Segura
-
-El sistema opera mediante una **Red Mesh Privada Cifrada con Tailscale (WireGuard)** para garantizar máxima seguridad y estabilidad en las conexiones:
+El backend consulta SQL Server de Vertical por la red privada de Tailscale. La conexión configurada es `100.121.115.8:1433`, base `KH_HE`. SAP utiliza su Service Layer por separado. PostgreSQL guarda la configuración y el histórico de BI.
 
 ```mermaid
-graph LR
-    subgraph Servidor Produccion [🖥️ Servidor Web / Producción HES]
-        App[Backend FastAPI / Python] -->|TDS Protocol| TailscaleProd[Tailscale Client]
-    end
-
-    subgraph Tailscale Network [🌐 Red Privada Segura - WireGuard 256-bit]
-        TailscaleProd <===>|Túnel Directo Punto a Punto| TailscaleAWS[Tailscale Node]
-    end
-
-    subgraph AWS EC2 [☁️ Servidor Base de Datos AWS]
-        TailscaleAWS -->|100.121.115.8:1433| SQLServer[(🏥 SQL Server KH_HE)]
-    end
+flowchart LR
+    Navegador -->|HTTP 5173| BI[Hospital Escandón BI · Node.js]
+    BI --> PG[(PostgreSQL de BI)]
+    BI -->|Service Layer HTTPS| SAP[SAP Business One]
+    BI -->|Tailscale · TCP 1433| Vertical[(SQL Server · KH_HE)]
 ```
 
-### 💎 Beneficios en Producción:
-* **IP Fija Permanente:** El servidor SQL Server siempre responde en `100.121.115.8:1433`.
-* **Cero Puertos Públicos Expuestos:** No requiere abrir puertos hacia internet en AWS ni en routers.
-* **Cifrado Extremo a Extremo:** Cumplimiento con estándares de protección de datos clínicos y normativas de salud.
-* **Operación 24/7 Desatendida:** El servicio se ejecuta a nivel de sistema operativo y se recupera automáticamente tras cualquier reinicio.
+## Preparar el servidor
 
----
+1. Instala Tailscale desde [su sitio oficial](https://tailscale.com/download/windows) e inicia sesión con la cuenta autorizada por Sistemas para la red del hospital.
+2. Comprueba que el servidor está conectado a esa red y que sus permisos permiten llegar al SQL Server. Mantén su conexión disponible tras reiniciar Windows según la configuración aprobada por Sistemas.
+3. Conserva las credenciales existentes en `backend/.env`. El pase sólo incluye `.env.example`; los ejemplos siguientes no contienen claves utilizables.
 
-## 🚀 2. Configuración en el Servidor de Producción
-
-Cuando despliegues el backend en el servidor de producción (sea Windows Server o Linux):
-
-### Caso A: Si Producción corre en Windows Server
-1. Descarga e instala Tailscale desde: [tailscale.com/download/windows](https://tailscale.com/download/windows).
-2. Abre PowerShell como Administrador y ejecuta:
-   ```powershell
-   & "C:\Program Files\Tailscale\tailscale.exe" up --unattended
-   ```
-3. Inicia sesión con la cuenta de sistemas: **`sistem01.he@gmail.com`**.
-4. Haz clic en **Connect** en la ventana del navegador.
-
-### Caso B: Si Producción corre en Linux (Ubuntu / Debian / Docker)
-1. Instala el repositorio y cliente oficial:
-   ```bash
-   curl -fsSL https://tailscale.com/install.sh | sh
-   ```
-2. Levanta el servicio en segundo plano autenticándolo en la red:
-   ```bash
-   sudo tailscale up --ssh --accept-routes
-   ```
-3. Autentica con la cuenta **`sistem01.he@gmail.com`**.
-
----
-
-## ⚙️ 3. Variables de Entorno en Producción (`.env`)
-
-En el archivo `.env` del backend en producción, configura las siguientes variables:
+El código actual utiliza estas variables:
 
 ```env
-# Conexión Directa a SQL Server (KH_HE) vía Tailscale
-KH_SERVER=100.121.115.8,1433
-KH_DATABASE=KH_HE
-KH_USERNAME=escandon_bi_user
-KH_PASSWORD=Bi_Escandon_2026!#
+REMOTE_DB_SERVER=100.121.115.8
+REMOTE_DB_PORT=1433
+REMOTE_DB_NAME=KH_HE
+REMOTE_DB_USER=USUARIO_AUTORIZADO
+REMOTE_DB_PASS=CLAVE_CONFIGURADA_EN_EL_SERVIDOR
 
-# Base de datos PostgreSQL Principal
-DATABASE_URL=postgresql://usuario_prod:password_prod@localhost:5432/hospital_escandon_db
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=escandon_bi
+PGUSER=USUARIO_POSTGRESQL
+PGPASSWORD=CLAVE_POSTGRESQL_DEL_SERVIDOR
+
+NODE_ENV=production
+PORT=5173
 ```
 
----
+Para esta plataforma se usan `REMOTE_DB_*` y `PG*`. Los nombres antiguos `KH_*` y `DATABASE_URL` no configuran esas conexiones. La conexión SAP y sus credenciales deben conservarse como están en el servidor.
 
-## 🧪 4. Verificación de la Conexión en Producción
+## Verificar la conexión
 
-Para comprobar que el servidor de producción tiene visibilidad inmediata con SQL Server:
+Desde PowerShell en el servidor:
 
-### Prueba de Red TCP:
-* **En Windows (PowerShell):**
-  ```powershell
-  Test-NetConnection -ComputerName 100.121.115.8 -Port 1433
-  ```
-  *Debe retornar: `TcpTestSucceeded : True`.*
-
-* **En Linux (Bash):**
-  ```bash
-  nc -zv 100.121.115.8 1433
-  ```
-  *Debe retornar: `Connection to 100.121.115.8 1433 port [tcp/ms-sql-s] succeeded!`.*
-
-### Prueba Rápida con Python:
-Ejecuta desde la raíz del backend:
-```bash
-python -c "import sys, os; sys.path.append('.'); from kh_database import get_kh_connection, fetch_camas; conn = get_kh_connection(); print('SQL Server Conectado:', conn is not None); print('Camas detectadas:', len(fetch_camas())); conn.close() if conn else None;"
+```powershell
+Test-NetConnection -ComputerName 100.121.115.8 -Port 1433
 ```
 
----
+`TcpTestSucceeded` debe ser `True`. Esta comprobación confirma acceso de red; la autenticación y los permisos de lectura se comprueban después al abrir un tablero o reporte autorizado.
 
-## 🛠️ 5. Mantenimiento y Troubleshooting
+Inicia la plataforma con `iniciar_produccion.bat` y abre `http://localhost:5173/health`. Debe mostrar `status: ok`, `db: ok` y `environment: production`. El dato `db` comprueba PostgreSQL local; no representa por sí solo el estado de SAP ni Vertical.
 
-| Síntoma | Causa Probable | Solución |
-| :--- | :--- | :--- |
-| **`Timeout al conectar`** | El nodo de Tailscale en AWS se detuvo o no está en modo desatendido. | En el servidor AWS, verificar que Tailscale esté en `Connected` y con `Run unattended` activo. |
-| **`Driver ODBC no encontrado`** | El servidor no tiene el driver de SQL Server instalado. | Instalar `ODBC Driver 18 for SQL Server` o `ODBC Driver 17 for SQL Server` de Microsoft. |
-| **`Nodo Offline en Tailscale`** | El servicio de Tailscale se pausó al cerrar la sesión de usuario. | Ejecutar `tailscale up --unattended` en el servidor correspondiente. |
-| **`Error 0x80072f0d al instalar en Windows Server`** | El instalador web falla por certificados de Windows Server. | Usar el instalador MSI sin conexión: `https://pkgs.tailscale.com/stable/tailscale-setup-1.102.3-amd64.msi`. |
-| **`x509: certificate signed by unknown authority (Grandstream / Firewall)`** | El firewall/router del hospital hace inspección SSL profunda. | En Grandstream: **Firewall -> Proxy SSL -> Lista de exención**, agregar la IP del servidor o los dominios `*.tailscale.com`. |
+Si falla el acceso remoto, revisa la conexión Tailscale, las reglas de acceso entre equipos, TCP 1433 y los permisos del usuario SQL Server. Las credenciales se revisan en el servidor; no deben copiarse al paquete de actualización ni a este documento.
+
+Consulta [README_PRODUCCION.md](README_PRODUCCION.md) para aplicar el pase completo y conservar los datos existentes.

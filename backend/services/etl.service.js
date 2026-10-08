@@ -783,7 +783,7 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
       let caducidad = row.Caducidad;
 
       if (!lote || !caducidad) {
-        // Si no hay lote en Cirrus, buscar el lote más antiguo (FIFO) de este ItemCode en SAP
+        // Si no hay lote en Vertical, buscar el lote más antiguo (FIFO) de este ItemCode en SAP
         // O si hay lote pero no hay caducidad, buscar esa caducidad.
         const itemBatches = sapBatches.filter(b => b.ItemCode === row.Codigo);
         

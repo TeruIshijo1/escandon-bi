@@ -41,12 +41,12 @@ router.post('/login', async (req, res, next) => {
 
     if (!user) {
       // Mensaje específico solicitado por el cliente
-      return res.status(401).json({ message: 'el usuario no existe, si hay un error comunicarse al departamento de TI' });
+      return res.status(401).json({ message: 'El usuario o la contraseña son incorrectos. Revisa tus datos e intenta de nuevo.' });
     }
 
     const passwordOk = await bcrypt.compare(password, user.PasswordHash);
     if (!passwordOk) {
-      return res.status(401).json({ message: 'Credenciales incorrectas' });
+      return res.status(401).json({ message: 'El usuario o la contraseña son incorrectos. Revisa tus datos e intenta de nuevo.' });
     }
 
     // Registrar último acceso

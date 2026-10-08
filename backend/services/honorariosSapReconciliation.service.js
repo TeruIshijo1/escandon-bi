@@ -490,4 +490,4 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
   };
 }
 
-module.exports = { reconcileHonorariosWithSap };
+module.exports = { reconcileHonorariosWithSap, fetchAllPagesStrict, normalizeProviderName, configuredWithholding, optionalSapBoolean };
