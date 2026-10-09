@@ -16,6 +16,7 @@ const argumentsMap = Object.fromEntries(process.argv.slice(2).reduce((pairs, val
 }, []));
 const source = path.resolve(argumentsMap.source || path.join(repository, 'docs/Mapa_Instructivo_Plataforma_y_Origen_Datos.md'));
 const output = path.resolve(argumentsMap.output || path.join(repository, 'tmp/pdfs/mapa-2026-10-09/updated-map.pdf'));
+if (path.extname(output).toLowerCase() !== '.pdf') throw new Error('La salida debe tener extensión .pdf.');
 const config = path.resolve(argumentsMap.config || path.join(here, 'config.json'));
 const outputDirectory = path.dirname(output);
 
@@ -61,13 +62,22 @@ for (const candidate of pythonCandidates) {
   if (candidate === 'python' || await exists(candidate)) { python = candidate; break; }
 }
 const result = spawnSync(python, [path.join(here, 'build.py'), '--tokens', tokenFile, '--output', output, '--config', config],
-  { cwd: repository, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, windowsHide: true });
+  { cwd: repository, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    maxBuffer: 10 * 1024 * 1024, windowsHide: true });
 if (result.stdout) process.stdout.write(result.stdout);
 if (result.stderr) process.stderr.write(result.stderr);
 if (result.error) throw result.error;
-if (result.status !== 0) process.exit(result.status || 1);
 const currentHash = crypto.createHash('sha256').update(await fs.readFile(source, 'utf8')).digest('hex');
-if (currentHash !== sourceHash) {
+const sourceUnchanged = currentHash === sourceHash;
+const qaFile = output.replace(/\.pdf$/i, '.qa.json');
+if (await exists(qaFile)) {
+  const qa = JSON.parse(await fs.readFile(qaFile, 'utf8'));
+  qa.currentSourceHashAtCompletion = currentHash;
+  qa.sourceUnchangedAtCompletion = sourceUnchanged && qa.sourceHash === sourceHash;
+  await fs.writeFile(qaFile, JSON.stringify(qa, null, 2), 'utf8');
+}
+if (result.status !== 0) process.exit(result.status || 1);
+if (!sourceUnchanged) {
   process.stderr.write('El Markdown cambió durante la exportación. Vuelve a ejecutar el generador antes de entregar el PDF.\n');
   process.exit(2);
 }

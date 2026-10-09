@@ -29,9 +29,9 @@ Se corrigió el filtro del empaquetador para excluir `tmp` y `temp` a cualquier 
 
 Validación de esta revisión:
 
-- **174 pruebas de backend aprobadas en 9 suites**, sobre referencias iniciales, runtime, instancia, conflicto de puerto, salud, revisión SAP y preparación/ejecución de reapertura. Las operaciones de cuentas utilizan adaptadores simulados y respaldos temporales. Evidencia: `tmp/pase-readiness-backend-tests-20261009.log`.
-- **8 pruebas de empaquetado aprobadas**, incluida la exclusión de temporales y la conservación de configuración e históricos existentes. Evidencia: `tmp/pase-readiness-package-tests-20261009.log`.
-- **Integración de navegador de reapertura aprobada**, con los permisos vigentes y comprobación del RBAC real, confirmación, caducidad, conflictos, resultado incierto y recuperación por consulta, móvil y tema oscuro. Todas sus API utilizan datos ficticios. Evidencia: `tmp/pase-readiness-reapertura-browser-20261009.log` y `tmp/account-review/`.
+- **174 pruebas de backend aprobadas en 9 suites**, sobre referencias iniciales, runtime, instancia, conflicto de puerto, salud, revisión SAP y preparación/ejecución de reapertura. Las operaciones de cuentas utilizan adaptadores simulados y respaldos temporales. Evidencia: `outputs/pase-readiness-2026-10-09/backend-tests.log`.
+- **8 pruebas de empaquetado aprobadas**, incluida la exclusión de temporales y la conservación de configuración e históricos existentes. Evidencia: `outputs/pase-readiness-2026-10-09/package-tests.log`.
+- **Integración de navegador de reapertura aprobada**, con los permisos vigentes y comprobación del RBAC real, confirmación, caducidad, conflictos, resultado incierto y recuperación por consulta, móvil y tema oscuro. Todas sus API utilizan datos ficticios. Evidencia: `outputs/pase-readiness-2026-10-09/reapertura-browser.log` y `tmp/account-review/`.
 
 La entrega se prepara con `build_deploy.ps1` y se comprueba mediante los dos verificadores indicados arriba, incluido el contraste `--source`. La instalación requiere npm en el servidor y las conexiones y permisos de base correspondientes. La cuenta de Windows que ejecuta la reapertura debe poder guardar y verificar el respaldo en la carpeta configurada. Un `/health` correcto no acredita por sí solo SAP, Vertical, SITI ni todas las funciones de DW o ML.
 

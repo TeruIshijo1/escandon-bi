@@ -39,6 +39,8 @@ function createPlan() {
   }
   for (const directory of ['frontend/dist', 'frontend/public', 'docs', 'database']) {
     for (const source of relativeFiles(directory, true)) {
+      // The platform map is internal maintenance documentation, not a production deliverable.
+      if (source === 'docs/Mapa_Plataforma_Hospital_Escandon_BI.pdf') continue;
       if (directory === 'database' && !/\.sql$/i.test(source)) continue;
       add(source);
     }

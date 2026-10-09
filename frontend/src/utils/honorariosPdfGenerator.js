@@ -8,6 +8,7 @@ import { formatHonorariosPdfText } from './honorariosPdfText';
 
 const PDF_MARGIN = 13;
 const PDF_CONTENT_BOTTOM_GAP = 14;
+const HONORARIOS_DECLARATION = 'Manifiesto mi conformidad con esta liquidación de honorarios por los servicios profesionales que le presté, sin sujeción a un horario, a FUNDACIÓN MARÍA ANA MIER DE ESCANDÓN, I.A.P. en el libre ejercicio de mi profesión de médico; en el mes arriba mencionado y para que estos me sean pagados, contra la firma de este documento,entrego Comprobante Fiscal Digital Por Internet, expedido por el suscrito, por lo que no me adeuda cantidad alguna por concepto de honorarios y reitero además que la relación que me une con dicha Fundación es de naturaleza civil por virtud del contrato de prestación de servicios profesionales que tenemos celebrado, reiterando que la única relación existente es la antes mencionada y por ende, no existe ninguna otra, ni de naturaleza laboral, ni de ninguna otra. Así mismo, con el pago que se me haga de estos honorarios se encuentra pagada cualquier cantidad adeudada por la Fundación, por lo que no me reservo derecho ni acción algunos que ejercitar en contra de esa Fundación, ni en el presente ni en el futuro, por ninguna vía; otorgándoles por este medio el finiquito más amplio que en derecho proceda.';
 
 /**
  * Formatea un número como moneda mexicana MXN ($ 1,234.56)
@@ -401,13 +402,30 @@ function renderFinalSignature(doc, doctorData, periodInfo, startAtY) {
   const pageHeight = doc.internal.pageSize.getHeight();
   const contentWidth = pageWidth - margin * 2;
   const contentBottom = pageHeight - PDF_CONTENT_BOTTOM_GAP;
-  let currentY = Number.isFinite(startAtY) ? startAtY + 3 : contentBottom;
+  const paragraphWidth = contentWidth;
+  const paragraphLineHeight = 3.6;
+  const paragraphGap = 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const declaration = formatHonorariosPdfText(HONORARIOS_DECLARATION).replace(/\s+/g, ' ').trim();
+  const declarationLines = doc.splitTextToSize(declaration, paragraphWidth);
+  const signatureHeight = 24;
+  const requiredHeight = declarationLines.length * paragraphLineHeight + paragraphGap + signatureHeight;
+  let currentY = Number.isFinite(startAtY) ? startAtY + 3 : 49;
 
-  if (currentY + 26 > contentBottom) {
+  if (currentY + requiredHeight > contentBottom) {
     doc.addPage('letter', 'portrait');
-    const headerEndY = drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader: false, continuation: true });
-    currentY = Math.max(headerEndY, contentBottom - 31);
+    currentY = drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader: false, continuation: true }) + 6;
   }
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(30, 41, 59);
+  declarationLines.forEach(line => {
+    doc.text(line, margin, currentY);
+    currentY += paragraphLineHeight;
+  });
+  currentY += paragraphGap;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);

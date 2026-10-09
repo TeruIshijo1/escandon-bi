@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import html
+import importlib.metadata
 import json
 import os
 import re
@@ -9,7 +10,6 @@ from pathlib import Path
 from collections import Counter
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
@@ -24,6 +24,8 @@ parser.add_argument('--config', required=True)
 args = parser.parse_args()
 payload = json.loads(Path(args.tokens).read_text(encoding='utf-8'))
 config = json.loads(Path(args.config).read_text(encoding='utf-8'))
+if config['pageSize'] != 'LETTER':
+    raise RuntimeError('El generador requiere pageSize LETTER.')
 output = Path(args.output)
 page_width, page_height = letter
 margin = config['marginPoints']
@@ -74,6 +76,7 @@ unsupported_tokens = Counter()
 unsupported_characters = Counter()
 font_fallbacks = Counter()
 table_registry = []
+catalog_registry = []
 pending_anchors = []
 
 def normalize(value):
@@ -193,8 +196,12 @@ class MapDocument(SimpleDocTemplate):
     def __init__(self, *values, **options):
         super().__init__(*values, **options)
         self.heading_pages = []
+        self.catalog_pages = []
         self.previous_outline_level = -1
     def afterFlowable(self, flowable):
+        catalog = getattr(flowable, '_map_catalog', None)
+        if catalog:
+            self.catalog_pages.append({**catalog, 'page': self.page})
         info = getattr(flowable, '_map_heading', None)
         if not info:
             return
@@ -229,9 +236,17 @@ def render_table(token, story):
     if len(header) >= config['wideTableColumns']:
         for index, row in enumerate(rows):
             story.append(Spacer(1, 4))
-            for (label_markup, label_plain), (value_markup, value_plain) in zip(header, row):
+            for column, ((label_markup, label_plain), (value_markup, value_plain)) in enumerate(zip(header, row)):
                 story.append(paragraph(label_markup, label_plain, label_style, 'table_header'))
-                story.append(paragraph(value_markup, value_plain, body, 'table_cell'))
+                value = paragraph(value_markup, value_plain, body, 'table_cell')
+                if column == 0 and header[0][1].startswith('ID / nombre'):
+                    identifiers = [part['text'] for part in token['rows'][index][0].get('tokens', []) if part['type'] == 'codespan']
+                    if len(identifiers) != 1:
+                        raise RuntimeError('Una ficha del catálogo no tiene un identificador único.')
+                    entry = {'id': identifiers[0], 'group': 'reports' if len(header) == 6 else 'assistantCapabilities'}
+                    catalog_registry.append(entry)
+                    value._map_catalog = entry
+                story.append(value)
             story.append(Spacer(1, 9))
         return
     count = len(header)
@@ -245,7 +260,7 @@ def render_table(token, story):
         widths = [width / count] * count
     data = [[paragraph(markup, plain, table_head, 'table_header') for markup, plain in header]]
     data.extend([[paragraph(markup, plain, table_body, 'table_cell') for markup, plain in row] for row in rows])
-    table = LongTable(data, colWidths=widths, repeatRows=1, hAlign='LEFT', splitByRow=1, splitInRow=1)
+    table = LongTable(data, colWidths=widths, repeatRows=1, hAlign='LEFT', splitByRow=1, splitInRow=0)
     table.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e8f0f3')),
                                ('GRID', (0, 0), (-1, -1), .35, colors.HexColor('#c8d7de')),
                                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f7f9fa')]),
@@ -282,7 +297,9 @@ def render(tokens, story, list_depth=0):
                 prefix = f'{start + index}. ' if token.get('ordered') else '- '
                 if item.get('task'):
                     prefix += '[x] ' if item.get('checked') else '[ ] '
-                item_tokens = item.get('tokens', [])
+                # Marked emits a standalone checkbox token before the task text;
+                # its value is already included in the list prefix.
+                item_tokens = [part for part in item.get('tokens', []) if not (item.get('task') and part['type'] == 'checkbox')]
                 for position, item_token in enumerate(item_tokens):
                     if item_token['type'] in ('text', 'paragraph'):
                         markup, plain = inline(item_token.get('tokens', [{'type': 'text', 'text': item_token.get('text', '')}]))
@@ -322,17 +339,38 @@ if missing_anchors or missing_links or unsupported_tokens or unsupported_charact
 markdown = Path(payload['source']).read_text(encoding='utf-8')
 if config['cutoffDate'] not in markdown:
     raise RuntimeError('La fecha de corte configurada no coincide con el Markdown.')
-document = MapDocument(str(output), pagesize=letter, leftMargin=margin, rightMargin=margin,
-                       topMargin=margin, bottomMargin=margin, title=config['title'], author='Hospital Escandón BI',
+# SimpleDocTemplate adds six points of frame padding on each side. Compensate
+# for that padding so the actual text and tables keep the configured margins.
+document = MapDocument(str(output), pagesize=letter, leftMargin=margin - 6, rightMargin=margin - 6,
+                       topMargin=margin - 6, bottomMargin=margin - 6, title=config['title'], author='Hospital Escandón BI',
                        subject=f'Mapa completo de la plataforma. Corte: {config["cutoffDate"]}')
 document.build(story, onFirstPage=decorate, onLaterPages=decorate)
 reader = PdfReader(str(output))
 page_texts = [page.extract_text() or '' for page in reader.pages]
+body_page_texts = []
+for page_number, page_text in enumerate(page_texts, 1):
+    decoration = f'{config["runningTitle"]}\nFecha de corte: {config["cutoffDate"]}\nPágina {page_number}\n'
+    body_page_texts.append(page_text[len(decoration):] if page_text.startswith(decoration) else page_text)
 
 def compact(value):
     return re.sub(r'\s+', '', normalize(html.unescape(value))).replace('\u00ad', '')
 
-pdf_compact = compact('\n'.join(page_texts))
+pdf_compact = compact('\n'.join(body_page_texts))
+def outline_count(entries):
+    return sum(outline_count(entry) if isinstance(entry, list) else 1 for entry in entries)
+
+pdf_outline_count = outline_count(reader.outline)
+page_references = {page.indirect_reference.idnum for page in reader.pages}
+internal_links, invalid_internal_links = 0, []
+for page_number, page in enumerate(reader.pages, 1):
+    for reference in page.get('/Annots', []):
+        annotation = reference.get_object()
+        destination = annotation.get('/Dest')
+        if destination is None:
+            continue
+        internal_links += 1
+        if not isinstance(destination, list) or not destination or getattr(destination[0], 'idnum', None) not in page_references:
+            invalid_internal_links.append(page_number)
 missing_segments = []
 for index, segment in enumerate(segments):
     expected = compact(segment['text'])
@@ -340,17 +378,24 @@ for index, segment in enumerate(segments):
         missing_segments.append({'index': index, 'type': segment['type'], 'length': len(segment['text']),
                                  'text': segment['text'][:400]})
 qa = {'source': payload['source'], 'sourceHash': payload['sourceHash'], 'output': str(output),
+      'pdfHash': hashlib.sha256(output.read_bytes()).hexdigest(),
       'cutoffDate': config['cutoffDate'], 'pages': len(reader.pages), 'headingCount': len(heading_registry),
       'sourceAnchorCount': len(payload['anchors']), 'sourceAnchorsPreserved': not missing_anchors,
       'headingPages': document.heading_pages, 'tables': table_registry,
+      'catalogCounts': dict(Counter(entry['group'] for entry in catalog_registry)),
+      'catalogPages': document.catalog_pages,
+      'missingCatalogIds': [entry['id'] for entry in catalog_registry if compact(entry['id']) not in pdf_compact],
+      'pdfOutlineCount': pdf_outline_count, 'internalLinkCount': internal_links,
+      'invalidInternalLinks': invalid_internal_links,
+      'runtimeVersions': {'reportlab': importlib.metadata.version('reportlab'), 'pypdf': importlib.metadata.version('pypdf')},
       'segments': len(segments), 'missingSegments': missing_segments, 'missingLinkTargets': missing_links,
       'unsupportedTokens': dict(unsupported_tokens), 'unsupportedCharacters': {},
       'fontFallbacks': {f'U+{ord(key):04X}': value for key, value in font_fallbacks.items()},
-      'fonts': font_paths, 'contentCoveragePassed': not missing_segments,
+      'fonts': font_paths, 'contentCoveragePassed': not missing_segments and not invalid_internal_links and pdf_outline_count == len(heading_registry),
       'finalPageText': page_texts[-1], 'visualReviewRequired': True}
 qa_file = output.with_suffix('.qa.json')
 qa_file.write_text(json.dumps(qa, indent=2, ensure_ascii=False), encoding='utf-8')
 print(json.dumps({'pdf': str(output), 'qa': str(qa_file), 'pages': qa['pages'], 'headings': qa['headingCount'],
                   'anchors': qa['sourceAnchorCount'], 'segments': qa['segments'], 'missingSegments': len(missing_segments)}, ensure_ascii=True))
-if missing_segments:
+if not qa['contentCoveragePassed'] or qa['missingCatalogIds']:
     raise SystemExit(3)
