@@ -8,6 +8,8 @@ import react from '@vitejs/plugin-react';
 import { chromium } from 'playwright';
 const require = createRequire(import.meta.url);
 const { prepareReport } = require('../../backend/services/reportAssistant.service');
+const { catalog: verticalAssistantSources } = require('../../backend/services/assistantVerticalSources.service');
+const { applyAnalysis, validateAnalysis, describeAnalysis } = require('../../backend/services/reportAnalysis.service');
 // Use the actual guided planner and fake records; this test never contacts an LLM or hospital database.
 for (const key of ['GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY']) delete process.env[key];
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -33,7 +35,70 @@ const catalog = [
   { id: 'vertical_sales_orders', source: 'Vertical', title: 'Órdenes de venta Vertical · resumen por orden', category: 'Servicios Clínicos', description: 'Todas las órdenes de venta, tengan servicios, artículos o ninguna línea.', grain: 'Una fila por orden Vertical.', requiresDateFilter: true, dateFieldLabel: 'Fecha de creación de orden', filters: [], defaultFields: ['SONum', 'CreatedOn', 'PatientName'], fields: [{ key: 'SONum', label: 'Número de orden', type: 'number' }, { key: 'CreatedOn', label: 'Creación de orden', type: 'datetime' }, { key: 'PatientName', label: 'Paciente' }, { key: 'PTNum', label: 'Número de paciente', type: 'number' }] },
   { id: 'vertical_service_orders', source: 'Vertical', title: 'Órdenes de venta de servicios', category: 'Servicios Clínicos', description: 'Solo líneas de servicio de órdenes Vertical.', requiresDateFilter: true, dateFieldLabel: 'Fecha de creación de orden', filters: [], defaultFields: ['SONum', 'SOLNNum', 'CreatedOn', 'PatientName'], fields: [{ key: 'SONum', label: 'Número de orden', type: 'number' }, { key: 'SOLNNum', label: 'Número de línea', type: 'number' }, { key: 'CreatedOn', label: 'Creación de orden', type: 'datetime' }, { key: 'PatientName', label: 'Paciente' }, { key: 'PTNum', label: 'Número de paciente', type: 'number' }] },
 ];
-let user = { username: 'amendoza', role: 'ADMIN', permisos: [] };
+const hiddenCapability = {
+  id: 'assistant_account_agreements_test', assistantOnly: true, source: 'SAP + Vertical',
+  title: 'Acuerdos comerciales y cuenta del paciente', category: 'Reportes conversados',
+  description: 'Relaciona la cuenta y el acuerdo de Vertical con el cliente de SAP.',
+  requiresDateFilter: false, filters: [], requiredPermissions: ['vertical_surgeries', 'sales_order_summary'],
+  defaultFields: ['AccountNumber', 'PatientName', 'AgreementName', 'CardName'],
+  fields: [{ key: 'AccountNumber', label: 'Cuenta' }, { key: 'PatientName', label: 'Paciente' }, { key: 'AgreementName', label: 'Acuerdo comercial' }, { key: 'CardName', label: 'Cliente SAP' }, { key: 'CreditLimit', label: 'Límite de crédito', type: 'money' }],
+};
+const hiddenRequest = 'Necesito acuerdos comerciales y estados de cuenta del paciente con el cliente de SAP';
+const commercialAgreementsCapability = verticalAssistantSources.assistant_commercial_agreements;
+const commercialTermsFixture = {
+  Deductible: 'SER_DED', DeductibleItemName: 'Deducible sintético', DefaultDeductible: 1500,
+  CopayAmount: 'SER_COPA', CopayAmountItemName: 'Copago sintético', DefaultCopayAmount: 300,
+  CopayPercentage: 'SER_COPA_PCT', CopayPercentageItemName: 'Copago porcentual sintético', DefaultCopayPercentage: 10,
+  Coinsurance: 'SER_COAS', CoinsuranceItemName: 'Coaseguro sintético',
+  CoinsurancePercentage: null, CoinsurancePercentageItemName: null, DefaultCoinsurancePercentage: 20,
+};
+const formattingCapability = {
+  id: 'assistant_formatting_values_test', assistantOnly: true, source: 'Vertical',
+  title: 'Condiciones registradas · valores de prueba', category: 'Reportes conversados',
+  requiresDateFilter: false, filters: [], requiredPermissions: ['assistant_commercial_agreements'],
+  defaultFields: ['AgreementCode', 'Amount', 'Rate', 'Count'],
+  fields: [{ key: 'AgreementCode', label: 'Código de convenio' }, { key: 'Amount', label: 'Condición de importe', type: 'money' }, { key: 'Rate', label: 'Condición de porcentaje', type: 'percent' }, { key: 'Count', label: 'Condición de cantidad', type: 'number' }],
+};
+const formattingRequest = 'Prueba local de condiciones numéricas y textos registrados';
+const analysisCapability = {
+  id: 'sales_invoice_summary', assistantOnly: true, source: 'SAP', title: 'Facturas de prueba · análisis', category: 'Reportes conversados',
+  requiresDateFilter: false, filters: [], requiredPermissions: ['assistant_sap_resources'], grain: 'Una fila por factura de prueba.',
+  defaultFields: ['DocEntry', 'CardName', 'DocTotal'], fields: [{ key: 'DocEntry', label: 'Identificador de factura', type: 'number' }, { key: 'CardName', label: 'Socio de negocios' }, { key: 'DocTotal', label: 'Importe de factura', type: 'money' }, { key: 'DocStatus', label: 'Estado de factura' }],
+};
+const analysisRequest = 'Analiza las facturas de prueba con importe positivo por socio de negocios, suma importes y cuenta facturas distintas; pregunta el orden';
+const analysisAdjustment = 'Ordena este análisis de menor a mayor';
+const financialAnalysis = validateAnalysis(analysisCapability, { predicates: [{ field: 'DocTotal', op: 'gt', value: 0 }], groupBy: ['CardName'], measures: [{ op: 'sum', field: 'DocTotal' }, { op: 'countDistinct', field: 'DocEntry' }], orderBy: [{ field: 'metric_0', direction: 'desc' }] });
+const analysisRows = Array.from({ length: 120 }, (_, index) => [
+  { DocEntry: index * 2 + 1, CardName: `Socio de prueba ${String(index + 1).padStart(3, '0')}`, DocTotal: 100 + index, DocStatus: 'O' },
+  { DocEntry: index * 2 + 2, CardName: `Socio de prueba ${String(index + 1).padStart(3, '0')}`, DocTotal: 50, DocStatus: 'C' },
+]).flat().concat([{ DocEntry: 241, CardName: 'Socio sin importe', DocTotal: 0, DocStatus: 'C' }, { DocEntry: 242, CardName: 'Socio desconocido', DocTotal: null, DocStatus: 'O' }]);
+let analysisSourceTruncated = false;
+let analysisOutputLimit = 10000;
+const exactCapability = {
+  id: 'assistant_account_billing_collections', assistantOnly: true, source: 'SAP + Vertical', title: 'Cuentas de prueba · consulta exacta', category: 'Reportes conversados',
+  requiresDateFilter: true, pointLookupFields: ['PCNum', 'PTNum'], filters: [], requiredPermissions: ['assistant_vertical_resources', 'assistant_sap_resources'],
+  defaultFields: ['PCNum', 'PatientName', 'InvoiceTotal'], fields: [{ key: 'PCNum', label: 'Cuenta del paciente', type: 'number' }, { key: 'PTNum', label: 'Número de paciente', type: 'number' }, { key: 'PatientName', label: 'Paciente' }, { key: 'InvoiceTotal', label: 'Importe facturado SAP', type: 'money' }, { key: 'Currency', label: 'Moneda' }],
+};
+const exactRequest = 'Consulta de prueba de la cuenta exacta 6101 sin período';
+const canonicalCurrencyRequest = 'Prueba de totales facturados por paciente conservando su moneda';
+const canonicalCurrencyFollowup = 'Ordena la prueba de moneda por total';
+const formattingRows = [
+  { AgreementCode: 'NUM', Amount: 1500.25, Rate: 10, Count: 2 },
+  { AgreementCode: 'NUM-STRING', Amount: '2500.50', Rate: '12.5', Count: '3' },
+  { AgreementCode: 'SCIENTIFIC', Amount: '1.5e3', Rate: '+1.2e1', Count: '-2e0' },
+  { AgreementCode: 'TEXT', Amount: 'Sin deducible <condición> & cobertura', Rate: '10% ó 15% según cobertura', Count: 'Consultar convenio' },
+  { AgreementCode: 'EXPRESSION', Amount: '1 UMA + IVA; validar tabulador', Rate: 'Copago fijo > $500 & no incluye IVA', Count: '=1+2' },
+  { AgreementCode: 'FORMATTED-TEXT', Amount: '$2,500.50 MXN', Rate: '12,5% aprobado', Count: 'Hasta 3 consultas' },
+  { AgreementCode: 'NONCANONICAL', Amount: '0x10', Rate: '20% incluido', Count: '1,000' },
+  { AgreementCode: 'NULL', Amount: null, Rate: null, Count: null },
+  { AgreementCode: 'EMPTY', Amount: '', Rate: '', Count: '' },
+  { AgreementCode: 'SPACE', Amount: '  ', Rate: '  ', Count: '  ' },
+  { AgreementCode: 'ZERO', Amount: 0, Rate: 0, Count: 0 },
+  // JSON cannot carry non-finite numeric values: they become null on the wire.
+  { AgreementCode: 'NONFINITE', Amount: Number.NaN, Rate: Number.POSITIVE_INFINITY, Count: Number.NEGATIVE_INFINITY },
+  { AgreementCode: 'NONFINITE-TEXT', Amount: 'NaN', Rate: 'Infinity', Count: '-Infinity' },
+];
+let user = { id: 1, username: 'amendoza', role: 'ADMIN', permisos: [] };
 let assistantError = false;
 let assistantOutageNoticeOnce = false;
 let assistantLocalWithKeyOnce = false;
@@ -42,6 +107,9 @@ let executionError = false;
 const requests = [];
 const plans = [];
 const saved = [];
+const assignmentRequests = [];
+const recipients = [{ id: 42, username: 'contador-prueba', nombre: 'Contador de prueba', role: 'JEFE_AREA', area: 'Contabilidad', activo: true }, { id: 43, username: 'auditor-prueba', nombre: 'Auditor de prueba', role: 'JEFE_AREA', area: 'Auditoría', activo: true }, { id: 44, username: 'exusuario-prueba', nombre: 'Exusuario de prueba', role: 'JEFE_AREA', area: 'Contabilidad', activo: false }];
+let assignmentErrorOnce = false;
 let browser, page;
 try {
   await server.listen(); browser = await chromium.launch({ headless: true });
@@ -55,11 +123,56 @@ try {
     if (pathname.endsWith('/auth/me')) return route.fulfill({ json: { user } });
     if (pathname.endsWith('/auth/login')) return route.fulfill({ json: { token: 'assistant-test', user } });
     const allowed = catalog.filter(entity => user.username === 'amendoza' || user.permisos.includes(`sap-query-${entity.id}`));
-    if (pathname.endsWith('/sap-query/catalog')) return route.fulfill({ json: { ok: true, catalog: allowed } });
-    if (pathname.endsWith('/sap-query/saved')) { if (route.request().method() === 'POST') saved.push(route.request().postDataJSON()); return route.fulfill({ json: { ok: true, queries: [] } }); }
+    const allowedAssistant = [...allowed, ...[hiddenCapability, commercialAgreementsCapability, formattingCapability, analysisCapability, exactCapability].filter(entity => entity.requiredPermissions.every(moduleId => user.username === 'amendoza' || user.permisos.includes(`sap-query-${moduleId}`)))];
+    if (pathname.endsWith('/sap-query/catalog')) return route.fulfill({ json: { ok: true, catalog: allowed, assistantCatalog: allowedAssistant } });
+    const canAssign = user.role === 'ADMIN' || user.username === 'amendoza';
+    const isAssigned = report => report.assignedUserIds?.includes(user.id);
+    const visibleSaved = report => canAssign || report.username === user.username || isAssigned(report);
+    if (pathname.endsWith('/sap-query/saved/access')) return route.fulfill({ json: { ok: true, hasAssignedReports: saved.some(isAssigned) } });
+    const savedDefinition = report => {
+      const entity = [...catalog, hiddenCapability, commercialAgreementsCapability, formattingCapability, analysisCapability, exactCapability].find(entity => entity.id === report.entity);
+      return { ...entity, fields: entity.fields.filter(field => report.selectedFields.includes(field.key)), defaultFields: report.selectedFields };
+    };
+    if (pathname.endsWith('/sap-query/saved/recipients')) return route.fulfill({ status: canAssign ? 200 : 403, json: canAssign ? { ok: true, users: recipients.filter(person => person.activo !== false) } : { ok: false, error: 'No tienes permiso para asignar reportes.' } });
+    const assignmentMatch = pathname.match(/\/sap-query\/saved\/([^/]+)\/assignments$/);
+    if (assignmentMatch) {
+      assert.equal(canAssign, true, 'Only administrators can change assignments');
+      const body = route.request().postDataJSON(); assignmentRequests.push({ id: assignmentMatch[1], ...body });
+      if (body.userIds.some(id => !recipients.some(person => person.id === id && person.activo !== false))) return route.fulfill({ status: 400, json: { ok: false, error: 'Sólo puedes asignar reportes a usuarios activos.' } });
+      if (assignmentErrorOnce) { assignmentErrorOnce = false; return route.fulfill({ status: 503, json: { ok: false, error: 'No se pudieron guardar los accesos. Intenta de nuevo.' } }); }
+      const report = saved.find(report => report.id === assignmentMatch[1]); assert.ok(report);
+      report.assignedUserIds = [...body.userIds];
+      return route.fulfill({ json: { ok: true, savedQueryId: report.id, assignedUsers: recipients.filter(person => body.userIds.includes(person.id)) } });
+    }
+    if (pathname.endsWith('/sap-query/saved')) {
+      if (route.request().method() === 'POST') {
+        const report = { id: `synthetic-${saved.length + 1}`, username: user.username, userId: user.id, createdAt: '2026-10-01T15:00:00Z', assignedUserIds: [], ...route.request().postDataJSON() }; saved.push(report);
+        return route.fulfill({ json: { ok: true, saved: { id: report.id, queryid: report.id, titulo: report.title, fechacreacion: report.createdAt } } });
+      }
+      return route.fulfill({ json: { ok: true, canAssign, queries: saved.filter(visibleSaved).map(report => ({ ...report, isOwner: report.username === user.username, isAssigned: isAssigned(report), canAssign, canDelete: canAssign || report.username === user.username, executionLocked: true, definition: savedDefinition(report), ...(canAssign ? { assignedUsers: recipients.filter(person => report.assignedUserIds?.includes(person.id)) } : {}) })) } });
+    }
     if (pathname.endsWith('/sap-query/assistant')) {
       const body = route.request().postDataJSON(); plans.push(body);
       if (assistantError) return route.fulfill({ status: 503, json: { ok: false, error: 'No pude preparar el reporte en este momento.' } });
+      // This fixture isolates the frontend contract for assistant-only joined reports.
+      // The existing scenarios below keep using the real guided planner.
+      if (body.message === hiddenRequest && allowedAssistant.some(entity => entity.id === hiddenCapability.id)) {
+        return route.fulfill({ json: { ok: true, status: 'ready', engine: 'guided', message: 'Prepararé los acuerdos de Vertical con el cliente de SAP.', plan: { entity: hiddenCapability.id, entityTitle: hiddenCapability.title, source: hiddenCapability.source, requiresDateFilter: false, selectedFields: hiddenCapability.defaultFields, filters: { fechaDesde: '', fechaHasta: '', busqueda: '', almacen: 'ALL', estatusDoc: 'ALL', clasificacionMedica: 'ALL' }, appliedFilters: [] } } });
+      }
+      if (body.message === formattingRequest && allowedAssistant.some(entity => entity.id === formattingCapability.id)) {
+        return route.fulfill({ json: { ok: true, status: 'ready', engine: 'guided', message: 'Prepararé las condiciones registradas de prueba.', plan: { entity: formattingCapability.id, entityTitle: formattingCapability.title, source: formattingCapability.source, requiresDateFilter: false, selectedFields: formattingCapability.defaultFields, filters: { fechaDesde: '', fechaHasta: '', busqueda: '', almacen: 'ALL', estatusDoc: 'ALL', clasificacionMedica: 'ALL' }, appliedFilters: [] } } });
+      }
+      if ([analysisRequest, analysisAdjustment, 'Ordena el total de mayor a menor.'].includes(body.message) && allowedAssistant.some(entity => entity.id === analysisCapability.id)) {
+        const analysis = body.message === analysisRequest ? { ...financialAnalysis, orderBy: [] } : body.message === analysisAdjustment ? { ...body.context.analysis, orderBy: [{ field: 'metric_0', direction: 'asc' }] } : financialAnalysis;
+        const plan = { entity: analysisCapability.id, entityTitle: analysisCapability.title, source: analysisCapability.source, selectedFields: analysisCapability.defaultFields, requiresDateFilter: false, filters: { fechaDesde: '', fechaHasta: '', busqueda: '', almacen: 'ALL', estatusDoc: 'ALL', clasificacionMedica: 'ALL' }, analysis, analysisSummary: describeAnalysis(analysisCapability, analysis), appliedFilters: [] };
+        return route.fulfill({ json: { ok: true, status: body.message === analysisRequest ? 'clarification' : 'ready', engine: 'guided', message: body.message === analysisRequest ? '¿Cómo quieres ordenar los totales?' : 'Prepararé el análisis de facturas por socio.', plan, ...(body.message === analysisRequest ? { pending: { request: analysisRequest, answers: [] }, options: [{ label: 'De mayor a menor', message: 'Ordena el total de mayor a menor.' }] } : {}) } });
+      }
+      if ([exactRequest, canonicalCurrencyRequest, canonicalCurrencyFollowup].includes(body.message) && allowedAssistant.some(entity => entity.id === exactCapability.id)) {
+        const analysis = body.message === exactRequest ? { predicates: [{ field: 'PCNum', op: 'eq', value: 6101 }], groupBy: [], measures: [], orderBy: [] } : body.message === canonicalCurrencyRequest ? { predicates: [], groupBy: ['PatientName'], measures: [{ op: 'sum', field: 'InvoiceTotal' }], orderBy: [] } : { ...body.context.analysis, orderBy: [{ field: 'metric_0', direction: 'desc' }] };
+        const filters = { fechaDesde: body.message === exactRequest ? '' : '2026-09-01', fechaHasta: body.message === exactRequest ? '' : '2026-09-30', busqueda: '', almacen: 'ALL', estatusDoc: 'ALL', clasificacionMedica: 'ALL' };
+        const plan = { entity: exactCapability.id, entityTitle: exactCapability.title, source: exactCapability.source, selectedFields: exactCapability.defaultFields, requiresDateFilter: true, filters, analysis, appliedFilters: [] };
+        return route.fulfill({ json: { ok: true, status: 'ready', engine: 'guided', message: 'Prepararé la consulta de cuentas de prueba.', plan } });
+      }
       const localWithKey = assistantLocalWithKeyOnce;
       assistantLocalWithKeyOnce = false;
       const providerEnv = ['GEMINI_API_KEY', 'GEMINI_MODEL', 'LLM_BASE_URL'];
@@ -71,7 +184,7 @@ try {
           process.env.GEMINI_MODEL = 'gemini-3.5-flash-lite';
           process.env.LLM_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
         }
-        result = await prepareReport({ ...body, catalog: allowed, now: new Date('2026-10-01T15:00:00Z'), fetchImpl: async () => { providerRequests += 1; throw new Error('Network access is blocked in this synthetic UI test'); } });
+        result = await prepareReport({ ...body, catalog: allowedAssistant.filter(entity => ![hiddenCapability.id, formattingCapability.id, analysisCapability.id, exactCapability.id].includes(entity.id)), now: new Date('2026-10-01T15:00:00Z'), fetchImpl: async () => { providerRequests += 1; throw new Error('Network access is blocked in this synthetic UI test'); } });
       } finally {
         for (const key of providerEnv) {
           if (previousProviderEnv[key] === undefined) delete process.env[key];
@@ -86,19 +199,38 @@ try {
       return route.fulfill({ json: { ok: true, ...result } });
     }
     if (pathname.endsWith('/sap-query/execute')) {
-      const body = route.request().postDataJSON(); requests.push(body);
+      const requestedBody = route.request().postDataJSON(); requests.push(requestedBody);
       if (executionError) return route.fulfill({ status: 503, json: { ok: false, error: 'No se pudo consultar la información. Intenta de nuevo.' } });
-      const entity = allowed.find(entity => entity.id === body.entity);
+      const savedReport = requestedBody.savedQueryId && saved.find(report => report.id === requestedBody.savedQueryId && visibleSaved(report));
+      if (requestedBody.savedQueryId && !savedReport) return route.fulfill({ status: 403, json: { ok: false, error: 'Ya no tienes acceso a este reporte. Actualiza Mis reportes.' } });
+      const body = savedReport ? { entity: savedReport.entity, selectedFields: savedReport.selectedFields, ...savedReport.filters } : requestedBody;
+      const entity = savedReport ? savedDefinition(savedReport) : allowedAssistant.find(entity => entity.id === body.entity);
       assert.ok(entity, 'Assistant cannot execute a module without permission');
-      const record = { Patient: 'Paciente de prueba', Doctor: 'Médico de prueba', Procedure: 'Procedimiento de prueba', Start: '2026-09-15T10:00:00', State: body.estatusDoc === 'OPEN' ? 'Abierta' : body.estatusDoc === 'CANCELED' ? 'Cancelada' : 'Cerrada', Discharged: body.estatusDoc === 'NO_MEDICAL_DISCHARGE' ? 'No' : 'Sí', DischargeDate: '2026-09-16T11:00:00', ClosedDate: '2026-09-17T09:00:00', Name: 'Insumo de prueba', Quantity: 12, Cost: 50, PatientName: 'Paciente de prueba OV', DocNum: 3101, DocDate: '2026-09-15', CardName: 'Aseguradora de prueba', SONum: 7101, SOLNNum: 1, CreatedOn: '2026-09-15T10:00:00', PTNum: 2101, PCNum: 6101 };
+      if (body.entity === analysisCapability.id) {
+        try {
+          const source = { entityTitle: entity.title, data: analysisRows, truncated: analysisSourceTruncated, loadedFields: body.selectedFields, columnas: entity.fields.filter(field => body.selectedFields.includes(field.key)), limit: analysisOutputLimit };
+          const result = body.analysis ? applyAnalysis(entity, source, body.analysis, { selectedFields: body.selectedFields, limit: analysisOutputLimit }) : { ...source, data: analysisRows.map(record => Object.fromEntries(body.selectedFields.map(key => [key, record[key]]))) };
+          return route.fulfill({ json: { ok: true, ...result } });
+        } catch (error) { return route.fulfill({ status: error.status || 400, json: { ok: false, error: error.message } }); }
+      }
+      if (body.entity === formattingCapability.id) return route.fulfill({ json: { ok: true, entityTitle: entity.title, data: formattingRows.map(record => Object.fromEntries(body.selectedFields.map(key => [key, record[key]]))), truncated: false, loadedFields: body.selectedFields, columnas: entity.fields.filter(field => body.selectedFields.includes(field.key)) } });
+      const record = { Patient: 'Paciente de prueba', Doctor: 'Médico de prueba', Procedure: 'Procedimiento de prueba', Start: '2026-09-15T10:00:00', State: body.estatusDoc === 'OPEN' ? 'Abierta' : body.estatusDoc === 'CANCELED' ? 'Cancelada' : 'Cerrada', Discharged: body.estatusDoc === 'NO_MEDICAL_DISCHARGE' ? 'No' : 'Sí', DischargeDate: '2026-09-16T11:00:00', ClosedDate: '2026-09-17T09:00:00', Name: 'Insumo de prueba', Quantity: 12, Cost: 50, PatientName: 'Paciente de prueba OV', DocNum: 3101, DocDate: '2026-09-15', CardName: 'Aseguradora de prueba', SONum: 7101, SOLNNum: 1, CreatedOn: '2026-09-15T10:00:00', PTNum: 2101, PCNum: 6101, InvoiceTotal: 120, Currency: 'USD', AccountNumber: 6101, AgreementCode: 'CONV-01', AgreementName: 'Acuerdo de prueba Vertical', CreditLimit: 9000, GlobalDiscount: 15, AdministrativeChargePercent: 5, ...commercialTermsFixture };
       const row = Object.fromEntries(body.selectedFields.map(key => [key, record[key]]));
-      return route.fulfill({ json: { ok: true, entityTitle: entity.title, data: body.busqueda === 'sin resultados' ? [] : [row], truncated: false } });
+      if (body.analysis) {
+        try {
+          const source = { entityTitle: entity.title, data: body.busqueda === 'sin resultados' ? [] : [record], truncated: false, loadedFields: body.selectedFields };
+          return route.fulfill({ json: { ok: true, ...applyAnalysis(entity, source, body.analysis, { selectedFields: body.selectedFields }) } });
+        } catch (error) { return route.fulfill({ status: error.status || 400, json: { ok: false, error: error.message } }); }
+      }
+      return route.fulfill({ json: { ok: true, entityTitle: entity.title, data: body.busqueda === 'sin resultados' ? [] : [row], truncated: false,
+        ...(entity.assistantOnly ? { loadedFields: body.selectedFields, columnas: entity.fields.filter(field => body.selectedFields.includes(field.key)) } : {}) } });
     }
     return route.fulfill({ json: { ok: true, data: [] } });
   });
   await page.goto(`${server.resolvedUrls.local[0]}__assistant`);
   const input = page.getByLabel('¿Qué información necesitas?', { exact: true });
   const send = async text => { await input.fill(text); await page.getByRole('button', { name: 'Enviar solicitud', exact: true }).click(); await page.getByRole('button', { name: 'Enviar solicitud', exact: true }).waitFor(); };
+  const waitForExportEnabled = () => page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.includes('Descargar Excel Oficial') && !button.disabled));
   await input.waitFor(); await page.waitForFunction(() => !document.querySelector('#report-assistant-message').disabled);
   assert.equal(await page.getByRole('button', { name: 'Crear con asistente', exact: true }).getAttribute('aria-pressed'), 'true');
   await send('Cirugías con paciente y médico');
@@ -191,10 +323,10 @@ try {
   assert.equal(requests.length, beforeUnsupported + 1, 'The report executes only after explicit acceptance of the missing cost');
   assert.ok(requests.at(-1).selectedFields.includes('Start'), 'The date column requested during the clarification is applied after accepting the omission');
   assert.ok(requests.at(-1).selectedFields.includes('Procedure'));
-  await page.getByRole('button', { name: 'Guardar consulta', exact: true }).click();
-  await page.getByPlaceholder('ej. Insumos con Caducidad Próxima de Quirófano').fill('Cirugías conversadas');
-  await page.getByRole('button', { name: 'Guardar Plantilla', exact: true }).click();
-  await page.waitForFunction(() => !document.body.textContent.includes('Guardar Plantilla de Consulta'));
+  await page.getByRole('button', { name: 'Guardar reporte', exact: true }).click();
+  await page.getByPlaceholder('Ej. Condiciones de convenios').fill('Cirugías conversadas');
+  await page.getByRole('dialog', { name: 'Guardar reporte', exact: true }).getByRole('button', { name: 'Guardar reporte', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Guardar reporte', exact: true }).waitFor({ state: 'hidden' });
   assert.equal(saved.at(-1).entity, 'vertical_surgeries');
   assert.deepEqual(saved.at(-1).selectedFields, requests.at(-1).selectedFields);
   assert.equal(saved.at(-1).filters.fechaDesde, '2026-09-01');
@@ -243,7 +375,7 @@ try {
   await page.getByRole('button', { name: 'Nueva conversación', exact: true }).click();
   assert.equal(await page.getByRole('log').getByText('Agrega el procedimiento', { exact: true }).count(), 0);
   assert.equal(await page.getByLabel('Reporte generado', { exact: true }).count(), 0, 'A new conversation clears the previous result');
-  assert.equal(await page.getByRole('button', { name: 'Guardar consulta', exact: true }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Guardar reporte', exact: true }).isDisabled(), true);
 
   await send('kiero las sirujias del mes pasado pasiente doc fecha');
   assert.deepEqual(requests.at(-1).selectedFields, ['Patient', 'Doctor', 'Start']);
@@ -259,7 +391,7 @@ try {
   const beforeChoice = requests.length;
   await page.getByRole('button', { name: 'Costo promedio', exact: true }).waitFor();
   assert.equal(await page.getByLabel('Reporte generado', { exact: true }).count(), 0, 'A pending adjustment must not show the old report as its result');
-  assert.equal(await page.getByRole('button', { name: 'Guardar consulta', exact: true }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Guardar reporte', exact: true }).isDisabled(), true);
   await page.setViewportSize({ width: 390, height: 1000 });
   for (const theme of ['light', 'dark']) {
     await page.evaluate(theme => document.documentElement.setAttribute('data-theme', theme), theme);
@@ -289,7 +421,9 @@ try {
   assert.deepEqual(requests.at(-1).selectedFields, ['Name', 'Quantity']);
   const beforeUnknown = requests.length;
   await send('solo con existencias mayor que 100');
-  assert.equal(requests.length, beforeUnknown, 'An unavailable condition cannot execute the previous report');
+  assert.equal(requests.length, beforeUnknown + 1, 'A supported numerical condition executes a new filtered analysis');
+  assert.deepEqual(requests.at(-1).analysis.predicates, [{ field: 'Quantity', op: 'gt', value: '100' }]);
+  await page.getByLabel('Análisis ejecutado', { exact: true }).getByText(/1 registros consultados; 0 cumplen las condiciones/).waitFor();
   await page.getByRole('button', { name: 'Nueva conversación', exact: true }).click();
 
   // Production regression: order names and their abbreviation must clarify the
@@ -442,6 +576,439 @@ try {
     await page.getByRole('button', { name: 'Nueva conversación', exact: true }).click();
   }
 
+  // Production regression: exact option labels with a percentage sibling
+  // must resolve the pending column instead of repeating the same question.
+  const commercialRequest = 'Necesito los acuerdos con descuentos, dedicibles, copagos y coaseguros';
+  for (const [copayLabel, copayField, otherCopayField] of [['Copago del convenio', 'CopayAmount', 'CopayPercentage'], ['Copago del convenio (%)', 'CopayPercentage', 'CopayAmount']]) {
+    const beforeCommercial = requests.length;
+    const beforeCommercialProvider = providerRequests;
+    await send(commercialRequest);
+    await latestMessage().getByRole('button', { name: 'Descuento global registrado (%)', exact: true }).waitFor();
+    assert.equal(requests.length, beforeCommercial, 'Commercial ambiguity must not query before the chosen fields are known');
+    await latestMessage().getByRole('button', { name: 'Descuento global registrado (%)', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('#report-assistant-message').disabled);
+    await latestMessage().getByRole('button', { name: copayLabel, exact: true }).waitFor();
+    assert.equal(plans.at(-1).message, 'Me refiero a «Descuento global registrado (%)».');
+    assert.equal(plans.at(-1).pending.request, commercialRequest, 'An option click retains the exact original request including its typo');
+    assert.equal(requests.length, beforeCommercial, 'Choosing the discount must still wait for the copay clarification');
+    await latestMessage().getByRole('button', { name: copayLabel, exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('#report-assistant-message').disabled);
+    assert.equal(plans.at(-1).message, `Me refiero a «${copayLabel}».`, 'The UI sends the exact option message without removing the percentage symbol');
+    assert.equal(plans.at(-1).pending.request, commercialRequest);
+    assert.ok(plans.at(-1).pending.answers.includes('Me refiero a «Descuento global registrado (%)».'));
+    assert.ok(plans.at(-1).context.selectedFields.includes('GlobalDiscount'), 'The next option carries the discount already chosen in the draft');
+    assert.doesNotMatch(await latestMessage().innerText(), /Cuando dices «copagos»/i, 'An exact copay choice must not repeat the same clarification');
+    await page.getByRole('button', { name: 'Ver reporte', exact: true }).waitFor();
+    assert.equal(requests.length, beforeCommercial + 1, 'All commercial clarifications produce one report');
+    assert.equal(requests.at(-1).entity, commercialAgreementsCapability.id);
+    const requestedConceptFields = ['Deductible', 'DeductibleItemName', 'DefaultDeductible', copayField, `${copayField}ItemName`, `Default${copayField}`, 'Coinsurance', 'CoinsuranceItemName', 'CoinsurancePercentage', 'CoinsurancePercentageItemName', 'DefaultCoinsurancePercentage'];
+    for (const field of ['AgreementCode', 'AgreementName', 'GlobalDiscount', ...requestedConceptFields]) assert.ok(requests.at(-1).selectedFields.includes(field), `The completed report retains ${field}`);
+    await page.getByLabel('Reporte generado', { exact: true }).getByRole('cell', { name: 'CONV-01', exact: true }).waitFor();
+    await page.getByLabel('Reporte generado', { exact: true }).getByRole('cell', { name: 'Acuerdo de prueba Vertical', exact: true }).waitFor();
+    for (const field of ['Deductible', 'DeductibleItemName', copayField, `${copayField}ItemName`, 'Coinsurance', 'CoinsuranceItemName']) await page.getByLabel('Reporte generado', { exact: true }).getByRole('cell', { name: commercialTermsFixture[field], exact: true }).waitFor();
+    for (const value of ['$1,500.00', copayField === 'CopayAmount' ? '$300.00' : '10.0%', '20.0%']) await page.getByLabel('Reporte generado', { exact: true }).getByRole('cell', { name: value, exact: true }).waitFor();
+    await page.locator('thead').getByText(commercialAgreementsCapability.fields.find(field => field.key === `Default${copayField}`).label, { exact: true }).waitFor();
+    const headerFits = await page.locator('thead th > div > div > span').evaluateAll(labels => labels.every(label => label.scrollWidth <= label.clientWidth + 1));
+    assert.equal(headerFits, true, 'Long concept headers wrap within their own columns');
+    assert.doesNotMatch(await page.getByLabel('Reporte generado', { exact: true }).innerText(), /NaN/);
+    const commercialDownloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: /Descargar Excel Oficial/ }).click();
+    const commercialDownload = await commercialDownloadPromise;
+    const commercialExcel = await fs.readFile(await commercialDownload.path(), 'utf8');
+    const exportedCommercialCells = await page.evaluate(html => [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('tr.even td, tr.odd td')].map(cell => cell.textContent), commercialExcel);
+    for (const field of ['Deductible', copayField, 'Coinsurance']) assert.ok(exportedCommercialCells.includes(commercialTermsFixture[field]), `Excel preserves the original ${field} item code in full`);
+    const exportedCodesAreText = await page.evaluate(({ html, code }) => [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('tr.even td, tr.odd td')].some(cell => cell.textContent === code && cell.hasAttribute('x:str')), { html: commercialExcel, code: commercialTermsFixture[copayField] });
+    assert.equal(exportedCodesAreText, true, 'Excel item codes are explicitly retained as text');
+    assert.doesNotMatch(commercialExcel, /NaN|<condición>/);
+    assert.ok(!requests.at(-1).selectedFields.includes(otherCopayField), 'The exact amount/percentage choice cannot add its sibling implicitly');
+    assert.equal(await page.getByRole('log').locator('.report-assistant__choices button').count(), 0, 'Completed clarifications retire the previous option buttons');
+    assert.equal(providerRequests, beforeCommercialProvider, 'Known commercial clarification options resolve without an AI provider request');
+    if (copayField === 'CopayAmount') await page.screenshot({ path: path.join(outputDir, 'copago-convenio-resuelto.png'), fullPage: true });
+    await page.getByRole('button', { name: 'Nueva conversación', exact: true }).click();
+  }
+
+  const administrativeRequest = 'Acuerdos comerciales con cargos administrativos';
+  const beforeAdministrative = requests.length;
+  await send(administrativeRequest);
+  await latestMessage().getByRole('button', { name: 'Cargo administrativo del convenio (%)', exact: true }).waitFor();
+  assert.equal(requests.length, beforeAdministrative, 'An ambiguity-only column request cannot query default columns');
+  await latestMessage().getByRole('button', { name: 'Cargo administrativo del convenio (%)', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('#report-assistant-message').disabled);
+  assert.equal(plans.at(-1).message, 'Me refiero a «Cargo administrativo del convenio (%)».');
+  assert.equal(plans.at(-1).pending.request, administrativeRequest);
+  await page.getByRole('button', { name: 'Ver reporte', exact: true }).waitFor();
+  assert.equal(requests.length, beforeAdministrative + 1, 'The exact administrative percentage choice generates once');
+  assert.equal(requests.at(-1).entity, commercialAgreementsCapability.id);
+  assert.deepEqual([...requests.at(-1).selectedFields].sort(), ['AgreementCode', 'AgreementName', 'AdministrativeChargePercent'].sort(), 'An ambiguity-only request includes the chosen column and identity fields without defaults or sibling amount/description');
+  await page.locator('thead').getByText('Cargo administrativo del convenio (%)', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('log').locator('.report-assistant__choices button').count(), 0);
+  assert.doesNotMatch(await latestMessage().innerText(), /Cuando dices «cargos administrativos»/i);
+  await page.screenshot({ path: path.join(outputDir, 'cargo-administrativo-porcentaje-resuelto.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Nueva conversación', exact: true }).click();
+
+  // Legacy money/percent metadata can contain original clinical expressions.
+  // The table and Excel must preserve these texts and format only finite numbers.
+  await send(formattingRequest);
+  await page.getByRole('button', { name: 'Ver reporte', exact: true }).waitFor();
+  const expectedFormattingRows = [
+    ['NUM', '$1,500.25', '10.0%', '2'],
+    ['NUM-STRING', '$2,500.50', '12.5%', '3'],
+    ['SCIENTIFIC', '$1,500.00', '12.0%', '-2'],
+    ['TEXT', 'Sin deducible <condición> & cobertura', '10% ó 15% según cobertura', 'Consultar convenio'],
+    ['EXPRESSION', '1 UMA + IVA; validar tabulador', 'Copago fijo > $500 & no incluye IVA', '=1+2'],
+    ['FORMATTED-TEXT', '$2,500.50 MXN', '12,5% aprobado', 'Hasta 3 consultas'],
+    ['NONCANONICAL', '0x10', '20% incluido', '1,000'],
+    ['NULL', '-', '-', '-'], ['EMPTY', '-', '-', '-'], ['SPACE', '-', '-', '-'],
+    ['ZERO', '$0.00', '0.0%', '0'],
+    ['NONFINITE', '-', '-', '-'], ['NONFINITE-TEXT', '-', '-', '-'],
+  ];
+  const actualFormattingRows = await page.getByLabel('Reporte generado', { exact: true }).locator('tbody tr').evaluateAll(rows => rows.map(row => [...row.querySelectorAll('td')].map(cell => cell.textContent)));
+  assert.deepEqual(actualFormattingRows, expectedFormattingRows, 'The table formats canonical finite values, keeps expressions intact, distinguishes zero, and hides missing/nonfinite data');
+  assert.doesNotMatch(await page.getByLabel('Reporte generado', { exact: true }).locator('tbody').innerText(), /NaN|Infinity/);
+  const formattingDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Descargar Excel Oficial/ }).click();
+  const formattingDownload = await formattingDownloadPromise;
+  const formattingExcel = await fs.readFile(await formattingDownload.path(), 'utf8');
+  const exportedFormattingRows = await page.evaluate(html => {
+    const document = new DOMParser().parseFromString(html, 'text/html');
+    return [...document.querySelectorAll('tr.even, tr.odd')].map(row => [...row.querySelectorAll('td')].map(cell => cell.textContent));
+  }, formattingExcel);
+  const expectedFormattingExport = expectedFormattingRows.map(row => row.map((value, index) => index > 0 && value === '-' ? '' : value));
+  assert.deepEqual(exportedFormattingRows, expectedFormattingExport, 'Excel keeps complete source text and the same finite numeric format, with blank cells for missing/nonfinite data');
+  assert.match(formattingExcel, /&lt;condición&gt; &amp; cobertura/, 'Expression text is escaped in the HTML workbook without changing its content');
+  const protectedExportText = await page.evaluate(html => {
+    const cells = [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('tr.even td, tr.odd td')];
+    return ['=1+2', '0x10', '20% incluido'].every(text => cells.some(cell => cell.textContent === text && cell.hasAttribute('x:str')));
+  }, formattingExcel);
+  assert.equal(protectedExportText, true, 'Formula-looking expressions and noncanonical numeric text remain text in Excel');
+  assert.doesNotMatch(formattingExcel, /NaN|Infinity|<condición>/);
+  await page.screenshot({ path: path.join(outputDir, 'condiciones-texto-numeros-sin-nan.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Nueva conversación', exact: true }).click();
+
+  // Joined capabilities can execute and be adjusted/saved without becoming
+  // another card or changing the source/category totals in the manual picker.
+  const beforeHidden = requests.length;
+  await send(hiddenRequest);
+  assert.equal(requests.length, beforeHidden + 1);
+  assert.equal(requests.at(-1).entity, hiddenCapability.id);
+  assert.deepEqual(requests.at(-1).selectedFields, hiddenCapability.defaultFields);
+  await page.getByRole('complementary', { name: 'Configuración del reporte conversado' }).getByText('SAP + Vertical', { exact: true }).waitFor();
+  await page.getByLabel('Reporte generado', { exact: true }).getByText('Información de SAP + Vertical · 4 columnas visibles', { exact: true }).waitFor();
+  assert.deepEqual(await page.locator('thead th > div > div > span').allTextContents(), ['Cuenta', 'Paciente', 'Acuerdo comercial', 'Cliente SAP']);
+  const hiddenDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Descargar Excel Oficial/ }).click();
+  const hiddenDownload = await hiddenDownloadPromise;
+  const hiddenExcel = await fs.readFile(await hiddenDownload.path(), 'utf8');
+  assert.match(hiddenExcel, /Reporte de SAP \+ Vertical/);
+  assert.match(hiddenExcel, /Acuerdo de prueba Vertical/);
+  assert.match(hiddenExcel, /Aseguradora de prueba/);
+  await page.getByRole('button', { name: 'Guardar reporte', exact: true }).click();
+  await page.getByPlaceholder('Ej. Condiciones de convenios').fill('Acuerdos conversados de prueba');
+  await page.getByRole('dialog', { name: 'Guardar reporte', exact: true }).getByRole('checkbox', { name: /Contador de prueba/ }).check();
+  await page.getByRole('dialog', { name: 'Guardar reporte', exact: true }).getByRole('button', { name: 'Guardar reporte', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Guardar reporte', exact: true }).waitFor({ state: 'hidden' });
+  assert.equal(saved.at(-1).entity, hiddenCapability.id);
+  assert.deepEqual(assignmentRequests.at(-1), { id: saved.at(-1).id, userIds: [42] }, 'Save uses the stable ID inside the API saved response when assigning recipients');
+  await page.getByRole('button', { name: 'Ajustar filtros y columnas', exact: true }).click();
+  await page.locator('.report-builder__configuration-panel').getByText('Información de SAP + Vertical. Elige los filtros y las columnas que quieres incluir.', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: `Seleccionar módulo: ${hiddenCapability.title}`, exact: true }).count(), 0);
+  assert.equal(await page.locator('.report-catalog__card').count(), catalog.length);
+  assert.equal(await page.locator('.report-catalog__count').innerText(), `${catalog.length} de ${catalog.length} módulos disponibles`);
+  assert.equal(await page.getByRole('button', { name: 'SAP + Vertical (1)', exact: true }).count(), 0, 'Assistant-only sources do not become manual filter chips');
+  await page.getByLabel('Buscar módulos o temas', { exact: true }).fill('acuerdos comerciales');
+  assert.equal(await page.locator('.report-catalog__card').count(), 0, 'Manual search excludes assistant-only capabilities');
+  assert.equal(await page.locator('.report-catalog__count').innerText(), `0 de ${catalog.length} módulos disponibles`);
+  await page.getByLabel('Buscar módulos o temas', { exact: true }).fill('');
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await page.getByRole('button', { name: /Descargar Excel Oficial/ }).waitFor();
+  await page.getByRole('checkbox', { name: 'Límite de crédito', exact: true }).check();
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), true, 'Unqueried columns cannot be exported as empty source values');
+  await page.getByRole('button', { name: 'Consultar los nuevos datos', exact: true }).waitFor();
+  assert.equal(await page.locator('thead').getByText('Límite de crédito', { exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  assert.equal(requests.at(-1).entity, hiddenCapability.id);
+  assert.ok(requests.at(-1).selectedFields.includes('CreditLimit'));
+  await page.locator('thead').getByText('Límite de crédito', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), false);
+  await page.getByRole('button', { name: /Mis reportes/ }).click();
+  await page.getByText(`Sección: ${hiddenCapability.title}`, { exact: true }).waitFor();
+  await page.getByText('Acuerdos conversados de prueba', { exact: true }).click();
+  assert.equal(await page.getByRole('checkbox', { name: 'Límite de crédito', exact: true }).isChecked(), false, 'An assistant-only saved template restores its authorized columns');
+
+  // Assignment gives access to one saved configuration, without granting its
+  // source modules. Two reports for the same entity retain separate definitions.
+  const assignedAgreement = saved.at(-1);
+  for (const label of ['Paciente', 'Acuerdo comercial', 'Cliente SAP']) await page.getByRole('checkbox', { name: label, exact: true }).uncheck();
+  await page.getByRole('checkbox', { name: 'Límite de crédito', exact: true }).check();
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await page.locator('thead').getByText('Límite de crédito', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Guardar reporte', exact: true }).click();
+  const saveDialog = page.getByRole('dialog', { name: 'Guardar reporte', exact: true });
+  await saveDialog.getByPlaceholder('Ej. Condiciones de convenios').fill('Crédito conversado de prueba');
+  await saveDialog.getByLabel('Buscar personas', { exact: true }).fill('contabilidad');
+  assert.equal(await saveDialog.getByRole('checkbox').count(), 1, 'Recipient search filters by department');
+  await saveDialog.getByRole('checkbox', { name: /Contador de prueba/ }).check();
+  await page.setViewportSize({ width: 390, height: 1000 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1), true, 'Save report with the recipient selector fits a 390px screen');
+  await page.screenshot({ path: path.join(outputDir, 'guardar-reporte-destinatarios-390.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  assignmentErrorOnce = true;
+  await saveDialog.getByRole('button', { name: 'Guardar reporte', exact: true }).click();
+  await saveDialog.waitFor({ state: 'hidden' });
+  await page.getByText(/El reporte quedó guardado\. No se pudieron asignar sus accesos/).waitFor();
+  const assignedCredit = saved.at(-1);
+  assert.deepEqual(assignedCredit.selectedFields, ['AccountNumber', 'CreditLimit']);
+  assert.deepEqual(assignedCredit.assignedUserIds, [], 'A failed assignment does not undo or duplicate the saved report');
+  // Model a historical assignment where one recipient was later deactivated.
+  assignedCredit.assignedUserIds.push(43, 44);
+  await page.getByRole('button', { name: /Mis reportes/ }).click();
+  const creditSavedRow = page.getByRole('article', { name: 'Reporte: Crédito conversado de prueba', exact: true });
+  await creditSavedRow.getByText('Usuarios inactivos: Exusuario de prueba', { exact: true }).waitFor();
+  assert.match(await creditSavedRow.innerText(), /Disponible para: Auditor de prueba\s+Usuarios inactivos: Exusuario de prueba/);
+  await creditSavedRow.getByRole('button', { name: 'Administrar accesos', exact: true }).click();
+  const accessDialog = page.getByRole('dialog', { name: 'Administrar accesos', exact: true });
+  await accessDialog.getByText('Al guardar se retirarán las asignaciones de estas personas inactivas: Exusuario de prueba.', { exact: true }).waitFor();
+  assert.equal(await accessDialog.getByRole('checkbox', { name: /Exusuario de prueba/ }).count(), 0, 'Inactive recipients cannot be reactivated from report assignment');
+  assert.equal(await accessDialog.getByRole('checkbox', { name: /Auditor de prueba/ }).isChecked(), true, 'Existing active assignments remain selected');
+  await accessDialog.getByRole('checkbox', { name: /Contador de prueba/ }).check();
+  await accessDialog.getByRole('checkbox', { name: /Auditor de prueba/ }).check();
+  await page.setViewportSize({ width: 390, height: 1000 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1), true, 'Manage report access with search and selection fits a 390px screen');
+  await page.screenshot({ path: path.join(outputDir, 'administrar-accesos-390.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await accessDialog.getByRole('button', { name: 'Guardar accesos', exact: true }).click();
+  await accessDialog.waitFor({ state: 'hidden' });
+  assert.deepEqual(assignedCredit.assignedUserIds, [43, 42]);
+  assert.deepEqual(assignmentRequests.at(-1), { id: assignedCredit.id, userIds: [43, 42] }, 'Saving removes the invisible inactive ID and preserves the active recipient plus new selection');
+  assert.equal(await creditSavedRow.getByText('Usuarios inactivos: Exusuario de prueba', { exact: true }).count(), 0);
+  await creditSavedRow.getByText('Disponible para: Contador de prueba, Auditor de prueba', { exact: true }).waitFor();
+  await page.screenshot({ path: path.join(outputDir, 'mis-reportes-administracion.png'), fullPage: true });
+  await page.getByRole('dialog', { name: 'Mis reportes', exact: true }).getByRole('button', { name: 'Cerrar', exact: true }).click();
+
+  user = { id: 42, username: 'contador-prueba', role: 'JEFE_AREA', permisos: [] };
+  await page.reload();
+  await page.getByRole('heading', { name: 'Mis reportes', exact: true, level: 1 }).waitFor();
+  await page.getByRole('button', { name: /Mis reportes/ }).click();
+  const myReportsDialog = page.getByRole('dialog', { name: 'Mis reportes', exact: true });
+  await myReportsDialog.getByRole('article', { name: 'Reporte: Acuerdos conversados de prueba', exact: true }).waitFor();
+  assert.equal(await myReportsDialog.getByRole('article').count(), 2, 'Recipients see only reports assigned to them');
+  assert.equal(await myReportsDialog.getByRole('button', { name: 'Administrar accesos', exact: true }).count(), 0);
+  assert.equal(await myReportsDialog.getByRole('button', { name: 'Eliminar reporte', exact: true }).count(), 0);
+  assert.equal(await myReportsDialog.getByRole('button', { name: 'Ajustar una copia', exact: true }).count(), 0);
+  await myReportsDialog.getByRole('article', { name: 'Reporte: Acuerdos conversados de prueba', exact: true }).getByRole('button', { name: 'Ver reporte', exact: true }).click();
+  await page.getByLabel('Reporte generado', { exact: true }).getByRole('cell', { name: 'Acuerdo de prueba Vertical', exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1), { savedQueryId: assignedAgreement.id }, 'Assigned execution sends only the report ID without source, dates, filters or field overrides');
+  assert.deepEqual(await page.locator('thead th > div > div > span').allTextContents(), ['Cuenta', 'Paciente', 'Acuerdo comercial', 'Cliente SAP']);
+  assert.equal(await page.getByRole('checkbox').count(), 0, 'An assigned report has no field editing controls');
+  assert.equal(await page.getByRole('button', { name: 'Guardar reporte', exact: true }).isDisabled(), true);
+  assert.equal(await page.getByLabel('Fecha Desde', { exact: true }).count(), 0);
+  await page.getByRole('button', { name: /Mis reportes/ }).click();
+  await myReportsDialog.getByRole('article', { name: 'Reporte: Crédito conversado de prueba', exact: true }).getByRole('button', { name: 'Ver reporte', exact: true }).click();
+  await page.getByLabel('Reporte generado', { exact: true }).getByRole('cell', { name: '$9,000.00', exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1), { savedQueryId: assignedCredit.id });
+  assert.deepEqual(await page.locator('thead th > div > div > span').allTextContents(), ['Cuenta', 'Límite de crédito'], 'The second saved definition does not merge fields from the first report with the same entity');
+  await page.getByRole('button', { name: 'Actualizar reporte', exact: true }).click();
+  await page.getByRole('button', { name: 'Actualizar reporte', exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1), { savedQueryId: assignedCredit.id });
+  const assignedDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Descargar Excel Oficial/ }).click();
+  const assignedDownload = await assignedDownloadPromise;
+  const assignedExcel = await fs.readFile(await assignedDownload.path(), 'utf8');
+  assert.match(assignedExcel, /Límite de crédito/);
+  assert.doesNotMatch(assignedExcel, /Paciente de prueba OV|Aseguradora de prueba|Acuerdo de prueba Vertical/, 'The recipient export contains only the saved columns');
+  await page.screenshot({ path: path.join(outputDir, 'mis-reportes-asignado.png'), fullPage: true });
+  assert.equal(await page.getByRole('button', { name: 'Elegir un tema', exact: true }).count(), 0, 'Saved-only recipients do not see the source topic editor');
+  assert.equal(await page.locator('.report-catalog__card').count(), 0, 'Assignment does not grant source module cards');
+
+  user = { id: 1, username: 'amendoza', role: 'ADMIN', permisos: [] };
+  await page.reload();
+  await page.getByRole('button', { name: /Mis reportes/ }).click();
+  await page.getByRole('article', { name: 'Reporte: Crédito conversado de prueba', exact: true }).getByRole('button', { name: 'Administrar accesos', exact: true }).click();
+  assert.equal(await accessDialog.getByRole('checkbox', { name: /Contador de prueba/ }).isChecked(), true);
+  await accessDialog.getByRole('checkbox', { name: /Contador de prueba/ }).uncheck();
+  await accessDialog.getByRole('button', { name: 'Guardar accesos', exact: true }).click();
+  await accessDialog.waitFor({ state: 'hidden' });
+  assert.deepEqual(assignedCredit.assignedUserIds, [43], 'Replacing assignment recipients can revoke one person while retaining another');
+  user = { id: 42, username: 'contador-prueba', role: 'JEFE_AREA', permisos: [] };
+  await page.reload();
+  await page.getByRole('button', { name: /Mis reportes/ }).click();
+  await myReportsDialog.getByRole('article', { name: 'Reporte: Acuerdos conversados de prueba', exact: true }).waitFor();
+  assert.equal(await myReportsDialog.getByRole('article', { name: 'Reporte: Crédito conversado de prueba', exact: true }).count(), 0, 'A revoked report disappears from Mis reportes');
+  user = { id: 1, username: 'amendoza', role: 'ADMIN', permisos: [] };
+  await page.reload(); await page.waitForFunction(() => !document.querySelector('#report-assistant-message')?.disabled);
+  await page.getByRole('button', { name: 'Crear con asistente', exact: true }).click();
+  user = { username: 'joined-reader', role: 'JEFE_AREA', permisos: hiddenCapability.requiredPermissions.map(moduleId => `sap-query-${moduleId}`) };
+  await page.reload(); await page.waitForFunction(() => !document.querySelector('#report-assistant-message')?.disabled);
+  await send(hiddenRequest);
+  assert.equal(requests.at(-1).entity, hiddenCapability.id, 'All component permissions grant the hidden capability without a separate capability permission');
+  const beforeMissingJoinPermission = requests.length;
+  user.permisos = user.permisos.slice(0, 1);
+  await page.evaluate(async () => { const result = await window.__refreshAssistantTestUser(); if (!result.ok) throw new Error('Synthetic auth refresh failed'); });
+  await page.waitForFunction(() => document.querySelector('.report-assistant__reset')?.disabled);
+  assert.equal(await page.getByLabel('Reporte generado', { exact: true }).count(), 0, 'Revoking one required source permission clears the joined result');
+  await send(hiddenRequest);
+  assert.equal(requests.length, beforeMissingJoinPermission, 'A partial set of required source permissions cannot generate a joined report');
+  user = { username: 'amendoza', role: 'ADMIN', permisos: [] };
+  await page.reload(); await page.waitForFunction(() => !document.querySelector('#report-assistant-message')?.disabled);
+
+  // Exercise the real in-memory backend analysis engine over synthetic invoices.
+  // The browser must retain source fields while displaying calculated aliases.
+  const beforeAnalysis = requests.length;
+  await send(analysisRequest);
+  await latestMessage().getByRole('button', { name: 'De mayor a menor', exact: true }).waitFor();
+  await page.getByLabel('Análisis solicitado', { exact: true }).getByText('Socio de negocios', { exact: true }).waitFor();
+  assert.equal(requests.length, beforeAnalysis, 'An unresolved ordering choice does not execute the analysis');
+  await latestMessage().getByRole('button', { name: 'De mayor a menor', exact: true }).click();
+  await page.getByRole('button', { name: 'Ver reporte', exact: true }).waitFor();
+  assert.deepEqual(plans.at(-1).context.analysis.groupBy, ['CardName']);
+  assert.deepEqual(plans.at(-1).context.analysis.measures, financialAnalysis.measures);
+  assert.equal(plans.at(-1).pending.request, analysisRequest);
+  assert.equal(requests.length, beforeAnalysis + 1);
+  assert.deepEqual(requests.at(-1).analysis, financialAnalysis);
+  assert.deepEqual(requests.at(-1).selectedFields, analysisCapability.defaultFields, 'Calculated output aliases are never sent as authorized source fields');
+  const analysisReport = page.getByLabel('Reporte generado', { exact: true });
+  const analysisOutput = applyAnalysis(analysisCapability, { data: analysisRows, truncated: false }, financialAnalysis, { selectedFields: analysisCapability.defaultFields });
+  assert.deepEqual(await analysisReport.locator('thead th > div > div > span').allTextContents(), analysisOutput.columnas.map(column => column.label));
+  assert.deepEqual(await analysisReport.locator('tbody tr').first().locator('td').allTextContents(), ['Socio de prueba 120', '$269.00', '2']);
+  assert.equal(await analysisReport.locator('tbody tr').count(), 100);
+  await analysisReport.getByLabel('Análisis ejecutado', { exact: true }).getByText(/242 registros consultados; 240 cumplen las condiciones/).waitFor();
+  await analysisReport.getByText('Mostrando 1 a 100 de 120 grupos', { exact: true }).waitFor();
+  await analysisReport.getByRole('button', { name: 'Siguiente', exact: true }).click();
+  assert.equal(await analysisReport.locator('tbody tr').count(), 20);
+  const analysisDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Descargar Excel Oficial/ }).click();
+  const analysisDownload = await analysisDownloadPromise;
+  const analysisExcel = await fs.readFile(await analysisDownload.path(), 'utf8');
+  const exportedAnalysis = await page.evaluate(html => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return [...doc.querySelectorAll('tr.even, tr.odd')].map(row => [...row.querySelectorAll('td')].map(cell => cell.textContent));
+  }, analysisExcel);
+  assert.equal(exportedAnalysis.length, 120, 'Excel exports every returned group rather than only the current page');
+  assert.deepEqual(exportedAnalysis[0], ['Socio de prueba 120', '$269.00', '2']);
+  assert.deepEqual(exportedAnalysis.at(-1), ['Socio de prueba 001', '$150.00', '2']);
+  assert.match(analysisExcel, /Una fila por combinación de Socio de negocios/);
+  assert.doesNotMatch(analysisExcel, /Una fila por factura de prueba/);
+  assert.match(analysisExcel, /Agrupado por: Socio de negocios/);
+  assert.match(analysisExcel, /Total del reporte · Registros que cumplen los filtros: 240/);
+  await send(analysisAdjustment);
+  await page.getByRole('button', { name: 'Ver reporte', exact: true }).waitFor();
+  assert.deepEqual(plans.at(-1).context.analysis, financialAnalysis, 'A follow-up keeps the complete prior analysis in conversation context');
+  assert.equal(requests.at(-1).analysis.orderBy[0].direction, 'asc');
+  assert.deepEqual(await analysisReport.locator('tbody tr').first().locator('td').allTextContents(), ['Socio de prueba 001', '$150.00', '2']);
+  const ascendingAnalysis = requests.at(-1).analysis;
+  await page.getByRole('button', { name: 'Ajustar filtros y columnas', exact: true }).click();
+  await page.getByLabel('Análisis configurado', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await waitForExportEnabled();
+  assert.deepEqual(requests.at(-1).analysis, ascendingAnalysis, 'Manual continuation preserves the analysis until explicitly removed');
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), false);
+  await page.getByRole('button', { name: 'Guardar reporte', exact: true }).click();
+  const saveAnalysisDialog = page.getByRole('dialog', { name: 'Guardar reporte', exact: true });
+  await saveAnalysisDialog.getByPlaceholder('Ej. Condiciones de convenios').fill('Análisis financiero de prueba');
+  await saveAnalysisDialog.getByRole('checkbox', { name: /Contador de prueba/ }).check();
+  await saveAnalysisDialog.getByRole('button', { name: 'Guardar reporte', exact: true }).click();
+  await saveAnalysisDialog.waitFor({ state: 'hidden' });
+  const savedAnalysis = saved.at(-1);
+  assert.deepEqual(savedAnalysis.filters.analysis, ascendingAnalysis, 'Saved reports persist the exact canonical analysis under filters.analysis');
+  await page.getByRole('button', { name: /Mis reportes/ }).click();
+  await page.getByRole('article', { name: 'Reporte: Análisis financiero de prueba', exact: true }).getByRole('button', { name: 'Ajustar una copia', exact: true }).click();
+  await page.getByLabel('Análisis configurado', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await waitForExportEnabled();
+  assert.deepEqual(requests.at(-1).analysis, ascendingAnalysis, 'Loading a copy retains its saved conditions, grouping, measures and order');
+  await page.getByRole('checkbox', { name: 'Estado de factura', exact: true }).check();
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), true, 'Changing analytical configuration blocks the prior Excel until a new query');
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await waitForExportEnabled();
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), false);
+  executionError = true;
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await page.getByRole('alert').getByText('No se pudo consultar la información. Intenta de nuevo.', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), true, 'A failed recalculation cannot export the previous successful analysis');
+  executionError = false;
+  analysisSourceTruncated = true;
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await page.getByRole('alert').getByText(/fuente supera el alcance de una consulta completa/).waitFor();
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), true, 'A truncated source cannot produce or export new totals');
+  analysisSourceTruncated = false;
+  analysisOutputLimit = 105;
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await analysisReport.getByText(/Se muestran 105 de 120 grupos por el límite de salida/).waitFor();
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), false, 'Complete source analysis remains valid when only its output groups are limited');
+  const limitedAnalysisDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Descargar Excel Oficial/ }).click();
+  const limitedAnalysisDownload = await limitedAnalysisDownloadPromise;
+  const limitedAnalysisExcel = await fs.readFile(await limitedAnalysisDownload.path(), 'utf8');
+  assert.equal(await page.evaluate(html => new DOMParser().parseFromString(html, 'text/html').querySelectorAll('tr.even, tr.odd').length, limitedAnalysisExcel), 105);
+  assert.match(limitedAnalysisExcel, /Se muestran 105 de 120 grupos por el límite de salida/);
+  analysisOutputLimit = 10000;
+  await page.getByRole('button', { name: 'Quitar análisis', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), true);
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await waitForExportEnabled();
+  assert.equal(requests.at(-1).analysis, undefined, 'Removing the analysis explicitly returns to the source detail report');
+  assert.deepEqual(await analysisReport.locator('thead th > div > div > span').allTextContents(), ['Identificador de factura', 'Socio de negocios', 'Importe de factura', 'Estado de factura']);
+
+  user = { id: 42, username: 'contador-prueba', role: 'JEFE_AREA', permisos: [] };
+  await page.reload();
+  await page.getByRole('heading', { name: 'Mis reportes', level: 1, exact: true }).waitFor();
+  await page.getByRole('button', { name: /Mis reportes/ }).click();
+  await page.getByRole('article', { name: 'Reporte: Análisis financiero de prueba', exact: true }).getByRole('button', { name: 'Ver reporte', exact: true }).click();
+  await analysisReport.getByRole('cell', { name: 'Socio de prueba 001', exact: true }).waitFor();
+  assert.deepEqual(requests.at(-1), { savedQueryId: savedAnalysis.id }, 'Assigned analytics execute only by saved report ID with no analytical overrides');
+  assert.equal(await page.getByRole('button', { name: 'Quitar análisis', exact: true }).count(), 0);
+  await page.getByLabel('Análisis guardado', { exact: true }).waitFor();
+  assert.deepEqual(await analysisReport.locator('thead th > div > div > span').allTextContents(), analysisOutput.columnas.map(column => column.label));
+  await page.evaluate(() => document.querySelector('[aria-label="Análisis ejecutado"]').scrollIntoView());
+  await page.screenshot({ path: path.join(outputDir, 'analisis-financiero-asignado.png') });
+  for (const theme of ['light', 'dark']) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(theme => document.documentElement.setAttribute('data-theme', theme), theme);
+    await page.waitForTimeout(350);
+    assert.equal(await page.locator('.report-builder').evaluate(element => getComputedStyle(element).getPropertyValue('--report-surface').trim()), theme === 'dark' ? '#142135' : '#fff');
+    const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    assert.ok(dimensions.scroll <= dimensions.width + 1, `${theme} analytical totals and assigned configuration must fit on mobile`);
+    await page.screenshot({ path: path.join(outputDir, `analisis-financiero-asignado-390-${theme}.png`) });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  user = { id: 1, username: 'amendoza', role: 'ADMIN', permisos: [] };
+  await page.reload(); await page.waitForFunction(() => !document.querySelector('#report-assistant-message')?.disabled);
+
+  const beforeExact = requests.length;
+  await send(exactRequest);
+  await page.getByRole('button', { name: 'Ver reporte', exact: true }).waitFor();
+  assert.equal(requests.length, beforeExact + 1, 'An authorized exact account query runs without a date range');
+  assert.equal(requests.at(-1).fechaDesde, ''); assert.equal(requests.at(-1).fechaHasta, '');
+  await page.getByRole('complementary', { name: 'Configuración del reporte conversado' }).getByText('Consulta exacta sin período', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Ajustar filtros y columnas', exact: true }).click();
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await waitForExportEnabled();
+  await page.getByLabel('Fecha Desde', { exact: true }).fill('2026-09-01');
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await page.getByRole('alert').getByText(/Elige las fechas de inicio y fin/).waitFor();
+  assert.equal(requests.length, beforeExact + 2, 'An exact lookup does not bypass validation when only one date is supplied');
+  assert.equal(await page.getByRole('button', { name: /Descargar Excel Oficial/ }).isDisabled(), true);
+  await page.getByLabel('Fecha Desde', { exact: true }).fill('');
+  await page.getByRole('button', { name: 'Buscar información', exact: true }).click();
+  await waitForExportEnabled();
+  assert.equal(requests.length, beforeExact + 3);
+  await analysisReport.getByText(/Consulta de cuenta\/paciente por identificador/).waitFor();
+  const exactDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Descargar Excel Oficial/ }).click();
+  const exactDownload = await exactDownloadPromise;
+  const exactExcel = await fs.readFile(await exactDownload.path(), 'utf8');
+  assert.match(exactExcel, /Consulta de cuenta\/paciente por identificador/);
+  assert.doesNotMatch(exactExcel, /Período:  al |Período: - al -/);
+  await page.getByRole('button', { name: 'Crear con asistente', exact: true }).click();
+  await send(canonicalCurrencyRequest);
+  await page.getByRole('button', { name: 'Ver reporte', exact: true }).waitFor();
+  await page.getByLabel('Análisis solicitado', { exact: true }).getByText('Paciente · Moneda', { exact: true }).waitFor();
+  assert.deepEqual(await analysisReport.locator('thead th > div > div > span').allTextContents(), ['Paciente', 'Moneda', 'Total de Importe facturado SAP (Moneda de facturas SAP)']);
+  assert.deepEqual(await analysisReport.locator('tbody tr').first().locator('td').allTextContents(), ['Paciente de prueba OV', 'USD', '$120.00']);
+  await send(canonicalCurrencyFollowup);
+  await page.getByRole('button', { name: 'Ver reporte', exact: true }).waitFor();
+  assert.deepEqual(plans.at(-1).context.analysis.groupBy, ['PatientName', 'Currency'], 'The next conversation turn uses the backend canonical currency grouping');
+
   await send('Cirugías con paciente y médico');
   const beforeRevokedDraft = requests.length;
   user = { username: 'limited', role: 'JEFE_AREA', permisos: ['sap-query-inventory'] };
@@ -465,7 +1032,7 @@ try {
   await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(outputDir, 'inicio.png') });
   assert.deepEqual(errors, []);
-  console.log('PASS: informal topics/columns/filters, misspellings, mixed changes, order origins/OV clarification without loops or dropped patient requests, cleared local-guided notices, manual continuation of partial/unknown requests without auto-execution, preserved context/pending, revoked access, exact execution/export, errors/retry, permissions and light/dark at 390–1440 px.');
+  console.log('PASS: informal topics/columns/filters, clarification/context/pending, commercial concepts/defaults and numeric/text formatting, hidden SAP + Vertical resources and source permissions, saved reports/assignments/inactive recipients, analytical conditions/grouping/sums/distinct/order with canonical currency grouping, 120 groups/pagination/full Excel, saved/copied/assigned analysis, changed/failed/truncated-source export blocking, complete limited output, exact lookup without dates and partial-date validation, errors/retry and light/dark at 390–1440 px.');
 } catch (error) {
   if (page) { await page.screenshot({ path: path.join(outputDir, 'failure.png'), fullPage: true }); console.error(await page.locator('body').innerText()); }
   throw error;

@@ -7,6 +7,67 @@ const PAGE_SIZE = 200;
 const MAX_PAGES = 500;
 const MAX_SERVICE_PERIOD_DAYS = 93;
 const SAP_LOOKAHEAD_DAYS = 30;
+const DEFAULT_TOTAL_TIMEOUT_MS = 60 * 1000;
+const MAX_REQUEST_TIMEOUT_MS = 30 * 1000;
+
+function sapTimeoutError() {
+  return Object.assign(new Error('SAP tardó demasiado en responder. Vuelve a intentar en unos momentos.'), {
+    status: 504, code: 'HONORARIOS_SAP_TIMEOUT'
+  });
+}
+
+function positiveTimeout(value, fallback) {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function createSapReadBudget(options = {}) {
+  const totalTimeoutMs = positiveTimeout(options.totalTimeoutMs, DEFAULT_TOTAL_TIMEOUT_MS);
+  const requestTimeoutMs = Math.min(positiveTimeout(options.requestTimeoutMs, MAX_REQUEST_TIMEOUT_MS), MAX_REQUEST_TIMEOUT_MS);
+  const controller = new AbortController();
+  const deadline = Date.now() + totalTimeoutMs;
+  let failure;
+  function abort(error) {
+    if (!controller.signal.aborted) {
+      failure = error?.code === 'SAP_READ_TIMEOUT' ? sapTimeoutError() : error;
+      controller.abort(failure);
+    }
+    return failure;
+  }
+  function assertActive() {
+    if (controller.signal.aborted) throw failure;
+    if (Date.now() >= deadline) throw abort(sapTimeoutError());
+  }
+  const deadlineTimer = setTimeout(() => abort(sapTimeoutError()), totalTimeoutMs);
+  function get(endpoint, headers = {}) {
+    assertActive();
+    const timeoutMs = Math.min(requestTimeoutMs, deadline - Date.now());
+    // Además de abortar HTTP/login, se limita la espera de get completo, incluidos
+    // sus reintentos. Una respuesta tardía no puede avanzar la paginación.
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let requestTimer;
+      const settle = (error, response) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(requestTimer);
+        controller.signal.removeEventListener('abort', onAbort);
+        if (error) reject(error);
+        else resolve(response);
+      };
+      const onAbort = () => settle(failure);
+      controller.signal.addEventListener('abort', onAbort, { once: true });
+      requestTimer = setTimeout(() => abort(sapTimeoutError()), timeoutMs);
+      Promise.resolve().then(() => {
+        assertActive();
+        return sapService.get(endpoint, headers, { signal: controller.signal, timeoutMs });
+      }).then(response => {
+        try { assertActive(); settle(null, response); }
+        catch (error) { settle(error); }
+      }, error => settle(abort(error)));
+    });
+  }
+  return { get, abort, assertActive, cleanup: () => clearTimeout(deadlineTimer) };
+}
 
 function asNumber(value) {
   const number = Number(value);
@@ -65,7 +126,10 @@ function normalizeNextLink(nextLink) {
   return `${pathWithinApi}${parsed.search}`;
 }
 
-async function fetchAllPagesStrict(initialEndpoint, maxPages = MAX_PAGES) {
+async function fetchAllPagesStrict(initialEndpoint, maxPages = MAX_PAGES, options = {}) {
+  const budget = options.readBudget || createSapReadBudget(options);
+  const ownsBudget = !options.readBudget;
+  try {
   const values = [];
   let currentEndpoint = initialEndpoint;
   let pageCount = 0;
@@ -77,7 +141,7 @@ async function fetchAllPagesStrict(initialEndpoint, maxPages = MAX_PAGES) {
     pageCount += 1;
     // $top limita la colección completa, no el tamaño de cada página. Usarlo aquí
     // ocultaba proveedores a partir del 201 aunque SAP devolviera una respuesta válida.
-    const response = await sapService.get(currentEndpoint, { Prefer: `odata.maxpagesize=${PAGE_SIZE}` });
+    const response = await budget.get(currentEndpoint, { Prefer: `odata.maxpagesize=${PAGE_SIZE}` });
     const body = response && response.data;
     if (!body || !Array.isArray(body.value)) {
       throw new Error('SAP devolvió una página incompleta o con formato inesperado; no se calculará como cero.');
@@ -87,7 +151,13 @@ async function fetchAllPagesStrict(initialEndpoint, maxPages = MAX_PAGES) {
     currentEndpoint = nextLink ? normalizeNextLink(nextLink) : null;
   }
 
+  budget.assertActive();
   return values;
+  } catch (error) {
+    throw budget.abort(error);
+  } finally {
+    if (ownsBudget) budget.cleanup();
+  }
 }
 
 function collectionValues(value) {
@@ -162,7 +232,7 @@ function prepareProviderInputs(input) {
   return uniqueNames;
 }
 
-async function getInvoices(cardCodes, startDate, endDate) {
+async function getInvoices(cardCodes, startDate, endDate, budget) {
     // Una lectura paginada por fecha evita decenas de consultas OR concurrentes
     // que producen 504 en este Service Layer. Filtrar proveedores tras paginar.
     const filter = `DocDate ge '${startDate}' and DocDate le '${endDate}'`;
@@ -173,18 +243,18 @@ async function getInvoices(cardCodes, startDate, endDate) {
       'NumAtCard', 'Comments', 'U_UDF_UUID', 'WithholdingTaxDataCollection', 'WithholdingTaxDataWTXCollection', 'DocumentLines'
     ].join(',');
     const endpoint = `/PurchaseInvoices?$select=${select}&$filter=${encodeURIComponent(filter)}&$orderby=DocEntry asc`;
-    const results = await fetchAllPagesStrict(endpoint);
+  const results = await fetchAllPagesStrict(endpoint, MAX_PAGES, { readBudget: budget });
   const codes = new Set(cardCodes);
   const byEntry = new Map();
   results.filter(invoice => codes.has(String(invoice.CardCode))).forEach(invoice => byEntry.set(String(invoice.DocEntry), invoice));
   return [...byEntry.values()];
 }
 
-async function getPayments(cardCodes, startDate, endDate) {
+async function getPayments(cardCodes, startDate, endDate, budget) {
     const filter = `DocDate ge '${startDate}' and DocDate le '${endDate}'`;
     const select = ['DocEntry', 'DocNum', 'DocDate', 'CardCode', 'CardName', 'DocCurrency', 'Cancelled', 'PaymentInvoices'].join(',');
     const endpoint = `/VendorPayments?$select=${select}&$filter=${encodeURIComponent(filter)}&$orderby=DocEntry asc`;
-    const results = await fetchAllPagesStrict(endpoint);
+    const results = await fetchAllPagesStrict(endpoint, MAX_PAGES, { readBudget: budget });
     const codes = new Set(cardCodes);
     return results.filter(payment => codes.has(String(payment.CardCode)));
 }
@@ -226,18 +296,21 @@ function addPaymentApplications(payments, invoicesByEntry) {
   return { byInvoice: linked, byCardCode };
 }
 
-async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinicalDirectory = [], includeAdditional = false }) {
+async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinicalDirectory = [], includeAdditional = false, scope = 'documents' }, options = {}) {
+  if (!['fiscal', 'documents'].includes(scope)) throw Object.assign(new Error('El alcance de la consulta no es válido.'), { status: 400 });
+  const documentsQueried = scope === 'documents';
+  if (!documentsQueried) includeAdditional = false;
   if (!isValidDate(startDate) || !isValidDate(endDate) || startDate > endDate) {
     throw new Error('El periodo de servicios no es válido.');
   }
   const periodDays = (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86400000 + 1;
   if (periodDays > MAX_SERVICE_PERIOD_DAYS) throw new Error(`El periodo de servicios no puede exceder ${MAX_SERVICE_PERIOD_DAYS} días.`);
   // Extiende SAP automáticamente para incluir facturas y pagos posteriores al servicio.
-  const sapEndDate = addDays(endDate, SAP_LOOKAHEAD_DAYS);
+  const sapEndDate = documentsQueried ? addDays(endDate, SAP_LOOKAHEAD_DAYS) : endDate;
   const period = {
     startDate, endDate: sapEndDate, serviceStartDate: startDate, serviceEndDate: endDate,
-    lookaheadDays: SAP_LOOKAHEAD_DAYS,
-    dateBasis: 'fecha de contabilización de factura y fecha del pago'
+    lookaheadDays: documentsQueried ? SAP_LOOKAHEAD_DAYS : 0,
+    dateBasis: documentsQueried ? 'fecha de contabilización de factura y fecha del pago' : 'fecha de servicios para la información fiscal'
   };
   const doctorNames = prepareProviderInputs(doctors);
   if (doctorNames.length === 0 && !includeAdditional) {
@@ -245,6 +318,7 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
       ok: true,
       source: 'SAP Business One Service Layer',
       readOnly: true,
+      documentsQueried,
       asOf: new Date().toISOString(),
       period,
       scope: 'Sin médicos en el reporte de honorarios para conciliar.',
@@ -252,11 +326,13 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
     };
   }
 
+  const budget = createSapReadBudget(options);
+  try {
   // La primera lectura establece la sesión antes de lanzar consultas concurrentes.
-  const suppliers = await fetchAllPagesStrict(`/BusinessPartners?$select=CardCode,CardName,GroupCode,FederalTaxID,U_B1SYS_FiscRegime,SubjectToWithholdingTax,BPWithholdingTaxCollection&$filter=CardType eq 'cSupplier'&$orderby=CardCode asc`);
+  const suppliers = await fetchAllPagesStrict(`/BusinessPartners?$select=CardCode,CardName,GroupCode,FederalTaxID,U_B1SYS_FiscRegime,SubjectToWithholdingTax,BPWithholdingTaxCollection&$filter=CardType eq 'cSupplier'&$orderby=CardCode asc`, MAX_PAGES, { readBudget: budget });
   const [groups, withholdingCodes] = await Promise.all([
-    fetchAllPagesStrict('/BusinessPartnerGroups?$select=Code,Name'),
-    fetchAllPagesStrict('/WithholdingTaxCodes?$select=WTCode,WTName,Rate,BaseType,BaseAmount,Category,EffectiveFrom,Inactive')
+    documentsQueried ? fetchAllPagesStrict('/BusinessPartnerGroups?$select=Code,Name', MAX_PAGES, { readBudget: budget }) : Promise.resolve([]),
+    fetchAllPagesStrict('/WithholdingTaxCodes?$select=WTCode,WTName,Rate,BaseType,BaseAmount,Category,EffectiveFrom,Inactive', MAX_PAGES, { readBudget: budget })
   ]);
   const groupNames = new Map(groups.map(group => [String(group.Code), group.Name]));
   const taxCodes = new Map(withholdingCodes.map(code => [String(code.WTCode), code]));
@@ -306,8 +382,8 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
     .filter(([name, candidates]) => candidates.length === 1 && (additionalLinks.has(name) || !crossLinkedCodes.has(String(candidates[0].CardCode))))
     .map(([, candidates]) => String(candidates[0].CardCode))
     .filter(Boolean))];
-  const [invoices, payments] = cardCodes.length
-    ? await Promise.all([getInvoices(cardCodes, startDate, sapEndDate), getPayments(cardCodes, startDate, sapEndDate)])
+  const [invoices, payments] = documentsQueried && cardCodes.length
+    ? await Promise.all([getInvoices(cardCodes, startDate, sapEndDate, budget), getPayments(cardCodes, startDate, sapEndDate, budget)])
     : [[], []];
   const invoicesByEntry = new Map(invoices.map(invoice => [String(invoice.DocEntry), invoice]));
   // Conserva también la factura a la que se aplicó un pago del periodo aunque
@@ -319,7 +395,7 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
       const id = String(application.DocEntry);
       if (invoicesByEntry.has(id)) continue;
       if (!/^\d+$/.test(id)) throw new Error('SAP devolvió un identificador de factura inválido.');
-      const response = await sapService.get(`/PurchaseInvoices(${id})`);
+      const response = await budget.get(`/PurchaseInvoices(${id})`);
       const invoice = response?.data;
       if (String(invoice?.DocEntry) !== id || String(invoice?.CardCode) !== String(payment.CardCode)) {
         throw new Error('No se pudo verificar la factura aplicada a un pago de SAP.');
@@ -437,6 +513,7 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
 
     providers[name] = {
       linkStatus: status,
+      documentsQueried,
       candidates: candidates.map(row => ({
         cardCode: row.CardCode,
         cardName: row.CardName,
@@ -449,9 +526,7 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
         subjectToWithholding: optionalSapBoolean(row.SubjectToWithholdingTax),
         configuredWithholdings: collectionValues(row.BPWithholdingTaxCollection).map(item => configuredWithholding(item, taxCodes))
       })),
-      invoices: providerInvoices,
-      totalsByCurrency,
-      paymentsInPeriod: providerPayments
+      ...(documentsQueried ? { invoices: providerInvoices, totalsByCurrency, paymentsInPeriod: providerPayments } : {})
     };
     if (additional) {
       if (providerInvoices.length || providerPayments.length) {
@@ -468,10 +543,12 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
     }
   }
 
+  budget.assertActive();
   return {
     ok: true,
     source: 'SAP Business One Service Layer',
     readOnly: true,
+    documentsQueried,
     supplierCoverage: {
       count: suppliers.length,
       withFiscalRegime: suppliers.filter(row => String(row.U_B1SYS_FiscRegime || '').trim()).length,
@@ -479,7 +556,9 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
     },
     asOf: new Date().toISOString(),
     period,
-    scope: 'Conciliación a nivel proveedor/documento. El nombre solo propone una coincidencia; no hay vínculo comprobado a CFDI ni atención de Vertical.',
+    scope: documentsQueried
+      ? 'Conciliación a nivel proveedor/documento. El nombre solo propone una coincidencia; no hay vínculo comprobado a CFDI ni atención de Vertical.'
+      : 'Consulta fiscal de proveedores y retenciones. No se consultaron facturas ni pagos de SAP.',
     providers,
     additionalProviders,
     discoveryCoverage: {
@@ -488,6 +567,11 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
       scope: 'Grupos médicos, catálogo clínico y grupo general Honorarios. Los candidatos requieren aprobación; el grupo general puede incluir servicios no médicos.'
     }
   };
+  } catch (error) {
+    throw budget.abort(error);
+  } finally {
+    budget.cleanup();
+  }
 }
 
 module.exports = { reconcileHonorariosWithSap, fetchAllPagesStrict, normalizeProviderName, configuredWithholding, optionalSapBoolean };

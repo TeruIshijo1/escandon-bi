@@ -446,5 +446,26 @@
     "icon": "🔄",
     "entity": "vertical_clinical_return_tickets",
     "category": "Vertical · Farmacia Clínica"
+  },
+  {
+    "id": "sap-query-assistant_commercial_agreements",
+    "name": "Convenios y condiciones comerciales de Vertical",
+    "icon": "🧩",
+    "entity": "assistant_commercial_agreements",
+    "category": "Vertical · Recursos para crear con asistente"
+  },
+  {
+    "id": "sap-query-assistant_vertical_resources",
+    "name": "Recursos financieros, administrativos y clínicos ampliados",
+    "icon": "🧩",
+    "entity": "assistant_vertical_resources",
+    "category": "Vertical · Recursos para crear con asistente"
+  },
+  {
+    "id": "sap-query-assistant_sap_resources",
+    "name": "Recursos financieros y administrativos ampliados",
+    "icon": "🧩",
+    "entity": "assistant_sap_resources",
+    "category": "SAP · Recursos para crear con asistente"
   }
 ]

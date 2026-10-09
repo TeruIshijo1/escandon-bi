@@ -67,10 +67,26 @@ try {
       result.reviews = Object.fromEntries(body.rows.map(input => [input.rowId, { ...body.decision,
         fingerprint: input.fingerprint, revision: input.expectedRevision + 1, reviewer: 'REVISOR DE EJEMPLO' }]));
       Object.assign(reviews, result.reviews); result.savedCount = body.rows.length; result.errors = [];
-    } else if (endpoint === '/sap-reconciliation') { result.providers = Object.fromEntries(body.doctors.map(name => [name, { linkStatus: 'sin_coincidencia', candidates: [], invoices: [] }])); result.additionalProviders = []; }
+    } else if (endpoint === '/sap-reconciliation') {
+      assert.equal(body.scope, 'fiscal'); result.documentsQueried = false;
+      result.providers = Object.fromEntries(body.doctors.map(name => [name, { linkStatus: 'sin_coincidencia', candidates: [] }])); result.additionalProviders = [];
+    }
+    else if (endpoint === '/available-payment-report') {
+      const selected = calculateHonorarios(sources, reviews, {}, '', profiles).filter(row => String(row.MedicoId) === String(body.providerId) && row._effectiveElegible);
+      const lines = selected.map(row => ({ rowId: row._rowId, providerId: row.MedicoId, providerName: row.Medico,
+        description: row.Servicio, serviceDate: String(row.FechaAtencion).slice(0, 10), quantity: Number(row.Cantidad), unitAmount: 225,
+        baseAmount: row._effectiveBase, vatRate: row._effectiveVatRate, vat: row._effectiveIVA,
+        isr: row._effectiveISR, vatWithholding: row._effectiveRetIVA, netAmount: row._effectiveNeto }));
+      const sum = field => lines.some(line => line[field] == null) ? null : Math.round(lines.reduce((total, line) => total + line[field], 0) * 100) / 100;
+      const totals = { base: sum('baseAmount'), vat: sum('vat'), isr: sum('isr'), vatWithholding: sum('vatWithholding'), net: sum('netAmount') };
+      const ready = totals.net !== null;
+      result.report = { version: 1, status: ready ? 'AVAILABLE' : 'FISCAL_PENDING', currency: 'MXN', generatedAt: '2026-10-08T18:00:00Z',
+        period: { startDate: body.startDate, endDate: body.endDate }, totals,
+        doctors: [{ providerId: 144, providerName, fiscal: { federalTaxId: profiles[144]?.federalTaxId, fiscalRegime: profiles[144]?.fiscalRegime, ready }, totals, lines }] };
+    }
     else if (endpoint === '/liquidations') {
       if (method === 'GET') result.liquidations = saved ? [{ id: 1, provider_id: '144', start_date: '2026-10-01', end_date: '2026-10-05', lines: 8, total_net: 1716 }] : [];
-      else if (!profiles[144]?.enabled) { status = 400; result.error = 'Completa los datos fiscales del médico para preparar su pago.'; }
+      else if (!profiles[144]?.enabled) { status = 400; result.error = 'Completa los datos fiscales del médico para preparar su pago.'; result.preparationStatus = 'NOT_CREATED'; }
       else {
         closeWrites++;
         const calculated = calculateHonorarios(sources, reviews, {}, '', profiles).filter(row => row.MedicoId === 144);

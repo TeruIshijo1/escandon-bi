@@ -9,5 +9,11 @@ const permissions = getEntityCatalog().map(entity => ({
   id: `sap-query-${entity.id}`, name: entity.title, icon: entity.icon, entity: entity.id,
   category: `${entity.source} · ${entity.category}`
 }));
+permissions.push(...[
+  ['assistant_commercial_agreements', 'Convenios y condiciones comerciales de Vertical', 'Vertical'],
+  ['assistant_vertical_resources', 'Recursos financieros, administrativos y clínicos ampliados', 'Vertical'],
+  ['assistant_sap_resources', 'Recursos financieros y administrativos ampliados', 'SAP']
+].map(([entity, name, source]) => ({ id: `sap-query-${entity}`, name, icon: '🧩', entity,
+  category: `${source} · Recursos para crear con asistente` })));
 fs.writeFileSync(path.join(__dirname, '../frontend/src/utils/reportQueryPermissions.json'), `${JSON.stringify(permissions, null, 2)}\n`);
 console.log(`Permisos de ${permissions.length} módulos sincronizados.`);

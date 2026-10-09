@@ -8,6 +8,15 @@ const catalog = [
 ];
 const dates = { fechaDesde: '2026-09-01', fechaHasta: '2026-09-30' };
 const proposal = (extra = {}) => ({ status: 'ready', message: 'Preparé las cirugías.', plan: { entity: 'vertical_surgeries', selectedFields: ['Patient', 'Doctor'], filters: dates }, ...extra });
+const analysisEntity = { id: 'vertical_accounts', title: 'Cuentas hospitalarias', aliases: ['cuentas'], source: 'Vertical', filters: [], requiresDateFilter: true,
+  pointLookupFields: ['PCNum', 'PTNum'], defaultFields: ['PCNum', 'PatientName', 'Customer', 'Balance'],
+  fields: [{ key: 'PCNum', label: 'Folio de atención', type: 'number' }, { key: 'PTNum', label: 'Número de paciente', type: 'number' },
+    { key: 'PatientName', label: 'Paciente', type: 'string' }, { key: 'Customer', label: 'Cliente / aseguradora', aliases: ['cliente'], type: 'string' },
+    { key: 'Balance', label: 'Saldo de cuenta', aliases: ['saldo'], type: 'money' }, { key: 'Total', label: 'Total de cuenta', type: 'money' },
+    { key: 'Rate', label: 'Precio unitario', type: 'money' }] };
+const analysisPlan = (analysis, filters = dates) => ({ entity: analysisEntity.id, selectedFields: analysisEntity.defaultFields, filters, ...(analysis ? { analysis } : {}) });
+const analysisResponse = plan => ({ status: 'ready', message: 'Preparé las cuentas.', plan });
+const providerResponse = plan => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(analysisResponse(plan)) } }] }) });
 const envKeys = ['GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY', 'GEMINI_MODEL', 'DEEPSEEK_MODEL', 'OPENAI_MODEL', 'LLM_BASE_URL', 'AZURE_OPENAI_ENDPOINT'];
 let originalEnv;
 beforeEach(() => { originalEnv = Object.fromEntries(envKeys.map(key => [key, process.env[key]])); envKeys.forEach(key => delete process.env[key]); });
@@ -18,6 +27,93 @@ test('valid proposals preserve exact columns and bounded supported filters', () 
   expect(result.status).toBe('ready');
   expect(result.plan.fieldLabels).toEqual(['Paciente', 'Médicos registrados']);
   expect(result.plan.filters).toEqual({ ...dates, almacen: 'ALL', estatusDoc: 'ALL', clasificacionMedica: 'ALL', busqueda: '' });
+});
+
+test('validated bounded analysis is public, canonical, and separate from source columns', () => {
+  const result = validateProposal(analysisResponse(analysisPlan({ predicates: [{ field: 'Balance', op: 'gt', value: 10000 }], groupBy: ['Customer'],
+    measures: [{ op: 'sum', field: 'Balance' }], orderBy: [{ field: 'metric_0', direction: 'desc' }] })), [analysisEntity]);
+  expect(result).toMatchObject({ status: 'ready', plan: { selectedFields: analysisEntity.defaultFields,
+    analysis: { predicates: [{ field: 'Balance', op: 'gt', value: '10000' }], groupBy: ['Customer'], measures: [{ op: 'sum', field: 'Balance' }], orderBy: [{ field: 'metric_0', direction: 'desc' }] } } });
+  expect(result.plan.analysisSummary.measures[0]).toMatch(/Saldo de cuenta/);
+  expect(result.plan.selectedFields).not.toContain('metric_0');
+});
+
+test.each([
+  { predicates: [{ field: 'Secret', op: 'eq', value: 1 }] },
+  { predicates: [{ field: 'Balance', op: 'gt', value: '1 + 1' }] },
+  { predicates: [{ field: 'Balance', op: 'between', values: [1] }] },
+  { predicates: [{ field: 'Balance', op: 'between', values: [100, 50] }] },
+  { predicates: [{ field: 'Balance', op: 'isNull', value: 0 }] },
+  { predicates: Array.from({ length: 9 }, () => ({ field: 'Balance', op: 'eq', value: 1 })) },
+  { groupBy: ['Customer'], having: [{ op: 'gt', value: 1 }] },
+  { groupBy: ['Customer'], compare: 'previous-month' },
+  { measures: [{ op: 'avg', field: 'Balance' }] },
+  { measures: [{ op: 'sum', field: 'Rate' }] },
+  { measures: [{ op: 'count', field: 'PCNum' }] },
+  { measures: [{ op: 'countDistinct' }] },
+  { measures: [{ op: 'sum', field: 'Balance' }], orderBy: [{ field: 'Balance', direction: 'desc' }] },
+  { orderBy: [{ field: 'metric_0', direction: 'desc' }] },
+  { orderBy: [{ field: 'Balance', direction: 'desc' }], topN: 10 },
+])('untrusted analysis cannot introduce keys, units, expressions or unsupported operations: %j', analysis => {
+  expect(validateProposal(analysisResponse(analysisPlan(analysis)), [analysisEntity])).toMatchObject({ status: 'unsupported', plan: null });
+});
+
+test('only a trusted exact positive identifier permits an undated plan; a partial period remains incomplete', () => {
+  const lookup = { predicates: [{ field: 'PCNum', op: 'eq', value: '123' }] };
+  expect(validateProposal(analysisResponse(analysisPlan(lookup, {})), [analysisEntity]).status).toBe('ready');
+  expect(validateProposal(analysisResponse(analysisPlan(lookup, { fechaDesde: '2026-09-01' })), [analysisEntity]).status).toBe('clarification');
+  for (const analysis of [{ predicates: [{ field: 'PCNum', op: 'gt', value: '123' }] }, { predicates: [{ field: 'PCNum', op: 'eq', value: '-1' }] },
+    { predicates: [{ field: 'PatientName', op: 'eq', value: 'Juan Pérez' }] }]) {
+    expect(validateProposal(analysisResponse(analysisPlan(analysis, {})), [analysisEntity]).status).toBe('clarification');
+  }
+  expect(validateProposal(analysisResponse(analysisPlan(lookup, {})), [{ ...analysisEntity, pointLookupFields: [] }]).status).toBe('clarification');
+});
+
+test('provider metadata declares exact bounded operations and preserves prior analysis when changing dates', async () => {
+  process.env.OPENAI_API_KEY = 'synthetic-test-key';
+  const analysis = { predicates: [{ field: 'Balance', op: 'gt', value: '10000' }], groupBy: ['Customer'], measures: [{ op: 'sum', field: 'Balance' }], orderBy: [{ field: 'metric_0', direction: 'desc' }] };
+  const context = { ...analysisPlan(analysis), ignoredRow: { PatientName: 'never-send-records' } };
+  const fetchImpl = jest.fn().mockResolvedValue(providerResponse(analysisPlan(null)));
+  const result = await prepareReport({ message: 'Mejor primera quincena de septiembre', context, catalog: [analysisEntity], now: new Date('2026-10-01T15:00:00Z'), fetchImpl });
+  expect(result).toMatchObject({ status: 'ready', engine: 'ai', plan: { analysis, filters: { fechaDesde: '2026-09-01', fechaHasta: '2026-09-15' } } });
+  const payload = JSON.parse(fetchImpl.mock.calls[0][1].body);
+  expect(payload.messages[0].content).toContain('"analysisCapabilities"');
+  expect(payload.messages[0].content).toContain('"sumAllowed":true');
+  expect(payload.messages[0].content).toContain('"sumAllowed":false');
+  expect(payload.messages[0].content).toContain('metric_0');
+  expect(payload.messages[0].content).toContain('pointLookupFields');
+  expect(JSON.stringify(payload)).not.toContain('never-send-records');
+  expect(JSON.parse(payload.messages.at(-1).content).context.analysis).toEqual(analysis);
+});
+
+test('a model cannot silently drop an explicit local financial condition or replace it with another threshold', async () => {
+  process.env.OPENAI_API_KEY = 'synthetic-test-key';
+  const fetchImpl = jest.fn().mockResolvedValue(providerResponse(analysisPlan({ predicates: [{ field: 'Balance', op: 'gt', value: '1' }] })));
+  const result = await prepareReport({ message: 'Cuentas con saldo mayor a $10,000 del mes pasado', catalog: [analysisEntity], now: new Date('2026-10-01T15:00:00Z'), fetchImpl });
+  expect(result).toMatchObject({ status: 'ready', plan: { analysis: { predicates: [{ field: 'Balance', op: 'gt', value: '10000' }] } } });
+});
+
+test('a model clarification retains the validated analysis and known period in its draft', async () => {
+  process.env.OPENAI_API_KEY = 'synthetic-test-key';
+  const analysis = { predicates: [{ field: 'Balance', op: 'gt', value: '10000' }], groupBy: ['Customer'], measures: [{ op: 'sum', field: 'Balance' }], orderBy: [] };
+  const fetchImpl = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ status: 'clarification', message: 'Necesito un dato más.', plan: analysisPlan(null) }) } }] }) });
+  const result = await prepareReport({ message: 'Mejor primera quincena de septiembre', context: analysisPlan(analysis), catalog: [analysisEntity], now: new Date('2026-10-01T15:00:00Z'), fetchImpl });
+  expect(result).toMatchObject({ status: 'clarification', plan: { analysis, filters: { fechaDesde: '2026-09-01', fechaHasta: '2026-09-15' } } });
+});
+
+test('an implicit model detail exposes the amount used by the requested predicate', async () => {
+  process.env.OPENAI_API_KEY = 'synthetic-test-key';
+  const entity = { ...analysisEntity, defaultFields: ['PCNum', 'PatientName'] };
+  const fetchImpl = jest.fn().mockResolvedValue(providerResponse({ ...analysisPlan(null), selectedFields: entity.defaultFields }));
+  const result = await prepareReport({ message: 'Cuentas de septiembre con saldo mayor a 10000', catalog: [entity], now: new Date('2026-10-01T15:00:00Z'), fetchImpl });
+  expect(result).toMatchObject({ status: 'ready', plan: { selectedFields: ['PCNum', 'PatientName', 'Balance'] } });
+});
+
+test.each(['Top 10 cuentas por saldo', 'Compara septiembre contra agosto', 'Calcula el promedio de saldo'])('a valid model detail proposal cannot erase an unsupported requested operation: %s', async message => {
+  process.env.OPENAI_API_KEY = 'synthetic-test-key';
+  const fetchImpl = jest.fn().mockResolvedValue(providerResponse(analysisPlan(null)));
+  const result = await prepareReport({ message, context: analysisPlan(null), catalog: [analysisEntity], now: new Date('2026-10-01T15:00:00Z'), fetchImpl });
+  expect(result).toMatchObject({ status: 'unsupported', plan: null });
 });
 
 test.each([
@@ -47,6 +143,25 @@ test.each([{}, { fechaDesde: '2026-09-31', fechaHasta: '2026-10-01' }, { fechaDe
 
 test('choices disclose authorized titles only', () => {
   expect(validateProposal({ status: 'clarification', choices: ['unknown', 'inventory', 'inventory'], message: 'Elige un tema.' }, catalog).choices).toEqual([{ id: 'inventory', title: 'Inventario por almacén' }]);
+});
+
+test('internal capabilities remain bounded and send descriptive metadata rather than executable joins to the provider', async () => {
+  process.env.OPENAI_API_KEY = 'synthetic-test-key';
+  const capability = { ...catalog[0], id: 'assistant_internal_account', assistantOnly: true, source: 'SAP + Vertical',
+    sources: ['SAP', 'Vertical'], title: 'Cuenta y pagador', aliases: ['cuenta con informacion del pagador'], grain: 'Una fila por cuenta',
+    sql: 'sensitive server implementation', requiredEntities: ['customers', 'vertical_accounts'] };
+  const plan = { entity: capability.id, selectedFields: ['Patient', 'Doctor'], filters: dates };
+  const fetchImpl = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ status: 'ready', plan }) } }] }) });
+  const result = await prepareReport({ message: 'Cuenta con informacion del pagador del mes pasado con paciente y médico',
+    catalog: [capability], now: new Date('2026-10-01T15:00:00Z'), fetchImpl });
+  expect(result).toMatchObject({ status: 'ready', engine: 'ai', plan: { ...plan, source: 'SAP + Vertical' } });
+  const system = JSON.parse(fetchImpl.mock.calls[0][1].body).messages[0].content;
+  expect(system).toContain('"assistantOnly":true');
+  expect(system).toContain('"aliases":["cuenta con informacion del pagador"]');
+  expect(system).toContain('"sources":["SAP","Vertical"]');
+  expect(system).not.toContain('sensitive server implementation');
+  expect(system).not.toContain('requiredEntities');
+  expect(validateProposal({ status: 'ready', plan: { ...plan, joins: ['customers'] } }, [capability])).toMatchObject({ status: 'unsupported', plan: null });
 });
 
 test('relative dates respect Mexico City at month/year boundaries', () => {
@@ -275,7 +390,7 @@ test('Gemini rate limits use at most one retry on another available stable model
   expect(JSON.parse(fetchImpl.mock.calls[2][1].body).model).toBe('gemini-3.5-flash');
 });
 
-test.each([[401, 'credentials'], [403, 'access'], [404, 'model'], [429, 'rate_limit'], [503, 'capacity'], [502, 'provider']])(
+test.each([[401, 'credentials'], [402, 'billing'], [403, 'access'], [404, 'model'], [429, 'rate_limit'], [503, 'capacity'], [502, 'provider']])(
   'provider HTTP %s has an allowlisted internal diagnosis and keeps guided mode', async (httpStatus, category) => {
     process.env.OPENAI_API_KEY = 'do-not-log-this-key';
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});

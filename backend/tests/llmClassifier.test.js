@@ -31,3 +31,29 @@ test('without a configured provider keeps the local classifier available and mak
   expect(await classifyWithLLM('quiero las cirugias', [])).toBeNull();
   expect(global.fetch).not.toHaveBeenCalled();
 });
+
+test('no authorized intents makes no external request even with an API key', async () => {
+  process.env.GEMINI_API_KEY = 'fictional';
+  const { classifyWithLLM } = require('../services/aria/core/llmClassifier');
+  expect(await classifyWithLLM('Una consulta privada', [])).toBeNull();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test('billing failure is safely reported once and never reads an external error body', async () => {
+  process.env.GEMINI_API_KEY = 'fictional-secret-key';
+  const json = jest.fn(); global.fetch.mockResolvedValue({ ok: false, status: 402, json });
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const diagnostic = jest.fn();
+  const { classifyWithLLM } = require('../services/aria/core/llmClassifier');
+  expect(await classifyWithLLM('quiero las cirugias', [{ id: 'cirugias_dia', patterns: [] }], { onDiagnostic: diagnostic })).toBeNull();
+  expect(diagnostic).toHaveBeenCalledWith(expect.objectContaining({ provider: 'gemini', category: 'billing', httpStatus: 402 }));
+  expect(global.fetch).toHaveBeenCalledTimes(1); expect(json).not.toHaveBeenCalled();
+  expect(JSON.stringify(warning.mock.calls)).not.toContain('fictional-secret-key'); warning.mockRestore();
+});
+
+test('classifier never executes an intent invented by the provider', async () => {
+  process.env.GEMINI_API_KEY = 'fictional';
+  global.fetch.mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: 'private-finances' } }] }) });
+  const { classifyWithLLM } = require('../services/aria/core/llmClassifier');
+  expect(await classifyWithLLM('Una pregunta nueva', [{ id: 'cirugias_dia', patterns: [] }])).toBeNull();
+});

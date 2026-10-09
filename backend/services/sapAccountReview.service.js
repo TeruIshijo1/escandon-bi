@@ -20,6 +20,7 @@ const REQUEST_BUDGET_MS = 120000;
 const REVIEW_BUDGET_MS = 240000;
 const SAP_CALL_TIMEOUT_MS = 30000;
 const MAX_ENDPOINT_LENGTH = 1800;
+const CANCELLATION_CONFLICT_REASON = 'SAP muestra un documento cancelado con estado Abierto; revisa esa inconsistencia antes de confirmar la reapertura.';
 const BALANCE_COLUMNS = 'T0.TransId, T0.Line_ID, T0.ShortName, T0.TransType, T0.CreatedBy, T0.Closed, T0.BalDueDeb, T0.BalDueCred, T0.BalFcDeb, T0.BalFcCred, T0.BalScDeb, T0.BalScCred';
 const SQL_QUERIES = {
   sq_bi_reopen_balance_v2: `SELECT ${BALANCE_COLUMNS} FROM JDT1 T0 WHERE T0.ShortName = :cardCode AND T0.TransType = :objectType AND T0.CreatedBy = :objectEntry`,
@@ -157,9 +158,9 @@ function int(value) {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed <= 2147483647 ? parsed : null;
 }
-function accountNumber(value) {
+function accountNumber(value, label = 'cuenta') {
   const number = typeof value === 'string' ? int(value.trim()) : null;
-  if (!number) throw fail('El número de cuenta debe contener sólo dígitos y ser mayor a cero.');
+  if (!number) throw fail(`El número de ${label} debe contener sólo dígitos y ser mayor a cero.`);
   return String(number);
 }
 function literal(value) { return `'${String(value).replace(/'/g, "''")}'`; }
@@ -318,29 +319,37 @@ function key(def, entry) { return `${def.entity}:${entry}`; }
 function identity(def, doc) { return int(def.kind === 'reconciliation' ? doc.ReconNum : def.kind === 'journal' ? doc.JdtNum : doc.DocEntry); }
 function definition(type) { return TYPES.get(String(type)) || REF_TYPES.get(String(type)); }
 function arrays(doc, field) {
-  if (!Array.isArray(doc[field])) throw fail(`SAP no informó la colección ${field}.`, 502);
+  if (!Array.isArray(doc[field])) throw fail('SAP no informó todos los vínculos de un documento.', 502);
   return doc[field];
+}
+
+async function accountKeys(def, account, validatedQueries) {
+  let entries;
+  try { entries = await sqlRows(def.accountQuery, { account: Number(account) }, validatedQueries); }
+  catch (error) {
+    if (String(error.code) !== '702') throw error;
+    // A SQL table allowlist rejection never proves that the account is absent.
+    // Verify native header and line folios in both search and detailed review.
+    const parts = await Promise.all([
+      readPages(endpoint(def.entity, { $select: 'DocEntry', $filter: `U_PCNum eq ${account}`, $orderby: 'DocEntry desc' })),
+      readPages(lineQuery(def, `${def.entity}/${def.kind === 'transfer' ? 'StockTransferLines' : 'DocumentLines'}/U_PCNum eq ${account}`)),
+    ]);
+    const byEntry = new Map(parts[0].rows.map(row => [int(row.DocEntry), row]));
+    for (const row of parts[1].rows) {
+      const DocEntry = int(row[def.entity]?.DocEntry);
+      if (!byEntry.has(DocEntry)) byEntry.set(DocEntry, { DocEntry });
+    }
+    if (byEntry.has(null)) throw fail('SAP devolvió un folio de cuenta sin identificador.', 502);
+    entries = [...byEntry.values()];
+  }
+  if (entries.length > MAX_NODES || entries.some(doc => int(doc.DocEntry) === null)) throw fail('No se pudieron verificar todos los documentos de la cuenta.', 502);
+  return entries;
 }
 
 async function accountDocuments(account, onWarning, definitions = SEEDS, validatedQueries = new Set()) {
   const documents = new Map();
   const results = await parallel(definitions.map(def => async () => {
-    let entries;
-    try { entries = await sqlRows(def.accountQuery, { account: Number(account) }, validatedQueries); }
-    catch (error) {
-      if (String(error.code) !== '702') throw error;
-      // SAP's SQL table allowlist does not include some inventory tables.
-      // Native GET still exposes them. Verify both header and line folios;
-      // rejection/timeout in either path remains an incomplete audit.
-      const parts = await Promise.all([
-        readPages(endpoint(def.entity, { $select: 'DocEntry', $filter: `U_PCNum eq ${account}`, $orderby: 'DocEntry desc' })),
-        readPages(lineQuery(def, `${def.entity}/${def.kind === 'transfer' ? 'StockTransferLines' : 'DocumentLines'}/U_PCNum eq ${account}`)),
-      ]);
-      const ids = new Set([...parts[0].rows.map(row => int(row.DocEntry)), ...parts[1].rows.map(row => int(row[def.entity]?.DocEntry))]);
-      if (ids.has(null)) throw fail('SAP devolvió un folio de cuenta sin identificador.', 502);
-      entries = [...ids].map(DocEntry => ({ DocEntry }));
-    }
-    if (entries.length > MAX_NODES || entries.some(doc => int(doc.DocEntry) === null)) throw fail('No se pudieron verificar todos los documentos de la cuenta.', 502);
+    const entries = await accountKeys(def, account, validatedQueries);
     const records = await parallel(entries.map(row => async () => {
       const doc = (await get(`/${def.entity}(${int(row.DocEntry)})`)).data;
       if (identity(def, doc) !== int(row.DocEntry)) throw fail('SAP devolvió un documento distinto al solicitado.', 502);
@@ -377,47 +386,115 @@ function patientNameForAccount(records, account) {
 
 function documentNode({ def, doc }, status = documentStatus(doc)) {
   const entry = identity(def, doc);
+  const cancellationDocument = doc.CancelStatus === 'csCancellation';
   return { id: key(def, entry), entity: def.entity, docEntry: entry,
-    docNum: doc.DocNum ?? doc.Number ?? doc.ReconNum ?? null, typeLabel: def.label,
-    status, statusBasis: 'document', sapStatus: doc.DocumentStatus ?? doc.DocStatus ?? null, cancelled: cancellation(doc),
+    docNum: doc.DocNum ?? doc.Number ?? doc.ReconNum ?? null,
+    typeLabel: cancellationDocument ? `${def.label} (documento de cancelación)` : def.label,
+    status, statusBasis: 'document', sapStatus: doc.DocumentStatus ?? doc.DocStatus ?? null,
+    cancelled: cancellation(doc), cancellationDocument,
+    cancellationStatusConflict: def.kind === 'document' && cancellation(doc) === true
+      && [doc.DocumentStatus, doc.DocStatus].some(value => ['bost_Open', 'O'].includes(value)),
     date: doc.DocDate ?? doc.ReferenceDate ?? doc.ReconDate ?? null,
     total: doc.DocTotal == null ? null : doc.DocCurrency && doc.DocCurrency !== (process.env.SAP_LOCAL_CURRENCY || 'MXN') ? doc.DocTotalFc ?? null : doc.DocTotal,
-    currency: doc.DocCurrency ?? null };
+    currency: doc.DocCurrency ?? null, cardCode: doc.CardCode ?? null, cardName: doc.CardName ?? null };
+}
+
+function mapSummary(nodes) {
+  const summary = { total: nodes.length, open: 0, unknown: 0, closed: 0, settled: 0, cancelled: 0 };
+  for (const node of nodes) if (Object.hasOwn(summary, node.status)) summary[node.status] += 1;
+  return summary;
+}
+
+function knownDocumentEdges(records) {
+  const knownIds = new Set(records.map(({ def, doc }) => key(def, identity(def, doc))));
+  const edges = new Map();
+  for (const { def, doc } of records) {
+    const target = key(def, identity(def, doc));
+    const addBase = (type, entry, label) => {
+      const sourceDef = definition(type);
+      const sourceEntry = int(entry);
+      if (!sourceDef || sourceEntry === null) return;
+      const source = key(sourceDef, sourceEntry);
+      if (knownIds.has(source) && source !== target) edges.set(`${source}|${target}|${label}`, { source, target, label });
+    };
+    for (const line of Array.isArray(doc.DocumentLines) ? doc.DocumentLines : []) addBase(line.BaseType, line.BaseEntry, 'Documento base');
+    addBase(doc.BaseType, doc.BaseEntry, 'Documento base');
+    addBase(doc.RelatedType, doc.RelatedEntry, 'Documento relacionado');
+    for (const ref of Array.isArray(doc.DocumentReferences) ? doc.DocumentReferences : []) addBase(ref.RefObjType, ref.RefDocEntr, 'Referencia SAP');
+  }
+  return [...edges.values()];
 }
 
 async function reviewWithoutInvoice(account, validatedQueries) {
-  const warnings = ['Mapa completo no consultado: la cuenta no tiene factura y no cumple el requisito para reapertura.'];
-  // Orders provide context only. They cannot change the already confirmed
-  // failure of the invoice prerequisite, so never spend the graph budget here.
+  const warnings = ['El mapa completo todavía no se ha consultado; los documentos mostrados son una revisión inicial.'];
+  // Show initial context promptly. An account without a current invoice can
+  // qualify only after explicitly checking its complete relation map.
   const deadline = Math.min(requestScope.getStore()?.deadline ?? Infinity, Date.now() + 10000);
-  const orders = await requestScope.run({ ...requestScope.getStore(), deadline }, () => accountDocuments(account,
-    message => warnings.push(message), [DOCUMENTS[1]], validatedQueries));
-  const nodes = orders.map(row => documentNode(row));
-  return { account, patientName: patientNameForAccount(orders, account), checkedAt: new Date().toISOString(),
-    complete: false, eligible: false, status: 'blocked', mapState: 'not_requested',
-    reasons: ['La cuenta no tiene una factura localizada en SAP.'],
-    invoices: [], nodes, edges: [], openDocuments: nodes.filter(node => node.status === 'open'), warnings };
+  const knownDocuments = await requestScope.run({ ...requestScope.getStore(), deadline }, async () => {
+    const orders = await accountDocuments(account, message => warnings.push(message), [DOCUMENTS[1]], validatedQueries);
+    if (orders.length) return orders;
+    return accountDocuments(account, message => warnings.push(message), SEEDS.slice(2), validatedQueries);
+  });
+  const nodes = knownDocuments.map(row => documentNode(row));
+  const openDocuments = nodes.filter(node => node.status === 'open');
+  const reasons = ['Consulta el mapa completo para confirmar que no hay documentos ni saldos abiertos.'];
+  if (openDocuments.length) reasons.unshift(openDocuments.length === 1
+    ? 'Hay un documento abierto entre los documentos consultados de la cuenta.'
+    : `Hay ${openDocuments.length} documentos abiertos entre los documentos consultados de la cuenta.`);
+  if (nodes.some(node => node.cancellationStatusConflict)) reasons.unshift(CANCELLATION_CONFLICT_REASON);
+  return { account, patientName: patientNameForAccount(knownDocuments, account), checkedAt: new Date().toISOString(),
+    complete: false, eligible: false, status: openDocuments.length ? 'blocked' : 'unverified', mapState: 'not_requested',
+    accountFound: nodes.length > 0, accountDocumentCount: nodes.length, reopeningScenario: null, reasons,
+    invoices: [], nodes, edges: knownDocumentEdges(knownDocuments), openDocuments,
+    unknownDocuments: nodes.filter(node => node.status === 'unknown'), mapSummary: mapSummary(nodes), warnings };
 }
 
 async function search({ mode = 'patient', q } = {}) {
-  if (!['patient', 'account'].includes(mode)) throw fail('Selecciona búsqueda por paciente o cuenta.');
-  if (typeof q !== 'string') throw fail('Escribe un nombre de paciente o número de cuenta.');
+  if (!['patient', 'account', 'order'].includes(mode)) throw fail('Selecciona búsqueda por paciente, cuenta u orden de venta SAP.');
+  if (typeof q !== 'string') throw fail('Escribe un nombre de paciente, número de cuenta u orden de venta SAP.');
   const query = q.trim();
   if (query.length > 120 || [...query].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) throw fail('El texto de búsqueda no es válido.');
   const account = mode === 'account' ? accountNumber(query) : null;
+  const orderNumber = mode === 'order' ? accountNumber(query, 'orden de venta SAP') : null;
   if (mode === 'patient' && query.length < 2) throw fail('Escribe al menos dos caracteres del nombre del paciente.');
   const found = new Map();
   const validatedQueries = new Set();
   let truncated = false;
-  const matches = mode === 'account' ? (await Promise.all([DOCUMENTS[0], DOCUMENTS[1]].map(async def => {
-    const entries = await sqlRows(def.accountQuery, { account: Number(account) }, validatedQueries);
-    return entries.map(doc => ({ def, doc: { ...doc, _accountKeyOnly: true } }));
-  }))).flat() : (await Promise.all([DOCUMENTS[0], DOCUMENTS[1]].map(async def => {
-    const result = await readPages(endpoint(def.entity, { $select: 'DocEntry,U_PCNum,U_PTName,DocumentLines',
-      $filter: `contains(U_PTName,${literal(query)})`, $orderby: 'DocEntry desc' }), { limit: 1000, headers: { 'B1S-CaseInsensitive': 'true' } });
-    truncated ||= result.truncated;
-    return result.rows.map(doc => ({ def, doc }));
-  }))).flat();
+  const searchDefinitions = async definitions => {
+    const results = await parallel(definitions.map(def => async () => {
+      if (mode === 'account') {
+        const entries = await accountKeys(def, account, validatedQueries);
+        return entries.map(doc => ({ def, doc: { ...doc, _accountKeyOnly: true } }));
+      }
+      const result = await readPages(endpoint(def.entity, { $select: 'DocEntry,U_PCNum,U_PTName,DocumentLines',
+        $filter: `contains(U_PTName,${literal(query)})`, $orderby: 'DocEntry desc' }), { limit: 1000, headers: { 'B1S-CaseInsensitive': 'true' } });
+      truncated ||= result.truncated;
+      return result.rows.map(doc => ({ def, doc }));
+    }));
+    for (const result of results) if (result.status === 'rejected') throw result.reason;
+    return results.flatMap(result => result.value);
+  };
+  // Preserve the fast path for the normal invoice/order account. A pending
+  // account may exist only on another commercial document, including a line;
+  // verify those families before reporting that SAP found no account.
+  let matches;
+  if (mode === 'order') {
+    const page = await readPages(endpoint('Orders', {
+      $select: 'DocEntry,DocNum,U_PCNum,U_PTName,DocumentLines',
+      $filter: `DocNum eq ${orderNumber}`, $orderby: 'DocEntry desc',
+    }), { limit: MAX_NODES });
+    matches = page.rows.map(doc => ({ def: DOCUMENTS[1], doc }));
+    truncated ||= page.truncated;
+  } else matches = await searchDefinitions([DOCUMENTS[0], DOCUMENTS[1]]);
+  if (mode === 'order' && matches.some(({ doc }) => int(doc.DocEntry) === null || int(doc.DocNum) !== Number(orderNumber))) {
+    throw fail('SAP no pudo confirmar el número de la orden de venta solicitada.', 502);
+  }
+  const hasIdentifiableAccount = ({ doc }) => {
+    if (mode === 'account') return true;
+    const lineAccounts = new Set((doc.DocumentLines || []).map(line => int(line.U_PCNum)).filter(Boolean));
+    return Boolean(int(doc.U_PCNum)) || lineAccounts.size === 1;
+  };
+  if (mode !== 'order' && !matches.some(hasIdentifiableAccount)) matches.push(...await searchDefinitions(SEEDS.slice(2)));
   for (const { def, doc } of matches) {
     // U_PRName es el médico. U_PTName es el paciente. Las facturas consolidadas
     // también pueden llevar el folio U_PCNum en cada línea.
@@ -431,34 +508,43 @@ async function search({ mode = 'patient', q } = {}) {
       const reliableName = namedAccount === value ? doc.U_PTName : null;
       const row = found.get(id) || { account: id, patientName: reliableName || 'Sin nombre de paciente en SAP', invoiceIds: new Set() };
       if (def.entity === 'Invoices') row.invoiceIds.add(int(doc.DocEntry));
+      if (mode === 'order') {
+        row.matchedOrders ||= [];
+        if (!row.matchedOrders.some(order => order.docEntry === int(doc.DocEntry))) row.matchedOrders.push({ docEntry: int(doc.DocEntry), docNum: int(doc.DocNum) });
+      }
       if (reliableName && row.patientName === 'Sin nombre de paciente en SAP') row.patientName = reliableName;
       found.set(id, row);
     }
   }
   const rows = [...found.values()].sort((a, b) => Number(b.account) - Number(a.account));
-  if (mode === 'patient' && rows.length) {
+  if (mode !== 'account' && rows.length) {
     // A named order can have invoices with a blank/different header name.
     // Count by the actual account keys instead of reporting a misleading zero.
     const counts = await parallel(rows.slice(0, SEARCH_LIMIT).map(row => async () => {
-      const matches = await sqlRows(DOCUMENTS[0].accountQuery, { account: Number(row.account) }, validatedQueries);
+      const matches = await accountKeys(DOCUMENTS[0], row.account, validatedQueries);
       if (matches.some(doc => int(doc.DocEntry) === null)) throw fail('SAP devolvió un conteo de facturas incompleto.', 502);
       return { row, ids: new Set(matches.map(doc => int(doc.DocEntry))) };
     }));
     for (const result of counts) {
-      if (result.status === 'rejected') throw fail('No se pudo completar la búsqueda por paciente en SAP.', 502);
+      if (result.status === 'rejected') throw fail('No se pudieron confirmar las facturas de las cuentas encontradas.', 502);
       result.value.row.invoiceIds = result.value.ids;
     }
   }
-  return { accounts: rows.slice(0, SEARCH_LIMIT).map(({ invoiceIds, ...row }) => ({ ...row, invoiceCount: invoiceIds.size })),
+  const result = { accounts: rows.slice(0, SEARCH_LIMIT).map(({ invoiceIds, ...row }) => ({ ...row, invoiceCount: invoiceIds.size })),
     truncated: truncated || rows.length > SEARCH_LIMIT };
+  if (mode === 'order') {
+    const unassignedDocumentCount = matches.filter(({ doc }) => !int(doc.U_PCNum) && !(doc.DocumentLines || []).some(line => int(line.U_PCNum))).length;
+    result.lookup = { mode: 'order', number: orderNumber, documentCount: matches.length, unassignedDocumentCount };
+    result.warnings = unassignedDocumentCount ? ['SAP encontró la orden de venta, pero no informó un número de cuenta del hospital en todos los documentos encontrados.'] : [];
+  }
+  return result;
 }
 
 async function review(value, { fullMap = false } = {}) {
   const account = accountNumber(value);
   const validatedQueries = new Set();
-  // Verify the mandatory invoice prerequisite first, using fresh, complete
-  // account keys. Zero invoices makes reopening impossible without scanning
-  // every document type and traversing a map for several minutes.
+  // Read fresh, complete invoice keys first. Without invoices, the initial
+  // view stays fast and unverified until the full map is explicitly requested.
   const ownInvoices = await accountDocuments(account, null, [DOCUMENTS[0]], validatedQueries);
   if (!ownInvoices.length && !fullMap) return reviewWithoutInvoice(account, validatedQueries);
   const warnings = new Set();
@@ -488,7 +574,7 @@ async function review(value, { fullMap = false } = {}) {
     const def = definition(type);
     if (!def) {
       if (String(type) === '-1' || String(type) === 'rot_ExternalDocument') warn('Hay una referencia externa cuyo estado no puede verificarse en SAP.');
-      else warn(`Hay un tipo de documento relacionado que no puede verificarse (${String(type)}).`);
+      else warn('Hay un documento relacionado cuyo estado no puede verificarse en SAP.');
       return;
     }
     const target = key(def, parsed);
@@ -503,6 +589,8 @@ async function review(value, { fullMap = false } = {}) {
     const id = add(def, doc);
     if (id && def.entity === 'Invoices') accountInvoiceIds.add(id);
   }
+  const accountDocumentCount = records.size;
+  const accountFound = accountDocumentCount > 0;
 
   // Only typed application/reference/reconciliation keys create financial
   // edges. BP codes scope the ledger checks and never substitute for a link.
@@ -579,7 +667,10 @@ async function review(value, { fullMap = false } = {}) {
         } else if (def.kind === 'payment') {
           for (const applied of arrays(doc, 'PaymentInvoices')) missing(PAYMENT_TYPES[applied.InvoiceType] ?? applied.InvoiceType, applied.DocEntry, id, 'Pago aplicado');
           for (const ref of arrays(doc, 'PaymentDocumentReferencesCollection')) missing(ref.ReferencedObjectType, ref.ReferencedDocEntry, id, 'Referencia SAP');
-          if (cancellation(doc) === false && doc.CardCode) {
+          // Cancellation is historical state, not proof that accounting
+          // residuals are zero. Verify the original posting for cancelled
+          // payments too, and include its related journal in the map.
+          if (cancellation(doc) !== null && doc.CardCode) {
             try {
               const ledger = await reviewSqlRows('sq_bi_reopen_balance_v2', { cardCode: doc.CardCode, objectType: String(def.type), objectEntry: row.entry });
               if (ledger.some(item => String(item.TransType) !== String(def.type) || int(item.CreatedBy) !== row.entry || item.ShortName !== doc.CardCode)) throw fail('Las partidas no corresponden al pago.', 502);
@@ -708,8 +799,8 @@ async function review(value, { fullMap = false } = {}) {
 
   const financialStates = new Map();
   const results = await parallel([...records.values()].filter(row => ['payment', 'journal'].includes(row.def.kind)).map(row => async () => {
-    if (cancellation(row.doc) === true) return { id: row.id, status: 'cancelled' };
-    if (row.def.kind === 'payment' && cancellation(row.doc) !== false) return { id: row.id, status: 'unknown' };
+    const cancelled = cancellation(row.doc);
+    if (row.def.kind === 'payment' && cancelled === null) return { id: row.id, status: 'unknown' };
     let rows;
     if (row.def.kind === 'payment') {
       if (!row.doc.CardCode) return { id: row.id, status: 'unknown' };
@@ -723,7 +814,8 @@ async function review(value, { fullMap = false } = {}) {
       const required = row.doc.JournalEntryLines?.filter(line => line.ShortName && line.ShortName !== line.AccountCode) || [];
       if (!required.length || required.some(line => !rows.some(item => item.ShortName === line.ShortName && (line.Line_ID == null || int(item.Line_ID) === int(line.Line_ID))))) return { id: row.id, status: 'unknown' };
     }
-    return { id: row.id, status: ledgerStatus(rows) };
+    const status = ledgerStatus(rows);
+    return { id: row.id, status: status === 'settled' && cancelled === true ? 'cancelled' : status };
   }));
   results.forEach(result => {
     if (result.status === 'rejected') warn('No se pudieron confirmar las partidas contables en moneda local, extranjera y de sistema.');
@@ -738,7 +830,9 @@ async function review(value, { fullMap = false } = {}) {
     if (def.kind === 'payment' || def.kind === 'journal') {
       status = financialStates.get(id) || 'unknown';
       statusBasis = 'ledger';
-      sapStatus = status === 'settled' ? 'Sin partidas abiertas (ML, ME y MS)' : status === 'open' ? 'Partidas contables abiertas' : null;
+      sapStatus = status === 'settled' ? 'Sin partidas abiertas (ML, ME y MS)'
+        : status === 'cancelled' ? 'Cancelado; sin partidas abiertas (ML, ME y MS)'
+          : status === 'open' ? 'Partidas contables abiertas' : null;
     } else if (def.kind === 'reconciliation') {
       const cancelledBy = int(doc.CancelAbs);
       status = cancelledBy === null ? 'unknown' : cancelledBy > 0 ? 'cancelled' : 'settled';
@@ -752,25 +846,38 @@ async function review(value, { fullMap = false } = {}) {
     }
     return { ...documentNode({ def, doc }, status), id, docEntry: entry, statusBasis, sapStatus, cancelled };
   });
-  // A related invoice from another account remains in the map, but cannot
-  // replace the selected account's own non-cancelled invoice requirement.
+  // Related invoices remain in the map and contribute their verified status.
+  // The account itself must have been located through its actual account keys;
+  // a related document never proves that an otherwise missing account exists.
   const invoices = nodes.filter(node => accountInvoiceIds.has(node.id));
   const currentInvoices = invoices.filter(node => node.cancelled === false);
   const openDocuments = nodes.filter(node => node.status === 'open');
   const unknownDocuments = nodes.filter(node => node.status === 'unknown');
   const reasons = [];
-  if (!invoices.length) reasons.push('La cuenta no tiene una factura localizada en SAP.');
-  else if (!currentInvoices.length) reasons.push('No hay una factura vigente sin cancelar con cierre confirmado.');
+  if (!accountFound) reasons.push(complete
+    ? 'No se localizaron documentos de esta cuenta en SAP.'
+    : 'No se pudo confirmar que existan documentos de esta cuenta en SAP.');
   if (currentInvoices.some(node => node.status !== 'closed')) reasons.push('Todas las facturas vigentes deben indicar literalmente Cerrado en SAP.');
-  if (openDocuments.length) reasons.push(`Hay ${openDocuments.length} documento(s) abierto(s) en el mapa de relación.`);
-  if (unknownDocuments.length) reasons.push(`No se pudo confirmar el estado de ${unknownDocuments.length} documento(s) relacionado(s).`);
+  if (openDocuments.length) reasons.push(openDocuments.length === 1
+    ? 'Hay un documento abierto en el mapa de relación.'
+    : `Hay ${openDocuments.length} documentos abiertos en el mapa de relación.`);
+  if (nodes.some(node => node.cancellationStatusConflict)) reasons.push(CANCELLATION_CONFLICT_REASON);
+  if (unknownDocuments.length) reasons.push(unknownDocuments.length === 1
+    ? 'No se pudo confirmar el estado de un documento relacionado.'
+    : `No se pudo confirmar el estado de ${unknownDocuments.length} documentos relacionados.`);
   if (!complete) reasons.push('La consulta del mapa está incompleta; no puede acreditar la reapertura.');
-  const eligible = complete && currentInvoices.length > 0 && !openDocuments.length && !unknownDocuments.length && currentInvoices.every(node => node.status === 'closed');
+  const eligible = accountFound && complete && !openDocuments.length && !unknownDocuments.length && currentInvoices.every(node => node.status === 'closed');
+  const operationalIds = new Set([...records.values()].filter(row => ['document', 'payment', 'transfer'].includes(row.def.kind)).map(row => row.id));
+  const operationalNodes = nodes.filter(node => operationalIds.has(node.id));
+  const reopeningScenario = eligible
+    ? operationalNodes.length > 0 && operationalNodes.every(node => node.status === 'cancelled') ? 'all_cancelled' : 'no_open_documents'
+    : null;
   return { account, patientName: patientNameForAccount([...records.values()], account), checkedAt: new Date().toISOString(),
-    complete, eligible, status: eligible ? 'eligible' : (!complete || unknownDocuments.length ? 'unverified' : 'blocked'),
+    complete, eligible, accountFound, accountDocumentCount, reopeningScenario,
+    status: eligible ? 'eligible' : openDocuments.length ? 'blocked' : (!complete || unknownDocuments.length ? 'unverified' : 'blocked'),
     mapState: complete ? 'complete' : 'incomplete',
     reasons, invoices, nodes, edges: [...edges.values()].filter(item => records.has(item.source) && records.has(item.target)),
-    openDocuments, warnings: [...warnings] };
+    openDocuments, unknownDocuments, mapSummary: mapSummary(nodes), warnings: [...warnings] };
 }
 
 const withBudget = (fn, budget = REQUEST_BUDGET_MS) => (...args) => requestScope.run({ deadline: Date.now() + budget, signal: args[1]?.signal }, () => fn(...args));

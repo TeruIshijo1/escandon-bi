@@ -4,8 +4,10 @@
  * Hospital Escandón BI Platform v3.5
  */
 import { Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { canAccessRoute, hasPermission, ROUTE_TO_PERMISSION } from '../../utils/rbac';
+import { canUseAssignedReportNavigation, REPORT_WORKSPACE_PATH } from '../../utils/assignedReportAccess';
 
 /**
  * @param {string[]} allowedRoles  - Roles permitidos para la ruta
@@ -14,10 +16,13 @@ import { canAccessRoute, hasPermission, ROUTE_TO_PERMISSION } from '../../utils/
  * @param {ReactNode} children
  */
 export default function ProtectedRoute({ allowedRoles, requiredArea, requiredUsername, children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, hasAssignedReports, assignedReportsLoading, refreshAssignedReportAccess } = useAuth();
   const location = useLocation();
+  useEffect(() => {
+    if (user && location.pathname === REPORT_WORKSPACE_PATH) refreshAssignedReportAccess?.();
+  }, [location.pathname, user, refreshAssignedReportAccess]);
 
-  if (loading) {
+  if (loading || (user && location.pathname === REPORT_WORKSPACE_PATH && !hasPermission(user, location.pathname) && assignedReportsLoading)) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
         <LoadingSpinner />
@@ -31,7 +36,8 @@ export default function ProtectedRoute({ allowedRoles, requiredArea, requiredUse
   }
 
   // 1. Verificar permisos individuales del usuario como MÁXIMA AUTORIDAD
-  const hasPerm = hasPermission(user, location.pathname);
+  const hasPerm = hasPermission(user, location.pathname)
+    || canUseAssignedReportNavigation(user, location.pathname, hasAssignedReports);
 
   // Si el rbac dictamina que no tiene permiso explícito (y la ruta exigía uno), rebotar
   if (!hasPerm) {

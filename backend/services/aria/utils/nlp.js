@@ -29,7 +29,7 @@ const GREETING_PATTERNS = [
 ];
 
 function isGreeting(normalizedQuery) {
-  if (!normalizedQuery || normalizedQuery.length <= 3) return true;
+  if (!normalizedQuery) return true;
   return GREETING_PATTERNS.some(p => p.test(normalizedQuery));
 }
 

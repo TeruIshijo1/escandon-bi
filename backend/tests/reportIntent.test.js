@@ -20,6 +20,170 @@ beforeEach(() => { savedEnv = Object.fromEntries(envKeys.map(key => [key, proces
 afterEach(() => { envKeys.forEach(key => { if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key]; }); jest.restoreAllMocks(); });
 const prepare = (message, extra = {}) => prepareReport({ message, catalog, now: new Date('2026-10-01T15:00:00Z'), ...extra });
 
+const patientAccountCapability = {
+  id: 'assistant_patient_accounts', assistantOnly: true, source: 'Vertical', title: 'Cuenta del paciente y acuerdos comerciales',
+  aliases: ['acuerdos comerciales y estados de cuenta del paciente', 'estado de cuenta con convenio', 'cuentas con acuerdos comerciales'],
+  requiresDateFilter: true, dateFieldLabel: 'Fecha de ingreso', filters: [],
+  defaultFields: ['PCNum', 'PatientName', 'AgreementName', 'AccountTotal', 'AccountBalance'],
+  fields: [{ key: 'PCNum', label: 'Folio de atención', type: 'number' }, { key: 'PatientName', label: 'Paciente' },
+    { key: 'AgreementName', label: 'Acuerdo comercial' }, { key: 'AccountTotal', label: 'Total de cuenta', type: 'money' },
+    { key: 'AccountBalance', label: 'Saldo de cuenta', type: 'money' }, { key: 'DoctorName', label: 'Médico' }],
+};
+const joinedPatientAccountCapability = {
+  ...patientAccountCapability, id: 'assistant_join__assistant_patient_accounts__customers', source: 'SAP + Vertical', sources: ['SAP', 'Vertical'],
+  title: 'Cuenta del paciente con información del pagador SAP', aliases: ['estado de cuenta con convenio sap y vertical'],
+  fields: [...patientAccountCapability.fields, { key: 'sap_customers_CardName', label: 'Cliente / aseguradora SAP' }],
+};
+
+const analysisAccounts = {
+  id: 'vertical_accounts', title: 'Cuentas hospitalarias', source: 'Vertical', aliases: ['cuentas'], filters: [],
+  requiresDateFilter: true, dateFieldLabel: 'Fecha de ingreso', pointLookupFields: ['PCNum', 'PTNum'],
+  defaultFields: ['PCNum', 'PatientName', 'Customer', 'AgreementName', 'Balance'],
+  fields: [{ key: 'PCNum', label: 'Folio de atención', type: 'number' }, { key: 'PTNum', label: 'Número de paciente', type: 'number' },
+    { key: 'PatientName', label: 'Paciente', type: 'string' }, { key: 'Customer', label: 'Cliente / aseguradora', aliases: ['cliente', 'aseguradora'], type: 'string' },
+    { key: 'AgreementName', label: 'Convenio', type: 'string' }, { key: 'Balance', label: 'Saldo de cuenta', aliases: ['saldo'], type: 'money' },
+    { key: 'Total', label: 'Total de cuenta', type: 'money' }, { key: 'Downpayments', label: 'Anticipos', type: 'money' },
+    { key: 'Rate', label: 'Precio unitario', type: 'money' }, { key: 'AttentionDate', label: 'Fecha de ingreso', type: 'datetime' }],
+};
+const analysisContext = { entity: analysisAccounts.id, selectedFields: analysisAccounts.defaultFields, filters: dates };
+
+test.each([
+  ['Cuentas con saldo mayor a $10,000 del mes pasado', { predicates: [{ field: 'Balance', op: 'gt', value: '10000' }] }],
+  ['saldo mayor o igual a 10000', { predicates: [{ field: 'Balance', op: 'gte', value: '10000' }] }],
+  ['con saldo entre 100 y 500', { predicates: [{ field: 'Balance', op: 'between', values: ['100', '500'] }] }],
+  ['con saldo distinto de 0', { predicates: [{ field: 'Balance', op: 'ne', value: '0' }] }],
+  ['con paciente contiene "Mediko Álvarez"', { predicates: [{ field: 'PatientName', op: 'contains', value: 'Mediko Álvarez' }] }],
+  ['con saldo nulo', { predicates: [{ field: 'Balance', op: 'isNull' }] }],
+  ['con saldo no nulo', { predicates: [{ field: 'Balance', op: 'notNull' }] }],
+  ['Cuantos registros por convenio', { groupBy: ['AgreementName'], measures: [{ op: 'count' }] }],
+  ['Total saldo cuentas por cliente', { groupBy: ['Customer'], measures: [{ op: 'sum', field: 'Balance' }] }],
+  ['Suma saldo por cliente ordena por saldo de mayor a menor', { groupBy: ['Customer'], measures: [{ op: 'sum', field: 'Balance' }], orderBy: [{ field: 'metric_0', direction: 'desc' }] }],
+  ['Suma saldo y total por cliente ordena por saldo desc y cliente asc', { groupBy: ['Customer'], measures: [{ op: 'sum', field: 'Balance' }, { op: 'sum', field: 'Total' }], orderBy: [{ field: 'metric_0', direction: 'desc' }, { field: 'Customer', direction: 'asc' }] }],
+  ['Cuantos clientes distintos por convenio', { groupBy: ['AgreementName'], measures: [{ op: 'countDistinct', field: 'Customer' }] }],
+])('bounded financial operations use authorized fields without becoming missing columns: %s', async (message, analysis) => {
+  const result = await prepare(message, { catalog: [analysisAccounts], context: analysisContext });
+  const operationFields = [...(analysis.predicates || []).map(item => item.field), ...(analysis.groupBy || []), ...(analysis.measures || []).flatMap(item => item.field ? [item.field] : []),
+    ...(analysis.orderBy || []).filter(item => !/^metric_/.test(item.field)).map(item => item.field)];
+  expect(result).toMatchObject({ status: 'ready', plan: { selectedFields: [...new Set([...analysisContext.selectedFields, ...operationFields])], filters: dates, analysis } });
+  expect(result.plan.analysisSummary.description).toBeTruthy();
+});
+
+test('invoice totals without an explicit measure use the sole verified amount and keep the source fields', async () => {
+  const entity = { id: 'sales_invoice_summary', title: 'Facturas', aliases: ['facturas'], source: 'SAP', requiresDateFilter: true, filters: [],
+    defaultFields: ['DocEntry', 'Customer', 'DocTotal'], fields: [{ key: 'DocEntry', label: 'Número de documento', type: 'number' },
+      { key: 'Customer', label: 'Cliente / aseguradora', aliases: ['cliente', 'aseguradora'], type: 'string' }, { key: 'DocTotal', label: 'Total de factura', type: 'money' }] };
+  const result = await prepare('Facturas totalizado por cliente/aseguradora del mes pasado', { catalog: [entity] });
+  expect(result).toMatchObject({ status: 'ready', plan: { selectedFields: entity.defaultFields, analysis: { groupBy: ['Customer'], measures: [{ op: 'sum', field: 'DocTotal' }] } } });
+});
+
+test('an ambiguous financial operation retains its amount and completed decisions across later clarification and date changes', async () => {
+  const entity = { ...analysisAccounts, fields: analysisAccounts.fields.map(field => field.key === 'Balance' ? { ...field, aliases: [] } : field)
+    .concat({ key: 'PayerBalance', label: 'Saldo del pagador en SAP', type: 'money' }) };
+  const first = await prepare('Cuentas con saldo mayor a $10,000 y agrupa por cliente del mes pasado', { catalog: [entity] });
+  expect(first.status).toBe('clarification');
+  expect(first.options.map(option => option.label)).toEqual(['Saldo de cuenta', 'Saldo del pagador en SAP']);
+  const second = await prepare('Me refiero a «Saldo de cuenta».', { catalog: [entity], context: first.plan, pending: first.pending });
+  expect(second).toMatchObject({ status: 'ready', plan: { selectedFields: entity.defaultFields, analysis: { predicates: [{ field: 'Balance', op: 'gt', value: '10000' }], groupBy: ['Customer'] } } });
+  const third = await prepare('Mejor la primera quincena de septiembre y agrega fecha de ingreso', { catalog: [entity], context: second.plan });
+  expect(third).toMatchObject({ status: 'ready', plan: { analysis: second.plan.analysis, filters: { fechaDesde: '2026-09-01', fechaHasta: '2026-09-15' } } });
+  expect(third.plan.selectedFields).toContain('AttentionDate');
+});
+
+test.each(['Suma precio unitario por cliente', 'Compara septiembre contra agosto', 'Top 10 cuentas por saldo', 'Agrupa por cliente con totales del grupo mayores a 100', 'Calcula el promedio de saldo'])('unverified or out-of-scope operations cannot execute a partial detail report: %s', async message => {
+  const result = await prepare(message, { catalog: [analysisAccounts], context: analysisContext });
+  expect(result).toMatchObject({ status: 'unsupported', plan: null });
+});
+
+test.each([
+  ['cuenta 123', 'PCNum', '123'], ['número de cuenta 123', 'PCNum', '123'],
+  ['folio de atención 123', 'PCNum', '123'], ['paciente número 456', 'PTNum', '456'],
+])('a trusted exact identifier becomes an equality lookup and can omit the dates: %s', async (message, field, value) => {
+  const result = await prepare(message, { catalog: [analysisAccounts], context: { ...analysisContext, filters: {} } });
+  expect(result).toMatchObject({ status: 'ready', plan: { selectedFields: [...new Set([...analysisAccounts.defaultFields, field])], analysis: { predicates: [{ field, op: 'eq', value }] }, filters: { fechaDesde: '', fechaHasta: '' } } });
+});
+
+test('a patient name does not authorize a lookup without a period or an identity choice', async () => {
+  const result = await prepare('paciente Juan Pérez con saldo', { catalog: [analysisAccounts] });
+  expect(result.status).toBe('clarification');
+  expect(result.plan?.analysis).toBeUndefined();
+});
+
+test('a financial filter appends the filtered amount to an implicit default detail, but respects explicit columns', async () => {
+  const entity = { ...analysisAccounts, defaultFields: ['PCNum', 'PatientName'] };
+  const implicit = await prepare('Cuentas de septiembre con saldo mayor a $10,000', { catalog: [entity] });
+  expect(implicit).toMatchObject({ status: 'ready', plan: { selectedFields: ['PCNum', 'PatientName', 'Balance'], filters: dates } });
+  const explicit = await prepare('Cuentas de septiembre con saldo mayor a $10,000 y muestra paciente', { catalog: [entity] });
+  expect(explicit).toMatchObject({ status: 'ready', plan: { selectedFields: ['PatientName'] } });
+});
+
+test('a single request preserves each financial condition while an explicit threshold adjustment replaces its old condition', async () => {
+  const first = await prepare('con saldo mayor a 500 y saldo mayor a 100', { catalog: [analysisAccounts], context: analysisContext });
+  expect(first).toMatchObject({ status: 'ready', plan: { analysis: { predicates: [{ field: 'Balance', op: 'gt', value: '500' }, { field: 'Balance', op: 'gt', value: '100' }] } } });
+  const next = await prepare('Mejor con saldo mayor a 1000', { catalog: [analysisAccounts], context: first.plan });
+  expect(next).toMatchObject({ status: 'ready', plan: { analysis: { predicates: [{ field: 'Balance', op: 'gt', value: '1000' }] } } });
+});
+
+test('changing an exact account or patient identifier does not intersect it with the prior lookup', async () => {
+  const first = await prepare('cuenta 123', { catalog: [analysisAccounts], context: { ...analysisContext, filters: {} } });
+  const next = await prepare('paciente número 456', { catalog: [analysisAccounts], context: first.plan });
+  expect(next).toMatchObject({ status: 'ready', plan: { analysis: { predicates: [{ field: 'PTNum', op: 'eq', value: '456' }] } } });
+});
+
+test('comparison qualifiers for patient balances and ordinary patient columns never masquerade as a named-person lookup', async () => {
+  const result = await prepare('Cuentas de septiembre con saldo del paciente mayor a 10000', { catalog: [analysisAccounts] });
+  expect(result).toMatchObject({ status: 'ready', plan: { analysis: { predicates: [{ field: 'Balance', op: 'gt', value: '10000' }] }, filters: dates } });
+});
+
+test('a specific account and agreement request uses an internal capability and retains both objectives while asking for dates', async () => {
+  const available = [...catalog, patientAccountCapability, joinedPatientAccountCapability];
+  const first = await prepare('Necesito ver acuerdos comerciales y estados de cuenta del paciente', { catalog: available });
+  expect(first).toMatchObject({ status: 'clarification', engine: 'guided', plan: { entity: patientAccountCapability.id,
+    selectedFields: patientAccountCapability.defaultFields, filters: { fechaDesde: '', fechaHasta: '' } } });
+  expect(first.message).toMatch(/período/);
+  expect(first.choices).toEqual([]);
+  const second = await prepare('El mes pasado', { catalog: available, context: first.plan, pending: first.pending });
+  expect(second).toMatchObject({ status: 'ready', engine: 'guided', pending: null, plan: { entity: patientAccountCapability.id,
+    selectedFields: patientAccountCapability.defaultFields, filters: dates } });
+  const adjustment = await prepare('Agrega el médico', { catalog: available, context: second.plan });
+  expect(adjustment).toMatchObject({ status: 'ready', plan: { selectedFields: [...patientAccountCapability.defaultFields, 'DoctorName'], filters: dates } });
+});
+
+test('internal aliases can resolve an exact conversational choice without turning their title into requested columns', async () => {
+  const available = [patientAccountCapability];
+  const first = await prepare('Quiero el reporte «estado de cuenta con convenio».', { catalog: available });
+  expect(first).toMatchObject({ status: 'clarification', plan: { entity: patientAccountCapability.id,
+    selectedFields: patientAccountCapability.defaultFields } });
+  const next = await prepare('Septiembre de 2026', { catalog: available, context: first.plan, pending: first.pending });
+  expect(next).toMatchObject({ status: 'ready', plan: { entity: patientAccountCapability.id,
+    selectedFields: patientAccountCapability.defaultFields, filters: dates } });
+});
+
+test.each(['estado de cuenta con convenio SAP y Vertical del mes pasado con paciente y saldo',
+  'Combina el estado de cuenta con convenio SAP y Vertical del mes pasado con paciente y saldo'])('both sources are selected only through an authorized internal combination: %s', async message => {
+  const result = await prepare(message, { catalog: [patientAccountCapability, joinedPatientAccountCapability] });
+  expect(result).toMatchObject({ status: 'ready', plan: { entity: joinedPatientAccountCapability.id, source: 'SAP + Vertical',
+    selectedFields: ['PatientName', 'AccountBalance'], filters: dates } });
+});
+
+test('an AI cannot turn a two-source account request into a one-source partial report', async () => {
+  process.env.OPENAI_API_KEY = 'synthetic-test-key';
+  const fetchImpl = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ status: 'ready',
+    plan: { entity: patientAccountCapability.id, selectedFields: patientAccountCapability.defaultFields, filters: dates } }) } }] }) });
+  const result = await prepare('Estado de cuenta con convenio SAP y Vertical del mes pasado', {
+    catalog: [patientAccountCapability], fetchImpl, requireAi: true,
+  });
+  expect(result).toMatchObject({ status: 'unsupported', plan: null });
+  expect(result.message).toMatch(/combinación de SAP y Vertical/);
+});
+
+test('source words inside a literal search do not change an internal report into a combination', async () => {
+  const result = await prepare('Estado de cuenta con convenio del mes pasado busca "SAP y Vertical"', {
+    catalog: [patientAccountCapability, joinedPatientAccountCapability],
+  });
+  expect(result).toMatchObject({ status: 'ready', plan: { entity: patientAccountCapability.id,
+    filters: { ...dates, busqueda: 'SAP y Vertical' } } });
+});
+
 test.each([
   ['nesesito las sirujias del mes pasado que salga el nombre del pasiente y el doc', ['Patient', 'Doctor']],
   ['kiero sirujias mes pasado pasiente doc fecha', ['Patient', 'Doctor', 'Start']],
@@ -31,6 +195,34 @@ test.each([
 ])('informal topic and column requests with spelling errors select actual fields: %s', async (message, fields) => {
   const result = await prepare(message);
   expect(result).toMatchObject({ status: 'ready', plan: { entity: 'vertical_surgeries', selectedFields: fields, filters: message.includes('quince') || message.includes('15') ? { fechaDesde: '2026-09-01', fechaHasta: '2026-09-15' } : dates } });
+});
+
+test.each([
+  ['Necesito las cirugías de septiembre con paciente médico procedimiento', ['Patient', 'Doctor', 'Procedure']],
+  ['cirugías de septiembre con paciente procedimientos médico', ['Patient', 'Procedure', 'Doctor']],
+  ['cirugías de septiembre con procedimiento paciente médico', ['Procedure', 'Patient', 'Doctor']],
+])('a surgery column list without commas preserves every requested column in order: %s', async (message, selectedFields) => {
+  const result = await prepare(message);
+  expect(result).toMatchObject({ engine: 'guided', status: 'ready', plan: { entity: 'vertical_surgeries', selectedFields,
+    filters: { ...dates, busqueda: '' } } });
+});
+
+test('a bare column list is recognized when the surgery topic is already selected', () => {
+  const result = interpretRequest({ message: 'paciente médico procedimiento', catalog, forcedEntity: catalog[0], today: '2026-10-01' });
+  expect(result).toMatchObject({ explicitFields: true, hasUnresolved: false,
+    proposal: { status: 'ready', plan: { entity: 'vertical_surgeries', selectedFields: ['Patient', 'Doctor', 'Procedure'], filters: { busqueda: '' } } } });
+});
+
+test.each(['paciente Juan Pérez médico procedimiento', 'paciente médico Juan Pérez procedimiento'])('a person in an unseparated column list still requires an explicit search: %s', async columns => {
+  const result = await prepare(`cirugías de septiembre con ${columns}`);
+  expect(result).toMatchObject({ status: 'clarification', plan: { filters: { ...dates, busqueda: '' } } });
+  expect(result.message).toContain('buscar una persona');
+});
+
+test('a literal search containing column words is kept intact when adding a procedure column', async () => {
+  const result = await prepare('busca "Juan Mediko Procedimiento" y agrega procedimiento', { context });
+  expect(result).toMatchObject({ status: 'ready', plan: { selectedFields: ['Patient', 'Doctor', 'Procedure'],
+    filters: { ...dates, busqueda: 'Juan Mediko Procedimiento' } } });
 });
 
 test.each([
@@ -129,7 +321,7 @@ test('unavailable conditions cannot be silently ignored or converted into anothe
   const orders = { entity: 'purchase_orders', selectedFields: ['Folio', 'Total'], filters: dates };
   expect((await prepare('solo las abiertas', { context: orders }))).toMatchObject({ status: 'ready', plan: { filters: { estatusDoc: 'OPEN' } } });
   expect((await prepare('solo las ya pagadas', { context: orders })).status).toBe('unsupported');
-  expect((await prepare('solo con costo mayor que 100', { context: inventoryContext })).status).toBe('unsupported');
+  expect((await prepare('solo con costo mayor que 100', { context: inventoryContext }))).toMatchObject({ status: 'ready', plan: { analysis: { predicates: [{ field: 'Cost', op: 'gt', value: '100' }] } } });
   expect((await prepare('cirugias del mes pasado con paciente y sexo')).status).toBe('unsupported');
   expect((await prepare('cirugias del mes pasado con paciente joven y medico')).status).toBe('unsupported');
   expect((await prepare('cirugias del medico Juan Peres del mes pasado')).status).toBe('clarification');
@@ -306,7 +498,7 @@ test.each(realOrders)('summary presentation preserves all requested columns and 
   const unknown = await prepare('con resumen por orden y dinosaurio', { catalog: realOrders, context: requestContext });
   expect(unknown.status).toBe('clarification');
   expect(unknown.message).toContain('dinosaurio');
-  expect((await prepare('agrupa por paciente', { catalog: realOrders, context: requestContext })).status).toBe('unsupported');
+  expect((await prepare('agrupa por paciente', { catalog: realOrders, context: requestContext }))).toMatchObject({ status: 'ready', plan: { analysis: { groupBy: [requestContext.selectedFields[0]], measures: [{ op: 'count' }] } } });
 });
 
 const inventoryChoices = { ...catalog[1], fields: [
@@ -411,4 +603,19 @@ test('removing the last column always leaves an unresolved mandatory choice', ()
   expect(result.proposal.status).toBe('clarification');
   expect(result.proposal.message).toContain('al menos una columna');
   expect(result.hasUnresolved).toBe(true);
+});
+
+test('long requests retain resolved columns after the bounded clarification history rolls over', async () => {
+  const groups = ['cargo administrativo', 'factor administrativo', 'recargo administrativo', 'ajuste administrativo', 'cargo especial', 'ajuste especial'];
+  const entity = { id: 'administrative_conditions', title: 'Condiciones administrativas', aliases: ['condiciones administrativas'],
+    fields: groups.flatMap((label, index) => [{ key: `amount${index}`, label: `${label} (importe)`, type: 'money' }, { key: `percent${index}`, label: `${label} (%)`, type: 'percent' }]),
+    defaultFields: [], filters: [], requiresDateFilter: false };
+  let result = await prepare(`Condiciones administrativas con ${groups.join(', ')}`, { catalog: [entity] });
+  for (const label of groups) {
+    expect(result.status).toBe('clarification');
+    const option = result.options.find(choice => choice.label === `${label} (%)`);
+    expect(option).toBeDefined();
+    result = await prepare(option.message, { catalog: [entity], context: result.plan, pending: result.pending });
+  }
+  expect(result).toMatchObject({ status: 'ready', pending: null, plan: { selectedFields: groups.map((_, index) => `percent${index}`) } });
 });

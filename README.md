@@ -71,6 +71,10 @@ npm run dev
 
 ---
 
+## Documentación de la plataforma
+
+El [mapa e instructivo editable](docs/Mapa_Instructivo_Plataforma_y_Origen_Datos.md) y su [versión PDF](docs/Mapa_Plataforma_Hospital_Escandon_BI.pdf) deben actualizarse juntos cada vez que se agregue o cambie algo en la plataforma. El procedimiento y las comprobaciones de cobertura se establecen en [AGENTS.md](AGENTS.md).
+
 ## 👨‍💻 Acerca del Autor
 
 **Ing. Alberto García Mendoza**  

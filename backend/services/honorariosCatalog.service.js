@@ -23,6 +23,18 @@ const CATALOG_SQL = `SELECT ItemCode,ItemName,ItemDescription,ItemGroupName,Item
   FROM CP c WHERE NULLIF(LTRIM(RTRIM(c.CPTCode)),'') IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM V_IT i WHERE i.ItemCode=c.CPTCode)`;
 const REFERENCE_SQL = `SELECT Id_UT,ITEMCODE,ITEMDESCRIPTION,IMPORTE,NOTAS FROM UT_Honorarios`;
+// La fuente consultable de Vertical no registra autor ni fecha de edición de
+// estas referencias. El usuario y fecha de configuración BI no son sus editores.
+function referencePriceWithAudit(reference) {
+  return { ...reference, changeAudit: { available: false, source: 'Vertical', reason: 'not_recorded',
+    changedBy: null, changedAt: null } };
+}
+
+// Enriquecer la referencia con información de auditoría no cambia su contenido
+// de negocio ni debe activar el aviso. Se conserva el aviso previamente guardado.
+const referenceMaterialSql = expression => `(SELECT COALESCE(jsonb_agg(ref - 'changeAudit'
+  ORDER BY ref->'id',ref->'amount',ref->'description',ref->'notes'),'[]'::jsonb)
+  FROM jsonb_array_elements(${expression}) ref)`;
 // Un corte acotado descubre servicios con movimiento sin ficha visible en V_IT.
 // No presupone que todo artículo de venta sea un servicio.
 const DISCOVERY_SQL = `WITH Codes AS (
@@ -165,7 +177,7 @@ function catalogRow(row) {
   return { itemCode: row.item_code, name: row.name, description: row.description, groupName: row.group_name,
     active: row.source_active, sourceMetadata: row.source_metadata, scopeExcluded,
     ...scope, status: scopeExcluded ? 'EXCLUIDO' : row.status, modality: row.modality, paymentUnit: row.payment_unit,
-    reason: row.reason, revision: row.revision, referencePrices: row.reference_prices || [],
+    reason: row.reason, revision: row.revision, referencePrices: (row.reference_prices || []).map(referencePriceWithAudit),
     referenceWarnings: row.reference_warnings || [], referenceChanged: row.reference_changed,
     updatedBy: row.updated_by, updatedAt: row.updated_at, createdAt: row.created_at,
     lastSeenAt: row.last_seen_at, tariffCount: Number(row.tariff_count || 0), approvedTariffCount,
@@ -184,8 +196,8 @@ function normalizeSource(items, references, discovered = []) {
     const code = String(row.ITEMCODE || '').trim();
     if (!code) continue;
     if (!referenceMap.has(code)) referenceMap.set(code, []);
-    referenceMap.get(code).push({ id: row.Id_UT, amount: row.IMPORTE === null ? null : Number(row.IMPORTE),
-      description: row.ITEMDESCRIPTION || '', notes: row.NOTAS || '' });
+    referenceMap.get(code).push(referencePriceWithAudit({ id: row.Id_UT, amount: row.IMPORTE === null ? null : Number(row.IMPORTE),
+      description: row.ITEMDESCRIPTION || '', notes: row.NOTAS || '' }));
   }
   const source = new Map();
   for (const row of items) {
@@ -258,7 +270,8 @@ async function performSync(remotePool) {
           scope_excluded boolean,modality text)
         ON CONFLICT(item_code) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.description,
           group_name=EXCLUDED.group_name,source_active=EXCLUDED.source_active,source_metadata=EXCLUDED.source_metadata,
-          reference_changed=bi_honorarios_catalog.reference_changed OR bi_honorarios_catalog.reference_prices<>EXCLUDED.reference_prices,
+          reference_changed=bi_honorarios_catalog.reference_changed
+            OR ${referenceMaterialSql('bi_honorarios_catalog.reference_prices')}<>${referenceMaterialSql('EXCLUDED.reference_prices')},
           reference_prices=EXCLUDED.reference_prices,reference_warnings=EXCLUDED.reference_warnings,
           scope_excluded=EXCLUDED.scope_excluded,last_seen_at=now()`, [JSON.stringify(entries)]);
       // Sólo una baja explícita de V_IT cambia source_active. Ausencia de ficha y
@@ -305,9 +318,7 @@ async function getCatalogItem(itemCode) {
   return catalogRow(rows[0]);
 }
 
-async function listCatalog(options = {}, remotePool) {
-  await ensureSchema();
-  const sync = remotePool && options.autoSync !== false ? await syncIfDue(remotePool) : await readSyncState();
+function catalogQueryFilters(options) {
   const values = [];
   const filters = [];
   if (options.search) {
@@ -319,10 +330,43 @@ async function listCatalog(options = {}, remotePool) {
     filters.push(`(CASE WHEN c.scope_excluded THEN 'EXCLUIDO' ELSE c.status END)=$${values.length}`);
   }
   if (options.includeInactive === false || options.includeInactive === 'false') filters.push('c.source_active=true');
+  return { values, where: filters.length ? `WHERE ${filters.join(' AND ')}` : '' };
+}
+
+function visibleCatalogItems(items, options) {
+  return items.filter(item => !item.scopeExcluded)
+    .filter(item => !APPROVAL_STATUSES.has(options.approvalStatus) || item.approvalStatus === options.approvalStatus);
+}
+
+async function listCatalog(options = {}, remotePool) {
+  await ensureSchema();
+  const sync = remotePool && options.autoSync !== false ? await syncIfDue(remotePool) : await readSyncState();
+  const { values, where } = catalogQueryFilters(options);
   const { rows } = await getDb().pool.query(`SELECT c.*, ${CATALOG_TARIFF_COUNTS} FROM bi_honorarios_catalog c
-    ${filters.length ? `WHERE ${filters.join(' AND ')}` : ''} ORDER BY c.item_code`, values);
-  return { items: rows.map(catalogRow).filter(item => !item.scopeExcluded)
-    .filter(item => !APPROVAL_STATUSES.has(options.approvalStatus) || item.approvalStatus === options.approvalStatus), sync };
+    ${where} ORDER BY c.item_code`, values);
+  return { items: visibleCatalogItems(rows.map(catalogRow), options), sync };
+}
+
+async function readCatalogExport(options = {}) {
+  const { values, where } = catalogQueryFilters(options);
+  // Una sola sentencia mantiene catálogo y tarifas en el mismo snapshot de BI,
+  // sin inicializar estructuras ni sincronizar fuentes durante la exportación.
+  const { rows } = await getDb().pool.query(`
+    SELECT statement_timestamp() AS snapshot_at,
+      COALESCE(jsonb_agg(to_jsonb(export_item) ORDER BY export_item.item_code),'[]'::jsonb) AS items
+    FROM (
+      SELECT c.*, ${CATALOG_TARIFF_COUNTS},
+        COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.valid_from DESC,t.id DESC)
+          FROM bi_honorarios_tariffs t WHERE t.item_code=c.item_code),'[]'::jsonb) AS export_tariffs
+      FROM bi_honorarios_catalog c ${where}
+    ) export_item`, values);
+  const snapshot = rows[0];
+  const timestamp = snapshot?.snapshot_at && new Date(snapshot.snapshot_at);
+  if (!Array.isArray(snapshot?.items) || !timestamp || !Number.isFinite(timestamp.getTime())) {
+    throw fail('No se pudo leer el catálogo completo para descargarlo. Intenta de nuevo.', 503);
+  }
+  const items = snapshot.items.map(row => ({ ...catalogRow(row), tariffs: (row.export_tariffs || []).map(tariffRow) }));
+  return { items: visibleCatalogItems(items, options), snapshotAt: timestamp.toISOString() };
 }
 
 async function saveCatalogConfig(input, user) {
@@ -521,7 +565,7 @@ async function discoverCandidates(candidates) {
   }
 }
 
-module.exports = { ensureSchema, syncCatalog, syncIfDue, readSyncState, listCatalog, saveCatalogConfig,
+module.exports = { ensureSchema, syncCatalog, syncIfDue, readSyncState, listCatalog, readCatalogExport, saveCatalogConfig,
   listTariffs, saveTariff, getCatalogHistory, resolveTariff, resolveTariffs, loadPricingContext, enrichCandidates, enrichCandidate,
   ensureCatalogReady, getCatalogItem, validateConfig, validateTariff, tariffOverlaps, normalizeSource, isExcludedHonorariosService,
   discoverCandidates,dateOnly, CATALOG_SQL, REFERENCE_SQL, DISCOVERY_SQL };

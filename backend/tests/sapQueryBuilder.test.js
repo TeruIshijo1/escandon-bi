@@ -22,7 +22,9 @@ test('every SAP/Vertical module has assignable permissions, valid columns and de
   const catalog = service.getEntityCatalog();
   expect(catalog.length).toBeGreaterThan(40);
   expect(new Set(catalog.map(entity => entity.id)).size).toBe(catalog.length);
-  expect(permissions.map(permission => permission.entity).sort()).toEqual(catalog.map(entity => entity.id).sort());
+  const sourcePermissions = ['assistant_commercial_agreements', 'assistant_vertical_resources', 'assistant_sap_resources'];
+  expect(permissions.filter(permission => !sourcePermissions.includes(permission.entity)).map(permission => permission.entity).sort()).toEqual(catalog.map(entity => entity.id).sort());
+  expect(permissions.map(permission => permission.entity)).toEqual(expect.arrayContaining(sourcePermissions));
   for (const entity of catalog) {
     expect(['SAP', 'Vertical']).toContain(entity.source);
     expect(entity.grain).toBeTruthy();
@@ -33,6 +35,19 @@ test('every SAP/Vertical module has assignable permissions, valid columns and de
       expect(entity.fields.some(field => field.key === key)).toBe(true);
     }
   }
+});
+
+test('internal capabilities remain hidden from manual themes and can be saved by their stable identity', async () => {
+  const capabilities = service.getAssistantCatalog().filter(entity => entity.assistantOnly);
+  expect(capabilities.length).toBeGreaterThan(1);
+  expect(service.getEntityCatalog().some(entity => entity.assistantOnly)).toBe(false);
+  const entity = service.getEntityDefinition('assistant_patient_accounts');
+  expect(entity.requiredPermissions).toEqual(['vertical_accounts', 'assistant_commercial_agreements']);
+  pool.query.mockResolvedValue({ rows: [{ queryid: 9 }] });
+  await service.saveQuery({ username: 'staff' }, { title: 'Cuenta con convenio', entity: entity.id, selectedFields: ['PatientName', 'AccountBalance'], filters: period });
+  const parameters = pool.query.mock.calls[0][1];
+  expect(parameters[4]).toBe(entity.id);
+  expect(JSON.parse(parameters[5])).toEqual(['PatientName', 'AccountBalance']);
 });
 
 test.each(['2026-02-30', '2026-9-01', "2026-09-01' or 1=1", '2026-13-01'])('rejects invalid dates before querying: %s', async fechaDesde => {

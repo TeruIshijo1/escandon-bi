@@ -17,6 +17,8 @@ const reviews = require('../services/honorariosReview.service');
 const monthly = require('../services/honorariosMonthlyFixed.service');
 const profiles = require('../services/honorariosFiscalProfile.service');
 const sources = require('../services/honorariosSources.service');
+const sap = require('../services/honorariosSapReconciliation.service');
+const coverage = require('../services/honorariosCoverage.service');
 const { closeLiquidation, checkLiquidationChanges } = require('../services/honorariosLiquidation.service');
 const { reviewFingerprint } = require('../utils/honorariosReviewSource');
 const user = { id: 1, nombre: 'Revisor de prueba' };
@@ -72,6 +74,23 @@ test('closes an explicitly included fixed payment in a partial month without cli
   expect(query.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO bi_honorarios_finalized_rows'))).toBe(true);
   expect(query.mock.calls.some(([sql]) => sql === 'COMMIT')).toBe(true);
   expect(release).toHaveBeenCalledTimes(1);
+});
+
+test('a SAP preparation timeout confirms no closure was created and never starts a financial transaction', async () => {
+  profiles.readProfiles.mockResolvedValue({});
+  coverage.getClinicalProviderDirectory.mockResolvedValue([]);
+  sap.reconcileHonorariosWithSap.mockRejectedValueOnce(Object.assign(new Error('SAP tardó demasiado en responder.'), {
+    status: 504, code: 'HONORARIOS_SAP_TIMEOUT'
+  }));
+  const connect = jest.fn();
+  getDb.mockReturnValue({ pool: { query, connect } });
+  await expect(closeLiquidation({}, input, user)).rejects.toMatchObject({
+    status: 504, code: 'HONORARIOS_SAP_TIMEOUT', preparationStatus: 'NOT_CREATED'
+  });
+  expect(sap.reconcileHonorariosWithSap).toHaveBeenCalledTimes(1);
+  expect(connect).not.toHaveBeenCalled();
+  expect(monthly.lockAndValidateRows).not.toHaveBeenCalled();
+  expect(query.mock.calls.some(([sql]) => sql === 'BEGIN' || sql === 'COMMIT' || /^INSERT\s/i.test(sql))).toBe(false);
 });
 
 test('one provider closure combines approved clinical services and an included monthly payment', async () => {
@@ -141,4 +160,36 @@ test('fixed monthly historical lines never become missing clinical services or u
   const clinical = { rowId: 'BI|SOLN|1|ORDEN', sourceType: 'SOLN', description: 'Consulta', sourceFingerprint: 'clinic' };
   expect(await checkLiquidationChanges({}, { ...history, snapshot: { lines: [fixed, clinical] } })).toEqual([
     expect.objectContaining({ rowId: clinical.rowId, code: 'CLINICAL_SOURCE_MISSING' }) ]);
+});
+
+test('validation and a confirmed rollback explicitly permit retrying the preparation', async () => {
+  monthly.readMonthlyReviews.mockResolvedValue({});
+  await expect(closeLiquidation({}, input, user)).rejects.toMatchObject({ preparationStatus: 'NOT_CREATED' });
+  monthly.readMonthlyReviews.mockResolvedValue({ [fixedRow().SourceIdentity]: fixedApproval(fixedRow()) });
+  monthly.lockAndValidateRows.mockRejectedValueOnce(Object.assign(new Error('La configuración cambió'), { status: 409 }));
+  await expect(closeLiquidation({}, input, user)).rejects.toMatchObject({ status: 409, preparationStatus: 'NOT_CREATED' });
+  expect(query.mock.calls.some(([sql]) => sql === 'ROLLBACK')).toBe(true);
+  expect(query.mock.calls.some(([sql]) => sql === 'COMMIT')).toBe(false);
+});
+
+test('a lost commit response cannot claim that the payment was not prepared', async () => {
+  const ordinaryQuery = query.getMockImplementation();
+  query.mockImplementation(async (sql, params) => {
+    if (sql === 'COMMIT') throw Object.assign(new Error('No se recibió la confirmación del cierre.'), { status: 503 });
+    return ordinaryQuery(sql, params);
+  });
+  const failure = await closeLiquidation({}, input, user).catch(error => error);
+  expect(failure).toMatchObject({ status: 503 });
+  expect(failure.preparationStatus).toBeUndefined();
+  expect(query.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO bi_honorarios_liquidations'))).toBe(true);
+});
+
+test('a detail-read error after commit remains uncertain even with a client-error status', async () => {
+  const ordinaryQuery = query.getMockImplementation();
+  query.mockImplementation(async (sql, params) => sql.includes('SELECT * FROM bi_honorarios_liquidations')
+    ? { rows: [] } : ordinaryQuery(sql, params));
+  const failure = await closeLiquidation({}, input, user).catch(error => error);
+  expect(failure).toMatchObject({ status: 404 });
+  expect(failure.preparationStatus).toBeUndefined();
+  expect(query.mock.calls.some(([sql]) => sql === 'COMMIT')).toBe(true);
 });

@@ -7,13 +7,8 @@
  * correcto, dándole a MAR-IA vocabulario prácticamente ilimitado.
  */
 
-const LLM_API_KEY = process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
-const LLM_MODEL = process.env.GEMINI_API_KEY ? (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite') :
-  (process.env.DEEPSEEK_API_KEY ? (process.env.DEEPSEEK_MODEL || 'deepseek-chat') : (process.env.OPENAI_MODEL || 'gpt-4o'));
-const LLM_BASE = process.env.LLM_BASE_URL ||
-  (process.env.GEMINI_API_KEY ? 'https://generativelanguage.googleapis.com/v1beta/openai' :
-  (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' :
-  (process.env.AZURE_OPENAI_ENDPOINT || 'https://api.openai.com/v1')));
+const { providerConfig } = require('../../../utils/reportAiProviders');
+const { failureDiagnostic } = require('../../../utils/reportAiDiagnostics');
 
 /**
  * Clasifica una consulta en una de las intenciones registradas.
@@ -21,8 +16,9 @@ const LLM_BASE = process.env.LLM_BASE_URL ||
  * @param {Array} intents - INTENT_REGISTRY (id + patterns)
  * @returns {Promise<string|null>} id del intent o null si no clasifica / no hay LLM
  */
-async function classifyWithLLM(query, intents) {
-  if (!LLM_API_KEY) return null;
+async function classifyWithLLM(query, intents, { onDiagnostic, fetchImpl = global.fetch } = {}) {
+  const config = providerConfig();
+  if (!config.key || !Array.isArray(intents) || !intents.length) return null;
   if (!query || query.trim().length < 4) return null;
 
   const intentList = intents
@@ -37,31 +33,34 @@ Si la pregunta no corresponde a ninguna intención, responde NINGUNA.
 Intenciones disponibles:
 ${intentList}`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const diagnose = (error, details) => {
+    const diagnostic = failureDiagnostic(config, error, details);
+    console.warn('[MAR-IA] La interpretación externa no está disponible.', diagnostic);
+    if (typeof onDiagnostic === 'function') onDiagnostic(diagnostic);
+  };
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
 
-    const res = await fetch(`${LLM_BASE.replace(/\/$/, '')}/chat/completions`, {
+    const res = await fetchImpl(`${config.base.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LLM_API_KEY}`,
+        'Authorization': `Bearer ${config.key}`,
       },
       body: JSON.stringify({
-        model: LLM_MODEL,
+        model: config.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: query },
         ],
-        max_tokens: 30,
+        max_tokens: 128,
         temperature: 0,
       }),
       signal: controller.signal,
     });
-    clearTimeout(timeout);
-
     if (!res.ok) {
-      console.warn(`[MAR-IA LLM] Clasificación falló (HTTP ${res.status}). Usando fallback sin LLM.`);
+      diagnose(null, { stage: 'http', httpStatus: res.status });
       return null;
     }
 
@@ -72,9 +71,11 @@ ${intentList}`;
     if (intentId === 'ninguna' || intentId === '') return null;
     return intents.some(i => i.id === intentId) ? intentId : null;
   } catch (err) {
-    console.warn('[MAR-IA LLM] No se pudo clasificar con LLM:', err.message);
+    diagnose(err, { aborted: controller.signal.aborted });
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
-module.exports = { classifyWithLLM, LLM_API_KEY };
+module.exports = { classifyWithLLM, get LLM_API_KEY() { return providerConfig().key; } };

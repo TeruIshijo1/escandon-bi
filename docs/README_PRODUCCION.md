@@ -1,10 +1,16 @@
 # Pase a producción — Hospital Escandón BI
 
-Actualizado el **7 de octubre de 2026**. Este pase integra todo el estado actual del proyecto, incluidos archivos nuevos y cambios pendientes de guardar en Git. El servidor `SERVIDORCALIDAD` entrega API y frontend en el puerto **5173**.
+Actualizado el **9 de octubre de 2026**. Este pase integra todo el estado actual del proyecto, incluidos archivos nuevos y cambios pendientes de guardar en Git. El servidor `SERVIDORCALIDAD` entrega API y frontend en el puerto **5173**.
 
-La revisión final incluye los estadísticos mensuales, la descarga completa de Excel por fechas y la corrección de tiempos de espera de SAP. Consulta [la revisión final del paquete](revision-pase-final-2026-10-07.md). Ejecuta `instalar.bat` antes del arranque: también prepara los dos archivos de referencia que utilizan los estadísticos, conservando el histórico existente.
+La revisión actual incluye todos los cambios de frontend y backend de honorarios, PDF y Excel, reportes, estadísticas, tableros, avisos y reapertura de cuentas. Consulta [la revisión del 9 de octubre](revision-pase-2026-10-09.md), [la revisión general del 8 de octubre](revision-pase-2026-10-08.md) y [la evidencia anterior de estadísticos](revision-pase-final-2026-10-07.md). Ejecuta `instalar.bat` antes del arranque: también prepara los dos archivos de referencia que utilizan los estadísticos, conservando el histórico existente.
+
+La reapertura en Vertical requiere los permisos de consulta y ejecución, una revisión completa de SAP, una preparación vigente y la confirmación del número de cuenta. Antes de modificar los registros conserva un respaldo en la carpeta configurada del servidor. Consulta [el procedimiento y sus límites](reapertura-cuentas-sap.md). El [mapa e instructivo](Mapa_Instructivo_Plataforma_y_Origen_Datos.md) y su [PDF completo](Mapa_Plataforma_Hospital_Escandon_BI.pdf) forman parte del pase.
+
+La revisión de Vertical documentada el 9 de octubre detectó que la conexión carecía de `VIEW DEFINITION`. La ejecución de reaperturas permanece bloqueada cuando no puede verificar toda la estructura y sus relaciones. El responsable de esa base debe habilitar la lectura de metadatos correspondiente; el instalador no cambia esos permisos. Esta preparación local no comprueba que ya se hayan habilitado en el servidor.
 
 ## Preparar el pase en desarrollo
+
+El lanzador productivo también prepara las referencias de estadísticas ausentes desde `initial-data` antes de cargar los servicios, conservando históricos y configuración existentes. Para recuperar una instalación anterior con el error de `statistics_manual_controls.json`, ejecuta desde la raíz `".runtime\node.exe" scripts\initialize-package-data.cjs` y, si termina correctamente, `iniciar_produccion.bat`. Debe estar copiado el pase completo, incluido el manifiesto. Consulta [el procedimiento vigente](../README_PRODUCCION.md).
 
 Ejecuta `powershell -ExecutionPolicy Bypass -File .\build_deploy.ps1` desde el proyecto. El script valida Node, recompila todo el frontend, incluye el backend completo y verifica hashes, dependencias locales y recursos compilados. El pase anterior queda conservado en `tmp/pase-anterior-*`. Si falla el build o la auditoría previa, el pase anterior se conserva.
 
@@ -19,7 +25,7 @@ El script usa el runtime de `.runtime/node.exe` preparado por `scripts/prepare-n
 - `database/*.sql`: esquemas y herramientas SQL; no se ejecutan en bloque ni se restaura una base durante una actualización.
 - `initial-data/`: historiales y modelos de referencia para instalaciones sin esos archivos. El instalador copia cada uno sólo cuando no existe; conserva los datos y modelos del servidor.
 - `instalar.bat`, `iniciar_produccion.bat`, `permitir_acceso_red.bat` y `verificar_pase.ps1`.
-- Documentación actualizada, `docs/revision-pase-2026-10-07.md` y `MANIFIESTO.json` con inventario, tamaños y hashes SHA256.
+- Documentación actualizada, la revisión del 9 de octubre, el mapa e instructivo en Markdown y PDF y `MANIFIESTO.json` con inventario, tamaños y hashes SHA256.
 
 No incluye `.env`, claves, `node_modules`, bases SQLite, dumps de PostgreSQL, cargas de usuarios, pruebas, logs, temporales ni backups de modelos. El instalador no restaura ni limpia PostgreSQL.
 

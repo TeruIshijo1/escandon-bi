@@ -6,11 +6,13 @@ import { authHeaders } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
 import { hasSapModulePermission } from '../../utils/rbac';
 import ReportBuilderIcon, { reportTopicIcon } from './ReportBuilderIcon';
-import ReportAssistant from './ReportAssistant';
+import ReportAssistant, { ReportAnalysisSummary, hasReportAnalysis, getReportPointLookup } from './ReportAssistant';
+import { formatReportNumeric, reportNumber, escapeReportHtml } from '../../utils/reportValueFormatting';
 import './ConsultaServiceLayer.css';
 
 const normalizeSearch = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-const entitySource = entity => entity?.source === 'Vertical' ? 'Vertical' : 'SAP';
+const entitySource = entity => entity?.source || 'SAP';
+const analysisFingerprint = (entity, fields, filters, analysis) => JSON.stringify({ entity, fields, filters, analysis: hasReportAnalysis(analysis) ? analysis : null });
 const validDraftDate = value => {
   if (value == null || value === '') return true;
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -32,6 +34,31 @@ const supportsFilter = (entity, filter) => {
     clasificacionMedica: ['MedicalClassification', 'SecondaryClassification'],
   };
   return Boolean(entity.fields?.some(field => fieldKeys[filter]?.includes(field.key)));
+};
+const executionFilters = (entity, filters = {}) => ({ fechaDesde: filters.fechaDesde || '', fechaHasta: filters.fechaHasta || '', busqueda: filters.busqueda || '', almacen: supportsFilter(entity, 'almacen') ? filters.almacen || 'ALL' : 'ALL', estatusDoc: supportsFilter(entity, 'estatusDoc') ? filters.estatusDoc || 'ALL' : 'ALL', clasificacionMedica: supportsFilter(entity, 'clasificacionMedica') ? filters.clasificacionMedica || 'ALL' : 'ALL' });
+
+const ReportModal = ({ title, children, onClose, busy = false, width = 720 }) => <div role="dialog" aria-modal="true" aria-label={title} onKeyDown={event => { if (event.key === 'Escape' && !busy) onClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, .65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+  <div style={{ background: 'var(--report-surface)', color: 'var(--report-text)', border: '1px solid var(--report-border)', borderRadius: 16, maxWidth: width, width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 30px rgba(0,0,0,.2)' }}>
+    <div style={{ padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--report-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><h2 style={{ margin: 0, fontSize: '1.1rem' }}>{title}</h2><button type="button" aria-label={`Cerrar ${title}`} disabled={busy} onClick={onClose} className="report-catalog__chip">×</button></div>
+    <div style={{ padding: '1.3rem', overflowY: 'auto', minHeight: 0 }}>{children}</div>
+  </div>
+</div>;
+
+const RecipientPicker = ({ users, loading, error, search, onSearch, selectedIds, onChange, onRetry }) => {
+  const terms = normalizeSearch(search).trim().split(/\s+/).filter(Boolean);
+  const matching = users.filter(person => terms.every(term => normalizeSearch([person.nombre, person.username, person.area].join(' ')).includes(term)));
+  return <fieldset style={{ margin: '1rem 0', padding: '1rem', border: '1px solid var(--report-border)', borderRadius: 10 }}>
+    <legend style={{ fontWeight: 700, fontSize: '.85rem' }}>Personas que podrán usar el reporte</legend>
+    <p style={{ margin: '0 0 .8rem', fontSize: '.78rem', color: 'var(--report-muted)' }}>Las personas elegidas verán este reporte en «Mis reportes» con la configuración guardada.</p>
+    {loading ? <p role="status">Cargando personas…</p> : error ? <div role="alert"><p>{error}</p><button type="button" className="report-catalog__chip" onClick={onRetry}>Reintentar lista de personas</button></div> : <>
+      <label style={{ display: 'grid', gap: 5, fontSize: '.78rem' }}>Buscar personas<input type="search" value={search} onChange={event => onSearch(event.target.value)} placeholder="Nombre, usuario o área" style={{ width: '100%', padding: '.6rem', color: 'var(--report-text)', background: 'var(--report-soft)', border: '1px solid var(--report-border)', borderRadius: 7 }} /></label>
+      <div style={{ maxHeight: 210, overflowY: 'auto', marginTop: '.75rem', display: 'grid', gap: '.5rem' }}>
+        {matching.map(person => <label key={person.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '.55rem', borderRadius: 7, background: 'var(--report-soft)', fontSize: '.82rem' }}><input type="checkbox" checked={selectedIds.some(id => String(id) === String(person.id))} onChange={() => onChange(selectedIds.some(id => String(id) === String(person.id)) ? selectedIds.filter(id => String(id) !== String(person.id)) : [...selectedIds, person.id])} /><span>{person.nombre || person.username}<span style={{ display: 'block', color: 'var(--report-muted)', fontSize: '.73rem' }}>{person.username}{person.area ? ` · ${person.area}` : ''}</span></span></label>)}
+        {!matching.length && <p style={{ fontSize: '.78rem' }}>{search.trim() ? 'No encontré personas con esa búsqueda.' : 'No hay personas disponibles para asignar.'}</p>}
+      </div>
+    </>}
+    <p role="status" style={{ margin: '.75rem 0 0', fontSize: '.75rem', color: 'var(--report-muted)' }}>{selectedIds.length} {selectedIds.length === 1 ? 'persona elegida' : 'personas elegidas'}</p>
+  </fieldset>;
 };
 
 const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align = 'left', maxWidth }) => {
@@ -69,11 +96,12 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
       padding: '8px 6px',
       background: '#004687',
       borderBottom: '3px solid #0088C9',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'normal',
+      minWidth: maxWidth || 120
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>
-          <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.9)', letterSpacing: '0.04em', fontWeight: '700' }}>
+          <span style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.9)', letterSpacing: '0.04em', fontWeight: '700', overflowWrap: 'anywhere', lineHeight: 1.35, minWidth: 0 }}>
             {label}
           </span>
           {isActive && (
@@ -173,17 +201,21 @@ export default function ConsultaServiceLayer() {
   const topScrollRef = useRef(null);
   const tableScrollRef = useRef(null);
   const queryRequestRef = useRef(0);
+  const savedRequestRef = useRef(0);
   const configurationRef = useRef(null);
   const resultsRef = useRef(null);
   const [reportMode, setReportMode] = useState('assistant');
   const [tableScrollWidth, setTableScrollWidth] = useState(1600);
 
   const [catalog, setCatalog] = useState([]);
+  const [assistantCatalog, setAssistantCatalog] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState(null);
   const [catalogRefresh, setCatalogRefresh] = useState(0);
   const [selectedEntityId, setSelectedEntityId] = useState('');
   const [selectedFields, setSelectedFields] = useState([]);
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisSummary, setAnalysisSummary] = useState(null);
   const [manualTopicRequired, setManualTopicRequired] = useState(false);
 
   // Helpers de fecha
@@ -216,15 +248,29 @@ export default function ConsultaServiceLayer() {
   const [queryResult, setQueryResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [executionFailed, setExecutionFailed] = useState(false);
 
   // Plantillas guardadas
   const [savedQueries, setSavedQueries] = useState([]);
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [savedError, setSavedError] = useState('');
+  const [savedNotice, setSavedNotice] = useState('');
+  const [activeSavedReport, setActiveSavedReport] = useState(null);
   const [showSavedModal, setShowSavedModal] = useState(false);
   const [showSaveFormModal, setShowSaveFormModal] = useState(false);
   const [saveTitle, setSaveTitle] = useState('');
   const [saveDescription, setSaveDescription] = useState('');
-  const [saveIsPublic, setSaveIsPublic] = useState(false);
   const [savingQuery, setSavingQuery] = useState(false);
+  const [recipientUsers, setRecipientUsers] = useState([]);
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
+  const [recipientsError, setRecipientsError] = useState('');
+  const [recipientSearch, setRecipientSearch] = useState('');
+  const [saveUserIds, setSaveUserIds] = useState([]);
+  const [assignmentTarget, setAssignmentTarget] = useState(null);
+  const [assignmentUserIds, setAssignmentUserIds] = useState([]);
+  const [assignmentError, setAssignmentError] = useState('');
+  const [assigningReport, setAssigningReport] = useState(false);
+  const [canChooseRecipients, setCanChooseRecipients] = useState(false);
 
   // Filtros de tabla y paginación
   const [colFilters, setColFilters] = useState({});
@@ -241,7 +287,10 @@ export default function ConsultaServiceLayer() {
         const res = await fetch(`${API_BASE}/sap-query/catalog`, { headers: authHeaders(), signal: controller.signal });
         const json = await res.json();
         if (!res.ok || !json.ok || !Array.isArray(json.catalog)) throw new Error('No se pudo cargar la lista de módulos.');
-        if (!controller.signal.aborted) setCatalog(json.catalog);
+        if (!controller.signal.aborted) {
+          setCatalog(json.catalog.filter(entity => !entity.assistantOnly));
+          setAssistantCatalog(Array.isArray(json.assistantCatalog) ? json.assistantCatalog : json.catalog);
+        }
       } catch (err) {
         if (controller.signal.aborted) return;
         console.error('[Report Builder] Error al cargar catálogo:', err);
@@ -255,16 +304,31 @@ export default function ConsultaServiceLayer() {
   }, [catalogRefresh]);
 
   useEffect(() => {
+    setSavedQueries([]);
+    setActiveSavedReport(null);
+    setAnalysis(null); setAnalysisSummary(null); setExecutionFailed(false);
+    setCanChooseRecipients(false);
+    setShowSavedModal(false); setShowSaveFormModal(false); setAssignmentTarget(null);
+    setRecipientUsers([]); setSavedNotice('');
+    queryRequestRef.current += 1;
+    setQueryResult(null); setLoading(false);
     loadSavedQueries();
-  }, []);
+  }, [user?.id, user?.username]);
 
   const userAllowedCatalog = useMemo(() => {
     return catalog.filter(c => hasSapModulePermission(user, c.id));
   }, [catalog, user]);
 
+  const userAllowedAssistantCatalog = useMemo(() => {
+    return assistantCatalog.filter(entity => Array.isArray(entity.requiredPermissions) && entity.requiredPermissions.length
+      ? entity.requiredPermissions.every(moduleId => hasSapModulePermission(user, moduleId))
+      : hasSapModulePermission(user, entity.id));
+  }, [assistantCatalog, user]);
+
   const currentEntityDef = useMemo(() => {
-    return userAllowedCatalog.find(c => c.id === selectedEntityId) || null;
-  }, [userAllowedCatalog, selectedEntityId]);
+    if (activeSavedReport?.entity === selectedEntityId) return activeSavedReport.definition;
+    return userAllowedAssistantCatalog.find(c => c.id === selectedEntityId) || null;
+  }, [activeSavedReport, userAllowedAssistantCatalog, selectedEntityId]);
 
   const hasStatusField = useMemo(() => {
     return supportsFilter(currentEntityDef, 'estatusDoc');
@@ -305,22 +369,25 @@ export default function ConsultaServiceLayer() {
 
   // Si cambia la lista de módulos permitidos, asegurar que selectedEntityId sea válido
   useEffect(() => {
-    if (userAllowedCatalog.length > 0 && !userAllowedCatalog.some(c => c.id === selectedEntityId)) {
+    if (activeSavedReport?.entity === selectedEntityId) return;
+    if (userAllowedAssistantCatalog.length > 0 && !userAllowedAssistantCatalog.some(c => c.id === selectedEntityId)) {
       if (manualTopicRequired && !selectedEntityId) return;
-      handleSelectEntity((userAllowedCatalog.find(c => c.id === 'inventory') || userAllowedCatalog[0]).id);
-    } else if (userAllowedCatalog.length === 0 && selectedEntityId) {
+      handleSelectEntity((userAllowedCatalog.find(c => c.id === 'inventory') || userAllowedCatalog[0] || userAllowedAssistantCatalog[0]).id);
+    } else if (userAllowedAssistantCatalog.length === 0 && selectedEntityId) {
       queryRequestRef.current += 1;
       setSelectedEntityId('');
       setSelectedFields([]);
       setQueryResult(null);
       setLoading(false);
     }
-  }, [userAllowedCatalog, selectedEntityId, manualTopicRequired]);
+  }, [activeSavedReport, userAllowedAssistantCatalog, userAllowedCatalog, selectedEntityId, manualTopicRequired]);
 
   // Al cambiar de entidad, preseleccionar sus campos default y limpiar filtros no aplicables
   const handleSelectEntity = (entId) => {
-    const def = userAllowedCatalog.find(c => c.id === entId);
+    const def = userAllowedAssistantCatalog.find(c => c.id === entId);
     if (!def) return;
+    setActiveSavedReport(null);
+    setAnalysis(null); setAnalysisSummary(null); setExecutionFailed(false);
     setManualTopicRequired(false);
     setSelectedEntityId(entId);
     if (def) {
@@ -369,43 +436,129 @@ export default function ConsultaServiceLayer() {
 
   // Cargar consultas guardadas
   const loadSavedQueries = async () => {
+    const requestId = ++savedRequestRef.current;
+    setSavedLoading(true); setSavedError('');
     try {
       const res = await fetch(`${API_BASE}/sap-query/saved`, { headers: authHeaders() });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.ok) setSavedQueries(json.queries || []);
-      }
+      const json = await res.json();
+      if (requestId !== savedRequestRef.current) return;
+      if (!res.ok || !json.ok || !Array.isArray(json.queries)) throw new Error(userMessage(json.error || 'No se pudieron cargar tus reportes. Intenta de nuevo.'));
+      setSavedQueries(json.queries);
+      setCanChooseRecipients(Boolean(json.canAssign));
     } catch (err) {
-      console.warn('[SAP Query Builder] Error al cargar consultas guardadas:', err);
+      if (requestId === savedRequestRef.current) setSavedError(userMessage(err.message));
+    } finally {
+      if (requestId === savedRequestRef.current) setSavedLoading(false);
     }
+  };
+
+  const loadRecipients = async () => {
+    setRecipientsLoading(true); setRecipientsError('');
+    try {
+      const res = await fetch(`${API_BASE}/sap-query/saved/recipients`, { headers: authHeaders() });
+      const json = await res.json();
+      if (!res.ok || !json.ok || !Array.isArray(json.users)) throw new Error(userMessage(json.error || 'No se pudo cargar la lista de personas. Intenta de nuevo.'));
+      setRecipientUsers(json.users);
+    } catch (err) { setRecipientsError(userMessage(err.message)); }
+    finally { setRecipientsLoading(false); }
+  };
+
+  const openSaveReport = () => {
+    setSaveUserIds([]); setRecipientSearch(''); setSavedNotice('');
+    setShowSaveFormModal(true);
+    if (canChooseRecipients) loadRecipients();
+  };
+
+  const openAssignments = (saved) => {
+    setAssignmentTarget(saved); setAssignmentUserIds((saved.assignedUsers || []).filter(person => person.activo !== false).map(person => person.id));
+    setAssignmentError(''); setRecipientSearch('');
+    loadRecipients();
+  };
+
+  const replaceAssignments = async (id, userIds) => {
+    const res = await fetch(`${API_BASE}/sap-query/saved/${encodeURIComponent(id)}/assignments`, {
+      method: 'PUT', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ userIds }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(userMessage(json.error || 'No se pudieron guardar los accesos. Intenta de nuevo.'));
+    return json;
+  };
+
+  const handleSaveAssignments = async () => {
+    if (!assignmentTarget || assigningReport || recipientsLoading || recipientsError) return;
+    setAssigningReport(true); setAssignmentError('');
+    try {
+      await replaceAssignments(assignmentTarget.id, assignmentUserIds);
+      setAssignmentTarget(null); setSavedNotice('Los accesos del reporte quedaron actualizados.');
+      await loadSavedQueries();
+    } catch (err) { setAssignmentError(userMessage(err.message)); }
+    finally { setAssigningReport(false); }
+  };
+
+  const handleExecuteSavedReport = async (saved) => {
+    const requestId = ++queryRequestRef.current;
+    setLoading(true); setError(null); setExecutionFailed(false); setQueryResult(null); setColFilters({}); setPage(1);
+    try {
+      const res = await fetch(`${API_BASE}/sap-query/execute`, {
+        method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ savedQueryId: saved.id }),
+      });
+      const json = await res.json();
+      if (requestId !== queryRequestRef.current) return;
+      if (!res.ok || !json.ok) throw new Error(userMessage(json.error || 'No se pudo consultar este reporte. Intenta de nuevo.'));
+      if (hasReportAnalysis(json.analysis || saved.filters?.analysis) && json.analysisScope?.complete !== true) throw new Error('No se pudieron calcular resultados completos. Ajusta el período o los filtros y vuelve a consultar.');
+      setAnalysis(json.analysis || saved.filters?.analysis || null); setAnalysisSummary(json.analysisSummary || null);
+      setQueryResult({ ...json, entityTitle: saved.title, requestedFilters: saved.filters || {}, loadedFields: json.loadedFields || saved.selectedFields });
+    } catch (err) { if (requestId === queryRequestRef.current) { setExecutionFailed(true); setError(userMessage(err.message)); } }
+    finally { if (requestId === queryRequestRef.current) setLoading(false); }
+  };
+
+  const handleOpenSavedReport = (saved) => {
+    const definition = saved.definition;
+    if (!definition || !Array.isArray(definition.fields) || !Array.isArray(saved.selectedFields) || !saved.selectedFields.length
+      || saved.selectedFields.some(key => !definition.fields.some(field => field.key === key))) {
+      setSavedError('No se pudo preparar este reporte. Actualiza «Mis reportes» e intenta de nuevo.');
+      return;
+    }
+    const snapshot = { ...saved, definition: { ...definition, id: saved.entity } };
+    setActiveSavedReport(snapshot); setReportMode('saved'); setSelectedEntityId(saved.entity); setSelectedFields([...saved.selectedFields]);
+    setAnalysis(saved.filters?.analysis || null); setAnalysisSummary(saved.analysisSummary || null);
+    setFechaDesde(saved.filters?.fechaDesde || ''); setFechaHasta(saved.filters?.fechaHasta || ''); setBusqueda(saved.filters?.busqueda || '');
+    setAlmacen(saved.filters?.almacen || 'ALL'); setEstatusDoc(saved.filters?.estatusDoc || 'ALL'); setClasificacionMedica(saved.filters?.clasificacionMedica || 'ALL');
+    setShowSavedModal(false); handleExecuteSavedReport(snapshot);
   };
 
   // Ejecutar consulta dinámica
   const handleExecute = async (configuration) => {
-    const definition = configuration ? userAllowedCatalog.find(entity => entity.id === configuration.entity) : currentEntityDef;
+    if (activeSavedReport && !configuration) return handleExecuteSavedReport(activeSavedReport);
+    const definition = configuration ? userAllowedAssistantCatalog.find(entity => entity.id === configuration.entity) : currentEntityDef;
     if (!definition) return;
     const fields = configuration?.selectedFields || selectedFields;
     const filters = configuration?.filters || { fechaDesde, fechaHasta, busqueda, almacen, estatusDoc, clasificacionMedica };
+    const requestedAnalysis = configuration ? configuration.analysis || configuration.filters?.analysis || null : analysis;
 
     if (!Array.isArray(fields) || !fields.length || fields.some(key => !definition.fields.some(field => field.key === key))) {
+      setExecutionFailed(true);
       setError('Las columnas disponibles cambiaron. Elige de nuevo los datos que quieres incluir.');
       return;
     }
 
-    if (definition.requiresDateFilter) {
+    if (definition.requiresDateFilter && (filters.fechaDesde || filters.fechaHasta || !getReportPointLookup(definition, requestedAnalysis))) {
       if (!filters.fechaDesde || !filters.fechaHasta) {
+        setExecutionFailed(true);
         setError(`Elige las fechas de inicio y fin para consultar ${definition.title}.`);
         return;
       }
       if (filters.fechaDesde > filters.fechaHasta) {
+        setExecutionFailed(true);
         setError('La fecha de inicio debe ser anterior o igual a la fecha de fin.');
         return;
       }
     }
 
     const requestId = ++queryRequestRef.current;
-    const requestedFilters = { fechaDesde: filters.fechaDesde || '', fechaHasta: filters.fechaHasta || '', busqueda: filters.busqueda || '', almacen: supportsFilter(definition, 'almacen') ? filters.almacen || 'ALL' : 'ALL', estatusDoc: supportsFilter(definition, 'estatusDoc') ? filters.estatusDoc || 'ALL' : 'ALL', clasificacionMedica: supportsFilter(definition, 'clasificacionMedica') ? filters.clasificacionMedica || 'ALL' : 'ALL' };
+    const requestedFilters = executionFilters(definition, filters);
     setLoading(true);
+    setExecutionFailed(false);
     setError(null);
     setPage(1);
     setColFilters({});
@@ -420,7 +573,8 @@ export default function ConsultaServiceLayer() {
         body: JSON.stringify({
           entity: definition.id,
           selectedFields: fields,
-          ...requestedFilters
+          ...requestedFilters,
+          ...(hasReportAnalysis(requestedAnalysis) ? { analysis: requestedAnalysis } : {})
         })
       });
 
@@ -429,12 +583,15 @@ export default function ConsultaServiceLayer() {
       if (!res.ok || !json.ok) {
         throw new Error(userMessage(json.error || 'No se pudo consultar la información. Intenta de nuevo.'));
       }
-
-      setQueryResult({ ...json, requestedFilters });
-      return { total: json.data?.length || 0, truncated: Boolean(json.truncated) };
+      if (hasReportAnalysis(json.analysis || requestedAnalysis) && json.analysisScope?.complete !== true) throw new Error('No se pudieron calcular resultados completos. Ajusta el período o los filtros y vuelve a consultar.');
+      const canonicalAnalysis = json.analysis || requestedAnalysis;
+      setAnalysis(canonicalAnalysis || null); setAnalysisSummary(json.analysisSummary || null);
+      setQueryResult({ ...json, requestedFilters, requestedConfiguration: analysisFingerprint(definition.id, fields, requestedFilters, canonicalAnalysis) });
+      return { total: json.data?.length || 0, truncated: Boolean(json.truncated), analysis: canonicalAnalysis, analysisSummary: json.analysisSummary };
     } catch (err) {
       if (requestId !== queryRequestRef.current) return;
       console.error('[SAP Query Execution Error]', err);
+      setExecutionFailed(true);
       setError(userMessage(err.message));
       if (configuration) throw err;
     } finally {
@@ -443,10 +600,11 @@ export default function ConsultaServiceLayer() {
   };
 
   const handleAssistantGenerate = async (plan) => {
-    const definition = userAllowedCatalog.find(entity => entity.id === plan.entity);
+    const definition = userAllowedAssistantCatalog.find(entity => entity.id === plan.entity);
     if (!definition || plan.selectedFields.some(key => !definition.fields.some(field => field.key === key))) throw new Error('Ese tema o alguna columna ya no está disponible. Intenta con otro reporte.');
     handleSelectEntity(plan.entity);
     setSelectedFields(plan.selectedFields);
+    setAnalysis(plan.analysis || null); setAnalysisSummary(plan.analysisSummary || null);
     setFechaDesde(plan.filters.fechaDesde || '');
     setFechaHasta(plan.filters.fechaHasta || '');
     setAlmacen(plan.filters.almacen || 'ALL');
@@ -464,6 +622,7 @@ export default function ConsultaServiceLayer() {
   const resetAssistantReport = () => {
     queryRequestRef.current += 1;
     setQueryResult(null);
+    setExecutionFailed(false);
     setError(null);
     setLoading(false);
     setColFilters({});
@@ -476,7 +635,7 @@ export default function ConsultaServiceLayer() {
     setModuleSearch('');
     setActiveCategory('ALL');
     setActiveSource('ALL');
-    const definition = draft && userAllowedCatalog.find(entity => entity.id === draft.entity);
+    const definition = draft && userAllowedAssistantCatalog.find(entity => entity.id === draft.entity);
     const filters = draft?.filters && typeof draft.filters === 'object' && !Array.isArray(draft.filters) ? draft.filters : {};
     const choices = {
       almacen: supportsFilter(definition, 'almacen') ? ['ALL', 'FAR', 'QX', 'QXCR', 'QXRCR', 'TERACR', 'PPBCR', 'PPACR', 'IMAGCR', 'CARDIOCR', 'CUNACR', 'QXCM', 'URG1CM', 'ALG'] : ['ALL'],
@@ -486,12 +645,13 @@ export default function ConsultaServiceLayer() {
     const valid = definition && Array.isArray(draft.selectedFields) && draft.selectedFields.length > 0
       && draft.selectedFields.every(key => definition.fields.some(field => field.key === key))
       && (draft.filters == null || typeof draft.filters === 'object' && !Array.isArray(draft.filters))
-      && Object.keys(filters).every(key => ['fechaDesde', 'fechaHasta', 'busqueda', 'almacen', 'estatusDoc', 'clasificacionMedica'].includes(key))
+      && Object.keys(filters).every(key => ['fechaDesde', 'fechaHasta', 'busqueda', 'almacen', 'estatusDoc', 'clasificacionMedica', 'analysis'].includes(key))
       && validDraftDate(filters.fechaDesde) && validDraftDate(filters.fechaHasta)
       && (!filters.fechaDesde || !filters.fechaHasta || filters.fechaDesde <= filters.fechaHasta)
       && Object.entries(choices).every(([key, values]) => values.includes(filters[key] || 'ALL'))
       && (filters.busqueda == null || typeof filters.busqueda === 'string' && filters.busqueda.length <= 200);
     if (!valid) {
+      setAnalysis(null); setAnalysisSummary(null);
       setManualTopicRequired(true);
       setSelectedEntityId(''); setSelectedFields([]);
       setFechaDesde(''); setFechaHasta(''); setBusqueda('');
@@ -502,6 +662,7 @@ export default function ConsultaServiceLayer() {
     // Only fill the form. The user completes it and explicitly starts the query.
     handleSelectEntity(definition.id);
     setSelectedFields([...new Set(draft.selectedFields)]);
+    setAnalysis(draft.analysis || filters.analysis || null); setAnalysisSummary(draft.analysisSummary || null);
     setFechaDesde(definition.requiresDateFilter ? filters.fechaDesde || '' : '');
     setFechaHasta(definition.requiresDateFilter ? filters.fechaHasta || '' : '');
     setBusqueda(filters.busqueda || '');
@@ -516,6 +677,7 @@ export default function ConsultaServiceLayer() {
     if (!saveTitle.trim()) return;
 
     setSavingQuery(true);
+    setSavedNotice('');
     try {
       const res = await fetch(`${API_BASE}/sap-query/saved`, {
         method: 'POST',
@@ -528,20 +690,30 @@ export default function ConsultaServiceLayer() {
           description: saveDescription.trim(),
           entity: selectedEntityId,
           selectedFields,
-          filters: { fechaDesde, fechaHasta, almacen: hasWhsField ? almacen : 'ALL', estatusDoc: hasStatusField ? estatusDoc : 'ALL', clasificacionMedica: hasMedClassField ? clasificacionMedica : 'ALL', busqueda },
-          isPublic: saveIsPublic
+          filters: { fechaDesde, fechaHasta, almacen: hasWhsField ? almacen : 'ALL', estatusDoc: hasStatusField ? estatusDoc : 'ALL', clasificacionMedica: hasMedClassField ? clasificacionMedica : 'ALL', busqueda, ...(hasReportAnalysis(analysis) ? { analysis } : {}) },
+          isPublic: false
         })
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(userMessage(json.error || 'No se pudo guardar la consulta'));
+      if (!res.ok || !json.ok) throw new Error(userMessage(json.error || 'No se pudo guardar el reporte. Intenta de nuevo.'));
+
+      let notice = 'El reporte quedó guardado en «Mis reportes».';
+      if (saveUserIds.length) {
+        try {
+          const id = json.saved?.id || json.saved?.queryid;
+          if (!id) throw new Error('No se recibió la confirmación del reporte guardado.');
+          await replaceAssignments(id, saveUserIds);
+          notice = 'El reporte quedó guardado y disponible para las personas elegidas.';
+        } catch (err) { notice = `El reporte quedó guardado. No se pudieron asignar sus accesos: ${userMessage(err.message)} Revisa «Administrar accesos» en Mis reportes.`; }
+      }
 
       setShowSaveFormModal(false);
       setSaveTitle('');
       setSaveDescription('');
-      loadSavedQueries();
-      alert('✅ Plantilla de consulta guardada con éxito.');
+      setSaveUserIds([]); setSavedNotice(notice);
+      await loadSavedQueries();
     } catch (err) {
-      alert(userMessage('❌ Error al guardar: ' + err.message));
+      setSavedNotice(userMessage(err.message));
     } finally {
       setSavingQuery(false);
     }
@@ -549,13 +721,18 @@ export default function ConsultaServiceLayer() {
 
   // Cargar una plantilla guardada
   const handleLoadSavedQuery = (sq) => {
-    const entity = userAllowedCatalog.find(def => def.id === sq.entity);
+    if (sq.isAssigned && !sq.isOwner) { handleOpenSavedReport(sq); return; }
+    const entity = userAllowedAssistantCatalog.find(def => def.id === sq.entity);
     if (!entity) {
+      if (sq.definition) { handleOpenSavedReport(sq); return; }
       setError('Este módulo no está disponible para tu usuario. Solicita acceso al área de Sistemas.');
       setShowSavedModal(false);
       return;
     }
+    setReportMode('manual');
     handleSelectEntity(sq.entity);
+    setAnalysis(sq.filters?.analysis || null); setAnalysisSummary(sq.analysisSummary || null);
+    if (hasReportAnalysis(sq.filters?.analysis)) { setFechaDesde(sq.filters?.fechaDesde || ''); setFechaHasta(sq.filters?.fechaHasta || ''); }
     if (sq.selectedFields && sq.selectedFields.length > 0) {
       const availableFields = sq.selectedFields.filter(key => entity.fields.some(field => field.key === key));
       if (availableFields.length) setSelectedFields(availableFields);
@@ -574,7 +751,7 @@ export default function ConsultaServiceLayer() {
   // Eliminar plantilla guardada
   const handleDeleteSavedQuery = async (sqId, e) => {
     e.stopPropagation();
-    if (!confirm('¿Estás seguro de eliminar esta plantilla de consulta?')) return;
+    if (!confirm('¿Eliminar este reporte guardado? Las personas asignadas dejarán de verlo.')) return;
 
     try {
       const res = await fetch(`${API_BASE}/sap-query/saved/${sqId}`, {
@@ -583,6 +760,7 @@ export default function ConsultaServiceLayer() {
       });
       if (res.ok) {
         loadSavedQueries();
+        setSavedNotice('El reporte quedó eliminado.');
       } else {
         const json = await res.json();
         alert(userMessage('Error: ' + json.error));
@@ -590,6 +768,13 @@ export default function ConsultaServiceLayer() {
     } catch (err) {
       alert(userMessage('Error al eliminar: ' + err.message));
     }
+  };
+
+  const changeReportMode = (mode) => {
+    if (activeSavedReport) {
+      setActiveSavedReport(null); resetAssistantReport(); setSelectedEntityId(''); setSelectedFields([]); setManualTopicRequired(true);
+    }
+    setReportMode(mode);
   };
 
   // Sincronizar scroll superior e inferior
@@ -610,16 +795,33 @@ export default function ConsultaServiceLayer() {
   }, [queryResult]);
 
   const rows = queryResult?.data || [];
+  const analyzedResult = hasReportAnalysis(queryResult?.analysis);
+  const resultDates = queryResult?.requestedFilters || {};
+  const resultWithoutPeriod = !resultDates.fechaDesde && !resultDates.fechaHasta;
+  const resultPointLookupLabel = resultWithoutPeriod && getReportPointLookup(currentEntityDef, queryResult?.analysis)
+    ? 'Consulta de cuenta/paciente por identificador'
+    : resultWithoutPeriod && queryResult?.analysisScope?.complete && currentEntityDef?.requiresDateFilter ? 'Consulta puntual, información actual' : '';
+  const limitMessage = analyzedResult && queryResult.analysisScope?.complete === true
+    ? `El análisis usa todos los registros de la consulta. Se muestran ${rows.length.toLocaleString('es-MX')} de ${Number(queryResult.totalRegistros || queryResult.analysisScope.groups || rows.length).toLocaleString('es-MX')} ${queryResult.analysis.groupBy?.length ? 'grupos' : 'resultados'} por el límite de salida. Ajusta los filtros para revisar el resto.`
+    : queryResult?.message || `Se alcanzó el límite de ${Number(queryResult?.limit || rows.length).toLocaleString('es-MX')} registros. Reduce el período o los filtros para revisar el resto.`;
+  const analysisConfigurationChanged = Boolean(queryResult && !activeSavedReport && (hasReportAnalysis(analysis) || analyzedResult)
+    && queryResult.requestedConfiguration !== analysisFingerprint(selectedEntityId, selectedFields, executionFilters(currentEntityDef, { fechaDesde, fechaHasta, busqueda, almacen, estatusDoc, clasificacionMedica }), analysis));
+  const hasUnloadedColumns = !analyzedResult && Array.isArray(queryResult?.loadedFields) && selectedFields.some(key => !queryResult.loadedFields.includes(key));
+  const needsSourceRefresh = analysisConfigurationChanged || hasUnloadedColumns || (currentEntityDef?.serverSideFilters?.includes('estatusDoc')
+    && queryResult && estatusDoc !== queryResult.requestedFilters?.estatusDoc);
+  const exportBlocked = loading || executionFailed || needsSourceRefresh;
 
   // Columnas dinámicas activas según los checkboxes seleccionados por el usuario
   const columns = useMemo(() => {
+    if (hasReportAnalysis(queryResult?.analysis) && Array.isArray(queryResult.columnas)) return queryResult.columnas;
     if (!currentEntityDef) return queryResult?.columnas || [];
     const activeKeys = (selectedFields && selectedFields.length > 0)
       ? selectedFields
       : (queryResult?.columnas ? queryResult.columnas.map(c => c.key) : currentEntityDef.fields.map(f => f.key));
     
     // Obtener las definiciones completas de las columnas seleccionadas
-    const activeDefs = [...new Set(activeKeys)].map(key => currentEntityDef.fields.find(field => field.key === key)).filter(Boolean);
+    const activeDefs = [...new Set(activeKeys)].filter(key => !Array.isArray(queryResult?.loadedFields) || queryResult.loadedFields.includes(key))
+      .map(key => currentEntityDef.fields.find(field => field.key === key)).filter(Boolean);
     return activeDefs.length > 0 ? activeDefs : (queryResult?.columnas || currentEntityDef.fields);
   }, [currentEntityDef, selectedFields, queryResult]);
 
@@ -629,6 +831,7 @@ export default function ConsultaServiceLayer() {
     if (!rawList || rawList.length === 0) return [];
 
     return rawList.filter(row => {
+      if (hasReportAnalysis(queryResult.analysis)) return Object.entries(colFilters).every(([key, value]) => !value?.trim() || String(row[key] ?? '').toLowerCase().includes(value.trim().toLowerCase()));
       // 1. Filtro de búsqueda general de texto (en todas las propiedades del objeto)
       if (busqueda && busqueda.trim() && busqueda !== queryResult.requestedFilters?.busqueda) {
         const q = busqueda.trim().toLowerCase();
@@ -690,12 +893,13 @@ export default function ConsultaServiceLayer() {
     setPage(1);
   }, [busqueda, almacen, estatusDoc, clasificacionMedica, colFilters, selectedFields]);
 
-  const hasActiveFilters = Boolean(
+  const hasActiveFilters = analyzedResult ? Object.values(colFilters).some(Boolean) : Boolean(
     busqueda || (hasWhsField && almacen && almacen !== 'ALL') || (hasStatusField && estatusDoc && estatusDoc !== 'ALL') ||
     (hasMedClassField && clasificacionMedica && clasificacionMedica !== 'ALL') || Object.values(colFilters).some(Boolean)
   );
 
   const handleClearFilters = () => {
+    if (analyzedResult) { setColFilters({}); return; }
     setBusqueda('');
     setAlmacen('ALL');
     setEstatusDoc('ALL');
@@ -711,16 +915,15 @@ export default function ConsultaServiceLayer() {
 
   // Totales para exportación y resumen
   const exportExcel = () => {
-    if (filteredRows.length === 0 || columns.length === 0) return;
+    if (exportBlocked || filteredRows.length === 0 || columns.length === 0) return;
 
     const fmt = (val, col) => {
-      if (val == null || val === '') return '';
-      if (typeof val === 'boolean') return val ? 'Sí' : 'No';
-      if (col.type === 'date') return formatReportDate(val);
-      if (col.type === 'datetime') return formatReportDate(val, true);
-      if (col.type === 'money') return `$${Number(val).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      if (col.type === 'percent') return `${Number(val).toFixed(1)}%`;
-      return String(val).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      if (val == null || typeof val === 'string' && !val.trim()) return '';
+      let formatted = typeof val === 'boolean' ? val ? 'Sí' : 'No' : String(val);
+      if (col.type === 'date') formatted = formatReportDate(val);
+      if (col.type === 'datetime') formatted = formatReportDate(val, true);
+      if (['money', 'percent', 'number'].includes(col.type)) formatted = formatReportNumeric(val, col.type, '');
+      return escapeReportHtml(formatted);
     };
 
     const fechaReporte = new Date().toLocaleString('es-MX');
@@ -742,20 +945,26 @@ export default function ConsultaServiceLayer() {
 <table>
   <tr><td colspan="${columns.length}" class="title-bar">HOSPITAL ESCANDÓN</td></tr>
   <tr><td colspan="${columns.length}" class="subtitle-bar">Reporte de ${entitySource(currentEntityDef)}: ${currentEntityDef?.title || 'Consulta Personalizada'}</td></tr>
-  <tr class="info-row"><td colspan="${columns.length}">Generado por: ${user?.nombre || user?.username} &nbsp;|&nbsp; ${currentEntityDef?.requiresDateFilter ? `${currentEntityDef.dateFieldLabel || 'Período'}: ${reportDates.fechaDesde} al ${reportDates.fechaHasta} &nbsp;|&nbsp; ` : ''}Registros: ${filteredRows.length} &nbsp;|&nbsp; Fecha: ${fechaReporte}</td></tr>
-  ${currentEntityDef?.grain ? `<tr class="info-row"><td colspan="${columns.length}">Cada fila representa: ${fmt(currentEntityDef.grain, {})}</td></tr>` : ''}
-  ${queryResult?.truncated ? `<tr class="info-row"><td colspan="${columns.length}">${fmt(queryResult.message || `Se alcanzó el límite de ${queryResult.limit || rows.length} registros. Reduce el período o los filtros para revisar el resto.`, {})}</td></tr>` : ''}
+  <tr class="info-row"><td colspan="${columns.length}">Generado por: ${user?.nombre || user?.username} &nbsp;|&nbsp; ${resultPointLookupLabel ? `${fmt(resultPointLookupLabel, {})} &nbsp;|&nbsp; ` : currentEntityDef?.requiresDateFilter && (reportDates.fechaDesde || reportDates.fechaHasta) ? `${currentEntityDef.dateFieldLabel || 'Período'}: ${reportDates.fechaDesde} al ${reportDates.fechaHasta} &nbsp;|&nbsp; ` : ''}Registros: ${filteredRows.length} &nbsp;|&nbsp; Fecha: ${fechaReporte}</td></tr>
+  ${queryResult?.grain || currentEntityDef?.grain ? `<tr class="info-row"><td colspan="${columns.length}">Cada fila representa: ${fmt(queryResult?.grain || currentEntityDef.grain, {})}</td></tr>` : ''}
+  ${analyzedResult ? [['conditions', 'Condiciones'], ['groups', 'Agrupado por'], ['measures', 'Cálculos'], ['order', 'Orden']].filter(([key]) => queryResult.analysisSummary?.[key]?.length).map(([key, label]) => `<tr class="info-row"><td colspan="${columns.length}">${label}: ${fmt(queryResult.analysisSummary[key].join(' · '), {})}</td></tr>`).join('') : ''}
+  ${analyzedResult && queryResult.analysisScope?.complete ? `<tr class="info-row"><td colspan="${columns.length}">Datos completos: ${fmt(queryResult.analysisScope.sourceRows, {})} registros consultados; ${fmt(queryResult.analysisScope.matchingRows, {})} cumplen las condiciones. ${fmt(queryResult.analysisScope.note || 'Los totales corresponden al reporte completo; los filtros de columnas sólo cambian las filas visibles.', {})}</td></tr>` : ''}
+  ${queryResult?.truncated ? `<tr class="info-row"><td colspan="${columns.length}">${fmt(limitMessage, {})}</td></tr>` : ''}
   <tr><td colspan="${columns.length}" style="height:6px;border:none"></td></tr>
-  <tr>${columns.map(c => `<th style="width:${c.width || 120}px">${c.label}</th>`).join('')}</tr>
+  <tr>${columns.map(c => `<th style="width:${c.width || 120}px">${fmt(c.label, {})}</th>`).join('')}</tr>
   ${filteredRows.map((row, i) => `<tr class="${i%2===0?'even':'odd'}">${columns.map(c => {
-    let cls = '';
-    let val = fmt(row[c.key], c);
-    if (c.type === 'money') cls = ' class="money"';
-    return `<td${cls} style="text-align:${c.align || 'left'}">${val}</td>`;
+    const raw = row[c.key];
+    const val = fmt(raw, c);
+    const numericColumn = ['money', 'percent', 'number'].includes(c.type);
+    const numericValue = reportNumber(raw);
+    const cls = c.type === 'money' && numericValue != null ? ' class="money"' : '';
+    const asText = val !== '' && typeof raw === 'string' && !['date', 'datetime'].includes(c.type) && (!numericColumn || numericValue == null);
+    return `<td${cls}${asText ? ' x:str' : ''} style="text-align:${c.align || 'left'}${asText ? ";mso-number-format:'\\@'" : ''}">${val}</td>`;
   }).join('')}</tr>`).join('')}
   <tr class="total-row">
-    <td colspan="${columns.length}">Total Registros: ${filteredRows.length.toLocaleString('es-MX')}</td>
+    <td colspan="${columns.length}">${analyzedResult && queryResult.analysis?.groupBy?.length ? 'Grupos exportados' : 'Total Registros'}: ${filteredRows.length.toLocaleString('es-MX')}</td>
   </tr>
+  ${analyzedResult ? (queryResult.kpis || []).map(kpi => `<tr class="total-row"><td colspan="${columns.length}">Total del reporte · ${fmt(kpi.label, {})}: ${fmt(kpi.value, {})}</td></tr>`).join('') : ''}
 </table></body></html>`;
 
     const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
@@ -769,6 +978,8 @@ export default function ConsultaServiceLayer() {
     URL.revokeObjectURL(url);
   };
 
+  const onlySavedReports = !catalogLoading && !catalogError && userAllowedAssistantCatalog.length === 0 && savedQueries.length > 0;
+
   return (
     <div className="report-builder">
       
@@ -778,42 +989,52 @@ export default function ConsultaServiceLayer() {
           <span className="report-builder__hero-icon"><ReportBuilderIcon /></span>
           <div>
             <p className="report-builder__eyebrow">Hospital Escandón · Reportes</p>
-            <h1>Crear reporte personalizado</h1>
-            <p className="report-builder__subtitle">{reportMode === 'assistant' ? 'Describe lo que necesitas y crea tu reporte con ayuda del asistente.' : 'Elige un tema, ajusta los filtros y descarga la información que necesitas.'}</p>
+            <h1>{onlySavedReports ? 'Mis reportes' : 'Crear reporte personalizado'}</h1>
+            <p className="report-builder__subtitle">{onlySavedReports ? 'Consulta y descarga los reportes que tienes disponibles.' : reportMode === 'assistant' ? 'Describe lo que necesitas y crea tu reporte con ayuda del asistente.' : 'Elige un tema, ajusta los filtros y descarga la información que necesitas.'}</p>
           </div>
         </div>
 
         <div className="report-builder__header-actions">
           <button
             type="button"
-            onClick={() => setShowSavedModal(true)}
+            onClick={() => { setShowSavedModal(true); loadSavedQueries(); }}
             className="report-builder__button report-builder__button--secondary"
           >
-            <ReportBuilderIcon name="folder" /> Mis plantillas guardadas <span className="report-builder__button-count">{savedQueries.length}</span>
+            <ReportBuilderIcon name="folder" /> Mis reportes <span className="report-builder__button-count">{savedQueries.length}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setShowSaveFormModal(true)}
-            disabled={!currentEntityDef || catalogLoading || (reportMode === 'assistant' && !queryResult)}
+            onClick={openSaveReport}
+            disabled={Boolean(activeSavedReport) || !currentEntityDef || catalogLoading || (reportMode === 'assistant' && !queryResult)}
             className="report-builder__button report-builder__button--primary"
           >
-            <ReportBuilderIcon name="save" /> Guardar consulta
+            <ReportBuilderIcon name="save" /> Guardar reporte
           </button>
         </div>
       </header>
 
-      <div className="report-builder__modes" role="group" aria-label="Cómo crear tu reporte">
-        <button type="button" className={`report-builder__mode${reportMode === 'assistant' ? ' is-active' : ''}`} aria-pressed={reportMode === 'assistant'} onClick={() => setReportMode('assistant')}><ReportBuilderIcon name="chat" /> Crear con asistente</button>
-        <button type="button" className={`report-builder__mode${reportMode === 'manual' ? ' is-active' : ''}`} aria-pressed={reportMode === 'manual'} onClick={() => setReportMode('manual')}><ReportBuilderIcon name="grid" /> Elegir un tema</button>
-      </div>
+      {savedNotice && <p role="status" style={{ padding: '1rem', border: '1px solid var(--report-border)', borderRadius: 10, background: 'var(--report-soft)' }}>{savedNotice}</p>}
+      {!onlySavedReports && <div className="report-builder__modes" role="group" aria-label="Cómo crear tu reporte">
+        <button type="button" className={`report-builder__mode${reportMode === 'assistant' ? ' is-active' : ''}`} aria-pressed={reportMode === 'assistant'} onClick={() => changeReportMode('assistant')}><ReportBuilderIcon name="chat" /> Crear con asistente</button>
+        <button type="button" className={`report-builder__mode${reportMode === 'manual' ? ' is-active' : ''}`} aria-pressed={reportMode === 'manual'} onClick={() => changeReportMode('manual')}><ReportBuilderIcon name="grid" /> Elegir un tema</button>
+      </div>}
+      {onlySavedReports && !activeSavedReport && <p className="report-builder__subtitle">Selecciona «Mis reportes» para abrir uno de tus reportes guardados o asignados.</p>}
 
-      <div hidden={reportMode !== 'assistant'}>
-        <ReportAssistant catalog={userAllowedCatalog} catalogLoading={catalogLoading} catalogError={catalogError} onGenerate={handleAssistantGenerate} onViewReport={showResults} onManual={handleAssistantManual} onReset={resetAssistantReport} />
+      {activeSavedReport && <section className="report-catalog" aria-label="Configuración guardada del reporte">
+        <div className="report-builder__configuration-heading"><div><h2 style={{ margin: 0 }}>{activeSavedReport.title}</h2><p style={{ color: 'var(--report-muted)', fontSize: '.82rem' }}>{activeSavedReport.isAssigned && !activeSavedReport.isOwner ? 'Reporte asignado para ti' : 'Reporte guardado'} · Creado por {activeSavedReport.username} · {entitySource(currentEntityDef)}</p></div><button type="button" className="report-builder__button report-builder__button--primary" disabled={loading} onClick={() => handleExecuteSavedReport(activeSavedReport)}>{loading ? 'Consultando…' : 'Actualizar reporte'}</button></div>
+        <p style={{ color: 'var(--report-muted)', fontSize: '.82rem' }}>Este reporte usa sus columnas y filtros guardados. Puedes revisarlo y descargarlo en Excel.</p>
+        {activeSavedReport.filters?.fechaDesde && <p style={{ fontSize: '.82rem' }}>Período guardado: {formatReportDate(activeSavedReport.filters.fechaDesde)}{activeSavedReport.filters.fechaHasta ? ` al ${formatReportDate(activeSavedReport.filters.fechaHasta)}` : ''}</p>}
+        <p style={{ fontSize: '.8rem' }}><strong>Columnas:</strong> {selectedFields.map(key => currentEntityDef?.fields.find(field => field.key === key)?.label).filter(Boolean).join(' · ')}</p>
+        <ReportAnalysisSummary analysis={analysis} summary={analysisSummary} entity={currentEntityDef} label="Análisis guardado" />
+      </section>}
+
+      <div hidden={onlySavedReports || reportMode !== 'assistant'}>
+        <ReportAssistant assistantCatalog={userAllowedAssistantCatalog} catalogLoading={catalogLoading} catalogError={catalogError} onGenerate={handleAssistantGenerate} onViewReport={showResults} onManual={handleAssistantManual} onReset={resetAssistantReport} />
       </div>
 
       {/* ── Selector de módulos y temas de SAP / Vertical ── */}
-      <section hidden={reportMode !== 'manual'} className="report-catalog" aria-label="Módulos y temas disponibles" aria-busy={catalogLoading}>
+      <section hidden={onlySavedReports || reportMode !== 'manual'} className="report-catalog" aria-label="Módulos y temas disponibles" aria-busy={catalogLoading}>
         <div className="report-catalog__heading">
           <div className="report-builder__section-title">
             <span className="report-builder__step" aria-hidden="true">01</span>
@@ -945,7 +1166,7 @@ export default function ConsultaServiceLayer() {
                 <h3 ref={configurationRef} tabIndex={-1}>
                   {currentEntityDef.title}
                 </h3>
-                <p>Elige los filtros y las columnas que quieres incluir.</p>
+                <p>Información de {entitySource(currentEntityDef)}. Elige los filtros y las columnas que quieres incluir.</p>
               </div>
             </div>
 
@@ -959,14 +1180,15 @@ export default function ConsultaServiceLayer() {
             </button>
           </div>
 
-          {currentEntityDef.grain && <div className="report-builder__grain"><strong>Cada fila representa:</strong> {currentEntityDef.grain}</div>}
+          {!hasReportAnalysis(analysis) && currentEntityDef.grain && <div className="report-builder__grain"><strong>Cada fila representa:</strong> {currentEntityDef.grain}</div>}
+          <ReportAnalysisSummary analysis={analysis} summary={analysisSummary} entity={currentEntityDef} onRemove={() => { setAnalysis(null); setAnalysisSummary(null); }} label="Análisis configurado" />
 
           <div className="report-builder__configuration">
             
             {/* Columna Izquierda: Rango de Fechas y Filtros Rápidos */}
             <div>
               <div className="report-builder__field-heading">
-                Filtros de búsqueda {currentEntityDef.requiresDateFilter && <span className="report-builder__required-dates">Elige un período</span>}
+                Filtros de búsqueda {currentEntityDef.requiresDateFilter && <span className="report-builder__required-dates">{getReportPointLookup(currentEntityDef, analysis) ? 'Período opcional para la consulta exacta' : 'Elige un período'}</span>}
               </div>
 
               {/* Rango de Fechas */}
@@ -1173,11 +1395,11 @@ export default function ConsultaServiceLayer() {
           }}>
             <div>
               <div style={{ fontWeight: 800, color: '#004687', fontSize: '1.05rem' }}>
-                {queryResult.entityTitle} ({filteredRows.length.toLocaleString('es-MX')} {filteredRows.length === 1 ? 'registro' : 'registros'}{filteredRows.length !== rows.length ? ` ${filteredRows.length === 1 ? 'filtrado' : 'filtrados'} de ${rows.length.toLocaleString('es-MX')}` : ''})
+                {queryResult.entityTitle} ({filteredRows.length.toLocaleString('es-MX')} {analyzedResult && queryResult.analysis.groupBy?.length ? filteredRows.length === 1 ? 'grupo' : 'grupos' : filteredRows.length === 1 ? 'registro' : 'registros'}{filteredRows.length !== rows.length ? ` ${analyzedResult ? 'visibles' : filteredRows.length === 1 ? 'filtrado' : 'filtrados'} de ${rows.length.toLocaleString('es-MX')}` : ''})
               </div>
               <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
                 Información de {entitySource(currentEntityDef)} · {columns.length} columnas visibles
-                {currentEntityDef?.requiresDateFilter && queryResult.requestedFilters && <> · {formatReportDate(queryResult.requestedFilters.fechaDesde)} al {formatReportDate(queryResult.requestedFilters.fechaHasta)}</>}
+                {resultPointLookupLabel ? <> · {resultPointLookupLabel}</> : currentEntityDef?.requiresDateFilter && (resultDates.fechaDesde || resultDates.fechaHasta) && <> · {formatReportDate(resultDates.fechaDesde)} al {formatReportDate(resultDates.fechaHasta)}</>}
               </div>
             </div>
 
@@ -1193,17 +1415,17 @@ export default function ConsultaServiceLayer() {
                   }}
                   title="Restablecer todos los filtros aplicados"
                 >
-                  🧹 Limpiar Filtros
+                  🧹 {analyzedResult ? 'Limpiar filtros de vista' : 'Limpiar Filtros'}
                 </button>
               )}
               <button
                 onClick={exportExcel}
-                disabled={filteredRows.length === 0}
+                disabled={filteredRows.length === 0 || exportBlocked}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
                   padding: '0.55rem 1.2rem', background: '#00974A', border: 'none',
                   borderRadius: 8, color: '#fff', fontWeight: 700, fontSize: '0.82rem',
-                  cursor: filteredRows.length === 0 ? 'not-allowed' : 'pointer',
+                  cursor: filteredRows.length === 0 || exportBlocked ? 'not-allowed' : 'pointer',
                   boxShadow: '0 4px 10px rgba(0,151,74,0.3)',
                   transition: 'all 0.15s ease'
                 }}
@@ -1213,7 +1435,13 @@ export default function ConsultaServiceLayer() {
             </div>
           </div>
 
-          {queryResult.truncated && <div className="report-builder__limit" role="status">{queryResult.message || `Se alcanzó el límite de ${Number(queryResult.limit || rows.length).toLocaleString('es-MX')} registros. Reduce el período o los filtros para revisar el resto.`}</div>}
+          {queryResult.truncated && <div className="report-builder__limit" role="status">{limitMessage}</div>}
+          <div style={{ padding: '0 1.25rem' }}><ReportAnalysisSummary analysis={queryResult.analysis} summary={queryResult.analysisSummary} entity={currentEntityDef} scope={queryResult.analysisScope} grain={queryResult.grain} label="Análisis ejecutado" /></div>
+          {executionFailed && <div className="report-builder__limit" role="status">La nueva consulta no terminó. Actualiza el reporte antes de descargarlo.</div>}
+          {needsSourceRefresh && <div className="report-builder__limit" role="status">
+            Cambiaste datos o filtros que requieren una nueva consulta. Actualiza el reporte para verlos y descargarlo.
+            {' '}<button type="button" disabled={loading} onClick={() => handleExecute()}>Consultar los nuevos datos</button>
+          </div>}
 
           {/* Tarjetas de Métricas KPI Dinámicas */}
           {queryResult.kpis && queryResult.kpis.length > 0 && (
@@ -1224,7 +1452,7 @@ export default function ConsultaServiceLayer() {
               padding: '1rem 1.25rem',
               background: '#F1F5F9',
               borderBottom: '1px solid #E2E8F0'
-            }}>
+            }} aria-label={analyzedResult ? 'Totales del reporte completo' : 'Indicadores del reporte'}>
               {queryResult.kpis.map((kpi, idx) => (
                 <div
                   key={idx}
@@ -1313,7 +1541,7 @@ export default function ConsultaServiceLayer() {
                         let formattedVal = val;
                         let cellStyle = { padding: '8px 10px', textAlign: col.align || 'left', color: '#1E293B' };
 
-                        if (val == null || val === '') {
+                        if (val == null || typeof val === 'string' && !val.trim()) {
                           formattedVal = '-';
                           cellStyle.color = '#94A3B8';
                         } else if (typeof val === 'boolean') {
@@ -1321,15 +1549,17 @@ export default function ConsultaServiceLayer() {
                         } else if (col.type === 'date' || col.type === 'datetime') {
                           formattedVal = formatReportDate(val, col.type === 'datetime');
                         } else if (col.type === 'money') {
-                          formattedVal = `$${Number(val).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                          cellStyle.fontWeight = 700;
-                          cellStyle.color = '#15803D';
+                          formattedVal = formatReportNumeric(val, col.type);
+                          if (reportNumber(val) !== null) {
+                            cellStyle.fontWeight = 700;
+                            cellStyle.color = '#15803D';
+                          }
                         } else if (col.type === 'percent') {
-                          formattedVal = `${Number(val).toFixed(1)}%`;
-                          cellStyle.fontWeight = 600;
+                          formattedVal = formatReportNumeric(val, col.type);
+                          if (reportNumber(val) !== null) cellStyle.fontWeight = 600;
                         } else if (col.type === 'number') {
-                          formattedVal = Number(val).toLocaleString('es-MX');
-                          cellStyle.fontWeight = 700;
+                          formattedVal = formatReportNumeric(val, col.type);
+                          if (reportNumber(val) !== null) cellStyle.fontWeight = 700;
                         } else if (col.type === 'status') {
                           const sStr = String(val);
                           const isVencido = sStr.includes('Vencido') || sStr === 'Inactivo';
@@ -1385,7 +1615,7 @@ export default function ConsultaServiceLayer() {
               padding: '1rem', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', fontSize: '0.85rem'
             }}>
               <div style={{ color: '#64748B' }}>
-                Mostrando {((page - 1) * PER_PAGE) + 1} a {Math.min(page * PER_PAGE, filteredRows.length)} de {filteredRows.length} registros
+                Mostrando {((page - 1) * PER_PAGE) + 1} a {Math.min(page * PER_PAGE, filteredRows.length)} de {filteredRows.length} {analyzedResult && queryResult.analysis.groupBy?.length ? 'grupos' : 'registros'}
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
@@ -1412,159 +1642,44 @@ export default function ConsultaServiceLayer() {
         </div>
       )}
 
-      {/* ── Modal: Mis Consultas Guardadas ── */}
-      {showSavedModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem'
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: '16px', maxWidth: '650px', width: '100%',
-            maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)'
-          }}>
-            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#004687' }}>
-                📂 Plantillas de Consulta Guardadas
-              </div>
-              <button onClick={() => setShowSavedModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
-            </div>
-
-            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
-              {savedQueries.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#64748B', padding: '2rem' }}>
-                  No tienes consultas guardadas aún. Configura tus filtros y haz clic en "Guardar Consulta".
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {savedQueries.map(sq => (
-                    <div
-                      key={sq.id}
-                      onClick={() => handleLoadSavedQuery(sq)}
-                      style={{
-                        padding: '1rem', border: '1px solid #E2E8F0', borderRadius: '10px',
-                        background: '#F8FAFC', cursor: 'pointer', transition: 'all 0.15s ease',
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#004687' }}>
-                          {sq.title}
-                        </div>
-                        {sq.description && (
-                          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>{sq.description}</div>
-                        )}
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '6px' }}>
-                          <span style={{ fontSize: '0.68rem', background: '#E0F2FE', color: '#0369A1', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                            Sección: {catalog.find(section => section.id === sq.entity)?.title || 'Consulta guardada'}
-                          </span>
-                          <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>
-                            Por: {sq.username} | {new Date(sq.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <button
-                          onClick={(e) => handleDeleteSavedQuery(sq.id, e)}
-                          title="Eliminar plantilla"
-                          style={{ background: '#FEE2E2', border: 'none', color: '#DC2626', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #E2E8F0', textAlign: 'right' }}>
-              <button
-                onClick={() => setShowSavedModal(false)}
-                style={{ padding: '0.5rem 1.2rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600 }}
-              >
-                Cerrar
-              </button>
-            </div>
+      {showSavedModal && <ReportModal title="Mis reportes" onClose={() => setShowSavedModal(false)}>
+        <p style={{ marginTop: 0, fontSize: '.83rem', color: 'var(--report-muted)' }}>Aquí encontrarás tus reportes guardados y los que te hayan asignado.</p>
+        {savedLoading ? <p role="status">Cargando tus reportes…</p> : savedError ? <div role="alert"><p>{savedError}</p><button type="button" className="report-catalog__chip" onClick={loadSavedQueries}>Reintentar mis reportes</button></div> : !savedQueries.length ? <p>No tienes reportes guardados o asignados. Crea un reporte y selecciona «Guardar reporte».</p> : <div style={{ display: 'grid', gap: '.85rem' }}>{savedQueries.map(sq => <article key={sq.id} aria-label={`Reporte: ${sq.title}`} style={{ padding: '1rem', border: '1px solid var(--report-border)', borderRadius: 10, background: 'var(--report-soft)', minWidth: 0 }}>
+          <button type="button" onClick={() => handleLoadSavedQuery(sq)} style={{ padding: 0, border: 0, background: 'transparent', color: 'var(--report-blue)', font: 'inherit', fontWeight: 750, textAlign: 'left', cursor: 'pointer' }}>{sq.title}</button>
+          {sq.isAssigned && !sq.isOwner && <span style={{ display: 'inline-block', marginLeft: 8, padding: '3px 7px', borderRadius: 6, fontSize: '.7rem', background: 'var(--report-selected)' }}>Asignado a ti</span>}
+          {sq.description && <p style={{ margin: '.4rem 0', fontSize: '.8rem' }}>{sq.description}</p>}
+          <p style={{ margin: '.5rem 0', fontSize: '.73rem', color: 'var(--report-muted)' }}>Sección: {sq.definition?.title || assistantCatalog.find(section => section.id === sq.entity)?.title || 'Reporte guardado'}</p>
+          <p style={{ margin: '.4rem 0', fontSize: '.73rem', color: 'var(--report-muted)' }}>Creado por {sq.username}{sq.createdAt ? ` · ${formatReportDate(sq.createdAt)}` : ''}</p>
+          {sq.canAssign && <p style={{ fontSize: '.75rem', color: 'var(--report-muted)' }}>{sq.assignedUsers?.some(person => person.activo !== false) ? `Disponible para: ${sq.assignedUsers.filter(person => person.activo !== false).map(person => person.nombre || person.username).join(', ')}` : 'Sin personas activas asignadas.'}{sq.assignedUsers?.some(person => person.activo === false) && <span style={{ display: 'block', marginTop: '.3rem' }}>Usuarios inactivos: {sq.assignedUsers.filter(person => person.activo === false).map(person => person.nombre || person.username).join(', ')}</span>}</p>}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem', marginTop: '.75rem' }}>
+            {sq.definition && <button type="button" className="report-builder__button report-builder__button--primary" onClick={() => handleOpenSavedReport(sq)}>Ver reporte</button>}
+            {!(sq.isAssigned && !sq.isOwner) && userAllowedAssistantCatalog.some(entity => entity.id === sq.entity) && <button type="button" className="report-builder__button" onClick={() => handleLoadSavedQuery(sq)}>Ajustar una copia</button>}
+            {sq.canAssign && <button type="button" className="report-builder__button" onClick={() => openAssignments(sq)}>Administrar accesos</button>}
+            {sq.canDelete && <button type="button" className="report-builder__button" onClick={event => handleDeleteSavedQuery(sq.id, event)}>Eliminar reporte</button>}
           </div>
-        </div>
-      )}
+        </article>)}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}><button type="button" className="report-builder__button" onClick={() => setShowSavedModal(false)}>Cerrar</button></div>
+      </ReportModal>}
 
-      {/* ── Modal: Guardar Consulta Actual ── */}
-      {showSaveFormModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem'
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: '16px', maxWidth: '500px', width: '100%',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)'
-          }}>
-            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#004687' }}>
-                💾 Guardar Plantilla de Consulta
-              </div>
-              <button onClick={() => setShowSaveFormModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
-            </div>
+      {showSaveFormModal && <ReportModal title="Guardar reporte" width={620} busy={savingQuery} onClose={() => setShowSaveFormModal(false)}>
+        <form onSubmit={handleSaveQuery}>
+          <label style={{ display: 'grid', gap: 6, marginBottom: '1rem', fontSize: '.82rem', fontWeight: 700 }}>Nombre del reporte *<input type="text" required autoFocus maxLength={200} placeholder="Ej. Condiciones de convenios" value={saveTitle} onChange={event => setSaveTitle(event.target.value)} style={{ width: '100%', padding: '.65rem', borderRadius: 7, border: '1px solid var(--report-border)', background: 'var(--report-soft)', color: 'var(--report-text)', font: 'inherit' }} /></label>
+          <label style={{ display: 'grid', gap: 6, marginBottom: '1rem', fontSize: '.82rem', fontWeight: 700 }}>Descripción (opcional)<textarea rows={2} maxLength={1000} placeholder="Para qué sirve este reporte" value={saveDescription} onChange={event => setSaveDescription(event.target.value)} style={{ width: '100%', padding: '.65rem', borderRadius: 7, border: '1px solid var(--report-border)', background: 'var(--report-soft)', color: 'var(--report-text)', font: 'inherit' }} /></label>
+          <p style={{ padding: '.8rem', background: 'var(--report-soft)', borderRadius: 8, fontSize: '.78rem', color: 'var(--report-muted)' }}>Se guardan las columnas y los filtros actuales. El reporte estará disponible para ti y para Sistemas{canChooseRecipients ? ', además de las personas que elijas.' : '.'}</p>
+          {canChooseRecipients && <RecipientPicker users={recipientUsers} loading={recipientsLoading} error={recipientsError} search={recipientSearch} onSearch={setRecipientSearch} selectedIds={saveUserIds} onChange={setSaveUserIds} onRetry={loadRecipients} />}
+          {savedNotice && <p role="alert">{savedNotice}</p>}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '.65rem' }}><button type="button" className="report-builder__button" disabled={savingQuery} onClick={() => setShowSaveFormModal(false)}>Cancelar</button><button type="submit" className="report-builder__button report-builder__button--primary" disabled={savingQuery}>{savingQuery ? 'Guardando…' : 'Guardar reporte'}</button></div>
+        </form>
+      </ReportModal>}
 
-            <form onSubmit={handleSaveQuery} style={{ padding: '1.5rem' }}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Nombre / Título de la Consulta *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ej. Insumos con Caducidad Próxima de Quirófano"
-                  value={saveTitle}
-                  onChange={(e) => setSaveTitle(e.target.value)}
-                  style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Descripción (Opcional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Notas adicionales o uso del reporte..."
-                  value={saveDescription}
-                  onChange={(e) => setSaveDescription(e.target.value)}
-                  style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div style={{ background: '#F8FAFC', padding: '0.8rem', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '0.75rem', color: '#64748B', marginBottom: '1.25rem' }}>
-                🔒 <strong>Privacidad:</strong> Esta consulta será visible únicamente para tu usuario y el área de Sistemas/Administradores.
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowSaveFormModal(false)}
-                  style={{ padding: '0.55rem 1.2rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingQuery}
-                  style={{
-                    padding: '0.55rem 1.5rem', borderRadius: '6px', border: 'none',
-                    background: '#004687', color: '#fff', fontWeight: 700, cursor: 'pointer'
-                  }}
-                >
-                  {savingQuery ? 'Guardando...' : 'Guardar Plantilla'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+      {assignmentTarget && <ReportModal title="Administrar accesos" width={620} busy={assigningReport} onClose={() => setAssignmentTarget(null)}>
+        <strong>{assignmentTarget.title}</strong>
+        {assignmentTarget.assignedUsers?.some(person => person.activo === false) && <p role="status" style={{ padding: '.8rem', background: 'var(--report-soft)', borderRadius: 8, fontSize: '.78rem' }}>Al guardar se retirarán las asignaciones de estas personas inactivas: {assignmentTarget.assignedUsers.filter(person => person.activo === false).map(person => person.nombre || person.username).join(', ')}.</p>}
+        <RecipientPicker users={recipientUsers} loading={recipientsLoading} error={recipientsError} search={recipientSearch} onSearch={setRecipientSearch} selectedIds={assignmentUserIds} onChange={setAssignmentUserIds} onRetry={loadRecipients} />
+        <p style={{ color: 'var(--report-muted)', fontSize: '.78rem' }}>Al quitar una persona, dejará de ver este reporte en «Mis reportes». Sus otros accesos permanecen igual.</p>
+        {assignmentError && <p role="alert">{assignmentError}</p>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '.65rem' }}><button type="button" className="report-builder__button" disabled={assigningReport} onClick={() => setAssignmentTarget(null)}>Cancelar</button><button type="button" className="report-builder__button report-builder__button--primary" disabled={assigningReport || recipientsLoading || Boolean(recipientsError)} onClick={handleSaveAssignments}>{assigningReport ? 'Guardando…' : 'Guardar accesos'}</button></div>
+      </ReportModal>}
     </div>
   );
 }

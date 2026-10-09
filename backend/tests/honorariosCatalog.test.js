@@ -222,3 +222,70 @@ test('a saved catalog is immediately available without another Vertical connecti
   expect(remote.request).not.toHaveBeenCalled();
   expect(query).toHaveBeenCalledTimes(1);
 });
+
+test('Vertical reference audit is explicitly unavailable without attributing the BI editor', async () => {
+  const { getDb } = require('../config/db');
+  const reference = { id: 10, amount: 450, description: 'Consulta', notes: 'Convenio' };
+  const entry = { item_code: 'SER1471', name: 'Consulta', status: 'INCLUIDO', source_active: true,
+    revision: 3, tariff_count: '1', approved_tariff_count: '1', reference_prices: [reference],
+    updated_by: '77: EDITOR BI', updated_at: new Date('2026-10-08T15:00:00Z') };
+  const client = { query: jest.fn(async sql => ({ rows: /SELECT c\./.test(sql) ? [entry]
+    : /UPDATE bi_honorarios_catalog SET/.test(sql) ? [{ ...entry, revision: 4 }] : [] })), release: jest.fn() };
+  getDb.mockReturnValue({ pool: { connect: async () => client,
+    query: jest.fn(async sql => ({ rows: /FROM bi_honorarios_catalog c/.test(sql) ? [entry] : [] })) } });
+  const expected = { ...reference, changeAudit: { available: false, source: 'Vertical', reason: 'not_recorded',
+    changedBy: null, changedAt: null } };
+  expect((await catalog.getCatalogItem('SER1471')).referencePrices).toEqual([expected]);
+  expect((await catalog.listCatalog({ autoSync: false })).items[0].referencePrices).toEqual([expected]);
+  const saved = await catalog.saveCatalogConfig({ itemCode: 'SER1471', expectedRevision: 3,
+    status: 'INCLUIDO', modality: 'presencial' }, { id: 77, nombre: 'EDITOR BI', permisos: ['interconsultas-jornadas'] });
+  expect(saved.referencePrices).toEqual([expected]);
+  const [source] = catalog.normalizeSource([{ ItemCode: 'SER1471', Enabled: true, ItemType: 'S' }],
+    [{ Id_UT: 10, ITEMCODE: 'SER1471', IMPORTE: 450, ITEMDESCRIPTION: 'Consulta', NOTAS: 'Convenio',
+      ModifiedBy: 'Campo no entregado por la fuente verificada', ModifiedOn: '2026-10-08' }]);
+  expect(source.referencePrices).toEqual([expected]);
+});
+
+test('catalog export reads one complete BI snapshot including specific and inactive tariffs', async () => {
+  const { getDb } = require('../config/db');
+  const snapshotAt = '2026-10-08T18:00:00.000Z';
+  const rows = Array.from({ length: 305 }, (_, index) => ({ item_code: `SER_EXPORT_${index}`, name: 'Consulta de prueba',
+    group_name: 'CONSULTA EXTERNA', status: 'INCLUIDO', source_active: true, tariff_count: 1, approved_tariff_count: 1,
+    export_tariffs: [] }));
+  rows[0].export_tariffs = [{ id: 71, item_code: rows[0].item_code, provider_id: '77', role: 'AN', amount: '325.50',
+    valid_from: '2026-04-01', valid_to: '2026-04-30', active: false, revision: 4, reason: 'Tarifa anterior' }];
+  rows.push({ item_code: 'A-FAR', name: 'Producto', group_name: 'CONSULTA EXTERNA', status: 'INCLUIDO',
+    source_active: true, scope_excluded: false, export_tariffs: [] });
+  const query = jest.fn(async () => ({ rows: [{ snapshot_at: snapshotAt, items: rows }] }));
+  const connect = jest.fn();
+  getDb.mockReturnValue({ pool: { query, connect } });
+  const result = await catalog.readCatalogExport({ search: "prueba' OR 1=1", status: 'INCLUIDO', includeInactive: 'false',
+    approvalStatus: 'APROBADO' });
+  expect(result.snapshotAt).toBe(snapshotAt);
+  expect(result.items).toHaveLength(305);
+  expect(result.items[0].tariffs).toEqual([expect.objectContaining({ id: 71, providerId: '77', role: 'AN', amount: 325.5,
+    active: false, validFrom: '2026-04-01', validTo: '2026-04-30', revision: 4 })]);
+  expect(result.items.every(item => item.approvalStatus === 'APROBADO')).toBe(true);
+  expect(query).toHaveBeenCalledTimes(1);
+  expect(connect).not.toHaveBeenCalled();
+  const [sql, parameters] = query.mock.calls[0];
+  expect(sql).toMatch(/statement_timestamp\(\)/);
+  expect(sql).toMatch(/source_active=true/);
+  expect(sql).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|TRUNCATE|LIMIT)\b/i);
+  expect(sql).not.toContain("prueba' OR 1=1");
+  expect(parameters).toEqual(["%prueba' OR 1=1%", 'INCLUIDO']);
+});
+
+test('catalog export applies the derived status and keeps a timestamp for empty filtered results', async () => {
+  const { getDb } = require('../config/db');
+  const snapshotAt = new Date('2026-10-08T18:00:00.000Z');
+  const query = jest.fn(async () => ({ rows: [{ snapshot_at: snapshotAt, items: [
+    { item_code: 'SER_EXPORT', name: 'Consulta', status: 'PENDIENTE', source_active: true, export_tariffs: [] },
+    { item_code: 'SER_INCLUDED', name: 'Consulta', status: 'INCLUIDO', source_active: true,
+      tariff_count: 1, approved_tariff_count: 1, export_tariffs: [] }
+  ] }] }));
+  getDb.mockReturnValue({ pool: { query } });
+  expect((await catalog.readCatalogExport({ approvalStatus: 'PENDIENTE' })).items.map(item => item.itemCode)).toEqual(['SER_EXPORT']);
+  query.mockResolvedValue({ rows: [{ snapshot_at: snapshotAt, items: [] }] });
+  expect(await catalog.readCatalogExport()).toEqual({ items: [], snapshotAt: snapshotAt.toISOString() });
+});

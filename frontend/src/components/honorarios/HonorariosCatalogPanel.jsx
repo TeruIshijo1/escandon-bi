@@ -1,30 +1,27 @@
 import { userMessage } from '../../utils/userMessages';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../api/client';
-import { isExcludedHonorariosService, classifyProfessionalCandidate } from '../../utils/honorariosScope';
+import { CATALOG_STATUS_LABELS as STATUS_LABELS, CATALOG_ROLE_LABELS as ROLE_LABELS,
+  isCatalogApproved as isApproved, catalogStateLabel as approvalLabel, withCatalogScope as withProfessionalScope,
+  catalogItemsForView, filterCatalogItems, createCatalogExportSheets } from '../../utils/honorariosCatalogExport';
+import { downloadInstitutionalExcel } from '../../utils/excelInstitutionalGenerator';
 import './HonorariosCatalogPanel.css';
 
-const STATUS_LABELS = { PENDIENTE: 'Por configurar', INCLUIDO: 'Incluido para pago', EXCLUIDO: 'Excluido' };
-const ROLE_LABELS = { TRATANTE: 'Tratante / consulta', AN: 'Anestesiólogo', SURGEON: 'Cirujano', AY: 'Ayudante' };
-const isApproved = item => item?.approvalStatus === 'APROBADO' || (!item?.approvalStatus
-  && item?.status === 'INCLUIDO' && item.active !== false && !item.scopeExcluded
-  && Number(item.approvedTariffCount ?? item.tariffCount) > 0);
-const approvalLabel = item => isApproved(item) ? 'Configurados' : item.status === 'EXCLUIDO'
-  ? 'Excluido' : item.active === false ? 'Inactivo' : item.status === 'INCLUIDO' ? 'Falta tarifa' : 'Por configurar';
 const PAGE_SIZE = 40;
-const withProfessionalScope = item => {
-  const scope = classifyProfessionalCandidate(item);
-  return { ...scope, ...item, professionalCandidate: item.professionalCandidate ?? scope.professionalCandidate };
-};
 const money = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
   ? Number(value).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) : 'Sin importe';
 const dateLabel = value => value ? String(value).slice(0, 10).split('-').reverse().join('/') : 'Sin fecha final';
 const timestampLabel = value => value ? new Date(value).toLocaleString('es-MX') : '';
+const referenceChangeLabel = reference => {
+  const audit = reference.changeAudit;
+  return audit?.available && audit.source === 'Vertical' && audit.changedBy
+    ? `Última modificación en Vertical: ${audit.changedBy}${audit.changedAt ? ` · ${timestampLabel(audit.changedAt)}` : ''}`
+    : '';
+};
 const localToday = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
-const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const blankTariff = () => ({ id: null, providerId: '', role: '', amount: '', validFrom: localToday(), validTo: '', active: true, revision: 0 });
 const historyDescription = entry => {
   const current = entry.payload?.current;
@@ -39,6 +36,8 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [providerError, setProviderError] = useState('');
@@ -61,8 +60,7 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
   const detailCache = useRef(new Map());
   const selectedCodeRef = useRef(selectedCode);
   selectedCodeRef.current = selectedCode;
-  const workingItems = useMemo(() => items.filter(item => !item.scopeExcluded && !isExcludedHonorariosService(item)
-    && (reviewOtherConcepts || item.professionalCandidate !== false || item.status === 'INCLUIDO')),
+  const workingItems = useMemo(() => catalogItemsForView(items, { reviewOtherConcepts }),
   [items, reviewOtherConcepts]);
   const approvedItems = useMemo(() => workingItems.filter(isApproved), [workingItems]);
   const recommendedItems = useMemo(() => workingItems.filter(item => !isApproved(item) && item.status !== 'EXCLUIDO'
@@ -160,11 +158,7 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
     else { detailRequest.current += 1; setDetailLoading(false); }
   }, [selectedCode, loadDetails]);
 
-  const filtered = useMemo(() => {
-    const term = normalize(search);
-    return scopedItems.filter(item => (status === 'TODOS' || item.status === status)
-      && (!term || normalize(`${item.itemCode} ${item.name || ''} ${item.description || ''} ${item.groupName || ''}`).includes(term)));
-  }, [scopedItems, search, status]);
+  const filtered = useMemo(() => filterCatalogItems(scopedItems, { search, status }), [scopedItems, search, status]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visiblePage = Math.min(page, pageCount - 1);
   const visibleItems = filtered.slice(visiblePage * PAGE_SIZE, (visiblePage + 1) * PAGE_SIZE);
@@ -173,6 +167,20 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
     return result;
   }, {}), [scopedItems]);
   const providerNames = useMemo(() => new Map(providers.map(provider => [String(provider.id), provider.name])), [providers]);
+  const exportCatalog = async () => {
+    const filters = { view: catalogView, status, search, reviewOtherConcepts };
+    setExporting(true); setExportError('');
+    try {
+      const result = await apiFetch('/honorarios/catalog/export-data');
+      if (!Array.isArray(result?.items) || result.items.some(item => !Array.isArray(item?.tariffs))) {
+        throw new Error('No se recibió la lista completa de precios. Intenta descargarla nuevamente.');
+      }
+      const workbook = createCatalogExportSheets(result.items, filters, providerNames, result.snapshotAt);
+      if (!workbook.servicesCount) throw new Error('No hay servicios con los filtros elegidos. Actualiza el catálogo o cambia los filtros.');
+      await downloadInstitutionalExcel({ filename: `Catalogo_Precios_Honorarios_${localToday()}_${filters.view.toLowerCase()}.xlsx`, sheets: workbook.sheets });
+    } catch (failure) { setExportError(userMessage(failure.message)); }
+    finally { setExporting(false); }
+  };
 
   const notifyChange = () => { if (onChanged) onChanged(); };
   const finishSave = (updated, action) => {
@@ -265,17 +273,19 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
   return (
     <section className="hon-catalog" aria-label="Catálogo de servicios y tarifas de honorarios">
       <div className="hon-card hon-catalog-intro">
-        <div>
+        <div className="hon-catalog-intro-copy">
           <h2>Servicios y tarifas para pago</h2>
           <p>Elige los servicios que se pagarán a los médicos y cuánto se pagará por cada uno.</p>
           <p className="hon-catalog-muted">Al incluir un servicio y guardar su tarifa, aparecerá en Aprobados y quedará disponible para revisar las atenciones del médico.</p>
         </div>
         <div className="hon-catalog-sync">
-          <button type="button" className="hon-catalog-button hon-catalog-primary" disabled={!canManage || syncing || saving || loading}
-            onClick={handleSync}>{syncing ? 'Actualizando…' : 'Buscar servicios nuevos'}</button>
-          <button type="button" className="hon-catalog-button" disabled={loading || syncing || saving} onClick={() => loadCatalog().then(() => {
-            if (selectedCode) loadDetails(selectedCode, true);
-          }).catch(() => {})}>Actualizar</button>
+          <div className="hon-catalog-sync-actions">
+            <button type="button" className="hon-catalog-button hon-catalog-primary" disabled={!canManage || syncing || saving || loading}
+              onClick={handleSync}>{syncing ? 'Actualizando…' : 'Buscar servicios nuevos'}</button>
+            <button type="button" className="hon-catalog-button" disabled={loading || syncing || saving} onClick={() => loadCatalog().then(() => {
+              if (selectedCode) loadDetails(selectedCode, true);
+            }).catch(() => {})}>Actualizar</button>
+          </div>
           <span className="hon-catalog-muted">{sync?.lastSuccess ? `Última actualización: ${timestampLabel(sync.lastSuccess)}` : 'Aún no se ha actualizado el catálogo'}</span>
         </div>
       </div>
@@ -321,6 +331,12 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
               onChange={event => { setReviewOtherConcepts(event.target.checked); setPage(0); }} />Revisar otros conceptos</label>
             <p className="hon-catalog-muted">Permite revisar servicios cuya relación con el pago a médicos aún debe confirmarse.</p>
           </div>
+          <div className="hon-catalog-export">
+            <p className="hon-catalog-muted">Incluye todos los resultados de estos filtros, de todas las páginas.</p>
+            <button type="button" className="hon-catalog-button" disabled={loading || syncing || saving || exporting || !filtered.length}
+              onClick={exportCatalog}>{exporting ? 'Preparando Excel…' : 'Descargar Excel'}</button>
+          </div>
+          {exportError && <p className="hon-catalog-alert hon-catalog-export-error" role="alert">{exportError}</p>}
           <div className="hon-catalog-table-scroll">
             <table className="hon-catalog-table">
               <thead><tr><th>Servicio</th><th>Configuración</th><th>Tarifas</th><th><span className="hon-catalog-visually-hidden">Seleccionar</span></th></tr></thead>
@@ -332,7 +348,11 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
                     {item.professionalCandidate === false && item.status !== 'INCLUIDO'
                       && <span className="hon-catalog-warning">Revisar si genera honorarios</span>}
                     {item.modality === 'contact_center' && <span className="hon-catalog-muted">Contact Center</span>}
-                    {item.referenceChanged && <span className="hon-catalog-warning">Cambió el precio de referencia</span>}</td>
+                    {item.referenceChanged && <span className="hon-catalog-reference-change">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                        <path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 7a7 7 0 0 1 11.7-1L20 9M4 15l2.2 3A7 7 0 0 0 17.9 17" />
+                      </svg><span>Cambió el precio de referencia en Vertical</span>
+                    </span>}</td>
                   <td>{Number(item.tariffCount) > 0 ? `${item.tariffCount} registrada${Number(item.tariffCount) === 1 ? '' : 's'}` : 'Por definir'}</td>
                   <td><button type="button" className="hon-catalog-button" disabled={saving || syncing} onClick={() => { setSelectedCode(item.itemCode); setMessage(''); }}
                     aria-label={`Configurar ${item.itemCode}`} aria-pressed={item.itemCode === selectedCode}>Ver</button></td>
@@ -389,9 +409,10 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
             </form>
             <details className="hon-catalog-reference">
               <summary>Precios de referencia ({selected.referencePrices?.length || 0})</summary>
-              <p className="hon-catalog-muted">Usa estos precios como guía y registra el importe autorizado para pagar al médico.</p>
+              <p className="hon-catalog-muted">Estos precios se consultan desde Vertical. Úsalos como guía y registra el importe autorizado para pagar al médico.</p>
               {(selected.referencePrices || []).map((reference, index) => <div className="hon-catalog-reference-row" key={reference.id ?? index}>
                 <strong>{money(reference.amount)}</strong>{reference.notes && <p>{reference.notes}</p>}
+                {referenceChangeLabel(reference) && <p className="hon-catalog-muted hon-catalog-reference-audit">{referenceChangeLabel(reference)}</p>}
               </div>)}
               {!selected.referencePrices?.length && <p>Sin precio de referencia.</p>}
               {(selected.referenceWarnings || []).map((warning, index) => <p key={index} className="hon-catalog-warning">{userMessage(warning)}</p>)}
@@ -435,6 +456,7 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
                     <label>Se aplica desde<input type="date" required value={tariff.validFrom} onChange={event => setTariff({ ...tariff, validFrom: event.target.value })} /></label>
                     <label>Se aplica hasta (opcional)<input type="date" value={tariff.validTo} min={tariff.validFrom} onChange={event => setTariff({ ...tariff, validTo: event.target.value })} /></label>
                   </div>
+                  <p className="hon-catalog-muted">Las atenciones anteriores a Se aplica desde quedan fuera de esta tarifa. Para revisar un periodo histórico, indica la fecha inicial autorizada.</p>
                   <label className="hon-catalog-checkbox"><input type="checkbox" checked={tariff.active} onChange={event => setTariff({ ...tariff, active: event.target.checked })} />Tarifa activa</label>
                   <p className="hon-catalog-muted">Usa una sola tarifa por médico y función para cada fecha. Si el precio cambia, indica cuándo termina la tarifa anterior y cuándo empieza la nueva.</p>
                   <div className="hon-catalog-actions"><button className="hon-catalog-button hon-catalog-primary" type="submit">{saving ? 'Guardando…' : 'Guardar tarifa'}</button>

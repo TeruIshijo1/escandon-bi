@@ -4,7 +4,7 @@ const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300
 const TOPICS = {
   inventory: ['inventario', 'stock', 'existencias', 'lo que hay en farmacia', 'lo que tengo en farmacia', 'que hay en farmacia', 'cuanto hay en farmacia', 'cuanto queda en farmacia', 'medicamentos de farmacia'],
   batches: ['lotes', 'caducidades', 'caducidad', 'caducados', 'vencidos', 'medicamentos vencidos'],
-  item_prices: ['lista de precios', 'precios por lista', 'precios de articulos'],
+  item_prices: ['lista de precios', 'listas de precios', 'precios por lista', 'precios de articulos', 'precios de publico general', 'precios de hospitalizacion'],
   item_master_data: ['catalogo de articulos', 'catalogo de medicamentos', 'maestro de articulos'],
   stock_availability: ['disponibilidad proyectada', 'stock comprometido', 'existencias en pedido'],
   purchase_invoices: ['facturas de compras', 'facturas de proveedores', 'compras facturadas'],
@@ -21,8 +21,8 @@ const TOPICS = {
   sales_invoice_summary: ['resumen de facturas de clientes', 'facturas de clientes por documento'],
   credit_memos: ['notas de credito de clientes', 'cancelaciones de facturas de clientes'],
   purchase_credit_memos: ['notas de credito de proveedores'],
-  business_partners: ['directorio de socios', 'socios de negocio'],
-  customers: ['directorio de clientes', 'lista de clientes', 'directorio de aseguradoras'],
+  business_partners: ['directorio de socios', 'socios de negocio', 'socios comerciales', 'socios de negocios'],
+  customers: ['directorio de clientes', 'lista de clientes', 'directorio de aseguradoras', 'clientes y aseguradoras', 'directorio de pagadores'],
   suppliers: ['directorio de proveedores', 'lista de proveedores'],
   accounts_receivable: ['cuentas por cobrar', 'clientes que deben', 'facturas de clientes sin pagar'],
   accounts_payable: ['cuentas por pagar', 'lo que debemos', 'facturas de proveedores sin pagar'],
@@ -67,7 +67,12 @@ const TYPOS = { kiero: 'quiero', qiero: 'quiero', nesesito: 'necesito', nececito
 Object.assign(TYPOS, { nomas: 'solo', solamente: 'solo', porfa: 'por favor', porfis: 'por favor', ponle: 'agrega', ponme: 'agrega', metele: 'agrega', anadele: 'agrega', sacale: 'quita', quitale: 'quita', quitame: 'quita', muestras: 'muestra', hasme: 'hazme', asme: 'hazme', medicina: 'medicamento', medicinas: 'medicamentos', materiales: 'insumos', cant: 'cantidad', antiviotico: 'antibiotico', medikoo: 'medico' });
 const COMMON_WORDS = new Set(('primera segunda primero quince veinte treinta ultimo ultimos ultima ultimas actual actualiza generado genera generarlo nuevo nuevos nueva nuevas mejor ahora mismo misma todos todas cualquier ninguno ninguna cuando donde cuales quienes como para desde hasta entre durante despues antes porque favor gracias refiero tratante solicitante registrados hospitalizacion publico unitario promedio general central nacimiento sexo genero persona personas joven mayores menores filtro filtros lados van').split(' '));
 Object.assign(TYPOS, { status: 'estatus', estatuss: 'estatus', estatuz: 'estatus' });
+Object.assign(TYPOS, { dedicible: 'deducible', dedicibles: 'deducibles' });
 ['medica', 'medicas', 'cuenta', 'cuentas', 'cierre', 'registrada', 'registradas', 'cancelada', 'canceladas', 'tenga', 'tengan', 'tiene', 'tienen'].forEach(word => COMMON_WORDS.add(word));
+['acuerdo', 'acuerdos', 'comercial', 'comerciales', 'convenio', 'convenios', 'pagador', 'pagadores', 'aseguradora', 'aseguradoras',
+  'socio', 'socios', 'negocio', 'negocios', 'descuento', 'descuentos', 'deducible', 'deducibles', 'copago', 'copagos', 'coaseguro', 'coaseguros',
+  'tabulador', 'tabuladores', 'conciliacion', 'contador', 'contralor', 'auditor', 'estados', 'facturar', 'facturado', 'facturada', 'facturados', 'facturadas',
+  'pagaron', 'cobrado', 'cobrada', 'cobrados', 'cobradas', 'cubiertas', 'vigentes', 'liquidada', 'liquidadas', 'deducible', 'coaseguro', 'retencion', 'retenciones'].forEach(word => COMMON_WORDS.add(word));
 const VOCABULARY = [...new Set([...Object.values(TOPICS).flat().flatMap(phrase => phrase.split(' ')), ...Object.values(TYPOS).flatMap(phrase => phrase.split(' ')), ...('paciente pacientes medico medicos procedimiento procedimientos nombre nombres apellido fecha fechas cantidad existencias precio precios costo costos promedio unitario saldo total importe subtotal impuesto iva proveedor cliente insumo medicamento producto articulo lote caducidad almacen especialidad folio telefono correo edad diagnostico habitacion codigo moneda descuento anticipo utilidad estado comentarios descripcion agrega agregar incluye incluir quita quitar elimina quitar cambia cambiar sustituye solo unicamente tambien pendientes pendiente abiertos abiertas cerrados cerradas vencidos vencidas antibioticos controlados refrigerados semana mes pasado anterior septiembre octubre noviembre diciembre enero febrero marzo abril mayo junio julio agosto quincena primero quince busca buscar filtra muestra cirugias inventario farmacia central general').split(' ')])].filter(word => word.length >= 4);
 
 function distance(a, b) {
@@ -105,4 +110,16 @@ function naturalText(message) {
     .replace(/\s+/g, ' ').trim();
 }
 
-module.exports = { normalize, normalizeWords, naturalText, TOPICS, WAREHOUSE_LABELS, distance };
+// Aliases and sources come from authorized server definitions. They describe
+// capabilities the assistant can use without adding cards to the manual list.
+function topicPhrases(entity) {
+  return [...new Set([entity.title, ...(TOPICS[entity.id] || []),
+    ...(Array.isArray(entity.aliases) ? entity.aliases.filter(alias => typeof alias === 'string' && alias.trim()) : [])])].filter(Boolean);
+}
+
+function entitySources(entity) {
+  const supplied = Array.isArray(entity?.sources) ? entity.sources.join(' ') : entity?.source || 'SAP';
+  return ['sap', 'vertical'].filter(source => new RegExp(`\\b${source}\\b`).test(normalize(supplied)));
+}
+
+module.exports = { normalize, normalizeWords, naturalText, TOPICS, WAREHOUSE_LABELS, distance, topicPhrases, entitySources };

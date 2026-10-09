@@ -88,7 +88,7 @@ function isProviderCooling(key) {
 
 function recordProviderFailure(key, category) {
   cleanupExpired();
-  if (!['configuration', 'credentials', 'access', 'model', 'rate_limit', 'capacity', 'provider', 'network', 'timeout', 'response_format'].includes(category)) return;
+  if (!['configuration', 'credentials', 'access', 'billing', 'model', 'rate_limit', 'capacity', 'provider', 'network', 'timeout', 'response_format'].includes(category)) return;
   providerCooling.set(key, { expires: Date.now() + COOLING_TTL });
 }
 

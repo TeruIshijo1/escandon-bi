@@ -64,6 +64,7 @@ test('monthly payments stay available without consultations and outside the exac
   const result = await getPeriodCandidates({}, '2026-04-15', '2026-04-20');
   expect(result.rows).toEqual([{ ...row, ReviewInvalidated: false }]);
   expect(result.coverage).toMatchObject({ candidates: 1, monthlyFixed: 1, omittedFromReview: 0, pendingCatalog: 0 });
+  expect(result.coverage.sourceCounts).toEqual({ orderLines: 0, clinicalCharges: 0, standaloneAppointments: 0, surgicalProcedures: 0, contactCenter: 0 });
   const reviewRead = require('../config/db').getDb().pool.query.mock.calls.find(([sql]) => sql.includes('SELECT row_id,payload'));
   expect(reviewRead[1]).toEqual([['FIXED|7|2026-04']]);
   await expect(approvalPreview({}, {}, row)).rejects.toThrow('configuración');
@@ -88,13 +89,15 @@ test('monthly configuration changes invalidate an open inclusion but preserve a 
 
 test('review only returns configured applicable services and counts omitted candidates without approving payment', async () => {
   getHonorariosCandidates.mockResolvedValue({ rows: [candidate(),
-    { ...candidate(), SourceIdentity: 'BI|SOLN|11|ORDEN', CatalogApproved: false, ReviewEligible: false },
-    { ...candidate(), SourceIdentity: 'BI|SOLN|12|ORDEN', ReviewEligible: false, MedicoId: null }
-  ], coverage: {} });
+    { ...candidate(), SourceIdentity: 'BI|PCBL|11|CARGO', SourceType: 'PCBL', SourceLineId: 11, CatalogApproved: false, ReviewEligible: false },
+    { ...candidate(), SourceIdentity: 'BI|PCFRCP|12|PROCEDIMIENTO', SourceType: 'PCFRCP', SourceLineId: 12, ReviewEligible: false, MedicoId: null }
+  ], coverage: { orderLines: 1, clinicalCharges: 1, surgicalProcedures: 1, contactCenter: 1 } });
   const result = await getPeriodCandidates({}, '2026-04-15', '2026-04-15');
   expect(result.rows.map(row => row.SourceIdentity)).toEqual([candidate().SourceIdentity]);
   expect(result.coverage).toMatchObject({ candidates: 1, sourceCandidates: 3, omittedFromReview: 2, pendingCatalog: 1, pendingProvider: 1 });
-  await expect(prepareSourceReview({}, { rowId: 'BI|SOLN|11|ORDEN', serviceDate: '2026-04-15', decision: { action: 'APROBAR' } }))
+  expect(result.coverage.sourceCounts).toEqual({ orderLines: 1, clinicalCharges: 1, standaloneAppointments: 0, surgicalProcedures: 1, contactCenter: 1 });
+  expect(result.coverage).toMatchObject({ orderLines: 1, clinicalCharges: 0, surgicalProcedures: 0 });
+  await expect(prepareSourceReview({}, { rowId: 'BI|PCBL|11|CARGO', serviceDate: '2026-04-15', decision: { action: 'APROBAR' } }))
     .rejects.toThrow('El servicio ya no aparece');
   const historical = await getPeriodCandidates({}, '2026-04-15', '2026-04-15', { includeUnconfigured: true });
   expect(historical.rows).toHaveLength(3);

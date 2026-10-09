@@ -20,6 +20,7 @@ const workflow = require('../services/honorariosWorkflow.service');
 const { getProviderDirectory } = require('../services/honorariosSources.service');
 const liquidation = require('../services/honorariosLiquidation.service');
 const paymentReport = require('../services/honorariosPaymentReport.service');
+const availablePaymentReport = require('../services/honorariosAvailablePaymentReport.service');
 const fiscalProfiles = require('../services/honorariosFiscalProfile.service');
 const { getFiscalDirectory } = require('../services/honorariosFiscalDirectory.service');
 const verticalAudit = require('../services/honorariosVerticalAudit.service');
@@ -107,7 +108,8 @@ const api = handler => async (req, res) => {
   try { return res.json({ ok: true, ...await handler(req) }); }
   catch (error) {
     console.error('[Honorarios BI]', error.message);
-    return res.status(error.status || 503).json({ ok: false, error: error.status ? error.message : 'No se pudo completar la consulta de honorarios. Intenta actualizar.' });
+    return res.status(error.status || 503).json({ ok: false, error: error.status ? error.message : 'No se pudo completar la consulta de honorarios. Intenta actualizar.',
+      ...(error.preparationStatus === 'NOT_CREATED' ? { preparationStatus: 'NOT_CREATED' } : {}) });
   }
 };
 
@@ -165,6 +167,10 @@ router.get('/catalog', api(async req => {
     return { ...cached, sync: { ...cached.sync, lastError: 'Vertical no está disponible para actualizar el catálogo.' } };
   }
 }));
+router.get('/catalog/export-data', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+}, api(async req => catalog.readCatalogExport(req.query)));
 router.post('/catalog/sync', api(async req => {
   await catalog.syncCatalog(await connectRemoteDB(), req.user);
   return catalog.listCatalog({ autoSync: false });
@@ -205,6 +211,10 @@ router.get('/audit', api(async req => {
 }));
 
 router.get('/liquidations', api(async () => ({ liquidations: await liquidation.listLiquidations() })));
+router.post('/available-payment-report', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+}, api(async req => ({ report: await availablePaymentReport.getAvailablePaymentReport(await connectRemoteDB(), req.body || {}) })));
 router.post('/liquidations', api(async req => ({ liquidation: await liquidation.closeLiquidation(await connectRemoteDB(), req.body, req.user) })));
 router.get('/liquidations/:id', api(async req => ({ liquidation: await liquidation.getLiquidation(req.params.id) })));
 router.get('/liquidations/:id/payment-report', api(async req => ({ report: await paymentReport.getPaymentReport(req.params.id, connectRemoteDB) })));
@@ -223,20 +233,20 @@ router.post('/liquidations/:id/adjustments', api(async req => ({ liquidation: aw
  * Los nombres recibidos son solo candidatos para localizar proveedores; no validan identidad.
  */
 router.post('/sap-reconciliation', authenticate, authorize(ALLOWED_ROLES), async (req, res) => {
-  const { startDate, endDate, doctors } = req.body || {};
+  const { startDate, endDate, doctors, scope = 'documents' } = req.body || {};
   if (!Array.isArray(doctors) || doctors.length > 500) {
     return res.status(400).json({ ok: false, error: 'La lista de médicos no es válida.' });
   }
+  if (!['fiscal', 'documents'].includes(scope)) return res.status(400).json({ ok: false, error: 'El alcance de la consulta no es válido.' });
 
   try {
-    const pool = await connectRemoteDB();
-    const clinicalDirectory = await getClinicalProviderDirectory(pool);
-    const result = await reconcileHonorariosWithSap({ startDate, endDate, doctors, clinicalDirectory, includeAdditional: true });
+    const clinicalDirectory = scope === 'documents' ? await getClinicalProviderDirectory(await connectRemoteDB()) : [];
+    const result = await reconcileHonorariosWithSap({ startDate, endDate, doctors, clinicalDirectory, includeAdditional: scope === 'documents', scope });
     return res.json(result);
   } catch (err) {
     console.error('[Honorarios] Error en conciliación SAP (solo lectura):', err);
     const clientInputError = /periodo|período|fecha|lista|médicos|medicos|nombre|máximo/i.test(err.message || '');
-    return res.status(clientInputError ? 400 : 502).json({
+    return res.status(err.status === 504 ? 504 : clientInputError ? 400 : 502).json({
       ok: false,
       error: clientInputError ? err.message : 'No se pudo completar la consulta de SAP. El reporte de honorarios permanece disponible.'
     });

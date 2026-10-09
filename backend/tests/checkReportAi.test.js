@@ -50,6 +50,19 @@ test('the production check distinguishes provider access failures from a success
   expect(JSON.stringify(result.result)).not.toMatch(/fictional-test-key|notice|message|plan/);
 });
 
+test('the Gemini check reports billing as unresolved even when guided mode can prepare the fictitious report', async () => {
+  process.env.GEMINI_API_KEY = 'fictional-billing-key';
+  process.env.REPORT_AI_GEMINI_FALLBACK_MODELS = 'gemini-3.8-flash';
+  jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const json = jest.fn(() => { throw new Error('private billing account'); });
+  const fetchImpl = jest.fn().mockResolvedValue({ ok: false, status: 402, json });
+  const check = await runCheck({ fetchImpl });
+  expect(check).toMatchObject({ exitCode: 2, result: { engine: 'guided', status: 'ready', provider: 'gemini', category: 'billing', httpStatus: 402 } });
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+  expect(json).not.toHaveBeenCalled();
+  expect(JSON.stringify(check.result)).not.toMatch(/fictional|private|account|notice|message|plan/);
+});
+
 test('the Gemini check actually calls the provider even when local interpretation can prepare its fictitious report', async () => {
   process.env.GEMINI_API_KEY = 'fictional-test-key';
   const fetchImpl = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ choices: [{ message: {

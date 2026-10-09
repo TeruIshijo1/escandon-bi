@@ -78,3 +78,6 @@ hoja membretada-02.png
 
 # Runtime portable local (no versionar binarios)
 .runtime/
+
+# Mapa vigente de la plataforma: conservar su PDF junto a la fuente Markdown
+!docs/Mapa_Plataforma_Hospital_Escandon_BI.pdf

@@ -1,6 +1,8 @@
 # Constructor de reportes SAP y Vertical
 
-Actualizado el 6 de octubre de 2026. El catálogo tiene 64 módulos: 39 SAP y 25 Vertical, en 19 categorías.
+Actualizado el 8 de octubre de 2026. El catálogo tiene 64 módulos: 39 SAP y 25 Vertical, en 19 categorías.
+
+MAR-IA reutiliza este intérprete para consultas de reportes y seguimientos con fechas, columnas y filtros. La [actualización de MAR-IA y Gemini](mar-ia-reportes-2026-10-08.md) documenta sus permisos, límites de vista previa y comprobación en el servidor. Un rechazo HTTP 402 se distingue de una consulta guiada exitosa y explica revisar el proyecto y la facturación del proveedor.
 
 ## Uso
 
@@ -44,7 +46,9 @@ La selección muestra la unidad de cada fila: documento, línea, cuenta, cita, l
 
 ## Acceso y límites
 
-Cada módulo conserva el permiso sap-query-<id>, incluso las fuentes Vertical. Sólo amendoza recibe acceso total automático. Los demás usuarios acceden mediante permisos granulares asignables en Administración; el permiso general de pantalla conserva el acceso limitado anterior a inventarios. Las plantillas se listan y guardan únicamente para módulos autorizados.
+Cada módulo conserva el permiso sap-query-<id>, incluso las fuentes Vertical. Sólo amendoza recibe acceso total automático. Los demás usuarios acceden mediante permisos granulares asignables en Administración; el permiso general de pantalla conserva el acceso limitado anterior a inventarios. Los reportes propios se listan y guardan únicamente para módulos autorizados.
+
+**Mis reportes** reúne los reportes propios y los asignados. Al guardar, Sistemas/Administración puede elegir usuarios activos; **Administrar accesos** permite cambiar esa lista después. El destinatario abre y consulta la fuente, las columnas y los filtros guardados, sin recibir permisos generales del módulo. La asignación se comprueba antes de consultar y antes de entregar el resultado. Consulta [el alcance de las asignaciones y de los recursos financieros](asistente-recursos-financieros-2026-10-08.md).
 
 El máximo es de 10000 filas entregadas. Se avisa cuando el origen o el resultado alcanza un límite; los indicadores describen sólo las filas entregadas. Las consultas SAP nuevas recorren páginas y filtran sus detalles antes del límite, con un tope operativo de 20000 documentos revisados. Las consultas SQL SAP heredadas mantienen su tope de 5000 y ahora avisan si lo alcanzan o si queda una página pendiente. Vertical usa TOP con un registro adicional, filtros parametrizados y fecha final inclusiva.
 
@@ -126,6 +130,8 @@ Archivos: backend/services/sapQueryBuilder.service.js integra el catálogo anter
 | Vertical | Farmacia Clínica | Tickets de devolución de insumos clínicos | vertical_clinical_return_tickets | Fecha de registro de devolución |
 
 ## Verificación
+
+La ampliación del 9 de octubre incorpora filtros por importes, agrupaciones, conteos y sumas verificadas, así como casos puntuales por cuenta o número de paciente en el asistente y Mar-IA. Consulta [Análisis y consultas de cuentas](asistente-analisis-y-casos-2026-10-09.md) para ejemplos, fuentes, límites y conservación de la configuración en «Mis reportes».
 
 La revisión de usabilidad del 7 de octubre de 2026 corrige las aclaraciones encadenadas: la selección de un reporte conserva su título como selección, incluso al volver a procesar las respuestas anteriores para añadir el período. El chat ofrece acciones sólo en la última respuesta. Las fechas faltantes y las elecciones concretas entre columnas del catálogo se resuelven localmente, sin consultar un proveedor ni mostrar un aviso de conexión. Un ajuste que pide un dato no disponible conserva los demás cambios pendientes hasta que el usuario lo corrija o acepte excluir ese dato; quitar la última columna exige elegir un dato antes de generar.
 

@@ -307,7 +307,7 @@ export default function AdminConfiguracion() {
       <div style={{ background: '#FFFFFF', borderRadius: 16, padding: '1.75rem 1.5rem', marginBottom: '2rem', border: '1px solid rgba(0,70,135,0.05)', boxShadow: 'var(--shadow-xs)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.65rem', borderBottom: '1px solid rgba(0,70,135,0.06)' }}>
           <div>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-azul-fuerte)', margin: 0, letterSpacing: '-0.01em' }}>🎛️ Configuración de Indicadores e Indicadores</h2>
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-azul-fuerte)', margin: 0, letterSpacing: '-0.01em' }}>🎛️ Configuración de indicadores</h2>
             <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: '0.2rem 0 0', fontFamily: 'var(--font-body)', fontWeight: 500 }}>Alinee títulos personalizados y reportes interactivos correspondientes a cada celda de datos.</p>
           </div>
           <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-azul-claro)', background: 'rgba(0,136,201,0.08)', padding: '0.25rem 0.75rem', borderRadius: 100, fontFamily: 'var(--font-mono)' }}>

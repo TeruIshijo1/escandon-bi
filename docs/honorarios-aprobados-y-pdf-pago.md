@@ -2,7 +2,7 @@
 
 # Honorarios: servicios aprobados y PDF para pago
 
-Actualización del 7 de octubre de 2026.
+Actualización del 8 de octubre de 2026.
 
 ## Flujo de trabajo
 
@@ -13,9 +13,11 @@ Actualización del 7 de octubre de 2026.
 
 Si la consulta no puede recuperar las decisiones guardadas, pulsa **Reintentar consulta**. Hasta recuperar su estado, no se presenta una lista de pendientes ni se permite aprobar esos servicios.
 
-Para conservar el neto y registrar pagos, abre **Ver servicios → Ver impuestos y documentos → Preparar pago de aprobados**. Médico y fechas ya vienen seleccionados. **Preparar cierre** guarda con motivo automático e intención explícita del botón, sujeto a las validaciones fiscales y de concurrencia del servidor. No hay guardado al navegar ni se pide motivo o casilla adicional. Cambiar médico o fechas es opcional.
+Abre **Ver servicios → Ver impuestos y documentos → Preparar pago de aprobados**. Médico y fechas ya vienen seleccionados. **Generar PDF para pago** comprueba los servicios aprobados del periodo actual sin esperar a SAP. Si falta la ficha fiscal interna, descarga el PDF con los datos disponibles y marca como pendientes las retenciones y el neto que no puedan calcularse. No crea un pago preparado ni cambia las aprobaciones; puedes completar la ficha después. Cambiar médico o fechas es opcional y consulta las aprobaciones de la nueva selección.
 
-Registra los pagos ya realizados y sus comprobantes, así como los ajustes que correspondan. Los pagos de otras herramientas deben estar aplicados a los servicios del cierre para descontarse. **Descargar PDF para pago** vuelve a consultar los movimientos, comprueba el cálculo y muestra el saldo pendiente. Si faltan datos fiscales, Contabilidad los completa; el PDF de aprobados permanece accesible.
+Con ficha interna completa y aplicable, el botón prepara el pago y descarga su PDF. Si el médico está configurado en SAP, después del PDF disponible abre **Opciones del pago → Preparar pago con datos de SAP**. Esa preparación conserva las validaciones fiscales y de concurrencia. No hay guardado al navegar ni se pide motivo o casilla adicional.
+
+En un pago preparado, registra los pagos ya realizados y sus comprobantes, así como los ajustes que correspondan. Los pagos de otras herramientas deben estar aplicados a los servicios del cierre para descontarse. **Descargar PDF para pago** vuelve a consultar los movimientos, comprueba el cálculo y muestra el saldo pendiente. El PDF de aprobaciones abiertas con fiscales pendientes muestra los importes disponibles; el saldo se obtiene del pago preparado y sus movimientos.
 
 Las descargas del menú **Exportar** de **Servicios** conservan el contexto de la revisión. Los dos botones junto al médico contienen solo aprobados. El documento que descuenta los pagos registrados se obtiene con **Preparar pago y PDF**, y después **Descargar PDF para pago**.
 

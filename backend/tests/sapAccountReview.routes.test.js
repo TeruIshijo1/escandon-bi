@@ -50,6 +50,17 @@ test('only an explicit fullMap=true query enables the full map override', async 
   }
 });
 
+test('the explicit SAP order search retains authentication, permission and no-store protections', async () => {
+  const url = '/api/sap/account-review/search?mode=order&q=50837';
+  expect((await request(app).get(url)).status).toBe(401);
+  expect((await request(app).get(url).set(auth({ permisos: [] }))).status).toBe(403);
+  expect(service.search).not.toHaveBeenCalled();
+  const response = await request(app).get(url).set(auth({ permisos: ['auditoria-reapertura-cuentas'] }));
+  expect(response.status).toBe(200);
+  expect(response.headers['cache-control']).toBe('no-store');
+  expect(service.search).toHaveBeenCalledWith({ mode: 'order', q: '50837' }, { signal: expect.any(AbortSignal) });
+});
+
 test('completed success and error responses cancel any remaining SAP branch on both endpoints', async () => {
   const headers = auth({ permisos: ['auditoria-reapertura-cuentas'] });
   for (const [method, url] of [['search', '/api/sap/account-review/search?mode=patient&q=Ana'],

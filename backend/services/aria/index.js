@@ -2,19 +2,17 @@
 
 const { normalizeText, isGreeting } = require('./utils/nlp');
 const { matchIntent, getSuggestionsForUser, IA_PERMISSION_CATALOG, INTENT_REGISTRY } = require('./config/intents');
-const { hasIAPermission, hasSectionPermission, buildAccessDeniedResponse } = require('./core/permissions');
+const { hasIASectionAccess, buildAccessDeniedResponse } = require('./core/permissions');
 const { classifyWithLLM } = require('./core/llmClassifier');
 const searchDatabaseDynamically = require('./core/dynamicSearch');
 const queryResumenEjecutivoGeneral = require('./handlers/resumen.handler');
+const { processReportQuery } = require('./reportQuery.service');
 
 /**
  * Ejecuta un intent verificando permisos IA y de sección.
  */
 async function executeIntent(intent, normalized, user) {
-  if (!hasIAPermission(user, intent.iaPermission)) {
-    return buildAccessDeniedResponse(intent.iaPermission, IA_PERMISSION_CATALOG);
-  }
-  if (intent.sectionPerm && !hasSectionPermission(user, intent.sectionPerm)) {
+  if (!hasIASectionAccess(user, intent.iaPermission, intent.sectionPerm)) {
     return buildAccessDeniedResponse(intent.iaPermission, IA_PERMISSION_CATALOG);
   }
   return await intent.handler(normalized);
@@ -26,7 +24,7 @@ async function executeIntent(intent, normalized, user) {
  * @param {object} user - Objeto del usuario autenticado (con role y permisos)
  * @returns {Object} Respuesta estructurada con resumen, KPIs y filas
  */
-async function processAriaQuery(query = '', user = null) {
+async function processAriaQuery(query = '', user = null, options = {}) {
   const normalized = normalizeText(query);
 
   // 1. Saludos / inicio → Resumen Ejecutivo
@@ -34,9 +32,11 @@ async function processAriaQuery(query = '', user = null) {
     return await queryResumenEjecutivoGeneral(user);
   }
 
-  // 2. Intentar match con el registro de intenciones (regex + coincidencia difusa)
   const match = matchIntent(normalized);
+  const reportResponse = await processReportQuery(query, user, { ...options, operationalIntent: match?.intent.id });
+  if (reportResponse) return reportResponse;
 
+  // 2. Intentar match con el registro de intenciones (regex + coincidencia difusa)
   if (match) {
     const { intent } = match;
     return await executeIntent(intent, normalized, user);
@@ -45,17 +45,21 @@ async function processAriaQuery(query = '', user = null) {
   // 2b. Clasificación con LLM: vocabulario amplio para todos los módulos.
   //     Solo se invoca cuando los regex no aciertan; si falla la API,
   //     se cae a la búsqueda dinámica sin afectar la experiencia.
-  const llmIntentId = await classifyWithLLM(query, INTENT_REGISTRY);
+  const allowedIntents = INTENT_REGISTRY.filter(intent => hasIASectionAccess(user, intent.iaPermission, intent.sectionPerm));
+  let diagnostic;
+  const llmIntentId = await classifyWithLLM(query, allowedIntents, { onDiagnostic: value => { diagnostic = value; } });
   if (llmIntentId) {
-    const intent = INTENT_REGISTRY.find(i => i.id === llmIntentId);
+    const intent = allowedIntents.find(i => i.id === llmIntentId);
     if (intent) {
-      console.log(`[MAR-IA LLM] Consulta "${query.slice(0, 60)}" → intent: ${intent.id}`);
       return await executeIntent(intent, normalized, user);
     }
   }
 
   // 3. Fallback: Búsqueda dinámica multitabla
-  return await searchDatabaseDynamically(query, user);
+  const response = await searchDatabaseDynamically(query, user);
+  return diagnostic ? { ...response, notice: diagnostic.category === 'billing'
+    ? 'La conexión de IA requiere revisar el proyecto y la facturación de Gemini. Puedes continuar con las consultas disponibles.'
+    : 'La conexión de IA no está disponible en este momento. Puedes continuar con las consultas disponibles.' } : response;
 }
 
 module.exports = {

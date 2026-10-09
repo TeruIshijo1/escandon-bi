@@ -12,6 +12,31 @@ const order = overrides => ({ ...invoice(), DocEntry: 20, DocNum: 200, TransNum:
 const closedLedger = overrides => ({ TransId: 1000, Line_ID: 0, ShortName: 'C01', TransType: 13, CreatedBy: 10, Closed: 'Y',
   BalDueDeb: 0, BalDueCred: 0, BalFcDeb: 0, BalFcCred: 0, BalScDeb: 0, BalScCred: 0, ...overrides });
 
+function cancelledChain() {
+  const cancelled = { Cancelled: 'tYES', CancelStatus: 'csYes' };
+  return {
+    Orders: [order({ DocNum: 50414, ...cancelled })],
+    DeliveryNotes: [order({ DocEntry: 30, DocNum: 44362, ...cancelled,
+      DocumentLines: [{ BaseType: 17, BaseEntry: 20 }] })],
+    Invoices: [invoice({ DocNum: 148186, ...cancelled, DocumentLines: [{ BaseType: 15, BaseEntry: 30 }] }),
+      invoice({ DocEntry: 11, DocNum: 148187, TransNum: 1001, Cancelled: undefined, CancelStatus: 'csCancellation',
+        DocumentReferences: [{ RefObjType: 'rot_SalesInvoice', RefDocEntr: 10 }] })],
+    IncomingPayments: [{ DocEntry: 88, DocNum: 147442, CardCode: 'C01', ...cancelled,
+      PaymentInvoices: [{ InvoiceType: 'it_Invoice', DocEntry: 10 }], PaymentDocumentReferencesCollection: [] }],
+    JournalEntries: [
+      { JdtNum: 1000, OriginalJournal: 'ttARInvoice', Original: 10, JournalEntryLines: [{ ShortName: 'C01', AccountCode: '111' }] },
+      { JdtNum: 1001, OriginalJournal: 'ttARInvoice', Original: 11, JournalEntryLines: [{ ShortName: 'C01', AccountCode: '111' }] },
+      { JdtNum: 2000, OriginalJournal: 'ttReceipt', Original: 88, JournalEntryLines: [{ ShortName: 'C01', AccountCode: '111' }] },
+    ],
+    InternalReconciliations: [{ ReconNum: 900, CancelAbs: 0, CardOrAccount: 'coaCard', InternalReconciliationRows: [
+      { ShortName: 'C01', SrcObjTyp: '13', SrcObjAbs: 10 }, { ShortName: 'C01', SrcObjTyp: '13', SrcObjAbs: 11 },
+      { ShortName: 'C01', SrcObjTyp: '24', SrcObjAbs: 88 },
+    ] }],
+    ledger: [closedLedger(), closedLedger({ TransId: 1001, CreatedBy: 11 }),
+      closedLedger({ TransId: 2000, TransType: 24, CreatedBy: 88 })],
+  };
+}
+
 function source(fixtures = {}) {
   const docs = { ...fixtures, JournalEntries: [...(fixtures.JournalEntries || [])] };
   const defaultLedger = [];
@@ -71,6 +96,7 @@ function source(fixtures = {}) {
     const entity = decoded.match(/^\/(\w+)/)?.[1];
     let rows = docs[entity] || [];
     if (decoded.includes('U_PCNum eq 123')) rows = rows.filter(doc => Number(doc.U_PCNum) === 123);
+    else if (decoded.includes('DocNum eq ')) rows = rows.filter(doc => Number(doc.DocNum) === Number(decoded.match(/DocNum eq (\d+)/)?.[1]));
     else if (decoded.includes('contains(U_PTName,')) rows = rows.filter(doc => doc.U_PTName);
     else if (decoded.includes('BaseType eq ')) rows = rows.filter(doc =>
       (doc.BaseType != null && decoded.includes(`BaseType eq ${doc.BaseType} and BaseEntry eq ${doc.BaseEntry}`)) ||
@@ -83,23 +109,44 @@ function source(fixtures = {}) {
 
 beforeEach(() => { jest.clearAllMocks(); source(); });
 
-test('an account without invoices returns a definitive block without scanning the full graph', async () => {
+test('an account without invoices keeps a known open-document block without scanning the full graph', async () => {
   source({ Orders: [order({ DocumentStatus: 'bost_Open' })] });
   const result = await service.review('123');
   expect(result).toMatchObject({ eligible: false, status: 'blocked', complete: false, mapState: 'not_requested',
     patientName: 'ANA PÉREZ', invoices: [], edges: [] });
   expect(result.nodes).toEqual([expect.objectContaining({ id: 'Orders:20', status: 'open' })]);
-  expect(result.reasons).toEqual(['La cuenta no tiene una factura localizada en SAP.']);
+  expect(result.reasons).toEqual([
+    'Hay un documento abierto entre los documentos consultados de la cuenta.',
+    'Consulta el mapa completo para confirmar que no hay documentos ni saldos abiertos.',
+  ]);
   expect(sap.get.mock.calls).toHaveLength(5);
   expect(sap.get.mock.calls.every(([url]) => !url.includes('$crossjoin') && !url.includes('recon') && !url.includes('balance'))).toBe(true);
   expect(sap.get.mock.calls.slice(2).every(([, , options]) => options.timeoutMs <= 10000)).toBe(true);
 });
 
-test('requesting the full map preserves relationship access even when there is no own invoice', async () => {
+test('a located account without an invoice can qualify only after a fully verified closed map', async () => {
   source({ Orders: [order()] });
+  expect(await service.review('123')).toMatchObject({ eligible: false, status: 'unverified', complete: false,
+    accountFound: true, accountDocumentCount: 1, mapState: 'not_requested', reopeningScenario: null });
   const result = await service.review('123', { fullMap: true });
-  expect(result).toMatchObject({ eligible: false, status: 'blocked', complete: true, mapState: 'complete', invoices: [] });
+  expect(result).toMatchObject({ eligible: true, status: 'eligible', complete: true, mapState: 'complete', invoices: [],
+    accountFound: true, accountDocumentCount: 1, reasons: [] });
   expect(sap.get.mock.calls.some(([url]) => url.includes('$crossjoin'))).toBe(true);
+});
+
+test('an empty complete graph never qualifies an account that was not found in SAP', async () => {
+  source();
+  const result = await service.review('999', { fullMap: true });
+  expect(result).toMatchObject({ eligible: false, status: 'blocked', complete: true,
+    accountFound: false, accountDocumentCount: 0, mapState: 'complete', nodes: [], invoices: [] });
+  expect(result.reasons).toEqual(['No se localizaron documentos de esta cuenta en SAP.']);
+});
+
+test('a located account without invoices still fails on open or unknown documents in its full map', async () => {
+  source({ Orders: [order({ DocumentStatus: 'bost_Open' })] });
+  expect(await service.review('123', { fullMap: true })).toMatchObject({ eligible: false, status: 'blocked', complete: true });
+  source({ Orders: [order({ DocumentStatus: 'unexpected' })] });
+  expect(await service.review('123', { fullMap: true })).toMatchObject({ eligible: false, status: 'unverified', complete: true });
 });
 
 test('a failed invoice lookup cannot become a definitive no-invoice shortcut', async () => {
@@ -122,6 +169,75 @@ test('eligibility requires literally closed current invoices and a fully closed 
   expect(sap.post).not.toHaveBeenCalled();
 });
 
+test('closed order-delivery-invoice-payment history stays visible without blocking a verified account', async () => {
+  source({ Orders: [order({ DocNum: 50414 })],
+    DeliveryNotes: [order({ DocEntry: 30, DocNum: 44362, DocumentLines: [{ BaseType: 17, BaseEntry: 20 }] })],
+    Invoices: [invoice({ DocNum: 148186, DocumentLines: [{ BaseType: 15, BaseEntry: 30 }] })],
+    IncomingPayments: [{ DocEntry: 88, DocNum: 147442, CardCode: 'C01', Cancelled: 'tNO', CancelStatus: 'csNo',
+      PaymentInvoices: [{ InvoiceType: 'it_Invoice', DocEntry: 10 }], PaymentDocumentReferencesCollection: [] }],
+    JournalEntries: [{ JdtNum: 2000, OriginalJournal: 'ttReceipt', Original: 88,
+      JournalEntryLines: [{ ShortName: 'C01', AccountCode: '111' }] }],
+    ledger: [closedLedger(), closedLedger({ TransId: 2000, TransType: 24, CreatedBy: 88 })] });
+  const result = await service.review('123');
+  expect(result).toMatchObject({ complete: true, eligible: true, mapState: 'complete',
+    reopeningScenario: 'no_open_documents', openDocuments: [], unknownDocuments: [],
+    mapSummary: { total: 6, closed: 3, settled: 3, open: 0, unknown: 0 } });
+  expect(result.nodes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'Orders:20', docNum: 50414, status: 'closed' }),
+    expect.objectContaining({ id: 'DeliveryNotes:30', docNum: 44362, status: 'closed' }),
+    expect.objectContaining({ id: 'Invoices:10', docNum: 148186, status: 'closed' }),
+    expect.objectContaining({ id: 'IncomingPayments:88', docNum: 147442, status: 'settled' }),
+  ]));
+  expect(result.edges).toEqual(expect.arrayContaining([
+    { source: 'Orders:20', target: 'DeliveryNotes:30', label: 'Documento base' },
+    { source: 'DeliveryNotes:30', target: 'Invoices:10', label: 'Documento base' },
+    { source: 'Invoices:10', target: 'IncomingPayments:88', label: 'Pago aplicado' },
+  ]));
+});
+
+test('all cancelled commercial documents qualify when cancellation entries and reconciliations have no open balances', async () => {
+  source(cancelledChain());
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: true, complete: true, status: 'eligible', reopeningScenario: 'all_cancelled',
+    openDocuments: [], unknownDocuments: [], mapSummary: { total: 9, cancelled: 5, settled: 4, open: 0, unknown: 0 } });
+  expect(result.nodes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'Orders:20', status: 'cancelled' }),
+    expect.objectContaining({ id: 'DeliveryNotes:30', status: 'cancelled' }),
+    expect.objectContaining({ id: 'Invoices:10', status: 'cancelled' }),
+    expect.objectContaining({ id: 'Invoices:11', status: 'cancelled', cancellationDocument: true }),
+    expect.objectContaining({ id: 'IncomingPayments:88', status: 'cancelled', statusBasis: 'ledger' }),
+    expect.objectContaining({ id: 'InternalReconciliations:900', status: 'settled' }),
+  ]));
+});
+
+test.each([
+  ['order', fixtures => Object.assign(fixtures.Orders[0], { Cancelled: 'tNO', CancelStatus: 'csNo', DocumentStatus: 'bost_Open' })],
+  ['delivery', fixtures => Object.assign(fixtures.DeliveryNotes[0], { Cancelled: 'tNO', CancelStatus: 'csNo', DocumentStatus: 'bost_Open' })],
+  ['invoice', fixtures => Object.assign(fixtures.Invoices[0], { Cancelled: 'tNO', CancelStatus: 'csNo', DocumentStatus: 'bost_Open' })],
+  ['return', fixtures => { fixtures.Returns = [order({ DocEntry: 40, DocumentStatus: 'bost_Open',
+    DocumentLines: [{ BaseType: 13, BaseEntry: 10 }] })]; }],
+  ['payment balance', fixtures => { fixtures.ledger[2].BalDueDeb = 25; }],
+  ['journal line', fixtures => { fixtures.ledger[0].Closed = 'N'; }],
+])('one open %s blocks a map whose other commercial documents are cancelled', async (_, addOpenDocument) => {
+  const fixtures = cancelledChain();
+  addOpenDocument(fixtures);
+  source(fixtures);
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: false, complete: true, status: 'blocked', reopeningScenario: null });
+  expect(result.openDocuments.length).toBeGreaterThan(0);
+});
+
+test('a cancelled document that SAP also reports Open exposes the inconsistency and stays unverified', async () => {
+  const fixtures = cancelledChain();
+  fixtures.Invoices[0].DocumentStatus = 'bost_Open';
+  source(fixtures);
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: false, complete: true, status: 'unverified', reopeningScenario: null });
+  expect(result.unknownDocuments).toEqual([expect.objectContaining({ id: 'Invoices:10', status: 'unknown',
+    cancelled: true, sapStatus: 'bost_Open', cancellationStatusConflict: true })]);
+  expect(result.reasons).toContain('SAP muestra un documento cancelado con estado Abierto; revisa esa inconsistencia antes de confirmar la reapertura.');
+});
+
 test('an open successor without an account UDF still blocks reopening through reverse base links', async () => {
   source({ Invoices: [invoice()], CreditNotes: [invoice({ DocEntry: 40, U_PCNum: null,
     DocumentStatus: 'bost_Open', DocumentLines: [{ BaseType: 13, BaseEntry: 10 }] })] });
@@ -140,19 +256,91 @@ test('a zero balance or unexpected status never counts as closed', async () => {
   expect(documentStatus(invoice({ DocumentStatus: undefined, DocStatus: 'C' }))).toBe('closed');
 });
 
-test('a cancelled invoice alone cannot satisfy the current invoice requirement', async () => {
+test('a cancelled invoice can qualify when its complete graph and accounting balances are verified closed', async () => {
   source({ Invoices: [invoice({ Cancelled: 'tYES', CancelStatus: 'csYes' })] });
   const result = await service.review('123');
-  expect(result).toMatchObject({ complete: true, eligible: false, status: 'blocked' });
+  expect(result).toMatchObject({ complete: true, eligible: true, status: 'eligible', accountFound: true });
   expect(result.invoices[0].status).toBe('cancelled');
 });
 
-test('a closed related invoice from another account cannot replace a cancelled own invoice', async () => {
+test('a cancellation document remains labelled while its verified settled map qualifies the account', async () => {
+  source({ Invoices: [invoice({ Cancelled: undefined, CancelStatus: 'csCancellation' })] });
+  const result = await service.review('123');
+  expect(result).toMatchObject({ complete: true, eligible: true, status: 'eligible' });
+  expect(result.invoices).toEqual([expect.objectContaining({ status: 'cancelled', cancelled: true,
+    cancellationDocument: true, typeLabel: 'Factura (documento de cancelación)' })]);
+});
+
+test('a cancelled original invoice plus its cancellation document qualify only with settled accounting', async () => {
+  source({ Invoices: [invoice({ Cancelled: 'tYES', CancelStatus: 'csYes' }),
+    invoice({ DocEntry: 11, DocNum: 101, TransNum: 1001, Cancelled: undefined, CancelStatus: 'csCancellation',
+      DocumentReferences: [{ RefObjType: 'rot_SalesInvoice', RefDocEntr: 10 }] })] });
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: true, complete: true, status: 'eligible',
+    accountFound: true, accountDocumentCount: 2, openDocuments: [], unknownDocuments: [] });
+  expect(result.invoices).toHaveLength(2);
+  expect(result.invoices.every(node => node.cancelled === true)).toBe(true);
+});
+
+test('a cancelled payment cannot hide any remaining local, foreign or system-currency balance', async () => {
+  source({ Invoices: [invoice({ Cancelled: 'tYES', CancelStatus: 'csYes' })],
+    IncomingPayments: [{ DocEntry: 88, CardCode: 'C01', Cancelled: 'tYES', CancelStatus: 'csYes',
+      PaymentInvoices: [{ InvoiceType: 'it_Invoice', DocEntry: 10 }], PaymentDocumentReferencesCollection: [] }],
+    JournalEntries: [{ JdtNum: 2000, OriginalJournal: 'ttReceipt', Original: 88,
+      JournalEntryLines: [{ ShortName: 'C01', AccountCode: '111' }] }],
+    ledger: [closedLedger(), closedLedger({ TransId: 2000, TransType: 24, CreatedBy: 88, BalFcDeb: 12 })] });
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: false, complete: true, status: 'blocked' });
+  expect(result.openDocuments).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'IncomingPayments:88', status: 'open', statusBasis: 'ledger', cancelled: true }),
+    expect.objectContaining({ id: 'JournalEntries:2000', status: 'open', statusBasis: 'ledger' }),
+  ]));
+});
+
+test('a cancelled payment qualifies only when both its original ledger and related journal confirm settlement', async () => {
+  source({ Invoices: [invoice({ Cancelled: 'tYES', CancelStatus: 'csYes' })],
+    IncomingPayments: [{ DocEntry: 88, CardCode: 'C01', Cancelled: 'tYES', CancelStatus: 'csYes',
+      PaymentInvoices: [{ InvoiceType: 'it_Invoice', DocEntry: 10 }], PaymentDocumentReferencesCollection: [] }],
+    JournalEntries: [{ JdtNum: 2000, OriginalJournal: 'ttReceipt', Original: 88,
+      JournalEntryLines: [{ ShortName: 'C01', AccountCode: '111' }] }],
+    ledger: [closedLedger(), closedLedger({ TransId: 2000, TransType: 24, CreatedBy: 88 })] });
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: true, complete: true, status: 'eligible' });
+  expect(result.nodes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'IncomingPayments:88', status: 'cancelled', statusBasis: 'ledger',
+      sapStatus: 'Cancelado; sin partidas abiertas (ML, ME y MS)' }),
+    expect.objectContaining({ id: 'JournalEntries:2000', status: 'settled', statusBasis: 'ledger' }),
+  ]));
+});
+
+test('a cancelled payment without ledger evidence remains unverified', async () => {
+  source({ Invoices: [invoice({ Cancelled: 'tYES', CancelStatus: 'csYes' })],
+    IncomingPayments: [{ DocEntry: 88, CardCode: 'C01', Cancelled: 'tYES', CancelStatus: 'csYes',
+      PaymentInvoices: [{ InvoiceType: 'it_Invoice', DocEntry: 10 }], PaymentDocumentReferencesCollection: [] }],
+    ledger: [closedLedger()] });
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: false, status: 'unverified' });
+  expect(result.unknownDocuments).toEqual([expect.objectContaining({ id: 'IncomingPayments:88', status: 'unknown', cancelled: true })]);
+});
+
+test('a failed cancelled-payment ledger read prevents approval and keeps its state unknown', async () => {
+  source({ Invoices: [invoice({ Cancelled: 'tYES', CancelStatus: 'csYes' })],
+    IncomingPayments: [{ DocEntry: 88, CardCode: 'C01', Cancelled: 'tYES', CancelStatus: 'csYes',
+      PaymentInvoices: [{ InvoiceType: 'it_Invoice', DocEntry: 10 }], PaymentDocumentReferencesCollection: [] }] });
+  const original = sap.get.getMockImplementation();
+  sap.get.mockImplementation((url, headers) => url.includes('sq_bi_reopen_balance_v2') && url.includes('/List')
+    ? Promise.reject(new Error('ledger unavailable')) : original(url, headers));
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: false, complete: false, status: 'unverified' });
+  expect(result.unknownDocuments).toEqual([expect.objectContaining({ id: 'IncomingPayments:88', status: 'unknown' })]);
+});
+
+test('a cancelled own invoice and closed related invoice can qualify with no open balances anywhere in the map', async () => {
   source({ Invoices: [invoice({ Cancelled: 'tYES', CancelStatus: 'csYes',
     DocumentReferences: [{ RefObjType: 'rot_SalesInvoice', RefDocEntr: 11 }] }),
   invoice({ DocEntry: 11, U_PCNum: 456, TransNum: 1001 })] });
   const result = await service.review('123');
-  expect(result).toMatchObject({ complete: true, eligible: false, status: 'blocked' });
+  expect(result).toMatchObject({ complete: true, eligible: true, status: 'eligible', accountFound: true });
   expect(result.invoices).toEqual([expect.objectContaining({ id: 'Invoices:10', status: 'cancelled' })]);
   expect(result.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'Invoices:11', status: 'closed' })]));
 });
@@ -163,6 +351,102 @@ test('line-level account folios find consolidated invoices with an empty header 
   expect(await service.review('123')).toMatchObject({ eligible: true, complete: true });
   expect(sap.get.mock.calls.some(([url]) => decodeURIComponent(url).includes('account=123'))).toBe(true);
   expect(sap.get.mock.calls.some(([url]) => decodeURIComponent(url).includes("U_PCNum eq '123'"))).toBe(false);
+});
+
+test('an account present only on delivery lines is found and remains visible in a partial review', async () => {
+  source({ DeliveryNotes: [order({ DocEntry: 30, U_PCNum: null,
+    DocumentStatus: 'bost_Open', DocumentLines: [{ U_PCNum: 123 }] })] });
+  expect(await service.search({ mode: 'account', q: '00123' })).toEqual({
+    accounts: [{ account: '123', patientName: 'Sin nombre de paciente en SAP', invoiceCount: 0 }], truncated: false,
+  });
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: false, complete: false, mapState: 'not_requested',
+    patientName: 'ANA PÉREZ', mapSummary: { total: 1, open: 1, unknown: 0 } });
+  expect(result.nodes).toEqual([expect.objectContaining({ id: 'DeliveryNotes:30', status: 'open' })]);
+  expect(result.openDocuments).toEqual(result.nodes);
+  expect(sap.get.mock.calls.some(([url]) => url.includes('recon') || url.includes('balance'))).toBe(false);
+});
+
+test('a named account with only an advance is found by patient without inventing an invoice', async () => {
+  source({ DownPayments: [order({ DocEntry: 50 })] });
+  expect(await service.search({ mode: 'patient', q: 'Ana' })).toEqual({
+    accounts: [{ account: '123', patientName: 'ANA PÉREZ', invoiceCount: 0 }], truncated: false,
+  });
+});
+
+test('known invoice/order accounts keep the fast search path without querying unrelated families', async () => {
+  source({ Orders: [order()] });
+  expect(await service.search({ mode: 'account', q: '123' })).toMatchObject({ accounts: [{ account: '123' }] });
+  expect(sap.get.mock.calls).toHaveLength(4);
+  expect(sap.get.mock.calls.every(([url]) => url.includes('sq_bi_reopen_invoice_keys_v1') || url.includes('sq_bi_reopen_keys_17_v1'))).toBe(true);
+});
+
+test('an order document number never substitutes for the hospital account folio', async () => {
+  source({ Orders: [order({ DocNum: 123, U_PCNum: 456 })] });
+  expect(await service.search({ mode: 'account', q: '123' })).toEqual({ accounts: [], truncated: false });
+});
+
+test('explicit SAP order search resolves its actual hospital account instead of using the order number', async () => {
+  source({ Orders: [order({ DocEntry: 50837, DocNum: 50837, U_PCNum: 3482 })],
+    Invoices: [invoice({ U_PCNum: 3482 })] });
+  expect(await service.search({ mode: 'order', q: '050837' })).toEqual({
+    accounts: [{ account: '3482', patientName: 'ANA PÉREZ', invoiceCount: 1,
+      matchedOrders: [{ docEntry: 50837, docNum: 50837 }] }],
+    truncated: false, lookup: { mode: 'order', number: '50837', documentCount: 1, unassignedDocumentCount: 0 }, warnings: [],
+  });
+  expect(sap.get.mock.calls.some(([url]) => decodeURIComponent(url).includes('DocNum eq 50837'))).toBe(true);
+  expect(sap.get.mock.calls.some(([url]) => decodeURIComponent(url).includes('account=50837'))).toBe(false);
+});
+
+test('a consolidated order returns real line accounts while preserving reliable patient attribution', async () => {
+  source({ Orders: [order({ DocNum: 50837, U_PCNum: 456,
+    DocumentLines: [{ U_PCNum: 123 }, { U_PCNum: 456 }, { U_PCNum: 123 }, { U_PCNum: null }] })] });
+  expect(await service.search({ mode: 'order', q: '50837' })).toMatchObject({ accounts: [
+    { account: '456', patientName: 'ANA PÉREZ', invoiceCount: 0 },
+    { account: '123', patientName: 'Sin nombre de paciente en SAP', invoiceCount: 0 },
+  ], lookup: { unassignedDocumentCount: 0 } });
+});
+
+test('an order without any account folio reports the association missing without inventing a account', async () => {
+  source({ Orders: [order({ DocNum: 50837, U_PCNum: null })] });
+  const result = await service.search({ mode: 'order', q: '50837' });
+  expect(result).toMatchObject({ accounts: [], lookup: { documentCount: 1, unassignedDocumentCount: 1 } });
+  expect(result.warnings).toHaveLength(1);
+  expect(sap.get.mock.calls).toHaveLength(1);
+});
+
+test('invalid SAP order numbers fail validation before any request', async () => {
+  for (const q of ['0', '-5', '50837 or 1 eq 1', '2147483648']) {
+    await expect(service.search({ mode: 'order', q })).rejects.toMatchObject({ status: 400 });
+  }
+  expect(sap.get).not.toHaveBeenCalled();
+});
+
+test('a failed extended account lookup cannot become a misleading no-account result', async () => {
+  source();
+  const original = sap.get.getMockImplementation();
+  sap.get.mockImplementation((url, headers) => url.includes('sq_bi_reopen_keys_15_v1') && url.includes('/List')
+    ? Promise.reject(new Error('delivery lookup failed')) : original(url, headers));
+  await expect(service.search({ mode: 'account', q: '123' })).rejects.toThrow('delivery lookup failed');
+});
+
+test('the partial map draws only actual typed links between known documents', async () => {
+  source({ DeliveryNotes: [order({ DocEntry: 30 })],
+    Returns: [order({ DocEntry: 40, DocumentStatus: 'bost_Open', DocumentLines: [{ BaseType: 15, BaseEntry: 30 }] })],
+    DownPayments: [order({ DocEntry: 50, DocumentStatus: 'unexpected' })] });
+  const result = await service.review('123');
+  expect(result).toMatchObject({ eligible: false, complete: false, mapState: 'not_requested',
+    mapSummary: { total: 3, open: 1, unknown: 1, closed: 1, settled: 0, cancelled: 0 } });
+  expect(result.edges).toEqual([{ source: 'DeliveryNotes:30', target: 'Returns:40', label: 'Documento base' }]);
+  expect(result.unknownDocuments).toEqual([expect.objectContaining({ id: 'DownPayments:50', status: 'unknown' })]);
+});
+
+test('a located account with no own invoice can qualify when its related invoice is also verified closed', async () => {
+  source({ DeliveryNotes: [order({ DocEntry: 30 })],
+    Invoices: [invoice({ U_PCNum: 456, DocumentLines: [{ BaseType: 15, BaseEntry: 30 }] })] });
+  const result = await service.review('123', { fullMap: true });
+  expect(result).toMatchObject({ eligible: true, complete: true, status: 'eligible', invoices: [], accountFound: true });
+  expect(result.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'Invoices:10', status: 'closed' })]));
 });
 
 test('patient queries use the patient UDF with escaped apostrophes and case-insensitive SAP header', async () => {
@@ -409,4 +693,15 @@ test('every fresh account SAP transport receives its cancellation signal and res
     expect(options.timeoutMs).toBeGreaterThan(0);
     expect(options.timeoutMs).toBeLessThanOrEqual(30000);
   }
+});
+
+test('account search uses native header and line folios when its SQL table is inaccessible', async () => {
+  source({ Orders: [order({ U_PCNum: null, DocumentLines: [{ U_PCNum: 123 }] })] });
+  const original = sap.get.getMockImplementation();
+  sap.get.mockImplementation((url, headers) => url.includes("SQLQueries('sq_bi_reopen_keys_17_v1')")
+    ? Promise.resolve({ data: { value: [] } }) : original(url, headers));
+  sap.post.mockRejectedValue(Object.assign(new Error('Table not accessible'), { status: 400, code: '702' }));
+  expect(await service.search({ mode: 'account', q: '123' })).toMatchObject({ accounts: [{ account: '123', invoiceCount: 0 }] });
+  expect(sap.get.mock.calls.some(([url]) => decodeURIComponent(url).includes('/Orders?$select=DocEntry&$filter=U_PCNum eq 123'))).toBe(true);
+  expect(sap.get.mock.calls.some(([url]) => decodeURIComponent(url).includes('$crossjoin(Orders,Orders/DocumentLines)'))).toBe(true);
 });

@@ -34,11 +34,12 @@ assert.equal(fiscalCategory(doctors[0], internal(1, { validFrom: '2026-11-01' })
 assert.equal(fiscalCategory(doctors[0], internal(1, { confirmed: false }), '2026-10-01').key, 'pending');
 let unavailable = false, directoryReads = 0, writes = [], versions = [], failSave = false;
 let delayHistory = false, releaseHistory;
+let delayDirectory = false, releaseDirectory;
 const server = await createServer({ configFile: false, root, appType: 'custom', plugins: [react(), {
   name: 'fiscal-categories-isolated', configureServer(server) { server.middlewares.use('/__categorias', async (_req, res) => {
     res.setHeader('Content-Type', 'text/html');
-    const app = `import React,{useState}from"react";import{createRoot}from"react-dom/client";import Panel from"/src/components/honorarios/HonorariosFiscalPanel.jsx";import"/src/components/honorarios/HonorariosReviewToolbar.css";const providers=${JSON.stringify(providers)},initial=${JSON.stringify(profiles)};function App(){const[profiles,setProfiles]=useState(initial);return React.createElement(Panel,{providers,profiles,referenceDate:'2026-10-01',canManage:true,onSaved:profile=>setProfiles(prev=>({...prev,[profile.providerId]:profile}))})};createRoot(document.getElementById('root')).render(React.createElement(App));`;
-    res.end(await server.transformIndexHtml('/__categorias', `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${commonStyles}body{font-family:Arial;margin:16px;background:#f1f5f9}button,input,select{font:inherit}h2{color:#17304d}</style></head><body><div id="root"></div><script type="module">${app}</script></body></html>`));
+    const app = `import React,{useState}from"react";import{createRoot}from"react-dom/client";import Panel from"/src/components/honorarios/HonorariosFiscalPanel.jsx";import"/src/components/honorarios/HonorariosReviewToolbar.css";const{providers,profiles:initial}=window.__fiscalFixture;function App(){const[profiles,setProfiles]=useState(initial);return React.createElement(Panel,{providers,profiles,initialProviderId:new URLSearchParams(location.search).get('provider')||'',referenceDate:'2026-10-01',canManage:true,onSaved:profile=>setProfiles(prev=>({...prev,[profile.providerId]:profile}))})};createRoot(document.getElementById('root')).render(React.createElement(App));`;
+    res.end(await server.transformIndexHtml('/__categorias', `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${commonStyles}body{font-family:Arial;margin:16px;background:#f1f5f9}button,input,select{font:inherit}h2{color:#17304d}</style></head><body><div id="root"></div><script>window.__fiscalFixture=${JSON.stringify({ providers, profiles })};</script><script type="module">${app}</script></body></html>`));
   }); }
 }], server: { host: '127.0.0.1', port: 0 } });
 let browser;
@@ -51,6 +52,7 @@ try {
     let result = { ok: true }, status = 200;
     if (endpoint === '/fiscal-directory' && method === 'GET') {
       directoryReads++; assert.equal(url.searchParams.get('date'), '2026-10-01');
+      if (delayDirectory) await new Promise(resolve => { releaseDirectory = resolve; });
       Object.assign(result, { date: '2026-10-01', sapAvailable: !unavailable, asOf: unavailable ? null : '2026-10-05T16:00:00Z',
         doctors: unavailable ? providers.map(item => ({ providerId: String(item.id), sapReady: false, suggestedProfile: {}, sap: { linkStatus: 'sin_consultar', candidates: [] } })) : doctors,
         warning: unavailable ? 'No se pudo consultar SAP. Puedes completar las fichas internas o pulsar Actualizar SAP para volver a intentar.' : undefined });
@@ -135,6 +137,52 @@ try {
   for (const width of [320, 390, 768]) { await page.setViewportSize({ width, height: 1050 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Desbordamiento ${width}`); }
   await page.setViewportSize({ width: 390, height: 1050 });
   await page.screenshot({ path: path.join(output, '04-movil.png'), fullPage: true });
+  // La consulta inicial no debe reemplazar una elección manual de grupo.
+  unavailable = false; delayDirectory = true;
+  const initialDirectoryRequest = page.waitForRequest(request => request.url().includes('/fiscal-directory'));
+  await page.goto(`${server.resolvedUrls.local[0]}__categorias?provider=1`); await initialDirectoryRequest;
+  const all = page.getByRole('button', { name: 'Ver todos (6)', exact: true });
+  await page.getByLabel('Buscar médico fiscal').fill('sin sap');
+  await all.click();
+  const initialDirectoryResponse = page.waitForResponse(response => response.url().includes('/fiscal-directory'));
+  releaseDirectory(); await initialDirectoryResponse;
+  await group('Listos con SAP').filter({ hasText: '1' }).waitFor();
+  assert.equal(await all.getAttribute('aria-pressed'), 'true', 'Una consulta SAP tardía conserva Ver todos');
+  assert.equal(await page.getByLabel('Buscar médico fiscal').inputValue(), '', 'Ver todos limpia la búsqueda anterior');
+  assert.equal(await select.locator('option').count(), providers.length + 1, 'Ver todos incluye médicos de los tres grupos');
+  assert.ok(Number(await select.getAttribute('size')) > 1, 'Ver todos despliega una lista visible');
+  assert.equal(await select.inputValue(), '1', 'Ver todos conserva al médico seleccionado');
+  await page.getByLabel('RFC del médico').fill('AAAC800101AAA');
+  await group('Por completar').click(); await all.click();
+  assert.equal(await page.getByLabel('RFC del médico').inputValue(), 'AAAC800101AAA', 'Cambiar de grupo conserva la captura del mismo médico');
+  assert.equal(writes.length, 3, 'Los filtros no guardan ni modifican fichas fiscales');
+  await page.locator('.hon-fiscal-panel').screenshot({ path: path.join(output, '06-ver-todos-movil.png') });
+  await page.setViewportSize({ width: 1250, height: 1050 });
+  const groupedDirectoryRequest = page.waitForRequest(request => request.url().includes('/fiscal-directory'));
+  await page.goto(`${server.resolvedUrls.local[0]}__categorias?provider=1`); await groupedDirectoryRequest;
+  await group('Configurados internamente').click();
+  const groupedDirectoryResponse = page.waitForResponse(response => response.url().includes('/fiscal-directory'));
+  releaseDirectory(); await groupedDirectoryResponse;
+  await group('Listos con SAP').filter({ hasText: '1' }).waitFor();
+  assert.equal(await group('Configurados internamente').getAttribute('aria-pressed'), 'true', 'Una consulta SAP tardía conserva el grupo elegido');
+  await all.click();
+  await page.locator('.hon-fiscal-panel').screenshot({ path: path.join(output, '07-ver-todos-escritorio.png') });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Ver todos sin desbordamiento');
+  // Un directorio del tamaño reportado también permite llegar al último médico.
+  providers.push(...Array.from({ length: 260 }, (_, index) => ({ id: index + 7, name: `MÉDICO ADICIONAL ${index + 7}` })));
+  delayDirectory = false;
+  await page.goto(`${server.resolvedUrls.local[0]}__categorias`);
+  await group('Listos con SAP').filter({ hasText: '1' }).waitFor();
+  await page.getByRole('button', { name: 'Ver todos (266)', exact: true }).click();
+  assert.equal(await select.locator('option').count(), 267);
+  assert.equal(await select.getAttribute('size'), '8', 'El directorio completo ocupa ocho filas y permite desplazarse');
+  await select.press('End');
+  assert.equal(await select.inputValue(), '266', 'El último médico también se puede elegir con el teclado');
+  await page.getByLabel('Buscar médico fiscal').fill('adicional 266');
+  assert.equal(await select.locator('option').count(), 2, 'La búsqueda también filtra el directorio desplegado');
+  await page.getByRole('button', { name: 'Ver todos (266)', exact: true }).click();
+  assert.equal(await select.locator('option').count(), 267);
+  assert.equal(await select.inputValue(), '266');
   assert.deepEqual(errors, []); assert.equal(writes.length, 3);
-  console.log('PASS: grupos, conteos, SAP completo/parcial/ambiguo, precarga, edición interna, actualización sin perder captura, vuelta a SAP, historial, vigencia futura, indisponibilidad y móvil.');
+  console.log('PASS: grupos, conteos, Ver todos visible, elección manual durante consulta SAP, captura conservada al filtrar, SAP completo/parcial/ambiguo, precarga, edición interna, actualización sin perder captura, vuelta a SAP, historial, vigencia futura, indisponibilidad y móvil.');
 } finally { if (browser) await browser.close(); await server.close(); }

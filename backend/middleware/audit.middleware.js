@@ -88,7 +88,7 @@ async function logAction(entry) {
 function sanitizeBody(body) {
   if (!body || typeof body !== 'object') return null;
   const safe = { ...body };
-  for (const key of ['password', 'contrasena', 'token', 'secret', 'pin']) {
+  for (const key of ['password', 'contrasena', 'token', 'previewToken', 'secret', 'pin']) {
     if (key in safe) safe[key] = '***';
   }
   return safe;

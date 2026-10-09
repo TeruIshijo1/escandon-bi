@@ -42,7 +42,8 @@ export function applySheetInstitutionalStyle(sheet, {
   columnas = [],
   filas = [],
   totales = null,
-  meta = null
+  meta = null,
+  freezeHeaders = false
 }) {
   const numCols = columnas.length;
   if (numCols === 0) return;
@@ -95,6 +96,7 @@ export function applySheetInstitutionalStyle(sheet, {
   const headerValues = columnas.map(c => c.header);
   const headerRow = sheet.addRow(headerValues);
   const headerRowNum = headerRow.number;
+  if (freezeHeaders) sheet.views = [{ state: 'frozen', ySplit: headerRowNum, showGridLines: true }];
   headerRow.height = 28;
 
   headerRow.eachCell((cell) => {
@@ -143,7 +145,7 @@ export function applySheetInstitutionalStyle(sheet, {
 
       // Formato numérico de moneda
       if (colDef.type === 'currency' || colDef.isCurrency) {
-        cell.numFmt = '"$"#,##0.00;[Red]("$"#,##0.00);"-"';
+        cell.numFmt = colDef.numFmt || '"$"#,##0.00;[Red]("$"#,##0.00);"-"';
         cell.alignment = { vertical: 'middle', horizontal: 'right' };
         if (typeof cell.value === 'number' && cell.value > 0) {
           cell.font = { size: 9, name: 'Calibri', bold: true, color: { argb: BRAND_COLORS.verdeMoneda } };
@@ -163,7 +165,12 @@ export function applySheetInstitutionalStyle(sheet, {
       }
 
       // Resaltado de estados de auditoría
-      if (colDef.key === 'estado' || colDef.key === 'Estatus' || colDef.key === 'Elegibilidad') {
+      const statusStyle = colDef.statusStyles?.[String(cell.value)];
+      if (statusStyle) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statusStyle.background } };
+        cell.font = { size: 9, name: 'Calibri', bold: true, color: { argb: statusStyle.color } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      } else if (colDef.key === 'estado' || colDef.key === 'Estatus' || colDef.key === 'Elegibilidad') {
         const strVal = String(cell.value || '').toUpperCase();
         if (strVal.includes('APROBADO') || strVal.includes('INCLUIDO') || strVal.includes('ELEGIBLE') || strVal.includes('SÍ') || strVal.includes('SI')) {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND_COLORS.verdeFondo } };

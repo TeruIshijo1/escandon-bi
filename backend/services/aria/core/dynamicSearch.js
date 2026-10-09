@@ -2,36 +2,30 @@
 
 const { getRemoteDb } = require('../../../config/remote-db');
 const { normalizeText } = require('../utils/nlp');
-const { hasIAPermission, buildAccessDeniedResponse } = require('./permissions');
+const { hasIAPermission, hasIASectionAccess, buildAccessDeniedResponse } = require('./permissions');
 const { getSuggestionsForUser, IA_PERMISSION_CATALOG } = require('../config/intents');
 const queryResumenEjecutivoGeneral = require('../handlers/resumen.handler');
 
-const { queryCirugiasDelMomento, queryKitsQuirurgicos } = require('../handlers/quirofano.handler');
-const { queryTrasladosAlmacen, queryKardexAlmacen, queryInventarioAlmacenGeneral } = require('../handlers/almacen.handler');
+const { queryCirugiasDelMomento } = require('../handlers/quirofano.handler');
+const { queryTrasladosAlmacen, queryKardexAlmacen } = require('../handlers/almacen.handler');
 const { queryRecetasPendientes, queryLibroControlados } = require('../handlers/recetas.handler');
 
 async function searchDatabaseDynamically(userQuery, user = null) {
   try {
     const normalized = normalizeText(userQuery);
 
-    // Redirección inteligente si la búsqueda en fallback contiene conceptos clave de los nuevos módulos
-    if (/cirug|quirofan|operac|procedim/.test(normalized)) {
-      return await queryCirugiasDelMomento();
+    const redirects = [
+      { pattern: /cirug|quirofan|operac|procedim/, permission: 'ia-quirofano', sections: ['quirofano', 'quirofano-agenda'], handler: queryCirugiasDelMomento },
+      { pattern: /traslad|solicitud.*almacen|envio.*almacen/, permission: 'ia-almacen', sections: ['almacen-traslados'], handler: queryTrasladosAlmacen },
+      { pattern: /kardex|trazabilidad/, permission: 'ia-almacen', sections: ['almacen-reportes'], handler: queryKardexAlmacen },
+      { pattern: /receta|surtir|despacho/, permission: 'ia-farmacia', sections: ['farmacia-inventario', 'area-farmacia'], handler: queryRecetasPendientes },
+      { pattern: /controlado|psicotrop|salida.*farmacia|dispensacion/, permission: 'ia-farmacia', sections: ['farmacia-inventario', 'area-farmacia'], handler: queryLibroControlados },
+    ];
+    const redirect = redirects.find(item => item.pattern.test(normalized));
+    if (redirect) {
+      if (!hasIASectionAccess(user, redirect.permission, redirect.sections)) return buildAccessDeniedResponse(redirect.permission, IA_PERMISSION_CATALOG);
+      return await redirect.handler(normalized);
     }
-    if (/traslad|solicitud.*almacen|envio.*almacen/.test(normalized)) {
-      return await queryTrasladosAlmacen();
-    }
-    if (/kardex|trazabilidad/.test(normalized)) {
-      return await queryKardexAlmacen();
-    }
-    if (/receta|surtir|despacho/.test(normalized)) {
-      return await queryRecetasPendientes();
-    }
-    if (/controlado|psicotrop|salida.*farmacia|dispensacion/.test(normalized)) {
-      return await queryLibroControlados();
-    }
-
-    const pool = await getRemoteDb();
 
     // Palabras de relleno / ruido a ignorar en la extracción de términos
     const FILLER_WORDS = new Set([
@@ -62,6 +56,8 @@ async function searchDatabaseDynamically(userQuery, user = null) {
       return buildAccessDeniedResponse('ia-busqueda-pacientes', IA_PERMISSION_CATALOG);
     }
 
+    const pool = await getRemoteDb();
+
     // Construir columnas de búsqueda según permisos
     const searchColumns = [];
     if (canSearchPatients) searchColumns.push('NOMBRE_DEL_PACIENTE');
@@ -90,14 +86,14 @@ async function searchDatabaseDynamically(userQuery, user = null) {
     const querySQL = `
       SELECT TOP 25
         NUMERO_DE_ORDEN          AS OrdenId,
-        NOMBRE_DEL_PACIENTE      AS Paciente,
+        ${canSearchPatients ? 'NOMBRE_DEL_PACIENTE' : 'NULL'} AS Paciente,
         UNIDAD_DE_SERVICIO       AS Area,
-        DESCRIPCION_DEL_ARTICULO AS Insumo,
-        CODIGO                   AS Codigo,
+        ${canSearchSupplies ? 'DESCRIPCION_DEL_ARTICULO' : 'NULL'} AS Insumo,
+        ${canSearchSupplies ? 'CODIGO' : 'NULL'} AS Codigo,
         CANTIDAD                 AS Cantidad,
         ${montoExpression}       AS Monto,
         FECHA_DE_CARGO           AS Fecha,
-        Medico_Solicitante       AS Medico
+        ${canSearchDoctors ? 'Medico_Solicitante' : 'NULL'} AS Medico
       FROM UDR_CUENTAS_SERVICIOS
       WHERE ${whereClauses}
       ORDER BY FECHA_DE_CARGO DESC
@@ -126,13 +122,15 @@ async function searchDatabaseDynamically(userQuery, user = null) {
       const topRow = rows[0];
       let topFecha = '';
       if (topRow.Fecha) {
-        try { topFecha = new Date(topRow.Fecha).toISOString().split('T')[0]; } catch (e) { topFecha = String(topRow.Fecha).slice(0, 10); }
+        try { topFecha = new Date(topRow.Fecha).toISOString().split('T')[0]; } catch { topFecha = String(topRow.Fecha).slice(0, 10); }
       }
-      const medicoName = topRow.Medico ? `el **Dr. ${topRow.Medico}**` : 'el personal de salud';
+      const medicoText = canSearchDoctors && topRow.Medico ? ` por el **Dr. ${topRow.Medico}**` : '';
+      const patientText = canSearchPatients ? ` para el paciente **${topRow.Paciente || 'General'}**` : '';
+      const supplyText = canSearchSupplies ? ` con el servicio **"${topRow.Insumo || 'Sin especificar'}"**` : '';
       const montoText = canSearchFinancial
         ? ` por un monto de **$${Math.abs(parseFloat(topRow.Monto || 0)).toLocaleString('es-MX')} MXN**`
         : '';
-      answerText = `La **última atención/consulta** registrada para **"${finalTerms.join(' ')}"** fue el **${topFecha}** por ${medicoName} para el paciente **${topRow.Paciente || 'General'}** en el área **${topRow.Area}** con el servicio **"${topRow.Insumo}"**${montoText}.`;
+      answerText = `La **última atención/consulta** registrada para **"${finalTerms.join(' ')}"** fue el **${topFecha}**${medicoText}${patientText} en el área **${topRow.Area}**${supplyText}${montoText}.`;
     } else {
       const montoText = canSearchFinancial
         ? ` acumulando un monto total de **$${totalMonto.toLocaleString('es-MX')} MXN**`
@@ -148,21 +146,23 @@ async function searchDatabaseDynamically(userQuery, user = null) {
     }
     kpis.push({ label: 'Unidades/Servicios', value: totalCantidad, color: '#004687' });
 
-    const headers = ['Fecha', 'Paciente', 'Área', 'Insumo / Servicio', 'Médico'];
+    const headers = ['Fecha'];
+    if (canSearchPatients) headers.push('Paciente');
+    headers.push('Área');
+    if (canSearchSupplies) headers.push('Insumo / Servicio');
+    if (canSearchDoctors) headers.push('Médico');
     if (canSearchFinancial) headers.push('Monto ($)');
 
     const tableRows = rows.slice(0, 7).map(r => {
       let fechaStr = '';
       if (r.Fecha) {
-        try { fechaStr = new Date(r.Fecha).toISOString().split('T')[0]; } catch (e) { fechaStr = String(r.Fecha).slice(0, 10); }
+        try { fechaStr = new Date(r.Fecha).toISOString().split('T')[0]; } catch { fechaStr = String(r.Fecha).slice(0, 10); }
       }
-      const row = [
-        fechaStr,
-        r.Paciente || 'Sin Nombre',
-        r.Area || 'General',
-        r.Insumo || 'Servicio',
-        r.Medico || 'Sin Asignar',
-      ];
+      const row = [fechaStr];
+      if (canSearchPatients) row.push(r.Paciente || 'Sin Nombre');
+      row.push(r.Area || 'General');
+      if (canSearchSupplies) row.push(r.Insumo || 'Servicio');
+      if (canSearchDoctors) row.push(r.Medico || 'Sin Asignar');
       if (canSearchFinancial) {
         row.push(`$${Math.abs(parseFloat(r.Monto || 0)).toLocaleString('es-MX')}`);
       }
@@ -179,7 +179,7 @@ async function searchDatabaseDynamically(userQuery, user = null) {
     console.error('Error en búsqueda dinámica:', err);
     return {
       topic: 'Búsqueda Dinámica',
-      answer: 'No se pudo realizar la búsqueda en tiempo real: ' + err.message,
+      answer: 'No pude consultar la información del hospital en este momento. Intenta de nuevo o elige una pregunta sugerida.',
     };
   }
 }

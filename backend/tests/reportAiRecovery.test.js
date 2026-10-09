@@ -1,6 +1,6 @@
 'use strict';
 const { retryDelay, waitForRetry } = require('../utils/reportAiRetry');
-const envKeys = ['GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY', 'GEMINI_MODEL', 'LLM_BASE_URL'];
+const envKeys = ['GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'OPENAI_API_KEY', 'GEMINI_MODEL', 'LLM_BASE_URL', 'REPORT_AI_FALLBACK_PROVIDERS', 'REPORT_AI_GEMINI_FALLBACK_MODELS'];
 const catalog = [{ id: 'inventory', title: 'Inventario por almacén', filters: [], defaultFields: ['Name'], fields: [{ key: 'Name', label: 'Insumo' }] }];
 const valid = { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify({ status: 'ready', plan: { entity: 'inventory', selectedFields: ['Name'], filters: {} } }) } }] }) };
 const busy = { ok: false, status: 503 };
@@ -178,10 +178,27 @@ test('capacity failure and cooldown preserve the pending patient/order request, 
   expect(noNetwork).not.toHaveBeenCalled();
 });
 
-test.each([401, 403])('credential and access errors do not retry or discover models: %s', async status => {
+test.each([401, 402, 403])('credential, billing and access errors do not retry or discover models: %s', async status => {
   const fetch = jest.fn().mockResolvedValue({ ok: false, status });
   await prepare(fetch);
   expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+test('a Gemini billing failure explains the next action and preserves the guided report without model changes or an unenabled reserve', async () => {
+  process.env.REPORT_AI_GEMINI_FALLBACK_MODELS = 'gemini-3.5-flash-lite,gemini-3.8-flash';
+  process.env.OPENAI_API_KEY = 'unenabled-fictional-key';
+  const json = jest.fn(() => { throw new Error('private account details'); });
+  const fetch = jest.fn().mockResolvedValue({ ok: false, status: 402, json });
+  const onDiagnostic = jest.fn();
+  const result = await prepare(fetch, { onDiagnostic });
+  expect(result).toMatchObject({ engine: 'guided', status: 'ready', plan: { entity: 'inventory', selectedFields: ['Name'] },
+    notice: 'La conexión de IA requiere revisar el proyecto y la facturación de Gemini. Puedes continuar preparando el reporte con la búsqueda guiada.' });
+  expect(onDiagnostic).toHaveBeenLastCalledWith({ provider: 'gemini', model: 'gemini-3.7-flash', category: 'billing', httpStatus: 402 });
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(posts(fetch)[0][1].body).model).toBe('gemini-3.7-flash');
+  expect(json).not.toHaveBeenCalled();
+  expect(JSON.stringify(result)).not.toMatch(/fictional|private|account|402/);
+  expect(JSON.stringify(console.warn.mock.calls)).not.toMatch(/fictional|private|account/);
 });
 
 test('a custom Gemini host keeps its configured model and single retry', async () => {

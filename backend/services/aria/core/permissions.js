@@ -1,5 +1,25 @@
 'use strict';
 
+// Legacy profiles retain only the IA modules covered by an explicit section.
+// Searches for individual patients require their own IA permission.
+const IA_SECTION_ACCESS = {
+  'ia-quirofano': ['quirofano', 'quirofano-agenda', 'quirofano-kits', 'quirofano-variaciones', 'quirofano-almacen', 'area-quirofano'],
+  'ia-productividad-medica': ['dashboard-directivo'],
+  'ia-ocupacion-camas': ['dashboard-ocupacion'],
+  'ia-auditoria-inventarios': ['auditoria-inventarios'],
+  'ia-calidad-datos': ['calidad-datos'],
+  'ia-busqueda-medicos': ['dashboard-directivo'],
+  'ia-busqueda-insumos': ['auditoria-inventarios', 'farmacia-inventario', 'almacen-inventario', 'quirofano-almacen'],
+  'ia-busqueda-financiera': ['dashboard-directivo'],
+  'ia-farmacia': ['farmacia-inventario', 'farmacia-devoluciones', 'farmacia-cargos-sap', 'farmacia-resumen-maestro', 'farmacia-reorden', 'area-farmacia'],
+  'ia-almacen': ['almacen-inventario', 'almacen-reorden', 'almacen-traslados', 'almacen-reportes', 'almacen-precios-articulos', 'area-almacen-general'],
+  'ia-finanzas': ['dashboard-financiero', 'dashboard-directivo'],
+};
+
+function userPermissions(user) {
+  return Array.isArray(user?.permisos) ? user.permisos.filter(permission => typeof permission === 'string') : [];
+}
+
 /**
  * Verifica si el usuario tiene un permiso IA específico
  * ADMIN y DIRECTOR siempre tienen acceso total.
@@ -10,9 +30,9 @@
 function hasIAPermission(user, iaPermId) {
   if (!user) return false;
   if (user.role === 'ADMIN' || user.role === 'DIRECTOR') return true;
-  const permisos = user.permisos || [];
+  const permisos = userPermissions(user);
   const hasAnyIAPerm = permisos.some(p => p.startsWith('ia-'));
-  if (!hasAnyIAPerm) return true; // Compatibilidad: si aún no hay permisos IA granulares asignados, permitir por defecto
+  if (!hasAnyIAPerm) return (IA_SECTION_ACCESS[iaPermId] || []).some(permission => permisos.includes(permission));
   return permisos.includes(iaPermId);
 }
 
@@ -23,7 +43,12 @@ function hasIAPermission(user, iaPermId) {
 function hasSectionPermission(user, permId) {
   if (!user) return false;
   if (user.role === 'ADMIN' || user.role === 'DIRECTOR') return true;
-  return (user.permisos || []).includes(permId);
+  const sectionPermissions = Array.isArray(permId) ? permId : [permId];
+  return sectionPermissions.some(permission => userPermissions(user).includes(permission));
+}
+
+function hasIASectionAccess(user, iaPermId, sectionPerm) {
+  return hasIAPermission(user, iaPermId) && (!sectionPerm || hasSectionPermission(user, sectionPerm));
 }
 
 /**
@@ -46,5 +71,6 @@ function buildAccessDeniedResponse(iaPermId, permissionCatalog) {
 module.exports = {
   hasIAPermission,
   hasSectionPermission,
+  hasIASectionAccess,
   buildAccessDeniedResponse
 };

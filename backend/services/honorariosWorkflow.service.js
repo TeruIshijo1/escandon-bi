@@ -87,6 +87,8 @@ async function getPeriodCandidates(pool, startDate, endDate, { includeUnconfigur
       BaseImporte: saved.snapshot.baseAmount, CambiosTrasCierre: false } : {}) };
   });
   return { rows: [...clinicalRows, ...monthlyRows], coverage: { ...result.coverage,
+    sourceCounts: Object.fromEntries(['orderLines', 'clinicalCharges', 'standaloneAppointments', 'surgicalProcedures', 'contactCenter']
+      .map(key => [key, Number(result.coverage?.[key]) || 0])),
     candidates: rows.length + monthlyRows.length, sourceCandidates: available.length + monthlyRows.length,
     fixedMonthly: monthlyRows.length, monthlyFixed: monthlyRows.length,
     omittedFromReview: available.filter(row => row.ReviewEligible !== true).length,

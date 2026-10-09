@@ -10,6 +10,9 @@ const sapInventoryService = require('./sapInventory.service');
 const { pool } = require('../config/pg-db');
 const sapReportCatalog = require('./sapReportCatalog.service');
 const verticalReportCatalog = require('./verticalReportCatalog.service');
+const assistantComposition = require('./assistantReportComposition.service');
+const savedReportAccess = require('./savedReportAccess.service');
+const reportAnalysis = require('./reportAnalysis.service');
 
 /* ══════════════════════════════════════════════════════════════
    DICCIONARIO DE ENTIDADES Y CAMPOS (LENGUAJE HOSPITALARIO)
@@ -421,6 +424,7 @@ for (const definition of Object.values(ENTITY_CATALOG)) {
   if (definition.fields.some(f => f.key === 'MedicalClassification')) definition.filters.push('clasificacionMedica');
 }
 Object.assign(ENTITY_CATALOG, sapReportCatalog.catalog, verticalReportCatalog.catalog);
+const ASSISTANT_CAPABILITIES = assistantComposition.createCatalog(ENTITY_CATALOG);
 
 const WAREHOUSE_NAMES = {
   'FAR': 'Farmacia Central',
@@ -595,9 +599,33 @@ async function fetchAllODataDocs(endpoint, filterStr, selectFields = '', maxDocs
 /**
  * Ejecuta una consulta dinámica en Service Layer validando filtros obligatorios
  */
-async function executeQuery({
+async function executeQuery(options = {}) {
+  const publicOptions = { ...options };
+  delete publicOptions.pointLookup;
+  delete publicOptions.searchFields;
+  options = publicOptions;
+  const definition = getEntityDefinition(options.entity);
+  if (!definition || options.analysis == null) return executeDetailedQuery(options);
+  const analysis = reportAnalysis.validateAnalysis(definition, options.analysis);
+  const selectedFields = options.selectedFields?.length ? options.selectedFields : definition.defaultFields;
+  if (!Array.isArray(selectedFields) || selectedFields.some(key => typeof key !== 'string' || !definition.fields.some(field => field.key === key))) {
+    throw Object.assign(new Error('La selección de columnas no es válida.'), { status: 400 });
+  }
+  const limit = Number.isFinite(Number(options.limit)) ? Math.min(10000, Math.max(1, Math.floor(Number(options.limit)))) : 10000;
+  const detailOptions = { ...options };
+  delete detailOptions.analysis;
+  const pointLookup = reportAnalysis.getPointLookup(definition, analysis);
+  const result = await executeDetailedQuery({ ...detailOptions, selectedFields: [...new Set([
+    ...selectedFields, ...reportAnalysis.requiredAnalysisFields(definition, analysis)
+  ])], searchFields: [...new Set(selectedFields)], ...(pointLookup ? { pointLookup } : {}), limit: 10000 });
+  return reportAnalysis.applyAnalysis(definition, result, analysis, { selectedFields, limit });
+}
+
+async function executeDetailedQuery({
   entity,
   selectedFields = [],
+  searchFields,
+  pointLookup,
   fechaDesde,
   fechaHasta,
   almacen,
@@ -607,13 +635,21 @@ async function executeQuery({
   clasificacionMedica,
   limit = 10000
 }) {
-  const entityDef = typeof entity === 'string' && Object.hasOwn(ENTITY_CATALOG, entity) ? ENTITY_CATALOG[entity] : null;
+  const entityDef = typeof entity === 'string' && Object.hasOwn(ENTITY_CATALOG, entity) ? ENTITY_CATALOG[entity]
+    : typeof entity === 'string' && Object.hasOwn(ASSISTANT_CAPABILITIES, entity) ? ASSISTANT_CAPABILITIES[entity] : null;
   if (!entityDef) {
     throw new Error(`Entidad '${entity}' no reconocida en el catálogo.`);
+  }
+  if (entityDef.pointLookupRequired && !pointLookup) {
+    throw Object.assign(new Error('Indica el folio exacto de atención para consultar su cuenta, facturas e insumos.'), { status: 400 });
   }
 
   if (!Array.isArray(selectedFields) || selectedFields.some(key => typeof key !== 'string')) {
     throw new Error('La selección de columnas no es válida.');
+  }
+  if (searchFields != null && (!Array.isArray(searchFields) || !searchFields.length
+    || searchFields.some(key => typeof key !== 'string' || !entityDef.fields.some(field => field.key === key)))) {
+    throw new Error('Los campos de búsqueda no son válidos.');
   }
   for (const value of [almacen, proveedor, busqueda, estatusDoc, clasificacionMedica]) {
     if (value != null && typeof value !== 'string') throw new Error('Los filtros deben ser texto.');
@@ -626,7 +662,7 @@ async function executeQuery({
     throw new Error('El formato de fechas es inválido. Use YYYY-MM-DD y fechas existentes.');
   }
   // 1. Validar filtro obligatorio de fechas
-  if (entityDef.requiresDateFilter) {
+  if (entityDef.requiresDateFilter && (!pointLookup || fechaDesde || fechaHasta)) {
     if (!fechaDesde || !fechaHasta) {
       throw new Error(`Para evitar sobrecarga en SAP Service Layer, el módulo '${entityDef.title}' requiere obligatoriamente un rango de fechas (Fecha Desde y Fecha Hasta).`);
     }
@@ -649,9 +685,14 @@ async function executeQuery({
 
   // Clave de caché para evitar consultas idénticas concurrentes a SAP
   const fieldsKey = JSON.stringify([...new Set(selectedFields)]);
+  const searchFieldsKey = searchFields == null ? null : JSON.stringify([...new Set(searchFields)]);
   const searchKey = (busqueda || '').trim().toLowerCase();
   const effectiveLimit = Number.isFinite(Number(limit)) ? Math.min(10000, Math.max(1, Math.floor(Number(limit)))) : 10000;
-  const cacheKey = JSON.stringify([entity, fechaDesde, fechaHasta, almacen, proveedor, estatusDoc, clasificacionMedica, fieldsKey, searchKey, effectiveLimit]);
+  if (entityDef.assistantOnly) {
+    return assistantComposition.execute(entity, { selectedFields, ...(searchFields ? { searchFields } : {}), ...(pointLookup ? { pointLookup } : {}), fechaDesde, fechaHasta, almacen, proveedor, busqueda,
+      estatusDoc, clasificacionMedica, limit: effectiveLimit }, ASSISTANT_CAPABILITIES, executeDetailedQuery);
+  }
+  const cacheKey = JSON.stringify([entity, fechaDesde, fechaHasta, almacen, proveedor, estatusDoc, clasificacionMedica, fieldsKey, searchFieldsKey, searchKey, pointLookup, effectiveLimit]);
   const cached = queryResultsCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < QUERY_CACHE_TTL_MS)) {
     const data = cached.data;
@@ -972,9 +1013,9 @@ async function executeQuery({
     default: {
       const service = entityDef.source === 'Vertical' ? verticalReportCatalog : sapReportCatalog;
       const result = await service.execute(entity, { fechaDesde, fechaHasta, almacen, proveedor, busqueda,
-        estatusDoc, clasificacionMedica, limit: effectiveLimit });
+        estatusDoc, clasificacionMedica, ...(pointLookup ? { pointLookup } : {}), limit: effectiveLimit });
       rawRows = result.rows;
-      sourceTruncated = result.truncated;
+      sourceTruncated = Boolean(result.truncated || result.complete === false || result.analysisScope?.complete === false);
     }
   }
 
@@ -1028,7 +1069,7 @@ async function executeQuery({
   if (busqueda && busqueda.trim() && !sapReportCatalog.catalog[entity] && entityDef.source !== 'Vertical') {
     const q = busqueda.toLowerCase().trim();
     rawRows = rawRows.filter(row => {
-      return Object.values(row).some(val => 
+      return (searchFields ? searchFields.map(key => row[key]) : Object.values(row)).some(val =>
         val != null && String(val).toLowerCase().includes(q)
       );
     });
@@ -1154,42 +1195,19 @@ async function executeQuery({
    GESTIÓN DE CONSULTAS GUARDADAS (PLANTILLAS DE USUARIO)
 ══════════════════════════════════════════════════════════════ */
 
-async function getSavedQueries(user) {
-  const isAdmin = user.role === 'ADMIN' || user.role === 'DIRECTOR' || String(user.username).toLowerCase() === 'amendoza';
-  
-  let res;
-  if (isAdmin) {
-    res = await pool.query(`
-      SELECT queryid, userid, username, titulo, descripcion, entidad, camposseleccionados, filtrosaplicados, espublico, fechacreacion, fechamodificacion
-      FROM usersapqueries
-      ORDER BY fechacreacion DESC
-    `);
-  } else {
-    res = await pool.query(`
-      SELECT queryid, userid, username, titulo, descripcion, entidad, camposseleccionados, filtrosaplicados, espublico, fechacreacion, fechamodificacion
-      FROM usersapqueries
-      WHERE username = $1 OR espublico = 1
-      ORDER BY fechacreacion DESC
-    `, [user.username]);
-  }
+function getEntityDefinition(id) {
+  const definition = typeof id === 'string' && Object.hasOwn(ENTITY_CATALOG, id) ? ENTITY_CATALOG[id]
+    : typeof id === 'string' && Object.hasOwn(ASSISTANT_CAPABILITIES, id) ? ASSISTANT_CAPABILITIES[id] : undefined;
+  return definition ? { ...definition, analysisCapabilities: reportAnalysis.getAnalysisCapabilities(definition) } : undefined;
+}
 
-  return (res.rows || []).map(r => ({
-    id: r.queryid,
-    userId: r.userid,
-    username: r.username,
-    title: r.titulo,
-    description: r.descripcion,
-    entity: r.entidad,
-    selectedFields: typeof r.camposseleccionados === 'string' ? JSON.parse(r.camposseleccionados || '[]') : (r.camposseleccionados || []),
-    filters: typeof r.filtrosaplicados === 'string' ? JSON.parse(r.filtrosaplicados || '{}') : (r.filtrosaplicados || {}),
-    isPublic: Boolean(r.espublico),
-    createdAt: r.fechacreacion,
-    isOwner: r.username === user.username
-  }));
+async function getSavedQueries(user) {
+  return savedReportAccess.getSavedQueries(user, getEntityDefinition);
 }
 
 async function saveQuery(user, { title, description, entity, selectedFields, filters, isPublic }) {
-  const definition = typeof entity === 'string' && Object.hasOwn(ENTITY_CATALOG, entity) ? ENTITY_CATALOG[entity] : null;
+  const definition = typeof entity === 'string' && Object.hasOwn(ENTITY_CATALOG, entity) ? ENTITY_CATALOG[entity]
+    : typeof entity === 'string' && Object.hasOwn(ASSISTANT_CAPABILITIES, entity) ? ASSISTANT_CAPABILITIES[entity] : null;
   if (typeof title !== 'string' || !title.trim() || !definition) {
     throw new Error('El título y la entidad son obligatorios para guardar la consulta.');
   }
@@ -1198,6 +1216,8 @@ async function saveQuery(user, { title, description, entity, selectedFields, fil
     throw new Error('La configuración del reporte no es válida.');
   }
   const fields = selectedFields.filter(key => definition.fields.some(field => field.key === key));
+  const savedFilters = { ...(filters || {}) };
+  if (savedFilters.analysis != null) savedFilters.analysis = reportAnalysis.validateAnalysis(definition, savedFilters.analysis);
 
   const res = await pool.query(`
     INSERT INTO usersapqueries (userid, username, titulo, descripcion, entidad, camposseleccionados, filtrosaplicados, espublico, fechacreacion)
@@ -1210,36 +1230,29 @@ async function saveQuery(user, { title, description, entity, selectedFields, fil
     description ? description.trim() : null,
     entity,
     JSON.stringify(fields.length ? fields : definition.defaultFields),
-    JSON.stringify(filters || {}),
+    JSON.stringify(savedFilters),
     isPublic ? 1 : 0
   ]);
 
-  return res.rows[0];
+  return { ...res.rows[0], id: res.rows[0].queryid };
 }
 
 async function deleteQuery(user, queryId) {
-  const isAdmin = user.role === 'ADMIN' || user.role === 'DIRECTOR' || String(user.username).toLowerCase() === 'amendoza';
-  
-  let res;
-  if (isAdmin) {
-    res = await pool.query(`DELETE FROM usersapqueries WHERE queryid = $1 RETURNING queryid`, [queryId]);
-  } else {
-    res = await pool.query(`DELETE FROM usersapqueries WHERE queryid = $1 AND username = $2 RETURNING queryid`, [queryId, user.username]);
-  }
-
-  if (res.rowCount === 0) {
-    throw new Error('No se encontró la consulta o no cuenta con permisos para eliminarla.');
-  }
-
-  return { ok: true, queryId };
+  return savedReportAccess.deleteQuery(user, queryId);
 }
 
 module.exports = {
-  getEntityCatalog: () => Object.values(ENTITY_CATALOG),
-  getEntityDefinition: (id) => Object.hasOwn(ENTITY_CATALOG, id) ? ENTITY_CATALOG[id] : undefined,
+  getEntityCatalog: () => Object.keys(ENTITY_CATALOG).map(getEntityDefinition),
+  getAssistantCatalog: () => [...Object.keys(ENTITY_CATALOG), ...Object.keys(ASSISTANT_CAPABILITIES)].map(getEntityDefinition),
+  getEntityDefinition,
   initSapQueryBuilderQueries,
   executeQuery,
   getSavedQueries,
   saveQuery,
-  deleteQuery
+  deleteQuery,
+  canAssignSavedReports: savedReportAccess.canAssign,
+  getSavedReportRecipients: savedReportAccess.getRecipients,
+  hasAssignedReports: savedReportAccess.hasAssignedReports,
+  setSavedReportAssignments: (user, id, userIds) => savedReportAccess.setAssignments(user, id, userIds, getEntityDefinition),
+  executeSavedQuery: (user, input) => savedReportAccess.executeSavedQuery(user, input, getEntityDefinition, executeQuery)
 };

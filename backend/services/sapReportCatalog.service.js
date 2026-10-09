@@ -275,4 +275,29 @@ async function execute(entity, options) {
   }
   return fetchPages(def, metadata, options);
 }
-module.exports = { catalog, execute };
+// Server-owned exact-key lookups used by cross-system relationships. Neither
+// endpoint nor expression is supplied by the user or the language model.
+async function lookup(entity, key, values) {
+  if (!({ customers: 'CardCode', item_master_data: 'ItemCode' }[entity] === key)
+    || !Array.isArray(values) || values.length > 10000 || values.some(value => typeof value !== 'string' || value.length > 100)) {
+    throw new Error('La relación solicitada con SAP no es válida.');
+  }
+  const unique = [...new Set(values)];
+  const rows = [];
+  const def = definitions[entity], chunks = [[]];
+  const predicate = chunk => chunk.map(value => `${key} eq '${value.replace(/'/g, "''")}'`).join(' or ');
+  for (const value of unique) {
+    const next = [...chunks.at(-1), value];
+    if (chunks.at(-1).length && (next.length > 50 || encodeURIComponent(predicate(next)).length + encodeURIComponent(def.select).length > 1450)) chunks.push([]);
+    chunks.at(-1).push(value);
+  }
+  for (const chunk of chunks.filter(chunk => chunk.length)) {
+    const filter = predicate(chunk);
+    const result = await fetchPages({ ...def, sourceFilter: `${def.sourceFilter ? `(${def.sourceFilter}) and ` : ''}(${filter})` },
+      catalog[entity], { limit: 10000 });
+    rows.push(...result.rows);
+    if (result.truncated) return { rows, truncated: true };
+  }
+  return { rows, truncated: false };
+}
+module.exports = { catalog, execute, lookup };

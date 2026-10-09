@@ -9,7 +9,7 @@ const NETWORK_CODES = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNR
 const MODEL_PATTERN = /^(?:gemini-\d+(?:\.\d+)?-(?:flash(?:-lite)?|pro)(?:-(?:preview|latest)(?:-\d+)?)?|deepseek-(?:chat|reasoner)|gpt-\d+(?:\.\d+)?o?(?:-(?:mini|nano|turbo|chat-latest|preview|latest))?|o[1-9](?:-(?:mini|preview))?)$/;
 const PROVIDERS = new Set(['gemini', 'deepseek', 'openai', 'azure', 'custom', 'unknown']);
 const CATEGORIES = new Set(['available', 'configuration', 'timeout', 'response_format', 'credentials',
-  'access', 'model', 'rate_limit', 'capacity', 'provider', 'network', 'unavailable', 'client_busy', 'cooldown']);
+  'access', 'billing', 'model', 'rate_limit', 'capacity', 'provider', 'network', 'unavailable', 'client_busy', 'cooldown']);
 
 function safeModel(model) {
   return typeof model === 'string' && model.length <= 80 && MODEL_PATTERN.test(model) ? model : 'configured';
@@ -35,7 +35,7 @@ function failureDiagnostic(config, error, { stage = 'request', httpStatus, abort
   else if (aborted || error?.name === 'AbortError' || error?.name === 'TimeoutError') category = 'timeout';
   else if (stage === 'client_busy' || stage === 'cooldown') category = stage;
   else if (stage === 'response') category = 'response_format';
-  else if (stage === 'http') category = ({ 401: 'credentials', 403: 'access', 404: 'model', 429: 'rate_limit', 503: 'capacity' })[status] || 'provider';
+  else if (stage === 'http') category = ({ 401: 'credentials', 402: 'billing', 403: 'access', 404: 'model', 429: 'rate_limit', 503: 'capacity' })[status] || 'provider';
   else if (networkCode || error?.name === 'TypeError') category = 'network';
   return { provider: details.provider, model: details.model, category,
     ...(stage === 'http' && status ? { httpStatus: status } : {}), ...(networkCode ? { networkCode } : {}) };

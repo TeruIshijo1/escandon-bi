@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { apiFetch } from '../../api/client';
 import { userMessage } from '../../utils/userMessages';
 import { fiscalCategories, fiscalCategory } from '../../utils/honorariosFiscalDirectory';
@@ -20,6 +20,8 @@ export default function HonorariosFiscalPanel({ providers, profiles, initialProv
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
   const initialCategory = useRef(false);
+  const doctorSelect = useRef(null);
+  const allDoctorsHint = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -60,6 +62,15 @@ export default function HonorariosFiscalPanel({ providers, profiles, initialProv
       setCategory(selected.status.key); initialCategory.current = true;
     }
   }, [directory, selected, initialProviderId]);
+  const chooseCategory = next => {
+    // La elección del usuario tiene prioridad sobre una consulta inicial tardía.
+    initialCategory.current = true;
+    setCategory(next); setSearch('');
+    if (next === 'all') requestAnimationFrame(() => {
+      doctorSelect.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      doctorSelect.current?.focus({ preventScroll: true });
+    });
+  };
   const field = (key, value) => { dirtyRef.current = true; setDirty(true); setForm(previous => ({ ...previous, [key]: value })); };
   const filtered = entries.filter(item => (category === 'all' || item.status.key === category)
     && normalize(`${item.name} ${item.id}`).includes(normalize(search)));
@@ -81,19 +92,22 @@ export default function HonorariosFiscalPanel({ providers, profiles, initialProv
     <p>Elige un grupo y busca al médico. Puedes corregir sus datos de SAP y guardarlos internamente.</p>
     <div className="hon-fiscal-categories" role="group" aria-label="Grupos de datos fiscales">
       {fiscalCategories.map(item => <button key={item.key} type="button" aria-pressed={category === item.key} disabled={busy}
-        className={`hon-fiscal-category ${item.key}`} onClick={() => { setCategory(item.key); setSearch(''); }}>
+        className={`hon-fiscal-category ${item.key}`} onClick={() => chooseCategory(item.key)}>
         <strong>{item.label}</strong><span>{loading && item.key === 'sap' ? 'Consultando…' : entries.filter(row => row.status.key === item.key).length}</span>
       </button>)}
     </div>
     <div className="hon-fiscal-tools">
-      <button type="button" className="hon-friendly-button subtle" aria-pressed={category === 'all'} disabled={busy} onClick={() => { setCategory('all'); setSearch(''); }}>Ver todos ({entries.length})</button>
+      <button type="button" className="hon-friendly-button subtle" aria-pressed={category === 'all'} disabled={busy} onClick={() => chooseCategory('all')}>Ver todos ({entries.length})</button>
       <button type="button" className="hon-friendly-button subtle" disabled={loading || busy} onClick={() => setRefresh(value => value + 1)}>{loading ? 'Consultando SAP…' : 'Actualizar SAP'}</button>
     </div>
     <p className="hon-fiscal-help">Estado para servicios desde {referenceDate?.split('-').reverse().join('/')}. Listos con SAP incluye retenciones para servicios con y sin IVA.
       {directory?.asOf && <> Consulta: {new Date(directory.asOf).toLocaleString('es-MX')}.</>}</p>
     {(directoryError || directory?.warning) && <p role="alert" className="hon-friendly-message error">{directoryError || directory.warning}</p>}
     <label>Buscar médico<input aria-label="Buscar médico fiscal" className="hon-input" value={search} disabled={busy} onChange={event => setSearch(event.target.value)} placeholder="Escribe su nombre o número" /></label>
-    <label>Médico<select aria-label="Médico fiscal" className="hon-input" value={providerId} disabled={busy} onChange={event => setProviderId(event.target.value)}>
+    {category === 'all' && <p id={allDoctorsHint} role="status" className="hon-fiscal-help">Mostrando {filtered.length} de {entries.length} médicos. Selecciona uno de la lista; puedes desplazarte para ver más.</p>}
+    <label>Médico<select ref={doctorSelect} aria-label="Médico fiscal" aria-describedby={category === 'all' ? allDoctorsHint : undefined}
+      className="hon-input" size={category === 'all' ? Math.max(2, Math.min(filtered.length + 1, 8)) : undefined}
+      value={providerId} disabled={busy} onChange={event => setProviderId(event.target.value)}>
       <option value="">Selecciona al médico</option>
       {filtered.map(item => <option key={item.id} value={item.id}>{item.name} · #{item.id}</option>)}
       {provider && !filtered.some(item => String(item.id) === providerId) && <option value={providerId}>{provider.name} · #{provider.id} · Selección actual</option>}

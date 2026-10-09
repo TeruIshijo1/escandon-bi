@@ -1,0 +1,660 @@
+{
+  "captured_on": "2026-10-06",
+  "source": "SQL Server sys.columns and sys.indexes; metadata only",
+  "columns": [
+    {
+      "object_name": "AG",
+      "column_name": "FCCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "AGCode",
+      "type_name": "nvarchar",
+      "is_nullable": false
+    },
+    {
+      "object_name": "AG",
+      "column_name": "AGName",
+      "type_name": "nvarchar",
+      "is_nullable": false
+    },
+    {
+      "object_name": "AG",
+      "column_name": "BPCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "PriceListNum",
+      "type_name": "int",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "Deductible",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "CoinsurancePercentage",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "GlobalDiscount",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "PriceFactor",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "PLCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "PLVersion",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "AG_ST",
+      "type_name": "nvarchar",
+      "is_nullable": false
+    },
+    {
+      "object_name": "AG",
+      "column_name": "CreatedOn",
+      "type_name": "datetime",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "FCCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "PCType",
+      "type_name": "nvarchar",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PC",
+      "column_name": "PCNum",
+      "type_name": "int",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PC",
+      "column_name": "PC_ST",
+      "type_name": "nvarchar",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PC",
+      "column_name": "Date",
+      "type_name": "datetime",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PC",
+      "column_name": "ClosedOn",
+      "type_name": "datetime",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "MedicalDischargeDate",
+      "type_name": "datetime",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "PTNum",
+      "type_name": "int",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PC",
+      "column_name": "PRNum",
+      "type_name": "int",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "BPCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "PriceListNum",
+      "type_name": "int",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "Balance",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "Downpayments",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "Total",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PC",
+      "column_name": "CreatedOn",
+      "type_name": "datetime",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "PCAGNum",
+      "type_name": "int",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "PTNum",
+      "type_name": "int",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "PCType",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "PCNum",
+      "type_name": "int",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "PCAG_ST",
+      "type_name": "nvarchar",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "AGCode",
+      "type_name": "nvarchar",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "BPCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "PriceListNum",
+      "type_name": "int",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "Deductible",
+      "type_name": "decimal",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "Copay",
+      "type_name": "decimal",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "CoinsurancePercentage",
+      "type_name": "decimal",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "GlobalDiscount",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "PriceFactor",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "Total",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "AgreementTotal",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "CreatedOn",
+      "type_name": "datetime",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PR",
+      "column_name": "PRNum",
+      "type_name": "int",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PR",
+      "column_name": "FullName",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PR",
+      "column_name": "BPCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PR",
+      "column_name": "FCCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PR",
+      "column_name": "CreatedOn",
+      "type_name": "datetime",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PT",
+      "column_name": "FCCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PT",
+      "column_name": "PTNum",
+      "type_name": "int",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PT",
+      "column_name": "FullName",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PT",
+      "column_name": "BPCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PT",
+      "column_name": "PriceListNum",
+      "type_name": "int",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PT",
+      "column_name": "Balance",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PT",
+      "column_name": "CreatedOn",
+      "type_name": "datetime",
+      "is_nullable": true
+    },
+    {
+      "object_name": "V_BP",
+      "column_name": "FCCode",
+      "type_name": "nvarchar",
+      "is_nullable": false
+    },
+    {
+      "object_name": "V_BP",
+      "column_name": "BPCode",
+      "type_name": "nvarchar",
+      "is_nullable": false
+    },
+    {
+      "object_name": "V_BP",
+      "column_name": "BPName",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "V_BP",
+      "column_name": "PriceListNum",
+      "type_name": "int",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "CopayAmount",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "CopayPercentage",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "AdministrativeChargeAmount",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "AdministrativeChargePercent",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "AdministrativeChargeDescription",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "AdditionalDiscount01",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "AdditionalDiscount02",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "AdditionalDiscount03",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "PLFactor",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "PLSurcharge",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "TaxRate",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "TaxCode",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "PatientCareAgreement",
+      "type_name": "bit",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "SalesOrderAgreement",
+      "type_name": "bit",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "AdditionalDiscountPercentage",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "TotalDiscount",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "TotalDeductible",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "TotalCopay",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "TotalCoinsurance",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "CopayPercentage",
+      "type_name": "decimal",
+      "is_nullable": false
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "CoinsuranceAmount",
+      "type_name": "decimal",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "PolicyNumber",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "ClaimAuthorizationNumber",
+      "type_name": "nvarchar",
+      "is_nullable": true
+    },
+    {
+      "object_name": "AG",
+      "column_name": "DefaultDeductible",
+      "type_name": "decimal",
+      "max_length": 9,
+      "precision": 19,
+      "scale": 6,
+      "is_nullable": false
+    },
+    {
+      "object_name": "AG",
+      "column_name": "DefaultCopayAmount",
+      "type_name": "decimal",
+      "max_length": 9,
+      "precision": 19,
+      "scale": 6,
+      "is_nullable": false
+    },
+    {
+      "object_name": "AG",
+      "column_name": "DefaultCopayPercentage",
+      "type_name": "decimal",
+      "max_length": 9,
+      "precision": 19,
+      "scale": 6,
+      "is_nullable": false
+    },
+    {
+      "object_name": "AG",
+      "column_name": "DefaultCoinsurancePercentage",
+      "type_name": "decimal",
+      "max_length": 9,
+      "precision": 19,
+      "scale": 6,
+      "is_nullable": false
+    },
+    {
+      "object_name": "AG",
+      "column_name": "Coinsurance",
+      "type_name": "nvarchar",
+      "max_length": 128,
+      "precision": 0,
+      "scale": 0,
+      "is_nullable": true
+    },
+    {
+      "object_name": "V_IT",
+      "column_name": "ItemCode",
+      "type_name": "nvarchar",
+      "max_length": 128,
+      "precision": 0,
+      "scale": 0,
+      "is_nullable": false
+    },
+    {
+      "object_name": "V_IT",
+      "column_name": "ItemName",
+      "type_name": "nvarchar",
+      "max_length": 512,
+      "precision": 0,
+      "scale": 0,
+      "is_nullable": true
+    }
+  ],
+  "unique_keys": [
+    {
+      "object_name": "AG",
+      "column_name": "AGCode",
+      "key_ordinal": 1
+    },
+    {
+      "object_name": "PC",
+      "column_name": "PCNum",
+      "key_ordinal": 1
+    },
+    {
+      "object_name": "PCAG",
+      "column_name": "PCAGNum",
+      "key_ordinal": 1
+    },
+    {
+      "object_name": "PR",
+      "column_name": "PRNum",
+      "key_ordinal": 1
+    },
+    {
+      "object_name": "PT",
+      "column_name": "PTNum",
+      "key_ordinal": 1
+    }
+  ],
+  "verified_financial_types_on": "2026-10-08",
+  "concept_reference_validation": {
+    "checked_on": "2026-10-08",
+    "source": "Live aggregate matching of AG references to V_IT.ItemCode; no declared foreign key",
+    "agreement_rows": 56,
+    "references": [
+      {
+        "source_column": "Deductible",
+        "target_object": "V_IT",
+        "target_column": "ItemCode",
+        "non_null_references": 23,
+        "matched_references": 23,
+        "unmatched_references": 0,
+        "references_with_multiple_catalog_rows": 0,
+        "references_with_conflicting_names": 0
+      },
+      {
+        "source_column": "CopayAmount",
+        "target_object": "V_IT",
+        "target_column": "ItemCode",
+        "non_null_references": 17,
+        "matched_references": 17,
+        "unmatched_references": 0,
+        "references_with_multiple_catalog_rows": 0,
+        "references_with_conflicting_names": 0
+      },
+      {
+        "source_column": "CopayPercentage",
+        "target_object": "V_IT",
+        "target_column": "ItemCode",
+        "non_null_references": 13,
+        "matched_references": 13,
+        "unmatched_references": 0,
+        "references_with_multiple_catalog_rows": 0,
+        "references_with_conflicting_names": 0
+      },
+      {
+        "source_column": "Coinsurance",
+        "target_object": "V_IT",
+        "target_column": "ItemCode",
+        "non_null_references": 8,
+        "matched_references": 8,
+        "unmatched_references": 0,
+        "references_with_multiple_catalog_rows": 0,
+        "references_with_conflicting_names": 0
+      },
+      {
+        "source_column": "CoinsurancePercentage",
+        "target_object": "V_IT",
+        "target_column": "ItemCode",
+        "non_null_references": 0,
+        "matched_references": 0,
+        "unmatched_references": 0,
+        "references_with_multiple_catalog_rows": 0,
+        "references_with_conflicting_names": 0
+      }
+    ],
+    "resolution": "Exact ItemCode; missing or conflicting descriptions remain null",
+    "final_projection": {
+      "checked_on": "2026-10-08",
+      "scope": "Final report SQL SELECT TOP (0) plus aggregated FROM row counts",
+      "column_count": 37,
+      "result_rows": 56,
+      "distinct_agreements": 56
+    }
+  }
+}

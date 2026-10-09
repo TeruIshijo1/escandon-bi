@@ -12,8 +12,10 @@ const output = path.resolve(root, '../tmp/honorarios-management');
 await mkdir(output, { recursive: true });
 const item = { itemCode: 'SER1471', description: 'SESIÓN PSICOLOGÍA AFIRMA', groupName: 'CONSULTA EXTERNA',
   active: true, status: 'PENDIENTE', modality: 'contact_center', paymentUnit: 'sesión', revision: 1,
-  professionalCandidate: true, scopeExcluded: false,
-  referencePrices: [{ id: 1, amount: 1, notes: 'Referencia nominal' }], tariffCount: 0 };
+  professionalCandidate: true, scopeExcluded: false, referenceChanged: true,
+  updatedBy: 'EDITOR DE CONFIGURACIÓN INTERNA', updatedAt: '2026-10-08T15:00:00Z',
+  referencePrices: [{ id: 1, amount: 1, notes: 'Referencia nominal',
+    changeAudit: { available: false, source: 'Vertical', reason: 'not_recorded', changedBy: null, changedAt: null } }], tariffCount: 0 };
 const additionalCatalogItems = [
   ...[['A-CEYE', 'ARTÍCULO CEYE'], ['A-FAR', 'ARTÍCULO FARMACIA'], ['A-ITEM', 'ARTÍCULOS GENERAL'],
     ['A-QUI', 'ARTÍCULO QUIRÓFANO'], ['PQX0002', 'PAQUETE QX COMPLETO'], ['SER1234', 'ESTANCIA AMBULATORIA'],
@@ -29,7 +31,9 @@ const additionalCatalogItems = [
   { ...item, itemCode: 'SER_REF_CERO', description: 'CONSULTA CON REFERENCIA CERO',
     referencePrices: [{ id: 10, amount: 0 }], referenceWarnings: ['Referencia sin importe positivo'] },
   { ...item, itemCode: 'SER_REF_DUPLICADA', description: 'CONSULTA CON REFERENCIA DUPLICADA',
-    referencePrices: [{ id: 11, amount: null }, { id: 12, amount: 250 }], referenceWarnings: ['Referencia duplicada; requiere revisión'] }
+    referencePrices: [{ id: 11, amount: null }, { id: 12, amount: 250,
+      changeAudit: { available: true, source: 'Vertical', changedBy: 'RESPONSABLE VERTICAL DE PRUEBA', changedAt: '2026-10-08T15:00:00Z' } }],
+    referenceWarnings: ['Referencia duplicada; requiere revisión'] }
 ];
 let fiftyMode = false, lastBulkBody, closeBody;
 let tariffs = [], reviews = {}, liquidation = null, approvalBody, auditRequests = 0, catalogRequests = 0, sapDelay = 0, paymentReportRequests = 0, paymentReportIssue = false;
@@ -125,6 +129,21 @@ try {
       result.providers = Object.fromEntries(body.doctors.map(name => [name, { linkStatus: fiftyMode ? 'sin_coincidencia' : 'candidato_unico', invoices: [],
         candidates: [{ subjectToWithholding: true, federalTaxId: 'AAAA800101AAA', configuredWithholdings: [{ inactive: false, estimateRule: 'isr_on_fee', rate: 10, appliesAt: 'factura', codeEffectiveFrom: '2025-01-01' }] }] }]));
       result.additionalProviders = []; result.period = { startDate: '2026-09-01', endDate: '2026-09-30' };
+    } else if (endpoint === '/available-payment-report') {
+      const lines = Object.entries(reviews).filter(([, review]) => review.action === 'APROBAR')
+        .map(([rowId, review]) => {
+          const snapshot = review.snapshot || { providerId: 7, providerName: 'MÉDICO PRUEBA',
+            description: item.description, serviceDate: '2026-09-02', quantity: 1, unitAmount: 250, baseAmount: 250 };
+          const vat = Math.round(snapshot.baseAmount * review.vatRate * 100) / 100;
+          return { ...snapshot, rowId, vatRate: review.vatRate, vat,
+            isr: fiftyMode ? null : 25, vatWithholding: fiftyMode ? null : 0,
+            netAmount: fiftyMode ? null : snapshot.baseAmount + vat - 25 };
+        });
+      const totals = Object.fromEntries(Object.entries({ base: 'baseAmount', vat: 'vat', isr: 'isr', vatWithholding: 'vatWithholding', net: 'netAmount' })
+        .map(([key, field]) => [key, lines.some(line => line[field] === null) ? null : lines.reduce((total, line) => total + Math.round(line[field] * 100), 0) / 100]));
+      result.report = { version: 1, currency: 'MXN', status: fiftyMode ? 'FISCAL_PENDING' : 'AVAILABLE', generatedAt: '2026-10-08T17:00:00Z',
+        period: { startDate: body.startDate, endDate: body.endDate }, totals,
+        doctors: [{ providerId: body.providerId, providerName: 'MÉDICO PRUEBA', fiscal: { ready: !fiftyMode }, lines, totals }] };
     } else if (endpoint === '/liquidations') {
       if (method === 'POST') {
         closeBody = body;
@@ -157,9 +176,18 @@ try {
   await page.getByRole('button', { name: 'Configuración', exact: true }).click();
   await page.getByRole('button', { name: 'Catálogo y precios', exact: true }).click();
   await page.getByRole('button', { name: 'Configurar SER1471' }).waitFor();
-  const pendingCatalogBadge = page.locator('.hon-catalog-table tbody tr').filter({ has: page.getByRole('button', { name: 'Configurar SER1471', exact: true }) }).locator('.hon-catalog-badge');
+  const catalogRow = page.locator('.hon-catalog-table tbody tr').filter({ has: page.getByRole('button', { name: 'Configurar SER1471', exact: true }) });
+  const pendingCatalogBadge = catalogRow.locator('.hon-catalog-badge');
   assert.equal(await pendingCatalogBadge.textContent(), 'Por configurar');
   assert.doesNotMatch(await pendingCatalogBadge.getAttribute('class'), /hon-catalog-status-configurado/, 'Un pendiente no se presenta como configurado');
+  const referenceNotice = catalogRow.locator('.hon-catalog-reference-change');
+  assert.equal(await referenceNotice.textContent(), 'Cambió el precio de referencia en Vertical');
+  const noticeColor = await referenceNotice.evaluate(element => getComputedStyle(element).color);
+  assert.notEqual(noticeColor, await pendingCatalogBadge.evaluate(element => getComputedStyle(element).color), 'El aviso de referencia se distingue del estado pendiente');
+  assert.equal(noticeColor, 'rgb(109, 40, 217)', 'Aviso de referencia violeta en tema claro');
+  await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
+  assert.equal(await referenceNotice.evaluate(element => getComputedStyle(element).color), 'rgb(196, 181, 253)', 'Aviso de referencia legible en tema oscuro');
+  await page.evaluate(() => delete document.documentElement.dataset.theme);
   assert.doesNotMatch(await page.locator('.hon-catalog').innerText(), /UT_Honorarios|\bBI\b|contabilizarse|inclusión/);
   const recommended = page.getByRole('button', { name: /^Recomendados \(/ });
   const allServices = page.getByRole('button', { name: /^Todos los servicios \(/ });
@@ -174,6 +202,11 @@ try {
   for (const code of ['SER_REF_CERO', 'SER_REF_DUPLICADA']) {
     assert.equal(await page.getByRole('button', { name: `Configurar ${code}`, exact: true }).count(), 1);
   }
+  await page.getByRole('button', { name: 'Configurar SER_REF_DUPLICADA', exact: true }).click();
+  await page.getByText('Precios de referencia (2)', { exact: true }).click();
+  await page.locator('.hon-catalog-reference-audit').getByText(/RESPONSABLE VERTICAL DE PRUEBA/).waitFor();
+  assert.equal(await page.locator('.hon-catalog-reference-audit').count(), 1, 'Sólo la referencia que trae responsable muestra atribución');
+  assert.doesNotMatch(await page.locator('.hon-catalog-reference').innerText(), /EDITOR DE CONFIGURACIÓN INTERNA/, 'El editor de configuración BI no sustituye al responsable Vertical');
   await page.getByLabel('Buscar servicio', { exact: true }).fill('SER_REF');
   assert.equal(await page.locator('.hon-catalog-table tbody tr').count(), 2);
   await page.getByLabel('Buscar servicio', { exact: true }).fill('');
@@ -216,12 +249,17 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Configurar SER_NUEVO', exact: true }).count(), 0);
   await recommended.click();
   await page.getByRole('button', { name: 'Configurar SER1471' }).click();
+  await page.getByText('Precios de referencia (1)', { exact: true }).click();
+  const referenceDetail = page.locator('.hon-catalog-reference');
+  assert.equal(await referenceDetail.locator('.hon-catalog-reference-audit').count(), 0, 'No se muestra texto extra cuando Vertical no entrega responsable');
+  assert.doesNotMatch(await referenceDetail.innerText(), /EDITOR DE CONFIGURACIÓN INTERNA/, 'El usuario de BI no se atribuye como autor de la referencia Vertical');
   await page.getByLabel('Incluir en honorarios').selectOption('INCLUIDO');
   for (const label of ['Unidad de pago', 'Motivo del cambio', 'Motivo de la tarifa']) {
     assert.equal(await page.getByLabel(label, { exact: true }).count(), 0, `${label} se retiró del formulario`);
   }
   await page.getByRole('button', { name: 'Guardar configuración', exact: true }).click();
   await page.getByRole('status').filter({ hasText: /Configuración/ }).waitFor();
+  assert.equal(await referenceDetail.locator('.hon-catalog-reference-audit').count(), 0, 'Guardar configuración tampoco inventa responsable de Vertical');
   assert.equal(await page.getByRole('button', { name: 'Aprobados (0)', exact: true }).count(), 1);
   await page.getByText('Falta tarifa', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Agregar tarifa', exact: true }).click();
@@ -393,9 +431,9 @@ try {
   await page.locator('.hon-card').filter({ has: page.getByRole('heading', { name: 'Preparar pago', exact: true }) }).screenshot({ path: path.join(output, '09-guardar-cierre.png') });
   await page.setViewportSize({ width: 1580, height: 1100 });
   await page.getByRole('button', { name: 'Generar PDF para pago', exact: true }).click();
+  await page.getByRole('heading', { name: /Pago #1/ }).waitFor();
   assert.equal(closeBody.startDate, '2026-09-01'); assert.equal(closeBody.endDate, '2026-09-30');
   assert.equal(closeBody.confirmed, true); assert.ok(closeBody.reason.length > 0);
-  await page.getByRole('heading', { name: /Pago #1/ }).waitFor();
   await page.getByText('Ajustes o pagos por servicio (opcional)', { exact: true }).click();
   await page.getByLabel('Servicio del cierre', { exact: true }).selectOption('BI|SOLN|91|ORDEN');
   await page.getByLabel('Importe MXN', { exact: true }).fill('100');
@@ -623,14 +661,14 @@ try {
     await doctorCard.getByRole('button', { name: 'Ver servicios de MÉDICO PRUEBA · #7', exact: true }).click();
   await doctorCard.getByText('Ver impuestos y documentos', { exact: true }).click();
   await doctorCard.getByRole('button', { name: 'Preparar pago de aprobados', exact: true }).click();
+  const lastCloseBody = closeBody;
+  const fiscalPendingPdf = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Generar PDF para pago', exact: true }).click();
-  await page.getByRole('alert').filter({ hasText: 'Los servicios siguen aprobados.' }).waitFor();
-  assert.equal(closeBody.providerId, '7');
+  await (await fiscalPendingPdf).saveAs(path.join(output, 'aprobados-con-fiscales-pendientes.pdf'));
+  await page.getByText('PDF generado con los servicios y datos disponibles. Falta completar los datos fiscales para calcular el neto y preparar el pago.', { exact: true }).waitFor();
+  assert.equal(closeBody, lastCloseBody, 'Sin fiscales genera PDF sin enviar creación del pago');
   assert.equal(liquidation.balance, 100, 'Falta fiscal no altera el cierre previo ni sus pagos');
-  assert.equal(await page.getByRole('button', { name: 'PDF de servicios aprobados', exact: true }).isEnabled(), true, 'El error fiscal deja disponible el PDF de aprobados');
-  const blockedClosePdf = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'PDF de servicios aprobados', exact: true }).click();
-  await (await blockedClosePdf).saveAs(path.join(output, 'aprobados-tras-cierre-bloqueado.pdf'));
+  assert.equal(await page.getByRole('button', { name: 'Completar datos fiscales', exact: true }).isEnabled(), true, 'El PDF pendiente permite completar fiscales después de descargar');
   assert.equal(catalogRequests, 1, 'Las modificaciones y cambios de pestaña no vuelven a descargar el catálogo');
   assert.deepEqual(errors, []);
   console.log('PASS: aprobación individual y por lotes fuera de Por revisar, conservada en Aprobados/Pagos; historial sin reaprobación; sólo los dos marcados y luego 48 pendientes. Cancelación, IVA único, móvil, catálogo, Excel, cierres, pagos y ambos PDF correctos.');

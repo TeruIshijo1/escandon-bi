@@ -74,6 +74,20 @@ function startServer({ backendDir = path.resolve(__dirname, '..'), argv = proces
   return child;
 }
 
+function prepareProductionData({ backendDir, environment, logger = console }) {
+  if (environment !== 'production') return;
+  const requiredFiles = ['excel_stats_history.json', 'statistics_manual_controls.json'];
+  const missing = requiredFiles.filter(file => !fs.existsSync(path.join(backendDir, 'data', file)));
+  if (!missing.length) return;
+  const root = path.resolve(backendDir, '..');
+  const initializer = path.join(root, 'scripts', 'initialize-package-data.cjs');
+  if (!fs.existsSync(initializer)) throw new Error('Falta el preparador de referencias. Copia el pase completo, incluidas las carpetas scripts e initial-data.');
+  const copied = require('../../scripts/initialize-package-data.cjs').initializePackageData(root);
+  const remaining = requiredFiles.filter(file => !fs.existsSync(path.join(backendDir, 'data', file)));
+  if (remaining.length) throw new Error(`Faltan las referencias ${remaining.join(', ')}. Copia el pase completo y ejecuta instalar.bat.`);
+  logger.log(`[Backend] Referencias iniciales preparadas: ${copied} archivos nuevos. Los existentes se conservaron.`);
+}
+
 async function runCli() {
   const backendDir = path.resolve(__dirname, '..');
   const argv = process.argv.slice(2);
@@ -107,6 +121,7 @@ async function runCli() {
       console.log(`[Backend] Ya está activo y disponible en http://localhost:${port}. Se utilizará esa instancia.`);
       return null;
     }
+    prepareProductionData({ backendDir, environment });
     return startServer({ backendDir, argv });
   } catch (error) {
     console.error('[Backend] ' + error.message);
@@ -116,4 +131,4 @@ async function runCli() {
 }
 
 if (require.main === module) runCli();
-module.exports = { validateVersion, resolveRuntime, startServer, runCli };
+module.exports = { validateVersion, resolveRuntime, startServer, prepareProductionData, runCli };

@@ -190,7 +190,7 @@ export default function HonorariosAuditView() {
     names.forEach(name => pendingSapDoctors.current.add(name));
     sapRequests.current += 1; setSapLoading(true);
     fetch(API_BASE + '/honorarios/sap-reconciliation', { method: 'POST', signal: controller?.signal,
-      headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ startDate, endDate, doctors: names })
+      headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ startDate, endDate, doctors: names, scope: 'fiscal' })
     }).then(async response => {
       const result = await response.json();
       if (!response.ok) throw new Error(userMessage(result.error));
@@ -468,7 +468,7 @@ export default function HonorariosAuditView() {
 
       setLoading(false);
 
-      // El reporte principal permanece disponible si SAP no responde; la conciliación es una lectura aparte.
+      // El cálculo necesita la configuración fiscal del médico, sin consultar su historial documental.
       const doctorNames = [...new Set(reportRows.flatMap(row => [String(row.Medico || '').trim(),
         row.ReviewBeneficiary?.providerName, loadedReviews[row.SourceIdentity || row.UDRKey]?.snapshot?.providerName]).filter(Boolean))];
       if (doctorNames.length) {
@@ -479,11 +479,11 @@ export default function HonorariosAuditView() {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             signal: controller.signal,
-            body: JSON.stringify({ startDate, endDate, doctors: doctorNames })
+            body: JSON.stringify({ startDate, endDate, doctors: doctorNames, scope: 'fiscal' })
           });
           const sapResult = await sapResponse.json();
           if (!current()) return;
-          if (!sapResponse.ok) throw new Error(userMessage(sapResult.error || 'No se pudieron consultar las facturas de SAP.'));
+          if (!sapResponse.ok) throw new Error(userMessage(sapResult.error || 'No se pudieron consultar los datos fiscales de SAP.'));
           setSapReconciliation(previous => ({ ...previous, ...sapResult, providers: { ...previous?.providers, ...sapResult.providers } }));
         } catch (sapErr) {
           if (!current()) return;
@@ -716,7 +716,7 @@ export default function HonorariosAuditView() {
       g.tasaISR = g.tasasISR.length === 1 ? g.tasasISR[0] : null;
       Object.assign(g, summarizeHonorarios(allMatchingRows));
       const sapProvider = sapReconciliation?.providers?.[g.providerName || g.medico] || sapReconciliation?.additionalProviders?.find(provider => provider.medico === (g.providerName || g.medico)) || null;
-      g.sap = sapProvider ? { ...sapProvider, invoices: (sapProvider.invoices || []).map(invoice =>
+      g.sap = sapProvider ? { ...sapProvider, documentsQueried: sapReconciliation?.documentsQueried, invoices: (sapProvider.invoices || []).map(invoice =>
         annotateSapInvoiceCoverage(invoice, g.providerName || g.medico, sourceRowsByMedico.get(g.medico) || [])) } : null;
       g.sapPeriod = sapReconciliation?.period;
     });
@@ -770,7 +770,7 @@ export default function HonorariosAuditView() {
       Object.assign(group, summarizeHonorarios(group.filasRevision));
       const sapProvider = sapReconciliation?.providers?.[group.providerName || group.medico]
         || sapReconciliation?.additionalProviders?.find(provider => provider.medico === (group.providerName || group.medico)) || null;
-      group.sap = sapProvider ? { ...sapProvider, invoices: (sapProvider.invoices || []).map(invoice =>
+      group.sap = sapProvider ? { ...sapProvider, documentsQueried: sapReconciliation?.documentsQueried, invoices: (sapProvider.invoices || []).map(invoice =>
         annotateSapInvoiceCoverage(invoice, group.providerName || group.medico, sourceRowsByMedico.get(group.medico) || [])) } : null;
       group.sapPeriod = sapReconciliation?.period;
       return group;
@@ -981,10 +981,11 @@ export default function HonorariosAuditView() {
         totalNeto: filteredTotals.net ?? 'Pendiente'
       };
 
+      const fiscalOnly = sapReconciliation?.documentsQueried === false;
       const filasSAP = excelGroups.flatMap(grupo => {
         const provider = grupo.sap;
         const base = { medicoKH: grupo.medico };
-        if (!provider) return [{ ...base, estadoVinculo: sapLoading ? 'Consultando facturas' : (sapError || 'Sin información de facturas') }];
+        if (!provider) return [{ ...base, estadoVinculo: sapLoading ? 'Consultando datos fiscales' : (sapError || 'Sin información fiscal') }];
         const candidates = provider.candidates || [];
         const candidateLabel = candidates.map(item => item.cardName).join(' / ');
         if (['candidato_unico', 'solo_sap'].includes(provider.linkStatus)) {
@@ -994,6 +995,10 @@ export default function HonorariosAuditView() {
           base.vigenciaFiscal = 'Pendiente de comprobar';
           base.retencionesConfiguradasSAP = formatConfiguredWithholdings(candidates[0]);
         }
+        if (fiscalOnly) return [{ ...base, tipoRegistro: 'Datos fiscales', proveedorCandidato: candidateLabel,
+          estadoVinculo: provider.linkStatus === 'ambiguo' ? 'Hay varios proveedores posibles'
+            : provider.linkStatus === 'candidato_unico' ? 'Proveedor encontrado por nombre; confirmar que sea el correcto' : 'No se encontró al proveedor',
+          observacion: 'Se consultaron los datos fiscales del médico. Las facturas y los pagos de SAP no se consultaron.' }];
         if (!['candidato_unico', 'solo_sap'].includes(provider.linkStatus)) {
           return [{ ...base, estadoVinculo: provider.linkStatus === 'ambiguo' ? 'Hay varios proveedores posibles' : 'No se encontró al proveedor', proveedorCandidato: candidateLabel, observacion: 'No se asignaron facturas porque no se pudo confirmar el proveedor.' }];
         }
@@ -1099,12 +1104,13 @@ export default function HonorariosAuditView() {
             totales: totalesMedicos
           },
           {
-            name: 'Facturas en SAP',
-            titulo: 'HOSPITAL ESCANDÓN - FACTURAS CONSULTADAS',
-            subtitulo: 'Los importes se muestran por moneda. El nombre es una referencia y no confirma por sí solo que la factura corresponda al médico o que ya se haya pagado.',
-            periodo: `Servicios: ${periodoTexto}. Se consultan facturas hasta ${formatDate(sapReconciliation?.period?.endDate || endDate)}.`,
+            name: fiscalOnly ? 'Datos fiscales SAP' : 'Facturas en SAP',
+            titulo: fiscalOnly ? 'HOSPITAL ESCANDÓN - DATOS FISCALES CONSULTADOS' : 'HOSPITAL ESCANDÓN - FACTURAS CONSULTADAS',
+            subtitulo: fiscalOnly ? 'Configuración fiscal utilizada para calcular los servicios. Las facturas y los pagos de SAP no se consultaron. El nombre propone una coincidencia que debe confirmarse.'
+              : 'Los importes se muestran por moneda. El nombre es una referencia y no confirma por sí solo que la factura corresponda al médico o que ya se haya pagado.',
+            periodo: fiscalOnly ? `Servicios: ${periodoTexto}.` : `Servicios: ${periodoTexto}. Se consultan facturas hasta ${formatDate(sapReconciliation?.period?.endDate || endDate)}.`,
             resumen: { ...resumenKPIs, 'Datos consultados el': sapReconciliation?.asOf || 'No disponible' },
-            columnas: columnasSAP,
+            columnas: fiscalOnly ? columnasSAP.filter(column => ['medicoKH', 'tipoRegistro', 'estadoVinculo', 'proveedorCandidato', 'rfcSAP', 'grupoSAP', 'regimenFiscalSAP', 'vigenciaFiscal', 'retencionesConfiguradasSAP', 'observacion'].includes(column.key)) : columnasSAP,
             filas: filasSAP
           }
         ]
@@ -1571,16 +1577,16 @@ export default function HonorariosAuditView() {
       `}</style>
       
       <HonorariosHeader workspace={workspace} onWorkspaceChange={changeWorkspace}
-        canExport={pdfExportGroups.length > 0 && !loading && !sapLoading && reviewReady && searchTerm === debouncedSearchTerm}
+        canExport={pdfExportGroups.length > 0 && !loading && reviewReady && searchTerm === debouncedSearchTerm}
         canExportExcel={filteredData.length > 0 && !loading && !sapLoading && reviewReady && searchTerm === debouncedSearchTerm}
         onExportSummary={() => generateAllDoctorsHonorariosPdf(pdfExportGroups, startDate, endDate, false, pdfGeneratedBy, workspace === 'approved')}
         onExportDetail={() => generateAllDoctorsHonorariosPdf(pdfExportGroups, startDate, endDate, true, pdfGeneratedBy, workspace === 'approved')}
         onExportExcel={exportToExcel} />
-      {['catalog', 'fiscal', 'monthly-fixed'].includes(workspace) && <div className="hon-friendly-actions" style={{ marginBottom: '1rem' }}>
+      {['catalog', 'fiscal', 'monthly-fixed'].includes(workspace) && <nav className="hon-config-nav" aria-label="Opciones de configuración de honorarios">
         <button type="button" className="hon-friendly-button" aria-pressed={workspace === 'fiscal'} onClick={() => { setFiscalProviderId(''); changeWorkspace('fiscal'); }}>Datos fiscales</button>
         <button type="button" className="hon-friendly-button" aria-pressed={workspace === 'catalog'} onClick={() => changeWorkspace('catalog')}>Catálogo y precios</button>
         <button type="button" className="hon-friendly-button" aria-pressed={workspace === 'monthly-fixed'} onClick={() => changeWorkspace('monthly-fixed')}>Jefes de área</button>
-      </div>}
+      </nav>}
       {workspace === 'audit' && <HonorariosVerticalAuditPanel />}
       {workspace === 'monthly-fixed' && <HonorariosMonthlyFixedPanel canManage={canManage} referenceMonth={startDate.slice(0, 7)} onChanged={onCatalogChanged} />}
       {fiscalError && <p role="alert" className="hon-friendly-message error">No se pudieron consultar las fichas fiscales internas. {fiscalError} <button type="button" onClick={loadFiscalProfiles}>Reintentar</button></p>}
@@ -1588,7 +1594,7 @@ export default function HonorariosAuditView() {
         onSaved={profile => { setFiscalProfiles(previous => ({ ...previous, [profile.providerId]: profile })); setFiscalError(''); }}
         onBack={paymentProviderId ? () => setWorkspace('liquidations') : undefined} />}
       {catalogVisited && <div hidden={workspace !== 'catalog'}><HonorariosCatalogPanel canManage={canManage} onChanged={onCatalogChanged} onReviewServices={reviewCatalogService} /></div>}
-      {workspace === 'liquidations' && <HonorariosLiquidationsPanel canManage={canManage} startDate={startDate} endDate={endDate} initialProviderId={paymentProviderId}
+      {workspace === 'liquidations' && <HonorariosLiquidationsPanel key={String(user?.id || user?.username || '')} preparationOwnerId={String(user?.id || user?.username || '')} canManage={canManage} startDate={startDate} endDate={endDate} initialProviderId={paymentProviderId}
         onViewApproved={() => changeWorkspace('approved')} onEditFiscal={id => { setFiscalProviderId(String(id || '')); setWorkspace('fiscal'); }}
         onDownloadApproved={paymentProviderId && approvedExportGroups.find(group => String(group.filasRevision[0]?.MedicoId) === paymentProviderId)
           ? () => downloadApprovedPdf(approvedExportGroups.find(group => String(group.filasRevision[0]?.MedicoId) === paymentProviderId)) : null}
@@ -1600,7 +1606,7 @@ export default function HonorariosAuditView() {
           onSearch={fetchReport} coverage={coverage} error={error} />
 
         {hasSearched && sapError && <div role="alert" className="hon-sap-notice">
-          No se pudieron consultar las facturas y los impuestos. Puedes revisar los servicios; los importes que dependen de esa información quedan pendientes. Vuelve a buscar para intentar de nuevo.
+          No se pudieron consultar los datos fiscales. Puedes revisar los servicios; los importes que dependen de esa información quedan pendientes. Vuelve a buscar para intentar de nuevo.
         </div>}
 
         {hasSearched && !loading && effectiveData.length > 0 && <>
@@ -1669,14 +1675,16 @@ export default function HonorariosAuditView() {
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
             <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>No se encontraron registros</h3>
             <p style={{ fontSize: '0.95rem', margin: 0 }}>
-              {effectiveData.length === 0 ? 'Para aparecer aquí, el servicio debe estar en Aprobados del catálogo y tener una tarifa que corresponda al médico y a la fecha de la atención.' : statusTab === 'pendientes'
+              {effectiveData.length === 0 && coverage?.pendingTariff > 0
+                ? `Hay ${coverage.pendingTariff.toLocaleString()} atenciones de servicios configurados sin tarifa para su fecha, médico o función. En Catálogo y precios, abre el servicio y edita la tarifa: revisa Se aplica desde, la fecha final y el médico.`
+                : effectiveData.length === 0 ? 'Para aparecer aquí, el servicio debe estar en Aprobados del catálogo y tener una tarifa que corresponda al médico y a la fecha de la atención.' : statusTab === 'pendientes'
                 ? 'No hay registros pendientes por revisar con estos filtros. Puedes consultar los aprobados o ver todo el historial.'
                 : 'No hay servicios aprobados del catálogo que coincidan con estos filtros en el periodo.'}
             </p>
             {statusTab === 'pendientes' && !bulkMessage && matchingReviewCounts.approved > 0 && <button type="button" className="hon-friendly-button primary" style={{ margin: '.75rem' }} onClick={() => changeWorkspace('approved')}>Ir a Pagos y PDF</button>}
-            {statusTab === 'pendientes' && <button onClick={() => setStatusTab('todos')} style={{ marginTop: '0.75rem', padding: '0.55rem 0.9rem', borderRadius: '8px', border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', fontWeight: '700', cursor: 'pointer' }}>Ver todo el historial</button>}
+            {statusTab === 'pendientes' && effectiveData.length > 0 && <button onClick={() => setStatusTab('todos')} style={{ marginTop: '0.75rem', padding: '0.55rem 0.9rem', borderRadius: '8px', border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', fontWeight: '700', cursor: 'pointer' }}>Ver todo el historial</button>}
             {effectiveData.length === 0 && <button type="button" className="hon-friendly-button primary" style={{ margin: '.75rem' }}
-              onClick={() => setWorkspace('catalog')}>Configurar servicios y tarifas</button>}
+              onClick={() => changeWorkspace('catalog')}>Configurar servicios y tarifas</button>}
           </div>
         )}
 
@@ -1713,7 +1721,7 @@ export default function HonorariosAuditView() {
                 pendingRows={pendingDoctorRows} selectedRows={selectedDoctorRows} expanded={isExpanded} onToggle={() => toggleMedico(grupo.medico)}
                 onApprove={() => openBulk('APROBAR', selectedDoctorRows.length ? selectedDoctorRows : pendingDoctorRows.slice(0, 100))}
                 onSelectRows={() => selectRows(grupo.filas)} canSelect={selectionAvailable}
-                canExport={(!sapLoading || fiscalProfiles[grupo.providerId || grupo.filasRevision[0]?.MedicoId]?.enabled) && reviewReady} sapLoading={sapLoading} rateText={rateText} sapLinkLabel={sapLinkLabel}
+                canExport={reviewReady} sapLoading={sapLoading} rateText={rateText} sapLinkLabel={sapLinkLabel}
                 onPreparePayment={() => { setPaymentProviderId(String(grupo.providerId || grupo.filasRevision[0]?.MedicoId || '')); setWorkspace('liquidations'); }}
                 onExportSummary={() => generateDoctorHonorariosPdf(exportGroups.find(item => item.medico === grupo.medico) || grupo, startDate, endDate, false, pdfGeneratedBy)}
                 onExportDetail={() => generateDoctorHonorariosPdf(exportGroups.find(item => item.medico === grupo.medico) || grupo, startDate, endDate, true, pdfGeneratedBy)}
@@ -2549,7 +2557,7 @@ export default function HonorariosAuditView() {
                   };
                   generateDoctorHonorariosPdf(docGroup, startDate, endDate, true, pdfGeneratedBy);
                 }}
-                disabled={sapLoading || !reviewReady}
+                disabled={!reviewReady}
                 style={{
                   padding: '0.6rem 1.4rem',
                   background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',

@@ -91,10 +91,11 @@ test('explicit stable Flash reserves can recover a Lite primary without automati
   expect(hosts(fetch)).toEqual(['generativelanguage.googleapis.com', 'generativelanguage.googleapis.com']);
 });
 
-test.each(['credentials', 'network', 'format'])('a %s failure can use an independently configured reserve', async failure => {
+test.each(['credentials', 'billing', 'network', 'format'])('a %s failure can use an independently configured reserve', async failure => {
   const fetch = jest.fn(async url => {
     if (new URL(url).hostname === 'api.openai.com') return success(proposal);
     if (failure === 'credentials') return { ok: false, status: 401 };
+    if (failure === 'billing') return { ok: false, status: 402 };
     if (failure === 'network') throw new TypeError('private provider error with fictional-google-key');
     return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'invalid JSON' } }] }) };
   });

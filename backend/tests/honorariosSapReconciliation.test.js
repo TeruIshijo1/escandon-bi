@@ -4,8 +4,40 @@ const assert = require('node:assert/strict');
 jest.mock('../services/sap.service', () => ({ get: jest.fn() }));
 jest.mock('../config/sap.config', () => ({ baseUrl: 'https://sap.example.test/b1s/v1' }));
 const sap = require('../services/sap.service');
-const { reconcileHonorariosWithSap } = require('../services/honorariosSapReconciliation.service');
+const { reconcileHonorariosWithSap, fetchAllPagesStrict } = require('../services/honorariosSapReconciliation.service');
 const input = { startDate: '2026-09-01', endDate: '2026-09-25', doctors: ['ANA PRUEBA MEDINA'] };
+
+test('fiscal scope reads complete fiscal catalogs without groups, invoices, payments or extra providers', async () => {
+  sap.get = jest.fn(async endpoint => {
+    if (endpoint.startsWith('/BusinessPartners')) return { data: endpoint.includes('$skip=')
+      ? { value: [{ CardCode: 'P1', CardName: input.doctors[0], FederalTaxID: 'AAAA800101AAA', U_B1SYS_FiscRegime: '612',
+        SubjectToWithholdingTax: 'boYES', BPWithholdingTaxCollection: [{ WTCode: 'SER' }] }] }
+      : { value: [], '@odata.nextLink': 'BusinessPartners?$skip=200' } };
+    if (endpoint.startsWith('/WithholdingTaxCodes')) return { data: { value: [{ WTCode: 'SER', WTName: 'Retención de ISR',
+      Rate: 10, BaseType: 'wtcbt_Net', BaseAmount: 100, Category: 'wtcc_Invoice', EffectiveFrom: '2025-01-01', Inactive: 'tNO' }] } };
+    throw new Error(`Fiscal PDF unnecessarily queried ${endpoint}`);
+  });
+  const result = await reconcileHonorariosWithSap({ ...input, scope: 'fiscal', includeAdditional: true });
+  expect(sap.get).toHaveBeenCalledTimes(3);
+  expect(result.documentsQueried).toBe(false);
+  expect(result.period).toMatchObject({ endDate: input.endDate, lookaheadDays: 0 });
+  expect(result.discoveryCoverage.enabled).toBe(false);
+  const provider = result.providers[input.doctors[0]];
+  expect(provider).toMatchObject({ documentsQueried: false, linkStatus: 'candidato_unico', candidates: [{
+    federalTaxId: 'AAAA800101AAA', fiscalRegime: '612', configuredWithholdings: [{ rate: 10, estimateRule: 'isr_on_fee' }]
+  }] });
+  for (const field of ['invoices', 'paymentsInPeriod', 'totalsByCurrency']) expect(provider).not.toHaveProperty(field);
+});
+
+test('fiscal scope keeps ambiguous identities ambiguous and validates its scope before SAP', async () => {
+  sap.get = jest.fn(async endpoint => ({ data: { value: endpoint.startsWith('/BusinessPartners') ? [
+    { CardCode: 'P1', CardName: input.doctors[0] }, { CardCode: 'P2', CardName: input.doctors[0] }
+  ] : [] } }));
+  expect((await reconcileHonorariosWithSap({ ...input, scope: 'fiscal' })).providers[input.doctors[0]].linkStatus).toBe('ambiguo');
+  sap.get.mockClear();
+  await expect(reconcileHonorariosWithSap({ ...input, scope: 'unknown' })).rejects.toMatchObject({ status: 400 });
+  expect(sap.get).not.toHaveBeenCalled();
+});
 
 test('reads beyond supplier 200 and preserves posted withholding amounts and missing regime', async () => {
   let supplierPages = 0;
@@ -157,4 +189,131 @@ test('discovers missing and generic honorarios suppliers and retrieves invoices 
   expect(result.additionalProviders[1].invoices[0]).toMatchObject({docEntry:30,documentTotal:1234,locatedByPayment:true});
   expect(result.additionalProviders[1].discoveryBasis).toMatch(/confirmar/);
   expect(outsideReads).toBe(1);
+});
+
+describe('bounded SAP reads', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+  const timeoutShape = { status: 504, code: 'HONORARIOS_SAP_TIMEOUT' };
+  const supplierPage = { data: { value: [{ CardCode: 'P1', CardName: input.doctors[0] }] } };
+
+  test('an independent fiscal-directory read has a finite default and ignores a late page', async () => {
+    let resolveLate;
+    sap.get = jest.fn(() => new Promise(resolve => { resolveLate = resolve; }));
+    const read = fetchAllPagesStrict('/BusinessPartners');
+    const rejection = expect(read).rejects.toMatchObject(timeoutShape);
+    await jest.advanceTimersByTimeAsync(29999);
+    expect(sap.get).toHaveBeenCalledTimes(1);
+    const options = sap.get.mock.calls[0][2];
+    expect(options.timeoutMs).toBe(30000);
+    expect(options.signal.aborted).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
+    await rejection;
+    expect(options.signal.aborted).toBe(true);
+    resolveLate({ data: { value: [{ CardCode: 'LATE' }], 'odata.nextLink': 'BusinessPartners?$skip=200' } });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(sap.get).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('the default total deadline covers all pages together instead of restarting for each page', async () => {
+    sap.get = jest.fn(() => new Promise(resolve => setTimeout(() => resolve({
+      data: { value: [{ CardCode: 'P1' }], '@odata.nextLink': 'BusinessPartners?$skip=200' }
+    }), 10000)));
+    const rejection = expect(reconcileHonorariosWithSap(input)).rejects.toMatchObject(timeoutShape);
+    await jest.advanceTimersByTimeAsync(60000);
+    await rejection;
+    expect(sap.get).toHaveBeenCalledTimes(6);
+    const requests = sap.get.mock.calls.map(call => call[2]);
+    expect(new Set(requests.map(options => options.signal)).size).toBe(1);
+    expect(requests.every(options => options.timeoutMs > 0 && options.timeoutMs <= 30000)).toBe(true);
+    expect(requests[0].signal.aborted).toBe(true);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('a shorter configurable deadline also rejects a get that listens for cancellation', async () => {
+    let aborted = false;
+    sap.get = jest.fn((endpoint, headers, { signal }) => new Promise((resolve, reject) => {
+      signal.addEventListener('abort', () => { aborted = true; reject(signal.reason); }, { once: true });
+    }));
+    const rejection = expect(reconcileHonorariosWithSap(input, { totalTimeoutMs: 50 })).rejects.toMatchObject(timeoutShape);
+    await jest.advanceTimersByTimeAsync(50);
+    await rejection;
+    expect(aborted).toBe(true);
+    expect(sap.get.mock.calls[0][2].timeoutMs).toBe(50);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('all masters, invoices, payments and inherited invoices use the same bounded signal', async () => {
+    sap.get = jest.fn(async endpoint => {
+      if (endpoint.startsWith('/BusinessPartners')) return supplierPage;
+      if (endpoint.startsWith('/VendorPayments')) return { data: { value: [{ CardCode: 'P1', PaymentInvoices: [
+        { DocEntry: 30, InvoiceType: 'it_PurchaseInvoice', SumApplied: 225 }
+      ] }] } };
+      if (endpoint === '/PurchaseInvoices(30)') return { data: {
+        DocEntry: 30, CardCode: 'P1', DocCurrency: 'MXN', DocTotal: 225, PaidToDate: 225
+      } };
+      return { data: { value: [] } };
+    });
+    const result = await reconcileHonorariosWithSap(input, { requestTimeoutMs: 45000 });
+    expect(result.providers[input.doctors[0]].invoices[0]).toMatchObject({ docEntry: 30, locatedByPayment: true });
+    expect(sap.get).toHaveBeenCalledTimes(6);
+    const requests = sap.get.mock.calls.map(call => call[2]);
+    expect(new Set(requests.map(options => options.signal)).size).toBe(1);
+    expect(requests.every(options => options.timeoutMs === 30000 && !options.signal.aborted)).toBe(true);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('a failed master read aborts its concurrent sibling and preserves the original error', async () => {
+    const failure = new Error('No se pudo leer el catálogo');
+    let siblingAborted = false;
+    sap.get = jest.fn(async (endpoint, headers, { signal }) => {
+      if (endpoint.startsWith('/BusinessPartners')) return supplierPage;
+      if (endpoint.startsWith('/BusinessPartnerGroups')) throw failure;
+      return new Promise((resolve, reject) => signal.addEventListener('abort', () => {
+        siblingAborted = true;
+        reject(signal.reason);
+      }, { once: true }));
+    });
+    await expect(reconcileHonorariosWithSap(input)).rejects.toBe(failure);
+    expect(siblingAborted).toBe(true);
+    expect(sap.get.mock.calls.every(call => call[2].signal.aborted)).toBe(true);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('a partial invoice collection and a hung payment read cannot return an empty or partial reconciliation', async () => {
+    sap.get = jest.fn(async (endpoint, headers, { signal }) => {
+      if (endpoint.startsWith('/BusinessPartners')) return supplierPage;
+      if (endpoint.startsWith('/PurchaseInvoices')) return { data: { value: [{ DocEntry: 1, CardCode: 'P1', DocTotal: 225 }] } };
+      if (endpoint.startsWith('/VendorPayments')) return new Promise((resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+      return { data: { value: [] } };
+    });
+    const rejection = expect(reconcileHonorariosWithSap(input)).rejects.toMatchObject(timeoutShape);
+    await jest.advanceTimersByTimeAsync(30000);
+    await rejection;
+    expect(sap.get.mock.calls.every(call => call[2].signal.aborted)).toBe(true);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('an inherited invoice is bounded and a native HTTP timeout has a safe typed error', async () => {
+    sap.get = jest.fn(async endpoint => {
+      if (endpoint.startsWith('/BusinessPartners')) return supplierPage;
+      if (endpoint.startsWith('/VendorPayments')) return { data: { value: [{ CardCode: 'P1', PaymentInvoices: [
+        { DocEntry: 30, InvoiceType: 'it_PurchaseInvoice', SumApplied: 225 }
+      ] }] } };
+      if (endpoint === '/PurchaseInvoices(30)') return new Promise(() => {});
+      return { data: { value: [] } };
+    });
+    const rejection = expect(reconcileHonorariosWithSap(input)).rejects.toMatchObject(timeoutShape);
+    await jest.advanceTimersByTimeAsync(30000);
+    await rejection;
+    expect(sap.get.mock.calls.at(-1)[0]).toBe('/PurchaseInvoices(30)');
+    sap.get = jest.fn(async () => { throw Object.assign(new Error('Internal URL and connection details'), { code: 'SAP_READ_TIMEOUT' }); });
+    await expect(fetchAllPagesStrict('/BusinessPartners')).rejects.toMatchObject({
+      ...timeoutShape, message: 'SAP tardó demasiado en responder. Vuelve a intentar en unos momentos.'
+    });
+    expect(jest.getTimerCount()).toBe(0);
+  });
 });

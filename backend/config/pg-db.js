@@ -704,6 +704,7 @@ async function initPostgresDW() {
       );
       CREATE INDEX IF NOT EXISTS idx_usersapqueries_user ON usersapqueries (username);
     `);
+    await require('../services/savedReportAccess.service').initAssignmentsTable(pool);
 
     // Corrección de error de Excel en el código SAP del guante 8.5
     await pool.query(`UPDATE dw_sap_reorder_settings SET itemcode = 'ALG0065' WHERE itemcode = '#REF!';`).catch(() => {});

@@ -30,7 +30,7 @@ function fixture(t) {
 test('inventory includes new runtime files and protects credentials, uploads, dumps and mutable data', () => {
   const plan = pack.createPlan();
   for (const source of ['backend/scripts/migrate-honorarios.js', 'backend/services/reportIntent.service.js', 'backend/services/honorariosSources.service.js', 'backend/services/sapAccountReview.service.js', '.runtime/node.exe', 'backend/package-lock.json']) assert.ok(plan.some(entry => entry.source === source));
-  assert.ok(!plan.some(entry => /(?:^|\/)\.env$|node_modules\/|uploads\/|\.dump$|_backup\.joblib$/.test(entry.destination)));
+  assert.ok(!plan.some(entry => /(?:^|\/)\.env$|(?:^|\/)(?:node_modules|uploads|tmp|temp)\/|\.dump$|_backup\.joblib$/.test(entry.destination)));
   assert.ok(plan.filter(entry => entry.source.startsWith('backend/data/')).every(entry => entry.destination.startsWith('initial-data/')));
 });
 test('production configuration comes from the example and changes only server mode and port', () => {

@@ -9,7 +9,7 @@ const { builtinModules } = require('node:module');
 const root = path.resolve(__dirname, '..');
 const normalize = value => value.split(path.sep).join('/');
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const excludedDir = /^(node_modules|tests|coverage|scratch|uploads|__pycache__|\.git|\.venv|venv)$/i;
+const excludedDir = /^(node_modules|tests|coverage|scratch|tmp|temp|uploads|__pycache__|\.git|\.venv|venv)$/i;
 const excludedFile = /^(?:\.env(?:\..+)?|(?:scratch|test|check|search|query|update)_.+|eslint\.config\.js|jest\.config\.js|nodemon\.json|0)$|\.(?:log|pyc|pyo|db(?:-wal|-shm)?|sqlite(?:-wal|-shm)?|dump|bak)$|_backup\.joblib$/i;
 const initialDataPath = /^backend\/(?:data\/|ml\/(?:models|reports)\/)/;
 

@@ -619,6 +619,14 @@ export function getPermissionSections(user) {
     });
   }
 
+  // Consultar el mapa no concede permiso para modificar una cuenta en Vertical.
+  sections.push({
+    id: 'ejecutar-reapertura-cuentas',
+    name: 'Reaperturar cuentas verificadas en Vertical',
+    icon: '🔄',
+    category: 'Auditoría',
+  });
+
   // ── Permisos Consultas SAP (sap-query-*) — Controlan módulos del constructor visual ──
   for (const sapPerm of SAP_QUERY_PERMISSIONS) {
     sections.push({

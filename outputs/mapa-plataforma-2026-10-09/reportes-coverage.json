@@ -1,0 +1,28 @@
+{
+  "manual": 64,
+  "assistant": 632,
+  "total": 696,
+  "tableIds": 696,
+  "groups": [
+    [
+      "Consultas especializadas de convenios, cuenta y precios",
+      5
+    ],
+    [
+      "Recursos de Vertical declarados por metadatos",
+      383
+    ],
+    [
+      "Recursos de SAP declarados por metadatos",
+      33
+    ],
+    [
+      "Relaciones declaradas entre recursos de Vertical",
+      48
+    ],
+    [
+      "Combinaciones de Vertical con pagador/artículo de SAP",
+      163
+    ]
+  ]
+}

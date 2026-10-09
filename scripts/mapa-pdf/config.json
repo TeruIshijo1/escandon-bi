@@ -1,0 +1,23 @@
+{
+  "pageSize": "LETTER",
+  "marginPoints": 42,
+  "bodyFontSize": 10.2,
+  "bodyLeading": 13.4,
+  "tableFontSize": 9.4,
+  "tableLeading": 12.2,
+  "wideTableColumns": 5,
+  "cutoffDate": "9 de octubre de 2026",
+  "title": "Mapa e instructivo de la plataforma Hospital Escandón BI",
+  "runningTitle": "Hospital Escandón BI | Mapa e instructivo",
+  "navy": "#193b4c",
+  "teal": "#00888d",
+  "text": "#182b35",
+  "fonts": {
+    "regular": "arial.ttf",
+    "bold": "arialbd.ttf",
+    "italic": "ariali.ttf",
+    "boldItalic": "arialbi.ttf",
+    "mono": "consola.ttf",
+    "unicode": "ARIALUNI.ttf"
+  }
+}

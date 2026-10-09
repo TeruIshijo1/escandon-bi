@@ -18,8 +18,9 @@ cache('../config/db', { getDb: () => ({ pool }) });
 const sources = require('../services/honorariosSources.service');
 const catalog = require('../services/honorariosCatalog.service');
 const { reviewFingerprint } = require('../utils/honorariosReviewSource');
-let fiftyMode=false, directoryReads=0;
+let fiftyMode=false, directoryReads=0, remoteReads=0, sapReads=0;
 let surgical=false;
+let referenceRows = [{ Id_UT: 1, ITEMCODE: 'SER1471', IMPORTE: 1, NOTAS: 'Referencia nominal; revisar' }];
 const procedure=()=>({PCFRNum:400,CPCode:'CXQ175',PCNum:300,PTNum:100,ServiceDate:'2026-10-03',
   ItemDescription:'CESAREA',ItemGroupName:'PROCEDIMIENTO EN QUIROFANO',SourceProcedureCount:1,
   SurgeryRole:'SURGEON',ProviderCount:1,ProviderId:7,ProviderName:'MÉDICO PRUEBA',PCFR_ST:'CL',PC_ST:'CL'});
@@ -38,6 +39,7 @@ const orders = () => fiftyMode ? Array.from({ length: 50 }, (_, i) => ({ SONum: 
     ServiceLineCount: 1, PCAP_ST: 'SH', UDF_Ejecutada: true, SO_ST: 'PR', SOLN_ST: 'PR' }))];
 const remote = { request() { const params = {}; return { input(key, value) { params[key] = value; return this; },
   async query(sql) {
+    remoteReads++;
     assert.doesNotMatch(sql, /\b(INSERT|UPDATE|DELETE|MERGE|ALTER|DROP|CREATE|TRUNCATE|EXEC|INTO)\b/i);
     let rows = [];
     if (sql === catalog.CATALOG_SQL) rows = [
@@ -49,7 +51,7 @@ const remote = { request() { const params = {}; return { input(key, value) { par
       { ItemCode: 'SER0715', ItemDescription: 'JORNADA VIGILANCIA ESPECIALIDAD MEDICA PROYECTO HSBC', ItemType: 'S', ItemGroupName: 'ANALISIS DE CUENTAS', Enabled: true },
       { ItemCode: 'SER_NUEVO', ItemDescription: 'CONCEPTO NUEVO POR CLASIFICAR', ItemType: 'S', ItemGroupName: '', Enabled: true }
     ];
-    else if (sql === catalog.REFERENCE_SQL) rows = [{ Id_UT: 1, ITEMCODE: 'SER1471', IMPORTE: 1, NOTAS: 'Referencia nominal; revisar' }];
+    else if (sql === catalog.REFERENCE_SQL) rows = referenceRows;
     else if (sql === sources.ORDER_CANDIDATES_SQL) rows = orders().filter(row => row.ServiceDate >= params.startDate && row.ServiceDate <= params.endDate);
     else if(sql === sources.PROCEDURE_CANDIDATES_SQL) rows=surgical?[procedure()].filter(row=>row.ServiceDate>=params.startDate&&row.ServiceDate<=params.endDate):[];
     else if (/FROM PR WHERE Role='P'/.test(sql)) { directoryReads++; rows = [{ PRNum: 7, FullName: 'MÉDICO PRUEBA', Role: 'P' }, { PRNum: 8, FullName: 'SOLICITANTE PRUEBA', Role: 'P' }]; }
@@ -57,16 +59,34 @@ const remote = { request() { const params = {}; return { input(key, value) { par
   } }; } };
 cache('../config/remote-db', { connectRemoteDB: async () => remote, getRemoteDb: async () => remote });
 cache('../middleware/auth.middleware', { authenticate(req, _res, next) { req.user = { id: 7, nombre: 'REVISOR PRUEBA', role: 'ADMIN', permisos: ['interconsultas-jornadas'] }; next(); }, authorize: () => (_req, _res, next) => next() });
-cache('../services/honorariosSapReconciliation.service', { reconcileHonorariosWithSap: async ({ doctors, startDate, endDate }) => ({
+cache('../services/honorariosSapReconciliation.service', { reconcileHonorariosWithSap: async ({ doctors, startDate, endDate }) => {
+  sapReads++;
+  return {
   ok: true, asOf: new Date().toISOString(), period: { startDate, endDate }, additionalProviders: [],
   providers: Object.fromEntries(doctors.map(name => [name, { linkStatus: 'candidato_unico', invoices: [],
     candidates: [{ subjectToWithholding: true, federalTaxId: 'AAAA800101AAA', configuredWithholdings: [
       { inactive: false, estimateRule: 'isr_on_fee', rate: 10, appliesAt: 'factura', codeEffectiveFrom: '2025-01-01' }
-    ] }] }])) }) });
+    ] }] }])) };
+} });
 const app = express(); app.use(express.json()); app.use('/api/honorarios', require('../routes/honorarios.routes'));
 const api = async (method, path, body, status = 200) => {
   const result = await request(app)[method](`/api/honorarios${path}`).send(body);
   assert.equal(result.status, status, JSON.stringify(result.body)); return result.body;
+};
+const availableInput = { startDate: '2026-09-01', endDate: '2026-09-30', providerId: 7 };
+const financialSnapshot = async () => Object.fromEntries(await Promise.all([
+  ['bi_honorarios_reviews', 'row_id'], ['bi_honorarios_review_history', 'id'],
+  ['bi_honorarios_fiscal_profiles', 'provider_id'], ['bi_honorarios_fiscal_profile_history', 'id'],
+  ['bi_honorarios_tariffs', 'id'], ['bi_honorarios_liquidations', 'id'],
+  ['bi_honorarios_finalized_rows', 'row_id'], ['bi_honorarios_payment_applications', 'id'],
+  ['bi_honorarios_liquidation_adjustments', 'id']
+].map(async ([table, order]) => [table, (await pool.query(`SELECT * FROM ${table} ORDER BY ${order}`)).rows])));
+const availableWithoutMutations = async (body = availableInput, status = 200) => {
+  const before = await financialSnapshot(), sapBefore = sapReads;
+  const result = await api('post', '/available-payment-report', body, status);
+  assert.deepEqual(await financialSnapshot(), before, 'Consultar el reporte disponible conserva tarifas, aprobaciones, fichas, cierres y pagos');
+  assert.equal(sapReads, sapBefore, 'El reporte disponible no consulta SAP');
+  return result.report || result;
 };
 const audit = async () => (await api('get', '/audit?startDate=2026-09-01&endDate=2026-09-30')).data;
 const approve = (row, changes = {}) => ({ rowId: row.SourceIdentity, serviceDate: row.FechaAtencion.slice(0, 10), expectedRevision: 0,
@@ -193,8 +213,26 @@ const approve = (row, changes = {}) => ({ rowId: row.SourceIdentity, serviceDate
     assert.equal(finalOnline.ReviewInvalidated, true);
     await api('put', '/reviews', { ...approve(finalOnline), expectedRevision: 3 });
     assert.equal((await audit()).find(row => row.SourceLineId === 91).ReviewInvalidated, false);
+    await api('get', '/liquidations');
+    await api('get', '/fiscal-profiles');
+    const firstAvailable = await availableWithoutMutations();
+    assert.equal(firstAvailable.status, 'FISCAL_PENDING');
+    assert.deepEqual(firstAvailable.totals, { base: 250, vat: 0, isr: null, vatWithholding: null, net: null });
+    assert.equal(firstAvailable.doctors.length, 1);
+    assert.equal(firstAvailable.doctors[0].providerId, 7, 'Se usa el médico asignado en la aprobación y no el solicitante de Vertical');
+    assert.deepEqual(firstAvailable.doctors[0].fiscal, { federalTaxId: null, fiscalRegime: null, ready: false });
+    assert.equal(firstAvailable.doctors[0].lines.length, 1);
+    assert.equal(firstAvailable.doctors[0].lines[0].rowId, online.SourceIdentity);
+    assert.equal(firstAvailable.doctors[0].lines[0].baseAmount, 250);
+    assert.equal(firstAvailable.doctors[0].lines[0].vatRate, 0);
+    assert.equal(firstAvailable.doctors[0].lines[0].vat, 0);
+    assert.equal(firstAvailable.doctors[0].lines[0].netAmount, null);
+    assert.equal(Object.hasOwn(firstAvailable, 'liquidationId'), false);
+    console.log('PASS: reporte disponible con fiscal pendiente conserva médico, honorario e IVA aprobado, sin consultar SAP ni modificar datos financieros.');
     const closed = await api('post', '/liquidations', { startDate: '2026-09-01', endDate: '2026-09-30', providerId: 7, confirmed: true, reason: 'Cierre revisado' });
     const id = closed.liquidation.id; assert.equal(closed.liquidation.snapshot.totalNet, 225);
+    const noAvailableAfterClose = await availableWithoutMutations(availableInput, 400);
+    assert.match(noAvailableAfterClose.error, /No hay servicios aprobados disponibles/);
     const paymentReport = (await api('get', `/liquidations/${id}/payment-report`)).report;
     assert.equal(paymentReport.status, 'READY'); assert.equal(paymentReport.totals.payable, 225);
     assert.equal(paymentReport.doctors[0].providerId, 7); assert.equal(paymentReport.totals.base, 250);
@@ -345,7 +383,112 @@ const approve = (row, changes = {}) => ({ rowId: row.SourceIdentity, serviceDate
     const restoredFifty = calculateHonorarios(rereadFifty, rereadReviews);
     assert.equal(restoredFifty.filter(row => row._reviewStatus === 'APROBADO' && row._effectiveElegible).length, 50);
     assert.equal(restoredFifty.filter(row => row._reviewStatus === 'PENDIENTE' || row._reviewStale).length, 0);
+    const fiftyAvailablePending = await availableWithoutMutations();
+    assert.equal(fiftyAvailablePending.status, 'FISCAL_PENDING');
+    assert.deepEqual(fiftyAvailablePending.totals, { base: 12500, vat: 2000, isr: null, vatWithholding: null, net: null });
+    assert.equal(fiftyAvailablePending.doctors[0].lines.length, 50);
+    assert.ok(fiftyAvailablePending.doctors[0].lines.every(line => line.quantity === 1 && line.unitAmount === 250
+      && line.baseAmount === 250 && line.vatRate === 0.16 && line.vat === 40
+      && line.isr === null && line.vatWithholding === null && line.netAmount === null));
+    console.log('PASS: 50 servicios aprobados con IVA 16% generan reporte disponible fiscal pendiente con base e IVA exactos, sin alteraciones.');
     console.log('PASS: cincuenta aprobaciones leídas desde PostgreSQL conservan firma, estado aprobado y elegibilidad en el cálculo real del cliente.');
+    {
+      // Reproduce referencias guardadas antes del enriquecimiento de auditoría,
+      // sin modificar las aprobaciones ni tarifas del esquema operativo.
+      const beforeConfig = (await pool.query("SELECT status,modality,payment_unit,reason,revision FROM bi_honorarios_catalog WHERE item_code='SER1471'")).rows;
+      const beforeTariffs = (await pool.query("SELECT * FROM bi_honorarios_tariffs WHERE item_code='SER1471' ORDER BY id")).rows;
+      const beforeReviews = (await pool.query('SELECT row_id,payload,revision FROM bi_honorarios_reviews ORDER BY row_id')).rows;
+      await pool.query(`UPDATE bi_honorarios_catalog SET reference_changed=false,
+        reference_prices=(SELECT jsonb_agg(ref - 'changeAudit') FROM jsonb_array_elements(reference_prices) ref)
+        WHERE item_code='SER1471'`);
+      assert.equal((await pool.query("SELECT reference_prices FROM bi_honorarios_catalog WHERE item_code='SER1471'")).rows[0].reference_prices[0].changeAudit, undefined);
+      await catalog.syncCatalog(remote);
+      let storedReference = (await pool.query("SELECT reference_changed,reference_prices FROM bi_honorarios_catalog WHERE item_code='SER1471'")).rows[0];
+      assert.equal(storedReference.reference_changed, false, 'Enriquecer referencias heredadas no anuncia un cambio de precio');
+      assert.deepEqual(storedReference.reference_prices[0].changeAudit, { available: false, source: 'Vertical', reason: 'not_recorded', changedBy: null, changedAt: null });
+      const original = referenceRows.map(row => ({ ...row }));
+      for (const changedReferences of [
+        [{ ...original[0], IMPORTE: 275 }],
+        [{ ...original[0], NOTAS: 'Nota de referencia modificada' }],
+        [{ ...original[0], ITEMDESCRIPTION: 'Descripción de referencia modificada' }],
+        [...original, { ...original[0], Id_UT: 2, IMPORTE: 300 }],
+        []
+      ]) {
+        await pool.query("UPDATE bi_honorarios_catalog SET reference_changed=false WHERE item_code='SER1471'");
+        referenceRows = changedReferences;
+        await catalog.syncCatalog(remote);
+        assert.equal((await pool.query("SELECT reference_changed FROM bi_honorarios_catalog WHERE item_code='SER1471'")).rows[0].reference_changed, true,
+          'Cambios de importe, notas, descripción, altas y bajas conservan el aviso');
+      }
+      referenceRows = original;
+      await catalog.syncCatalog(remote);
+      await catalog.syncCatalog(remote);
+      assert.equal((await pool.query("SELECT reference_changed FROM bi_honorarios_catalog WHERE item_code='SER1471'")).rows[0].reference_changed, true,
+        'Una sincronización idéntica no borra avisos existentes');
+      assert.deepEqual((await pool.query("SELECT status,modality,payment_unit,reason,revision FROM bi_honorarios_catalog WHERE item_code='SER1471'")).rows, beforeConfig);
+      assert.deepEqual((await pool.query("SELECT * FROM bi_honorarios_tariffs WHERE item_code='SER1471' ORDER BY id")).rows, beforeTariffs);
+      assert.deepEqual((await pool.query('SELECT row_id,payload,revision FROM bi_honorarios_reviews ORDER BY row_id')).rows, beforeReviews);
+      const afterReferences = await audit();
+      const currentReviews = (await api('get', '/reviews?startDate=2026-09-01&endDate=2026-09-30')).reviews;
+      assert.ok(afterReferences.every(row => row.ReviewInvalidated === false));
+      const calculated = calculateHonorarios(afterReferences, currentReviews);
+      assert.equal(calculated.filter(row => row._reviewStatus === 'APROBADO' && row._effectiveElegible).length, 50);
+      assert.equal(calculated.filter(row => row._reviewStale).length, 0);
+      console.log('PASS: referencias heredadas enriquecidas sin falso aviso; importe/notas/descripción/altas/bajas detectados; tarifas, revisiones y 50 aprobaciones conservadas.');
+    }
+    {
+      await pool.query(`INSERT INTO bi_honorarios_catalog(item_code,name,group_name,source_active,status,scope_excluded,revision)
+        SELECT 'SER_EXPORT_'||n,'Consulta exportación prueba '||n,'CONSULTA EXTERNA',n<>2,
+          CASE WHEN n=3 THEN 'EXCLUIDO' WHEN n=4 THEN 'PENDIENTE' ELSE 'INCLUIDO' END,n=305,2
+        FROM generate_series(1,305) n`);
+      await pool.query(`INSERT INTO bi_honorarios_tariffs(item_code,amount,valid_from,active,reason,updated_by)
+        SELECT 'SER_EXPORT_'||n,100,'2026-01-01',true,'Tarifa de exportación aislada','REVISOR PRUEBA'
+        FROM generate_series(1,305) n WHERE n<>4`);
+      await pool.query(`INSERT INTO bi_honorarios_tariffs(item_code,provider_id,role,amount,valid_from,valid_to,active,reason,updated_by)
+        VALUES('SER_EXPORT_1','77','AN',250,'2026-01-01','2026-04-30',false,'Tarifa específica anterior','REVISOR PRUEBA'),
+          ('SER_EXPORT_1','88','SURGEON',350,'2026-10-01',NULL,true,'Tarifa específica vigente','REVISOR PRUEBA')`);
+      const beforeCatalog = (await pool.query('SELECT * FROM bi_honorarios_catalog ORDER BY item_code')).rows;
+      const beforeTariffs = (await pool.query('SELECT * FROM bi_honorarios_tariffs ORDER BY id')).rows;
+      const beforeReviews = (await pool.query('SELECT * FROM bi_honorarios_reviews ORDER BY row_id')).rows;
+      const beforeRemote = remoteReads;
+      const statements = [], query = pool.query;
+      let exported;
+      pool.query = function (...args) { statements.push(args[0]); return query.apply(this, args); };
+      try {
+        exported = await api('get', '/catalog/export-data?search=' + encodeURIComponent('Consulta exportación prueba'));
+      } finally { pool.query = query; }
+      assert.equal(statements.length, 1, 'El endpoint toma catálogo y todas sus tarifas en una consulta snapshot');
+      assert.match(statements[0], /statement_timestamp\(\)/);
+      assert.doesNotMatch(statements[0], /\b(INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|TRUNCATE|LIMIT)\b/i);
+      assert.equal(exported.items.length, 304, 'Exporta todas las páginas y conserva la exclusión de alcance');
+      assert.ok(Number.isFinite(Date.parse(exported.snapshotAt)));
+      const specific = exported.items.find(item => item.itemCode === 'SER_EXPORT_1');
+      assert.equal(specific.tariffs.length, 3);
+      const inactiveSpecific = specific.tariffs.find(rate => rate.providerId === '77');
+      assert.equal(inactiveSpecific.role, 'AN');
+      assert.equal(inactiveSpecific.amount, 250);
+      assert.equal(inactiveSpecific.active, false);
+      assert.equal(inactiveSpecific.validFrom, '2026-01-01');
+      assert.equal(inactiveSpecific.validTo, '2026-04-30');
+      assert.ok(specific.tariffs.some(rate => rate.providerId === '88' && rate.role === 'SURGEON' && rate.amount === 350 && rate.active));
+      assert.equal(exported.items.find(item => item.itemCode === 'SER_EXPORT_2').active, false);
+      assert.equal(exported.items.find(item => item.itemCode === 'SER_EXPORT_3').approvalStatus, 'EXCLUIDO');
+      assert.equal(exported.items.find(item => item.itemCode === 'SER_EXPORT_4').approvalStatus, 'PENDIENTE');
+      const approved = await catalog.readCatalogExport({ search: 'Consulta exportación prueba', includeInactive: false, approvalStatus: 'APROBADO' });
+      assert.equal(approved.items.length, 301);
+      assert.ok(approved.items.every(item => item.active && item.approvalStatus === 'APROBADO'));
+      assert.deepEqual((await catalog.readCatalogExport({ search: 'Consulta exportación prueba', status: 'EXCLUIDO' })).items.map(item => item.itemCode), ['SER_EXPORT_3']);
+      const empty = await catalog.readCatalogExport({ search: 'NO_EXISTE_EXPORT_TEST' });
+      assert.deepEqual(empty.items, []); assert.ok(Number.isFinite(Date.parse(empty.snapshotAt)));
+      assert.equal(remoteReads, beforeRemote, 'Exportar no consulta ni sincroniza Vertical');
+      assert.deepEqual((await pool.query('SELECT * FROM bi_honorarios_catalog ORDER BY item_code')).rows, beforeCatalog);
+      assert.deepEqual((await pool.query('SELECT * FROM bi_honorarios_tariffs ORDER BY id')).rows, beforeTariffs);
+      assert.deepEqual((await pool.query('SELECT * FROM bi_honorarios_reviews ORDER BY row_id')).rows, beforeReviews);
+      const afterExport = calculateHonorarios(await audit(), (await api('get', '/reviews?startDate=2026-09-01&endDate=2026-09-30')).reviews);
+      assert.equal(afterExport.filter(row => row._reviewStatus === 'APROBADO' && row._effectiveElegible).length, 50);
+      assert.equal(afterExport.filter(row => row._reviewStale).length, 0);
+      console.log('PASS: exportación de 304 servicios en un snapshot, filtros, estados, tarifas generales/específicas/inactivas, sin lecturas Vertical ni cambios de precios/aprobaciones.');
+    }
     { // Ficha interna: completa un proveedor sin retención IVA en SAP, sin tocar SAP.
     const fiscal = { expectedRevision: 0, enabled: true, federalTaxId: 'AAAA800101AAA', fiscalRegime: '612',
       validFrom: '2026-01-01', isrRate: 0.1, vatFraction: 2 / 3, defaultVatRate: 0.16 };
@@ -357,12 +500,29 @@ const approve = (row, changes = {}) => ({ rowId: row.SourceIdentity, serviceDate
     await api('put', '/fiscal-profiles/7', fiscal, 409);
     assert.equal((await api('get', '/fiscal-profiles')).profiles['7'].defaultVatRate, 0.16);
     assert.equal((await api('get', '/fiscal-profiles/7/history')).history.length, 1);
+    const fiftyAvailableComplete = await availableWithoutMutations();
+    assert.equal(fiftyAvailableComplete.status, 'AVAILABLE');
+    assert.deepEqual(fiftyAvailableComplete.totals, { base: 12500, vat: 2000, isr: 1250, vatWithholding: 1333.33, net: 11916.67 });
+    assert.deepEqual(fiftyAvailableComplete.doctors[0].fiscal, { federalTaxId: fiscal.federalTaxId,
+      fiscalRegime: fiscal.fiscalRegime, ready: true });
+    assert.equal(fiftyAvailableComplete.doctors[0].lines.length, 50);
+    assert.ok(fiftyAvailableComplete.doctors[0].lines.every(line => line.baseAmount === 250 && line.vat === 40
+      && line.vatRate === 0.16 && line.isr === 25 && line.fiscalSnapshot.revision === 1));
     const allClosed = (await api('post', '/liquidations', { startDate: '2026-09-01', endDate: '2026-09-30',
       providerId: 7, confirmed: true, reason: 'Pago preparado con ficha interna de prueba aislada' })).liquidation;
     assert.equal(allClosed.lines.length, 50); assert.equal(allClosed.snapshot.totalBase, 12500);
     assert.equal(allClosed.snapshot.totalNet, 11916.67);
     assert.ok(allClosed.lines.every(line => line.vat === 40 && line.fiscalSnapshot.source === 'BI_INTERNO'
       && line.fiscalSnapshot.revision === 1 && line.vatRate === 0.16));
+    const availableById = new Map(fiftyAvailableComplete.doctors[0].lines.map(line => [line.rowId, line]));
+    for (const line of allClosed.lines) {
+      const available = availableById.get(line.rowId);
+      for (const field of ['baseAmount', 'vat', 'isr', 'vatWithholding', 'netAmount']) {
+        assert.equal(line[field], available[field], `El cierre conserva ${field} del reporte disponible, centavo por centavo`);
+      }
+    }
+    await availableWithoutMutations(availableInput, 400);
+    console.log('PASS: 50 servicios pasan de fiscal pendiente a AVAILABLE tras ficha interna; reporte y cierre coinciden por centavo y los cerrados quedan excluidos.');
     const internalPaymentId = allClosed.id;
     const paymentInput = { providerId: '7', amount: 1000.01, paymentDate: '2026-10-05', reference: 'COMPROBANTE-UNICO' };
     const paid = (await api('post', `/liquidations/${internalPaymentId}/provider-payment`, paymentInput)).liquidation;

@@ -89,9 +89,10 @@ export default function HonorariosDoctorReviewCard({ group, rows, pendingRows, s
           {[['Honorario aprobado', group.totalBase], ['IVA', group.totalIVA], ['ISR estimado', group.totalISR], ['Retención de IVA', group.totalRetIVA]].map(([label, amount], index) =>
             <div key={label}><span>{label}</span><strong>{index > 1 && Number(amount) > 0 ? '−' : ''}{formatMoney(amount)}</strong></div>)}
         </div>
-        <p>ISR estimada: {rateText}. {sapLoading ? 'Consultando facturas e impuestos…' : sapLinkLabel}.</p>
-        {group.sap && <p>Facturas activas en SAP: {group.sap.invoices?.filter(invoice => !invoice.cancelled).length || 0}.</p>}
-        {(group.sap?.totalsByCurrency || []).map(total => <p key={total.currency}>
+        <p>ISR estimada: {rateText}. {sapLoading ? 'Consultando datos fiscales…' : sapLinkLabel}.</p>
+        {group.sap?.documentsQueried === false && <p>Las facturas y los pagos de SAP no se consultaron.</p>}
+        {group.sap && group.sap.documentsQueried !== false && <p>Facturas activas en SAP: {group.sap.invoices?.filter(invoice => !invoice.cancelled).length || 0}.</p>}
+        {(group.sap?.documentsQueried === false ? [] : group.sap?.totalsByCurrency || []).map(total => <p key={total.currency}>
           Saldo de facturas SAP ({total.currency}): {formatSapMoney(total.openBalance, total.currency)}.</p>)}
         {group.approvedDocuments > 0 && <p>Atenciones aprobadas: {formatMoney(group.clinicalNet)} · Facturas aprobadas: {formatMoney(group.sapDocumentNet)}.
           Las facturas conservan los importes registrados en SAP.</p>}

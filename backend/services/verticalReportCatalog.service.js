@@ -441,16 +441,30 @@ function validDate(value) {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
+// Exact hospital identities may be consulted without guessing an admission
+// period. The scope is derived by the report engine, never from a request body.
+for (const [id, keys] of Object.entries({
+  vertical_accounts: ['PCNum', 'PTNum'], vertical_account_charges: ['PCNum'],
+  vertical_sales_orders: ['PCNum', 'PTNum'], vertical_service_orders: ['PCNum', 'PTNum'],
+  vertical_receivables: ['PCNum', 'PTNum']
+})) catalog[id].pointLookupFields = keys;
+
 async function execute(entityId, options = {}) {
   const id = typeof entityId === 'string' ? entityId : entityId?.id;
   const definition = definitions[id];
   if (!definition) throw Object.assign(new Error('El módulo Vertical no existe.'), { status: 400 });
-  const { fechaDesde, fechaHasta, busqueda, estatusDoc = 'ALL' } = options;
+  const { fechaDesde, fechaHasta, busqueda, estatusDoc = 'ALL', pointLookup } = options;
+  if (pointLookup && (!(catalog[id].pointLookupFields || []).includes(pointLookup.field)
+    || !Number.isInteger(pointLookup.value) || pointLookup.value < 1 || pointLookup.value > 2147483647)) {
+    throw Object.assign(new Error('La identificación de la cuenta o paciente no es válida.'), { status: 400 });
+  }
   const limit = options.limit === undefined ? 10000 : Number(options.limit);
   if (!Number.isInteger(limit) || limit < 1 || limit > 10000) {
     throw Object.assign(new Error('El límite debe estar entre 1 y 10000 registros.'), { status: 400 });
   }
-  if (definition.date && (!validDate(fechaDesde) || !validDate(fechaHasta) || fechaDesde > fechaHasta)) {
+  const hasPeriod = Boolean(fechaDesde || fechaHasta);
+  if (definition.date && (!pointLookup || hasPeriod) && (!validDate(fechaDesde) || !validDate(fechaHasta) || fechaDesde > fechaHasta
+    || (Date.parse(fechaHasta) - Date.parse(fechaDesde)) / 86400000 > 366)) {
     throw Object.assign(new Error('El periodo de consulta Vertical no es válido.'), { status: 400 });
   }
   if (busqueda != null && (typeof busqueda !== 'string' || busqueda.length > 500)) {
@@ -468,7 +482,11 @@ async function execute(entityId, options = {}) {
     request.input('estadoCuenta', sql.NVarChar(2), { OPEN: 'OP', CLOSED: 'CL', CANCELED: 'CA' }[estatusDoc]);
     conditions.push(`${definition.status} = @estadoCuenta`);
   }
-  if (definition.date) {
+  if (pointLookup) {
+    request.input('pointIdentity', sql.Int, pointLookup.value);
+    conditions.push(`${definition.fields.find(field => field.key === pointLookup.field).expression} = @pointIdentity`);
+  }
+  if (definition.date && hasPeriod) {
     request.input('fechaDesde', sql.VarChar(10), fechaDesde).input('fechaHasta', sql.VarChar(10), fechaHasta);
     conditions.push(`${definition.date} >= CAST(@fechaDesde AS date)`,
       `${definition.date} < DATEADD(day, 1, CAST(@fechaHasta AS date))`);
@@ -489,6 +507,9 @@ async function execute(entityId, options = {}) {
     ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
     ORDER BY ${definition.order}`);
   const recordset = result.recordset || [];
+  if (pointLookup && recordset.some(row => Number(row[pointLookup.field]) !== pointLookup.value)) {
+    throw new Error('No se pudo verificar la identidad de todos los registros de la cuenta o paciente.');
+  }
   return {
     rows: recordset.slice(0, limit).map(row => Object.fromEntries(definition.fields.map(column => [column.key, civilDate(row[column.key])]))),
     truncated: recordset.length > limit

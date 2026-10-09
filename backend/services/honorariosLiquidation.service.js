@@ -6,7 +6,6 @@ const { getPeriodCandidates, validatePeriod } = require('./honorariosWorkflow.se
 const { reviewFingerprint } = require('../utils/honorariosReviewSource');
 const { priceApprovedSnapshots } = require('../utils/honorariosFiscal');
 const { reconcileHonorariosWithSap } = require('./honorariosSapReconciliation.service');
-const { getClinicalProviderDirectory } = require('./honorariosCoverage.service');
 const { getHonorariosCandidates } = require('./honorariosSources.service');
 const { dateOnly } = require('./honorariosCatalog.service');
 const fiscalProfiles = require('./honorariosFiscalProfile.service');
@@ -40,6 +39,19 @@ async function ensureSchema() {
 }
 
 async function closeLiquidation(pool, input, user) {
+  const outcome = { mayHaveCommitted: false };
+  try {
+    return await prepareLiquidation(pool, input, user, outcome);
+  } catch (error) {
+    // Antes de COMMIT no puede existir un pago preparado por esta solicitud.
+    // Si se perdió la confirmación de COMMIT o su lectura posterior, se consulta
+    // el resultado existente antes de volver a enviar una creación.
+    if (!outcome.mayHaveCommitted) error.preparationStatus = 'NOT_CREATED';
+    throw error;
+  }
+}
+
+async function prepareLiquidation(pool, input, user, outcome) {
   if (!canReview(user)) throw fail('No tienes permiso para cerrar honorarios.', 403);
   const { startDate, endDate, providerId, reason } = input || {};
   validatePeriod(startDate, endDate);
@@ -71,8 +83,8 @@ async function closeLiquidation(pool, input, user) {
   const names = [...new Set(approved.map(review => review.snapshot.providerName))];
   const internal = await fiscalProfiles.readProfiles();
   const sapNames = names.filter(name => approved.some(review => review.snapshot.providerName === name && !internal[review.snapshot.providerId]?.enabled));
-  const sap = sapNames.length ? await reconcileHonorariosWithSap({ startDate, endDate, doctors: sapNames,
-    clinicalDirectory: await getClinicalProviderDirectory(pool), includeAdditional: false }) : { providers: {}, asOf: new Date().toISOString() };
+  const sap = sapNames.length ? await reconcileHonorariosWithSap({ startDate, endDate, doctors: sapNames, scope: 'fiscal',
+    includeAdditional: false }) : { providers: {}, asOf: new Date().toISOString() };
   const lines = priceApprovedSnapshots(approved, sap.providers, internal);
   const client = await getDb().pool.connect();
   try {
@@ -111,6 +123,7 @@ async function closeLiquidation(pool, input, user) {
     const id = saved.rows[0].id;
     for (const line of lines) await client.query(`INSERT INTO bi_honorarios_finalized_rows(row_id,liquidation_id,snapshot)
       VALUES($1,$2,$3)`, [line.rowId, id, line]);
+    outcome.mayHaveCommitted = true;
     await client.query('COMMIT');
     return getLiquidation(id);
   } catch (error) { await client.query('ROLLBACK'); throw error; }

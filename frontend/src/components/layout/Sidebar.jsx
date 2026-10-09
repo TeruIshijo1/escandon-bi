@@ -7,9 +7,10 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth }                  from '../../context/AuthContext';
 import { getNavItems, AREAS_LABELS, hasPermission } from '../../utils/rbac';
+import { canUseAssignedReportNavigation } from '../../utils/assignedReportAccess';
 
 export default function Sidebar() {
-  const { user, logout }    = useAuth();
+  const { user, logout, hasAssignedReports } = useAuth();
   const navigate            = useNavigate();
   const location            = useLocation();
   const [collapsed, setCol] = useState(false);
@@ -17,7 +18,9 @@ export default function Sidebar() {
   if (!user) return null;
 
   const navItems = getNavItems(user.role, user.area, user.username)
-    .filter(item => hasPermission(user, item.path));
+    .filter(item => hasPermission(user, item.path) || canUseAssignedReportNavigation(user, item.path, hasAssignedReports))
+    .map(item => !hasPermission(user, item.path) && canUseAssignedReportNavigation(user, item.path, hasAssignedReports)
+      ? { ...item, label: 'Mis reportes', icon: '📄' } : item);
 
   // Agrupar por sección
   const sections = navItems.reduce((acc, item) => {

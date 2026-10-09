@@ -77,7 +77,7 @@ try {
         saveRequests.push(route.request().postDataJSON());
         return route.fulfill({ json: { ok: true } });
       }
-      return route.fulfill({ json: { ok: true, queries: savedQueries } });
+      return route.fulfill({ json: { ok: true, queries: savedQueries.filter(report => user.role === 'ADMIN' || report.username === user.username) } });
     }
     if (pathname.endsWith('/sap-query/execute')) {
       const request = route.request().postDataJSON(); executeRequests.push(request);
@@ -94,7 +94,7 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}__reports`);
   await page.getByRole('button', { name: 'Elegir un tema', exact: true }).click();
   await page.getByText('Cargando módulos de SAP y Vertical…', { exact: true }).waitFor();
-  assert.equal(await page.getByRole('button', { name: /Guardar consulta/i }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: /Guardar reporte/i }).isDisabled(), true);
   catalogMode = 'ok'; releaseCatalog();
   await page.getByText('5 de 5 módulos disponibles', { exact: true }).waitFor();
   assert.equal(await page.locator('.report-catalog__card').count(), 5);
@@ -132,11 +132,11 @@ try {
   await page.getByRole('alert').getByText('La fecha de inicio debe ser anterior o igual a la fecha de fin.', { exact: true }).waitFor();
   assert.equal(executeRequests.length, 0);
 
-  await page.getByRole('button', { name: /Mis plantillas guardadas/i }).click();
+  await page.getByRole('button', { name: /Mis reportes/i }).click();
   await page.getByText('Plantilla con columnas anteriores', { exact: true }).click();
   assert.equal(await page.getByRole('checkbox', { name: 'Nombre', exact: true }).isChecked(), true, 'A retired field list falls back to module defaults');
   assert.equal(await page.locator('.report-builder__configuration input[type="checkbox"]:checked').count(), 1);
-  await page.getByRole('button', { name: /Mis plantillas guardadas/i }).click();
+  await page.getByRole('button', { name: /Mis reportes/i }).click();
   await page.getByText('Mi reporte de cuentas', { exact: true }).click();
   assert.equal(await recordSearch.inputValue(), 'Ana');
   assert.equal(await page.getByRole('combobox', { name: 'Almacén', exact: true }).count(), 0);
@@ -191,10 +191,10 @@ try {
   assert.match(formattedExcel, />No<\/td>/);
   assert.match(formattedExcel, /1\/10\/2026/);
   assert.match(formattedExcel, /14:35/);
-  await page.getByRole('button', { name: /Guardar consulta/i }).click();
-  await page.getByPlaceholder('ej. Insumos con Caducidad Próxima de Quirófano').fill('Cuentas de Ana');
-  await page.getByRole('button', { name: 'Guardar Plantilla', exact: true }).click();
-  await page.waitForFunction(() => !document.body.textContent.includes('Guardar Plantilla de Consulta'));
+  await page.getByRole('button', { name: /Guardar reporte/i }).click();
+  await page.getByPlaceholder('Ej. Condiciones de convenios').fill('Cuentas de Ana');
+  await page.getByRole('dialog', { name: 'Guardar reporte', exact: true }).getByRole('button', { name: 'Guardar reporte', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Guardar reporte', exact: true }).waitFor({ state: 'hidden' });
   assert.equal(saveRequests.at(-1).entity, 'vertical_accounts');
   assert.equal(saveRequests.at(-1).filters.almacen, 'ALL');
 
@@ -233,7 +233,7 @@ try {
   catalogMode = 'error'; await page.reload();
   await page.getByRole('button', { name: 'Elegir un tema', exact: true }).click();
   await page.getByRole('alert').getByText('No se pudo cargar la lista de módulos de SAP y Vertical. Intenta de nuevo.', { exact: true }).waitFor();
-  assert.equal(await page.getByRole('button', { name: /Guardar consulta/i }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: /Guardar reporte/i }).isDisabled(), true);
   catalogMode = 'ok'; await page.getByRole('button', { name: 'Reintentar carga', exact: true }).click();
   await page.getByText('2 de 2 módulos disponibles', { exact: true }).waitFor();
   catalogMode = 'empty'; await page.reload();

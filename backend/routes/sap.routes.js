@@ -9,6 +9,7 @@ const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const sapService = require('../services/sap.service');
 const sapAccountReview = require('../services/sapAccountReview.service');
+const accountReopening = require('../services/accountReopening.service');
 
 // This audit contains patient/account data. A role or an unrelated permission
 // must never unlock it through the general authorize middleware's fallback.
@@ -17,6 +18,47 @@ function authorizeAccountReview(req, res, next) {
   if (user && (String(user.username || '').toLowerCase() === 'amendoza' ||
     (Array.isArray(user.permisos) && user.permisos.includes('auditoria-reapertura-cuentas')))) return next();
   return res.status(403).json({ success: false, error: 'No tienes permiso para consultar la reapertura de cuentas.', code: 'ACCOUNT_REVIEW_FORBIDDEN' });
+}
+
+function authorizeAccountReopening(req, res, next) {
+  const user = req.user;
+  if (user && (String(user.username || '').toLowerCase() === 'amendoza' ||
+    (Array.isArray(user.permisos) && user.permisos.includes('ejecutar-reapertura-cuentas')))) return next();
+  return res.status(403).json({ success: false, error: 'No tienes permiso para reaperturar cuentas.', code: 'ACCOUNT_REOPENING_FORBIDDEN' });
+}
+
+// SAP supplies the fresh eligibility check; the only account changes occur in Vertical.
+// A dropped connection cancels pending preparation. Once execution starts, its
+// durable receipt must be completed so the user can safely consult its result.
+for (const action of ['prepare', 'execute', 'status']) {
+  router.post(`/account-review/:account/reopening/${action}`, authenticate, authorizeAccountReview, authorizeAccountReopening, async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const controller = new AbortController();
+    const cancel = () => { if (!res.writableEnded) controller.abort(); };
+    if (action !== 'execute') res.once('close', cancel);
+    try {
+      const body = req.body || {};
+      const data = await accountReopening[action](req.params.account, {
+        user: req.user, signal: controller.signal,
+        ...(action !== 'prepare' ? { previewToken: body.previewToken } : {}),
+        ...(action === 'execute' ? { confirmedAccount: body.confirmedAccount } : {}),
+      });
+      if (!res.destroyed) res.json({ success: true, data });
+    } catch (error) {
+      if (res.destroyed || controller.signal.aborted) return;
+      const status = [400, 403, 404, 409, 422, 502, 503].includes(error.status) ? error.status : 502;
+      res.status(status).json({
+        success: false,
+        error: error.publicMessage || (action === 'prepare'
+          ? 'No se pudo preparar la reapertura. Verifica la cuenta e intenta de nuevo.'
+          : 'No se pudo confirmar el resultado de la reapertura. Consulta su estado antes de volver a intentarlo.'),
+        code: error.publicMessage && error.code ? error.code : 'ACCOUNT_REOPENING_FAILED',
+      });
+    } finally {
+      res.removeListener('close', cancel);
+      controller.abort();
+    }
+  });
 }
 
 router.get('/account-review/search', authenticate, authorizeAccountReview, async (req, res) => {
