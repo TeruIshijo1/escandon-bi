@@ -64,10 +64,10 @@ try {
   };
   const detailed = await download(doctor, true, false, 'revision-detallada.pdf');
   for (const present of ['SERVICIO APROBADO', 'SERVICIO PENDIENTE', 'SERVICIO EXCLUIDO', 'PACIENTE AUTORIZADO',
-    'PACIENTE PENDIENTE', 'PACIENTE EXCLUIDO', 'Orden de venta #882', '1 aprobados, 1 excluidos y 1 por revisar',
+    'PACIENTE PENDIENTE', 'PACIENTE EXCLUIDO', 'Orden de venta #882',
     'Por revisar', 'Excluido', '$225.00']) assert.ok(detailed.includes(present), present);
   for (const absent of ['NO INCLUIR', 'PACIENTE AJENO', 'MEDICO AJENO', 'FACTURA SECRETA', 'CONCEPTO AJENO',
-    '$5,000.00', '$999,999.00', 'finiquito', 'REVISOR PRUEBA']) assert.equal(detailed.includes(absent), false, absent);
+    '$5,000.00', '$999,999.00', '1 aprobados, 1 excluidos y 1 por revisar', 'REVISOR PRUEBA']) assert.equal(detailed.includes(absent), false, absent);
   assert.ok(detailed.includes('Honorario propuesto: $250.00'));
   assert.equal(detailed.includes('Honorario propuesto: $0.00'), false);
 

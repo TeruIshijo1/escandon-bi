@@ -12,6 +12,20 @@ const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).d
 const excludedDir = /^(node_modules|tests|coverage|scratch|tmp|temp|uploads|__pycache__|\.git|\.venv|venv)$/i;
 const excludedFile = /^(?:\.env(?:\..+)?|(?:scratch|test|check|search|query|update)_.+|eslint\.config\.js|jest\.config\.js|nodemon\.json|0)$|\.(?:log|pyc|pyo|db(?:-wal|-shm)?|sqlite(?:-wal|-shm)?|dump|bak)$|_backup\.joblib$/i;
 const initialDataPath = /^backend\/(?:data\/|ml\/(?:models|reports)\/)/;
+// Keep only current operational and user documentation in the deployment package.
+// Historical reviews, evidence, drafts, and the consultation PDF of the platform map stay in the source docs.
+const productionDocs = new Set([
+  'docs/constructor-reportes-sap-vertical.md',
+  'docs/estadisticos-mensuales-2026-10-07.md',
+  'docs/honorarios-aprobados-y-pdf-pago.md',
+  'docs/honorarios-jefes-de-area.md',
+  'docs/instructivo_honorarios.html',
+  'docs/instructivo_honorarios.pdf',
+  'docs/Mapa_Instructivo_Plataforma_y_Origen_Datos.md',
+  'docs/Mapa_Proyecto.md',
+  'docs/Pase_a_Produccion.md',
+  'docs/reapertura-cuentas-sap.md',
+]);
 
 function walk(directory, filtered = false) {
   if (!fs.existsSync(directory)) throw new Error(`Falta el directorio requerido: ${directory}`);
@@ -39,8 +53,7 @@ function createPlan() {
   }
   for (const directory of ['frontend/dist', 'frontend/public', 'docs', 'database']) {
     for (const source of relativeFiles(directory, true)) {
-      // The platform map is internal maintenance documentation, not a production deliverable.
-      if (source === 'docs/Mapa_Plataforma_Hospital_Escandon_BI.pdf') continue;
+      if (directory === 'docs' && !productionDocs.has(source) && !source.startsWith('docs/instructivo_honorarios_capturas/')) continue;
       if (directory === 'database' && !/\.sql$/i.test(source)) continue;
       add(source);
     }

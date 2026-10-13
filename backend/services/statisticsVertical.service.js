@@ -8,6 +8,23 @@ const STAY = new Set(['SER0653', 'SER0654', 'SER0657', 'SER0658', 'SER0660', 'SE
 const INTENSIVE = new Set(['SER0658', 'SER0660', 'SER0661', 'SER0662', 'SER0663']);
 const MAX_ROWS = 100000;
 
+const BIRTHS_SQL = `
+SELECT TOP (${MAX_ROWS + 1}) pt.PTNum AS NoPaciente, pt.BirthDate AS Fecha,
+ pt.BirthDate AS FechaNacimiento,
+ pt.CreatedOn AS FechaCreacion,
+ COALESCE(NULLIF(RTRIM(pt.FullName),''), 'RECIÉN NACIDO') AS Paciente,
+ pt.Gender AS Genero,
+ pt.UDF_No_Expediente_Ant AS ExpedienteAnterior,
+ pt.UDF_ORIGEN_IDENT AS OrigenIdentificacion,
+ pt.IdType AS TipoIdentificacion,
+ pt.Identification AS Identificacion,
+ 1 AS Cantidad
+FROM PT pt
+WHERE pt.CreatedOn>=@startDate AND pt.CreatedOn<@endExclusive
+ AND pt.BirthDate>=@startDate AND pt.BirthDate<@endExclusive
+ AND CONVERT(date,pt.CreatedOn)=CONVERT(date,pt.BirthDate)
+ORDER BY pt.CreatedOn,pt.PTNum`;
+
 const CHARGES_SQL = `
 WITH Catalog AS (
  SELECT ItemCode, MAX(ItemDescription) AS ItemDescription, MAX(ItemGroupCode) AS ItemGroupCode,
@@ -15,12 +32,15 @@ WITH Catalog AS (
  FROM V_IT WHERE ItemType = 'S' GROUP BY ItemCode
 )
 SELECT TOP (${MAX_ROWS + 1}) c.PCITNum AS NumeroCargo, c.PCNum AS FolioAtencion,
+ p.PTNum AS NoPaciente, pt.FullName AS Paciente, pr.FullName AS Medico,
  c.ChargeDate AS Fecha, c.ItemCode AS Codigo, COALESCE(NULLIF(c.ItemDescription,''),i.ItemDescription,c.ItemCode) AS Servicio,
  c.Quantity AS CantidadOriginal, ISNULL(c.Returned,0) AS Devuelto,
  c.Quantity-ISNULL(c.Returned,0) AS Cantidad, c.PCType AS TipoAtencion,
  c.PCFRNum AS FolioEstancia, c.SUCode AS UnidadServicio,
  i.ItemGroupCode AS GrupoCodigo, i.GroupCount AS ClasificacionesCatalogo
 FROM PCIT c INNER JOIN PC p ON p.PCNum=c.PCNum
+LEFT JOIN PT pt ON pt.PTNum=p.PTNum
+LEFT JOIN PR pr ON pr.PRNum=p.PRNum
 INNER JOIN Catalog i ON i.ItemCode=c.ItemCode
 WHERE c.ChargeDate>=@startDate AND c.ChargeDate<@endExclusive
  AND c.PCIT_ST='CH' AND p.PC_ST IN ('OP','CL','PD')
@@ -29,7 +49,8 @@ ORDER BY c.ChargeDate,c.PCITNum`;
 
 const ACCOUNTS_SQL = `
 SELECT TOP (${MAX_ROWS + 1}) p.PCNum AS FolioAtencion, p.PTNum AS NoPaciente,
- p.MedicalDischargeDate AS Fecha, p.Date AS FechaIngreso, p.PCType AS TipoAtencion,
+ pt.FullName AS Paciente, pr.FullName AS Medico,
+ p.MedicalDischargeDate AS Fecha, p.MedicalDischargeDate AS FechaEgreso, p.Date AS FechaIngreso, p.PCType AS TipoAtencion,
  p.PC_ST AS EstadoCuenta, p.Gender AS Genero,
  CASE WHEN p.BirthDate IS NOT NULL AND p.BirthDate<=p.MedicalDischargeDate THEN
  DATEDIFF(year,p.BirthDate,p.MedicalDischargeDate)-CASE WHEN DATEADD(year,DATEDIFF(year,p.BirthDate,p.MedicalDischargeDate),p.BirthDate)>p.MedicalDischargeDate THEN 1 ELSE 0 END END AS Edad,
@@ -38,19 +59,27 @@ SELECT TOP (${MAX_ROWS + 1}) p.PCNum AS FolioAtencion, p.PTNum AS NoPaciente,
  CASE WHEN EXISTS (SELECT 1 FROM PCAG ag WHERE ag.PCNum=p.PCNum AND ag.AGCode='VAGSEG001' AND ag.PCAG_ST='AU') THEN 1 ELSE 0 END AS VaSeguro,
  1 AS Cantidad
 FROM PC p
+LEFT JOIN PT pt ON pt.PTNum=p.PTNum
+LEFT JOIN PR pr ON pr.PRNum=p.PRNum
 WHERE p.MedicalDischargeDate>=@startDate AND p.MedicalDischargeDate<@endExclusive AND p.PC_ST='CL'
 ORDER BY p.MedicalDischargeDate,p.PCNum`;
 
 const SURGERIES_SQL = `
 SELECT TOP (${MAX_ROWS + 1}) v.PCFRNum AS FolioEstancia,p.PCNum AS FolioAtencion,
+ p.PTNum AS NoPaciente,
+ COALESCE(NULLIF(RTRIM(v.Paciente),''), pt.FullName) AS Paciente,
  MIN(v.FechaInicio) AS Fecha,MAX(v.FechaFin) AS FechaFin,
- MAX(v.Quirofano) AS Quirofano,MAX(v.Procedimientos) AS Servicio,
+ MAX(v.Quirofano) AS Quirofano,
+ MAX(COALESCE(v.Medicos, pr.FullName)) AS Medico,
+ MAX(COALESCE(v.Procedimientos, p.Notes)) AS Servicio,
  MAX(p.PCType) AS TipoAtencion,MAX(p.Date) AS FechaIngreso,MAX(p.MedicalDischargeDate) AS FechaEgreso,
  MAX(p.PC_ST) AS EstadoCuenta,1 AS Cantidad
 FROM UDR_USOQX v INNER JOIN PCFR fr ON fr.PCFRNum=v.PCFRNum INNER JOIN PC p ON p.PCNum=fr.PCNum
+LEFT JOIN PT pt ON pt.PTNum=p.PTNum
+LEFT JOIN PR pr ON pr.PRNum=p.PRNum
 WHERE v.FechaInicio>=@startDate AND v.FechaInicio<@endExclusive
  AND fr.PCFR_ST<>'CA' AND p.PC_ST IN ('OP','CL','PD')
-GROUP BY v.PCFRNum,p.PCNum ORDER BY MIN(v.FechaInicio),v.PCFRNum`;
+GROUP BY v.PCFRNum,p.PCNum,p.PTNum,v.Paciente,pt.FullName ORDER BY MIN(v.FechaInicio),v.PCFRNum`;
 
 function section(rows, unit, criterion, warnings = []) {
   return { rows, quantity: rows.reduce((sum,row) => sum + Number(row.Cantidad || 0),0), unit, criterion, warnings,
@@ -72,13 +101,14 @@ function isSameDayDischarge(row) {
   return row.EstadoCuenta==='CL'&&admission!==null&&admission===discharge
     &&new Date(row.FechaIngreso).getTime()<=new Date(row.FechaEgreso).getTime();
 }
-function buildClinicalStatistics({ charges, accounts, surgeries }) {
+function buildClinicalStatistics({ charges, accounts, surgeries, births = [] }) {
   const charged = uniqueBy(charges,'NumeroCargo').filter(r=>Number(r.Cantidad)>0);
   const discharge = uniqueBy(accounts,'FolioAtencion');
   const operations = uniqueBy(surgeries,'FolioEstancia');
+  const newborns = uniqueBy(births.filter(row => calendarDate(row.FechaNacimiento) !== null
+    && calendarDate(row.FechaNacimiento) === calendarDate(row.FechaCreacion)), 'NoPaciente');
   const catalogAmbiguities = charged.filter(r=>Number(r.ClasificacionesCatalogo)>1).length;
   const serviceCriterion = 'Fecha de cargo; cargos vigentes; cantidad original menos devoluciones; una fila por cargo.';
-  const noBirthEvidence = 'No se encontró un campo o registro estructurado que confirme el nacimiento dentro del hospital. La edad y el uso de cunero no lo demuestran; el total requiere validar el registro de nacimientos.';
   const hospital = discharge.filter(r=>r.TipoAtencion==='IP');
   const emergency = discharge.filter(r=>r.TipoAtencion==='ER');
   const relevantDischarges = discharge.filter(r=>r.TipoAtencion==='IP'||r.TipoAtencion==='ER');
@@ -88,7 +118,7 @@ function buildClinicalStatistics({ charges, accounts, surgeries }) {
   const studyWarnings = ['Incluye servicios cargados a hospitalización y urgencias. Los estudios externos vendidos por órdenes se concilian por separado en SAP. Un cargo no acredita por sí mismo la realización del estudio.'];
   if(catalogAmbiguities)studyWarnings.push(`${catalogAmbiguities} cargos tienen clasificación de catálogo ambigua y se excluyeron de los grupos de estudios.`);
   const sections = {
-    births: unavailable('nacimientos confirmados','Fecha real de nacimiento y evidencia del lugar de nacimiento.',noBirthEvidence),
+    births: section(newborns,'recién nacidos','Pacientes cuyo expediente fue creado en la misma fecha calendario que su fecha de nacimiento; ambas fechas deben estar dentro del periodo seleccionado. Se cuenta una vez por paciente.'),
     hospital: section(hospital,'cuentas','Alta médica dentro del periodo, cuenta cerrada y tipo hospitalización.'),
     emergencyAccounts: section(emergency,'cuentas','Alta médica dentro del periodo, cuenta cerrada y tipo urgencias.'),
     vasSeguro: section(discharge.filter(r=>Number(r.VaSeguro)===1),'cuentas','Alta médica dentro del periodo, cuenta cerrada y convenio VASEGURO PAQUETE autorizado; excluye convenios cancelados.'),
@@ -132,8 +162,8 @@ async function getClinicalStatistics(range) {
     if(result.recordset.length>MAX_ROWS)throw new Error('El periodo supera el límite de registros. Selecciona un periodo menor.');
     return result.recordset;
   };
-  const [charges,accounts,surgeries]=await Promise.all([read(CHARGES_SQL),read(ACCOUNTS_SQL),read(SURGERIES_SQL)]);
-  return buildClinicalStatistics({charges,accounts,surgeries});
+  const [charges,accounts,surgeries,births]=await Promise.all([read(CHARGES_SQL),read(ACCOUNTS_SQL),read(SURGERIES_SQL),read(BIRTHS_SQL)]);
+  return buildClinicalStatistics({charges,accounts,surgeries,births});
 }
 
 async function getAccountClassifications(folios) {
@@ -145,11 +175,11 @@ async function getAccountClassifications(folios) {
     const request=pool.request();request.timeout=30000;
     const batch=ids.slice(offset,offset+1000);
     batch.forEach((id,index)=>request.input(`folio${index}`,sql.Int,id));
-    const rows=await request.query(`SELECT p.PCNum AS FolioAtencion,p.PCType AS TipoAtencion,p.PRNum AS NumeroMedico,pr.FullName AS Medico FROM PC p LEFT JOIN PR pr ON pr.PRNum=p.PRNum WHERE p.PCNum IN (${batch.map((_,index)=>`@folio${index}`).join(',')})`);
-    for(const row of rows.recordset)result[String(row.FolioAtencion)]={TipoAtencion:row.TipoAtencion,NumeroMedico:row.NumeroMedico,Medico:row.Medico};
+    const rows=await request.query(`SELECT p.PCNum AS FolioAtencion,p.PTNum AS NoPaciente,pt.FullName AS Paciente,p.PCType AS TipoAtencion,p.PRNum AS NumeroMedico,pr.FullName AS Medico FROM PC p LEFT JOIN PT pt ON pt.PTNum=p.PTNum LEFT JOIN PR pr ON pr.PRNum=p.PRNum WHERE p.PCNum IN (${batch.map((_,index)=>`@folio${index}`).join(',')})`);
+    for(const row of rows.recordset)result[String(row.FolioAtencion)]={TipoAtencion:row.TipoAtencion,NumeroMedico:row.NumeroMedico,Medico:row.Medico,NoPaciente:row.NoPaciente,Paciente:row.Paciente};
   }
   return result;
 }
 
 module.exports={ getClinicalStatistics, getAccountClassifications, buildClinicalStatistics,
-  EMERGENCY_CONSULTATIONS,STAY,INTENSIVE,CHARGES_SQL,ACCOUNTS_SQL,SURGERIES_SQL };
+  EMERGENCY_CONSULTATIONS,STAY,INTENSIVE,BIRTHS_SQL,CHARGES_SQL,ACCOUNTS_SQL,SURGERIES_SQL };

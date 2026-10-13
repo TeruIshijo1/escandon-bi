@@ -7,7 +7,7 @@ import { filterDoctorReviewRows } from './honorariosEligibility';
 import { formatHonorariosPdfText } from './honorariosPdfText';
 
 const PDF_MARGIN = 13;
-const PDF_CONTENT_BOTTOM_GAP = 14;
+const PDF_CONTENT_BOTTOM_GAP = 12;
 const HONORARIOS_DECLARATION = 'Manifiesto mi conformidad con esta liquidación de honorarios por los servicios profesionales que le presté, sin sujeción a un horario, a FUNDACIÓN MARÍA ANA MIER DE ESCANDÓN, I.A.P. en el libre ejercicio de mi profesión de médico; en el mes arriba mencionado y para que estos me sean pagados, contra la firma de este documento,entrego Comprobante Fiscal Digital Por Internet, expedido por el suscrito, por lo que no me adeuda cantidad alguna por concepto de honorarios y reitero además que la relación que me une con dicha Fundación es de naturaleza civil por virtud del contrato de prestación de servicios profesionales que tenemos celebrado, reiterando que la única relación existente es la antes mencionada y por ende, no existe ninguna otra, ni de naturaleza laboral, ni de ninguna otra. Así mismo, con el pago que se me haga de estos honorarios se encuentra pagada cualquier cantidad adeudada por la Fundación, por lo que no me reservo derecho ni acción algunos que ejercitar en contra de esa Fundación, ni en el presente ni en el futuro, por ninguna vía; otorgándoles por este medio el finiquito más amplio que en derecho proceda.';
 
 /**
@@ -280,21 +280,7 @@ function renderDoctorReceipt(doc, doctorData, periodInfo) {
   if (totalIVA !== 0) {
     summaryRows.push({ label: 'RETENCIÓN DE IVA', val: totalRetIVA === null ? 'FALTA DATO FISCAL' : `-${formatCurrency(totalRetIVA)}`, bold: false, color: [220, 38, 38] });
   }
-  const calculationText = doctorData.fiscalNotes.join(' ');
-  const counts = { APROBADO: 0, RECHAZADO: 0, PENDIENTE: 0 };
-  reviewRows.forEach(row => { counts[row._reviewStatus] !== undefined ? counts[row._reviewStatus] += 1 : counts.PENDIENTE += 1; });
-  const configurationText = reviewRows.some(row => row.FixedMonthly)
-    ? 'Las atenciones utilizan su tarifa autorizada. Los pagos fijos mensuales son adicionales y requieren una decisión explícita para incluir el importe completo del mes. Configurar una jefatura no incluye automáticamente su pago.'
-    : 'Los servicios de este documento pertenecen al catálogo Aprobados y tienen una tarifa aplicable al médico, su función y la fecha del servicio. La aprobación del catálogo no autoriza automáticamente el pago de cada atención.';
-  const legalText = `Revisión: ${counts.APROBADO} aprobados, ${counts.RECHAZADO} excluidos y ${counts.PENDIENTE} por revisar. Solo los conceptos aprobados suman al importe aprobado. La tabla muestra el honorario de cada concepto y su estado.\n\n${configurationText}\n\n${calculationText}\n\nEl importe final se calcula así: honorario + IVA - retención de ISR - retención de IVA. Los impuestos son estimados y pueden variar por redondeo. Si un importe aparece como pendiente, falta revisar o completar información; no significa $0. Este resumen sirve para revisar servicios y no acredita un pago realizado.`;
-  const paddingX = 4;
-  const paddingY = 2.5;
-  const usableWidth = contentWidth - paddingX * 2;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  const splitLegal = doc.splitTextToSize(formatHonorariosPdfText(legalText).replace(/\n{2,}/g, '\n'), usableWidth);
-  const lineHeight = 3;
-  const legalBoxHeight = splitLegal.length * lineHeight + paddingY * 2;
+
   const summaryHeight = summaryRows.length * 5.2 + 9;
   if (currentY + summaryHeight > contentBottom) {
     doc.addPage('letter', 'portrait');
@@ -325,19 +311,6 @@ function renderDoctorReceipt(doc, doctorData, periodInfo) {
   doc.text(formatCurrency(totalNeto), summaryX + summaryWidth - 3, currentY + 4.8, { align: 'right' });
   currentY += 9;
 
-  doc.setTextColor(71, 85, 105);
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.3);
-  if (currentY + legalBoxHeight + 3 > contentBottom) {
-    doc.addPage('letter', 'portrait');
-    currentY = drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader: false, continuation: true });
-  }
-  doc.setFillColor(248, 250, 252); doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(margin, currentY, contentWidth, legalBoxHeight, 2, 2, 'FD');
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(71,85,105);
-  splitLegal.forEach((line, index) => doc.text(line, margin + paddingX, currentY + paddingY + 2.5 + index * lineHeight));
-  currentY += legalBoxHeight + 3;
   return currentY;
 }
 

@@ -17,11 +17,17 @@ describe('clinical statistics reconciliation',()=>{
     expect(result.sections.stay.quantity).toBe(8);
     expect(result.sections.intensive.quantity).toBe(4);
   });
-  test('VaSeguro uses the verified agreement flag and births stay unknown',()=>{
+  test('VaSeguro uses the verified agreement flag and births require matching creation and birth dates',()=>{
     const result=build({accounts:[{FolioAtencion:1,VaSeguro:1,Cantidad:1,TipoAtencion:'ER'},{FolioAtencion:2,VaSeguro:0,Cantidad:1,TipoAtencion:'IP'}]});
     expect(result.sections.vasSeguro.quantity).toBe(1);
-    expect(result.sections.births.quantity).toBeNull();
+    expect(result.sections.births.quantity).toBe(0);
     expect(result.general.TotalEgresos).toBe(2);
+  });
+  test('births count each patient once only when PT creation date equals birth date',()=>{
+    const matching={NoPaciente:10,FechaNacimiento:'2026-09-04T00:00:00',FechaCreacion:'2026-09-04T14:35:00',Cantidad:1};
+    const result=build({births:[matching,{...matching},{NoPaciente:11,FechaNacimiento:'2026-09-01',FechaCreacion:'2026-09-08',Cantidad:1}]});
+    expect(result.sections.births.quantity).toBe(1);
+    expect(result.sections.births.rows.map(row=>row.NoPaciente)).toEqual([10]);
   });
   test('separates surgical stays from distinct account volume',()=>{
     const row={FolioAtencion:20,Cantidad:1,EstadoCuenta:'CL',FechaIngreso:'2026-09-02T08:00:00',FechaEgreso:'2026-09-02T18:00:00'};
@@ -55,6 +61,11 @@ describe('clinical statistics reconciliation',()=>{
     expect(input).toHaveBeenCalledWith('startDate',{type:'varchar',length:10},'2026-09-01');
     expect(input).toHaveBeenCalledWith('endExclusive',{type:'varchar',length:10},'2026-10-01');
     for(const [statement] of query.mock.calls){expect(statement).toContain('TOP (100001)');expect(statement).toContain('<@endExclusive');}
+    const birthQuery=query.mock.calls.map(([statement])=>statement).find(statement=>statement.includes('FROM PT pt'));
+    expect(birthQuery).toContain('pt.CreatedOn>=@startDate AND pt.CreatedOn<@endExclusive');
+    expect(birthQuery).toContain('pt.BirthDate>=@startDate AND pt.BirthDate<@endExclusive');
+    expect(birthQuery).toContain('CONVERT(date,pt.CreatedOn)=CONVERT(date,pt.BirthDate)');
+    expect(birthQuery).toContain('pt.BirthDate AS Fecha');
   });
   test('invalid dates and incomplete result sets fail instead of returning zero',async()=>{
     await expect(getClinicalStatistics({startDate:'2026-02-30',endExclusive:'2026-03-05'})).rejects.toThrow('inválido');

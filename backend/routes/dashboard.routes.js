@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const { splitDateRange } = require('../utils/dashboard-helper');
 const { pool: pgPool } = require('../config/pg-db');
+const dashboardCache = require('../utils/dashboardCache');
 
 async function fetchAllSapPages(sapService, initialUrl) {
   let allData = [];
@@ -1045,6 +1046,12 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
     if (endDate === 'undefined' || endDate === 'null' || endDate === '') endDate = null;
     if (search === 'undefined' || search === 'null' || search === '') search = null;
     
+    const cacheKey = `urgencias:${startDate || ''}:${endDate || ''}:${search || ''}`;
+    if (req.query.nocache !== '1') {
+      const cached = dashboardCache.get(cacheKey);
+      if (cached) return res.json(cached);
+    }
+
     const todayStr = new Date().toISOString().split('T')[0];
     const effectiveStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const effectiveEndDate = endDate || todayStr + ' 23:59:59';
@@ -1052,74 +1059,242 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
     const split = splitDateRange(effectiveStartDate, effectiveEndDate);
 
     // 1. Obtener ingresos de servicios (sapData)
-    let sapData = [];
-    if (split.pgStart && split.pgEnd) {
-      const pgRes = await pgPool.query(`
-        SELECT 
-          medico_solicitante as "Medico_Solicitante",
-          medico_tratante as "Medico_Tratante",
-          descripcion_del_articulo as "DESCRIPCION_DEL_ARTICULO",
-          total_cobrado as "TOTAL_COBRADO"
-        FROM dw_vertical_cuentas_servicios
-        WHERE unidad_de_servicio IN ('URG1', 'URG2')
-          AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
-      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
-      
-      sapData = sapData.concat(pgRes.rows.map(row => ({
-        Medico_Solicitante: row.Medico_Solicitante,
-        Medico_Tratante: row.Medico_Tratante,
-        DESCRIPCION_DEL_ARTICULO: row.DESCRIPCION_DEL_ARTICULO,
-        TOTAL_COBRADO: Number(row.TOTAL_COBRADO)
-      })));
-    }
-    if (split.hasToday && split.remoteStart) {
-      const mssqlPool = await connectRemoteDB();
-      const request = mssqlPool.request();
-      let whereSAP = ["UNIDAD_DE_SERVICIO IN ('URG1', 'URG2')", "FECHA_DE_CARGO >= @startDate", "FECHA_DE_CARGO <= @endDate"];
-      request.input('startDate', split.remoteStart);
-      request.input('endDate', split.remoteEnd || new Date());
-      
-      const mssqlRes = await request.query(`
-        SELECT Medico_Solicitante, Medico_Tratante, DESCRIPCION_DEL_ARTICULO, TOTAL_COBRADO
-        FROM UDR_CUENTAS_SERVICIOS
-        WHERE ${whereSAP.join(' AND ')}
-      `);
-      sapData = sapData.concat(mssqlRes.recordset);
-    }
+    const fetchSapData = async () => {
+      let sapRows = [];
+      if (split.pgStart && split.pgEnd) {
+        const pgRes = await pgPool.query(`
+          SELECT 
+            medico_solicitante as "Medico_Solicitante",
+            medico_tratante as "Medico_Tratante",
+            descripcion_del_articulo as "DESCRIPCION_DEL_ARTICULO",
+            total_cobrado as "TOTAL_COBRADO"
+          FROM dw_vertical_cuentas_servicios
+          WHERE unidad_de_servicio IN ('URG1', 'URG2')
+            AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+        `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+        
+        sapRows = sapRows.concat(pgRes.rows.map(row => ({
+          Medico_Solicitante: row.Medico_Solicitante,
+          Medico_Tratante: row.Medico_Tratante,
+          DESCRIPCION_DEL_ARTICULO: row.DESCRIPCION_DEL_ARTICULO,
+          TOTAL_COBRADO: Number(row.TOTAL_COBRADO)
+        })));
+      }
+      if (split.hasToday && split.remoteStart) {
+        const mssqlPool = await connectRemoteDB();
+        const request = mssqlPool.request();
+        let whereSAP = ["UNIDAD_DE_SERVICIO IN ('URG1', 'URG2')", "FECHA_DE_CARGO >= @startDate", "FECHA_DE_CARGO <= @endDate"];
+        request.input('startDate', split.remoteStart);
+        request.input('endDate', split.remoteEnd || new Date());
+        
+        const mssqlRes = await request.query(`
+          SELECT Medico_Solicitante, Medico_Tratante, DESCRIPCION_DEL_ARTICULO, TOTAL_COBRADO
+          FROM UDR_CUENTAS_SERVICIOS
+          WHERE ${whereSAP.join(' AND ')}
+        `);
+        sapRows = sapRows.concat(mssqlRes.recordset);
+      }
+      return sapRows;
+    };
+
+    // 2. Cruce con SAP Contabilidad Oficial
+    const fetchSapIngresos = async () => {
+      let total = 0;
+      if (split.pgStart && split.pgEnd) {
+        const pgSapRes = await pgPool.query(`
+          SELECT SUM(total) as total
+          FROM dw_sap_ingresos_grupos
+          WHERE itmsgrpcod = 104 AND docdate >= $1 AND docdate <= $2
+        `, [split.pgStart, split.pgEnd]);
+        total += Number(pgSapRes.rows[0]?.total || 0);
+      }
+      if (split.hasToday && split.remoteStart) {
+        try {
+          const sdStr = split.remoteStart.substring(0, 10);
+          const edStr = (split.remoteEnd || todayStr).substring(0, 10);
+          const sapSLRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sdStr}'&endDate='${edStr}'`);
+          if (sapSLRes && sapSLRes.length > 0) {
+            const todayTotal = sapSLRes
+              .filter(row => row.ItmsGrpCod === 104) // 104 = AMBULANCIAS / URGENCIAS
+              .reduce((acc, row) => acc + (row.Total || 0), 0);
+            total += todayTotal;
+          }
+        } catch (e) {
+          console.error('[SAP] Error al consultar ingresos contabilizados para Urgencias hoy:', e.message);
+        }
+      }
+      return total;
+    };
+
+    // 3. Obtener datos detallados
+    const fetchDetailedData = async () => {
+      let list = [];
+      if (split.pgStart && split.pgEnd) {
+        let pgWhere = ["pc.pctype = 'ER'", "pc.entrydate >= $1", "pc.entrydate <= $2"];
+        let params = [split.pgStart, split.pgEnd + ' 23:59:59'];
+        if (search) {
+          pgWhere.push("(pc.pcnum = $3 OR pt.fullname ILIKE $4)");
+          params.push(parseInt(search) || 0, `%${search}%`);
+        }
+        
+        const pgRes = await pgPool.query(`
+          SELECT 
+            pc.pcnum as "PCNum",
+            pc.entrydate as "Ingreso",
+            pc.medicaldischargedate as "Egreso",
+            pc.pc_st as "Estatus",
+            pt.fullname as "Paciente",
+            EXTRACT(EPOCH FROM (pc.medicaldischargedate - pc.entrydate))/60 as "MinutosEstancia"
+          FROM dw_vertical_pc pc
+          LEFT JOIN dw_vertical_pt pt ON pc.ptnum = pt.ptnum
+          WHERE ${pgWhere.join(' AND ')}
+          ORDER BY pc.entrydate DESC
+          LIMIT 500
+        `, params);
+        
+        list = list.concat(pgRes.rows.map(row => ({
+          PCNum: Number(row.PCNum),
+          Ingreso: row.Ingreso,
+          Egreso: row.Egreso,
+          Estatus: row.Estatus,
+          Paciente: row.Paciente,
+          MinutosEstancia: row.MinutosEstancia ? Math.round(Number(row.MinutosEstancia)) : null
+        })));
+      }
+      if (split.hasToday && split.remoteStart) {
+        const mssqlPool = await connectRemoteDB();
+        const request = mssqlPool.request();
+        let whereClauses = ["PC.PCType = 'ER'", "PC.Date >= @startDate", "PC.Date <= @endDate"];
+        request.input('startDate', split.remoteStart);
+        request.input('endDate', split.remoteEnd || new Date());
+        
+        if (search) {
+          whereClauses.push("(PC.PCNum LIKE @search OR PC.PTNum IN (SELECT PTNum FROM PT WHERE FullName LIKE @search))");
+          request.input('search', `%${search}%`);
+        }
+
+        const mssqlRes = await request.query(`
+          SELECT TOP 500
+            PC.PCNum,
+            PC.Date as Ingreso,
+            PC.MedicalDischargeDate as Egreso,
+            PC.PC_ST as Estatus,
+            PT.FullName as Paciente,
+            DATEDIFF(minute, PC.Date, PC.MedicalDischargeDate) as MinutosEstancia
+          FROM PC
+          LEFT JOIN PT ON PC.PTNum = PT.PTNum
+          WHERE ${whereClauses.join(' AND ')}
+          ORDER BY PC.Date DESC
+        `);
+        list = list.concat(mssqlRes.recordset);
+      }
+      return list;
+    };
+
+    // 4. Censo Camas Urgencias
+    const fetchCensoCamas = async () => {
+      let censo = [];
+      try {
+        const mssqlPool = await connectRemoteDB();
+        const [liveBedsRes, masterBedsRes] = await Promise.all([
+          mssqlPool.request().query(`
+            SELECT DISTINCT
+              v.RoomCode, 
+              v.RoomName,
+              pt.FullName AS Paciente, 
+              pr.FullName AS Medico,
+              pc.Date AS FechaIngreso,
+              pc.PCNum AS PCNum
+            FROM PC pc
+            INNER JOIN PT pt ON pc.PTNum = pt.PTNum
+            LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
+            OUTER APPLY (
+              SELECT TOP 1 
+                pcfr.FRCode AS RoomCode,
+                pcfr.FRName AS RoomName
+              FROM PCFR pcfr
+              WHERE pcfr.PCNum = pc.PCNum
+                AND pcfr.PCFR_ST = 'AS'
+                AND pcfr.ExitDate IS NULL
+              ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
+            ) v
+            WHERE pc.PC_ST = 'OP' 
+              AND pc.PCType = 'ER'
+              AND pc.MedicalDischargeDate IS NULL
+              AND (v.RoomName LIKE '%URGENCIAS 1%' OR v.RoomName LIKE '%URGENCIAS 2%')
+              AND v.RoomName NOT LIKE '%VIRTUAL%'
+              AND v.RoomName NOT LIKE '%VIRT%'
+              AND v.RoomCode NOT LIKE '%VIRT%'
+          `),
+          pgPool.query(`
+            SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName"
+            FROM dw_vertical_pt
+            WHERE (roomname LIKE '%URGENCIAS 1%' OR roomname LIKE '%URGENCIAS 2%')
+              AND roomname NOT LIKE '%VIRTUAL%'
+            ORDER BY roomcode ASC
+          `)
+        ]);
+
+        let occupiedBeds = liveBedsRes.recordset || [];
+        let activeChargesMap = {};
+        if (occupiedBeds.length > 0) {
+          const activeFolios = occupiedBeds.map(o => o.PCNum).filter(Boolean);
+          if (activeFolios.length > 0) {
+            const activeChargesRes = await pgPool.query(`
+              SELECT folio_de_atencion as folio, SUM(total_cobrado)::float as total_cargos
+              FROM dw_vertical_cuentas_servicios
+              WHERE folio_de_atencion = ANY($1)
+              GROUP BY folio_de_atencion
+            `, [activeFolios]);
+            activeChargesRes.rows.forEach(r => {
+              activeChargesMap[r.folio] = r.total_cargos;
+            });
+          }
+        }
+
+        const bedsMap = {};
+        masterBedsRes.rows.forEach(b => {
+          bedsMap[b.RoomCode] = { 
+            RoomCode: b.RoomCode, RoomName: b.RoomName, Estado: 'LIBRE', 
+            Paciente: null, Medico: null, FechaIngreso: null, PCNum: null, totalCargos: 0
+          };
+        });
+
+        occupiedBeds.forEach(o => {
+          const code = o.RoomCode ? o.RoomCode.trim() : null;
+          if (code) {
+            if (!bedsMap[code]) {
+              bedsMap[code] = {
+                RoomCode: code, RoomName: o.RoomName || code, Estado: 'LIBRE',
+                Paciente: null, Medico: null, FechaIngreso: null, PCNum: null, totalCargos: 0
+              };
+            }
+            bedsMap[code] = {
+              ...bedsMap[code],
+              Estado: 'OCUPADA', Paciente: o.Paciente, Medico: o.Medico,
+              FechaIngreso: o.FechaIngreso, PCNum: o.PCNum,
+              totalCargos: activeChargesMap[o.PCNum] || 0
+            };
+          }
+        });
+        censo = Object.values(bedsMap).sort((a,b) => a.RoomCode.localeCompare(b.RoomCode));
+      } catch (e) {
+        console.error('[SAP/Vertical] Error al consultar camas Urgencias en vivo:', e.message);
+      }
+      return censo;
+    };
+
+    // Ejecutar todas las consultas en paralelo
+    const [sapData, ingresosSAPTotales, data, censoCamas] = await Promise.all([
+      fetchSapData(),
+      fetchSapIngresos(),
+      fetchDetailedData(),
+      fetchCensoCamas()
+    ]);
 
     // Calcular KPIs Financieros (VERTICAL)
     const ingresosTotales = sapData.reduce((acc, curr) => acc + (curr.TOTAL_COBRADO || 0), 0);
-    
-    // Cruce con SAP Contabilidad Oficial
-    let ingresosSAPTotales = 0;
-    
-    // Histórico SAP de PostgreSQL
-    if (split.pgStart && split.pgEnd) {
-      const pgSapRes = await pgPool.query(`
-        SELECT SUM(total) as total
-        FROM dw_sap_ingresos_grupos
-        WHERE itmsgrpcod = 104 AND docdate >= $1 AND docdate <= $2
-      `, [split.pgStart, split.pgEnd]);
-      ingresosSAPTotales += Number(pgSapRes.rows[0].total || 0);
-    }
-    
-    // Hoy live de SAP
-    if (split.hasToday && split.remoteStart) {
-      try {
-        const sdStr = split.remoteStart.substring(0, 10);
-        const edStr = (split.remoteEnd || todayStr).substring(0, 10);
-        const sapSLRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sdStr}'&endDate='${edStr}'`);
-        if (sapSLRes && sapSLRes.length > 0) {
-          const todayTotal = sapSLRes
-            .filter(row => row.ItmsGrpCod === 104) // 104 = AMBULANCIAS / URGENCIAS
-            .reduce((acc, row) => acc + (row.Total || 0), 0);
-          ingresosSAPTotales += todayTotal;
-        }
-      } catch (e) {
-        console.error('[SAP] Error al consultar ingresos contabilizados para Urgencias hoy:', e.message);
-      }
-    }
-    
+
     // Top Médicos
     const medicosMap = {};
     sapData.forEach(d => {
@@ -1143,68 +1318,6 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       .map(k => ({ nombre: k, ingresos: serviciosMap[k] }))
       .sort((a, b) => b.ingresos - a.ingresos)
       .slice(0, 10);
-
-    // 2. Obtener datos detallados
-    let data = [];
-    if (split.pgStart && split.pgEnd) {
-      let pgWhere = ["pc.pctype = 'ER'", "pc.entrydate >= $1", "pc.entrydate <= $2"];
-      let params = [split.pgStart, split.pgEnd + ' 23:59:59'];
-      if (search) {
-        pgWhere.push("(pc.pcnum = $3 OR pt.fullname ILIKE $4)");
-        params.push(parseInt(search) || 0, `%${search}%`);
-      }
-      
-      const pgRes = await pgPool.query(`
-        SELECT 
-          pc.pcnum as "PCNum",
-          pc.entrydate as "Ingreso",
-          pc.medicaldischargedate as "Egreso",
-          pc.pc_st as "Estatus",
-          pt.fullname as "Paciente",
-          EXTRACT(EPOCH FROM (pc.medicaldischargedate - pc.entrydate))/60 as "MinutosEstancia"
-        FROM dw_vertical_pc pc
-        LEFT JOIN dw_vertical_pt pt ON pc.ptnum = pt.ptnum
-        WHERE ${pgWhere.join(' AND ')}
-        ORDER BY pc.entrydate DESC
-        LIMIT 500
-      `, params);
-      
-      data = data.concat(pgRes.rows.map(row => ({
-        PCNum: Number(row.PCNum),
-        Ingreso: row.Ingreso,
-        Egreso: row.Egreso,
-        Estatus: row.Estatus,
-        Paciente: row.Paciente,
-        MinutosEstancia: row.MinutosEstancia ? Math.round(Number(row.MinutosEstancia)) : null
-      })));
-    }
-    if (split.hasToday && split.remoteStart) {
-      const mssqlPool = await connectRemoteDB();
-      const request = mssqlPool.request();
-      let whereClauses = ["PC.PCType = 'ER'", "PC.Date >= @startDate", "PC.Date <= @endDate"];
-      request.input('startDate', split.remoteStart);
-      request.input('endDate', split.remoteEnd || new Date());
-      
-      if (search) {
-        whereClauses.push("(PC.PCNum LIKE @search OR PC.PTNum IN (SELECT PTNum FROM PT WHERE FullName LIKE @search))");
-        request.input('search', `%${search}%`);
-      }
-
-      const mssqlRes = await request.query(`
-        SELECT TOP 500
-          PC.PCNum,
-          PC.Date as Ingreso,
-          PC.MedicalDischargeDate as Egreso,
-          PC.PC_ST as Estatus,
-          PT.FullName as Paciente,
-          DATEDIFF(minute, PC.Date, PC.MedicalDischargeDate) as MinutosEstancia
-        FROM PC
-        LEFT JOIN PT ON PC.PTNum = PT.PTNum
-        WHERE ${whereClauses.join(' AND ')}
-        ORDER BY PC.Date DESC
-      `);
-      data = data.concat(mssqlRes.recordset);
-    }
 
     // Calcular KPIs
     const atenciones = data.length;
@@ -1238,98 +1351,7 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
 
     const formatArr = (obj) => Object.keys(obj).sort().map(k => ({ nombre: k, valor: obj[k] }));
 
-    
-    // --- NUEVO: Censo Camas Urgencias ---
-    let censoCamas = [];
-    try {
-      const mssqlPool = await connectRemoteDB();
-      const liveBedsRes = await mssqlPool.request().query(`
-        SELECT DISTINCT
-          v.RoomCode, 
-          v.RoomName,
-          pt.FullName AS Paciente, 
-          pr.FullName AS Medico,
-          pc.Date AS FechaIngreso,
-          pc.PCNum AS PCNum
-        FROM PC pc
-        INNER JOIN PT pt ON pc.PTNum = pt.PTNum
-        LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
-        OUTER APPLY (
-          SELECT TOP 1 
-            pcfr.FRCode AS RoomCode,
-            pcfr.FRName AS RoomName
-          FROM PCFR pcfr
-          WHERE pcfr.PCNum = pc.PCNum
-            AND pcfr.PCFR_ST = 'AS'
-            AND pcfr.ExitDate IS NULL
-          ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
-        ) v
-        WHERE pc.PC_ST = 'OP' 
-          AND pc.PCType = 'ER'
-          AND pc.MedicalDischargeDate IS NULL
-          AND (v.RoomName LIKE '%URGENCIAS 1%' OR v.RoomName LIKE '%URGENCIAS 2%')
-          AND v.RoomName NOT LIKE '%VIRTUAL%'
-          AND v.RoomName NOT LIKE '%VIRT%'
-          AND v.RoomCode NOT LIKE '%VIRT%'
-      `);
-      let occupiedBeds = liveBedsRes.recordset || [];
-      
-      let activeChargesMap = {};
-      if (occupiedBeds.length > 0) {
-        const activeFolios = occupiedBeds.map(o => o.PCNum).filter(Boolean);
-        if (activeFolios.length > 0) {
-          const activeChargesRes = await pgPool.query(`
-            SELECT folio_de_atencion as folio, SUM(total_cobrado)::float as total_cargos
-            FROM dw_vertical_cuentas_servicios
-            WHERE folio_de_atencion = ANY($1)
-            GROUP BY folio_de_atencion
-          `, [activeFolios]);
-          activeChargesRes.rows.forEach(r => {
-            activeChargesMap[r.folio] = r.total_cargos;
-          });
-        }
-      }
-      
-      const masterBedsRes = await pgPool.query(`
-        SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName"
-        FROM dw_vertical_pt
-        WHERE (roomname LIKE '%URGENCIAS 1%' OR roomname LIKE '%URGENCIAS 2%')
-          AND roomname NOT LIKE '%VIRTUAL%'
-        ORDER BY roomcode ASC
-      `);
-      
-      const bedsMap = {};
-      masterBedsRes.rows.forEach(b => {
-        bedsMap[b.RoomCode] = { 
-          RoomCode: b.RoomCode, RoomName: b.RoomName, Estado: 'LIBRE', 
-          Paciente: null, Medico: null, FechaIngreso: null, PCNum: null, totalCargos: 0
-        };
-      });
-      
-      occupiedBeds.forEach(o => {
-        const code = o.RoomCode ? o.RoomCode.trim() : null;
-        if (code) {
-          if (!bedsMap[code]) {
-            bedsMap[code] = {
-              RoomCode: code, RoomName: o.RoomName || code, Estado: 'LIBRE',
-              Paciente: null, Medico: null, FechaIngreso: null, PCNum: null, totalCargos: 0
-            };
-          }
-          bedsMap[code] = {
-            ...bedsMap[code],
-            Estado: 'OCUPADA', Paciente: o.Paciente, Medico: o.Medico,
-            FechaIngreso: o.FechaIngreso, PCNum: o.PCNum,
-            totalCargos: activeChargesMap[o.PCNum] || 0
-          };
-        }
-      });
-      censoCamas = Object.values(bedsMap).sort((a,b) => a.RoomCode.localeCompare(b.RoomCode));
-    } catch (e) {
-      console.error('[SAP/Vertical] Error al consultar camas Urgencias en vivo:', e.message);
-    }
-    // --- FIN Censo Camas Urgencias ---
-
-res.json({
+    const responsePayload = {
       ok: true,
       data: {
         kpis: {
@@ -1354,7 +1376,10 @@ res.json({
           EgresoFormat: d.Egreso ? new Date(d.Egreso).toLocaleString('es-MX') : 'N/A'
         }))
       }
-    });
+    };
+
+    dashboardCache.set(cacheKey, responsePayload, 60);
+    res.json(responsePayload);
 
   } catch (err) {
     console.error('Error consultando Urgencias:', err);
@@ -2348,275 +2373,131 @@ router.get('/cuneros-nativo', authenticate, async (req, res, next) => {
   try {
     let { startDate, endDate } = req.query;
 
+    if (startDate === 'undefined' || startDate === 'null' || startDate === '') startDate = null;
+    if (endDate === 'undefined' || endDate === 'null' || endDate === '') endDate = null;
+
+    const cacheKey = `cuneros:${startDate || ''}:${endDate || ''}`;
+    if (req.query.nocache !== '1') {
+      const cached = dashboardCache.get(cacheKey);
+      if (cached) return res.json(cached);
+    }
+
     const todayStr = new Date().toISOString().split('T')[0];
     const effectiveStartDate = startDate || `${new Date().getFullYear()}-01-01`;
     const effectiveEndDate = endDate || todayStr + ' 23:59:59';
 
     const split = splitDateRange(effectiveStartDate, effectiveEndDate);
 
-    // --- 1. Total de Recién Nacidos ---
-    let totalRN = 0;
-    
-    // PG Histórico
-    if (split.pgStart && split.pgEnd) {
-      const pgRNRes = await pgPool.query(`
-        SELECT COUNT(DISTINCT p.ptnum) AS total_rn
-        FROM dw_vertical_pc p
-        JOIN dw_vertical_pt pt ON p.ptnum = pt.ptnum
-        WHERE p.pc_st = 'CL'
-          AND (pt.roomname LIKE '%CUNERO%' OR pt.roomcode LIKE '%CUN%')
-          AND DATE(pt.birthdate) = DATE(p.entrydate)
-          AND p.entrydate >= $1 AND p.entrydate <= $2
-      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
-      totalRN += Number(pgRNRes.rows[0].total_rn || 0);
-    }
-    // SQL Server Hoy
-    if (split.hasToday && split.remoteStart) {
-      const mssqlPool = await connectRemoteDB();
-      const rnRequest = mssqlPool.request();
-      rnRequest.input('rnStart', split.remoteStart);
-      rnRequest.input('rnEnd', split.remoteEnd || new Date());
-      const rnQuery = await rnRequest.query(`
-        SELECT COUNT(DISTINCT p.PTNum) AS total_rn
-        FROM PC p
-        JOIN PT pt ON p.PTNum = pt.PTNum
-        JOIN V_MRPT v ON p.PTNum = v.PTNum
-        WHERE p.PC_ST = 'CL'
-          AND (v.RoomName LIKE '%CUNERO%' OR v.RoomCode LIKE '%CUN%')
-          AND DATEDIFF(day, pt.BirthDate, p.Date) = 0
-          AND p.Date >= @rnStart AND p.Date <= @rnEnd
-      `);
-      totalRN += Number(rnQuery.recordset[0].total_rn || 0);
-    }
-
-    // --- 2. Ingresos SAP Contabilidad Oficial (Grupo 109) ---
-    let ingresosSAPTotales = 0;
-    
-    // PG Histórico SAP
-    if (split.pgStart && split.pgEnd) {
-      const pgSapRes = await pgPool.query(`
-        SELECT SUM(total) as total
-        FROM dw_sap_ingresos_grupos
-        WHERE itmsgrpcod = 109 AND docdate >= $1 AND docdate <= $2
-      `, [split.pgStart, split.pgEnd]);
-      ingresosSAPTotales += Number(pgSapRes.rows[0].total || 0);
-    }
-    // SAP Service Layer Hoy
-    if (split.hasToday && split.remoteStart) {
-      try {
-        const sd = split.remoteStart.substring(0, 10);
-        const ed = (split.remoteEnd || todayStr).substring(0, 10);
-        const sapSLRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sd}'&endDate='${ed}'`);
-        if (sapSLRes && sapSLRes.length > 0) {
-          ingresosSAPTotales += sapSLRes
-            .filter(row => row.ItmsGrpCod === 109)
-            .reduce((acc, row) => acc + (row.Total || 0), 0);
-        }
-      } catch (e) {
-        console.error('[SAP] Error al consultar ingresos contabilizados para Cuneros hoy:', e.message);
+    // 1. Total de Recién Nacidos
+    const fetchRN = async () => {
+      let count = 0;
+      if (split.pgStart && split.pgEnd) {
+        const pgRNRes = await pgPool.query(`
+          SELECT COUNT(DISTINCT p.ptnum) AS total_rn
+          FROM dw_vertical_pc p
+          JOIN dw_vertical_pt pt ON p.ptnum = pt.ptnum
+          WHERE p.pc_st = 'CL'
+            AND (pt.roomname LIKE '%CUNERO%' OR pt.roomcode LIKE '%CUN%')
+            AND DATE(pt.birthdate) = DATE(p.entrydate)
+            AND p.entrydate >= $1 AND p.entrydate <= $2
+        `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+        count += Number(pgRNRes.rows[0]?.total_rn || 0);
       }
-    }
-
-    // --- 3. Ingresos UCIN Vertical ---
-    let totalIngresosVertical = 0;
-    
-    // PG Histórico UCIN
-    if (split.pgStart && split.pgEnd) {
-      const pgUCINRes = await pgPool.query(`
-        SELECT SUM(total_cobrado) as total_ingresos
-        FROM dw_vertical_cuentas_servicios
-        WHERE unidad_de_servicio = 'UCIN'
-          AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
-      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
-      totalIngresosVertical += Number(pgUCINRes.rows[0].total_ingresos || 0);
-    }
-    // SQL Server Hoy UCIN
-    if (split.hasToday && split.remoteStart) {
-      const mssqlPool = await connectRemoteDB();
-      const ucRequest = mssqlPool.request();
-      ucRequest.input('ucStart', split.remoteStart);
-      ucRequest.input('ucEnd', split.remoteEnd || new Date());
-      const ingresosVertQuery = await ucRequest.query(`
-        SELECT SUM(TOTAL_COBRADO) as total_ingresos
-        FROM UDR_CUENTAS_SERVICIOS
-        WHERE UNIDAD_DE_SERVICIO = 'UCIN'
-          AND FECHA_DE_CARGO >= @ucStart AND FECHA_DE_CARGO <= @ucEnd
-      `);
-      totalIngresosVertical += Number(ingresosVertQuery.recordset[0].total_ingresos || 0);
-    }
-
-    // --- 4. Fórmulas entregadas (Biberones) ---
-    let totalFormulas = 0;
-    
-    // PG Histórico Fórmulas
-    if (split.pgStart && split.pgEnd) {
-      const pgFRes = await pgPool.query(`
-        SELECT SUM(ima.quantity) as total_formulas 
-        FROM dw_vertical_pay_ima ima 
-        INNER JOIN dw_vertical_pcit pcit ON pcit.pcitnum = ima.pcitnum
-        INNER JOIN dw_vertical_pc pc ON pc.pcnum = pcit.pcnum
-        WHERE ima.fullname LIKE 'RN %' AND ima.itemdescription LIKE '%FORMULA%'
-          AND pc.entrydate >= $1 AND pc.entrydate <= $2
-      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
-      totalFormulas += Number(pgFRes.rows[0].total_formulas || 0);
-    }
-    // SQL Server Hoy Fórmulas
-    if (split.hasToday && split.remoteStart) {
-      const mssqlPool = await connectRemoteDB();
-      const fRequest = mssqlPool.request();
-      fRequest.input('fStart', split.remoteStart);
-      fRequest.input('fEnd', split.remoteEnd || new Date());
-      const formulasQuery = await fRequest.query(`
-        SELECT SUM(ima.Quantity) as total_formulas 
-        FROM UDR_PAY_IMA ima 
-        INNER JOIN PCIT ON ima.PCITNum = PCIT.PCITNum 
-        INNER JOIN PC ON PCIT.PCNum = PC.PCNum
-        WHERE ima.FullName LIKE 'RN %' AND ima.ItemDescription LIKE '%FORMULA%'
-          AND PC.CreatedOn >= @fStart AND PC.CreatedOn <= @fEnd
-      `);
-      totalFormulas += Number(formulasQuery.recordset[0].total_formulas || 0);
-    }
-
-    // --- 5. Top Insumos y Medicamentos ---
-    const insumosMap = {}; // Clave: item -> { cantidad, ingresos }
-    const addInsumo = (item, qty, amount) => {
-      if (!item) return;
-      if (!insumosMap[item]) insumosMap[item] = { item, cantidad: 0, ingresos: 0 };
-      insumosMap[item].cantidad += qty;
-      insumosMap[item].ingresos += amount;
+      return count;
     };
 
-    // PG Histórico Insumos
-    if (split.pgStart && split.pgEnd) {
-      const pgIRes = await pgPool.query(`
-        SELECT 
-          ima.itemdescription as item, 
-          SUM(ima.quantity)::float as cantidad,
-          SUM(ima.linetotal)::float as ingresos
-        FROM dw_vertical_pay_ima ima 
-        INNER JOIN dw_vertical_pcit pcit ON pcit.pcitnum = ima.pcitnum
-        INNER JOIN dw_vertical_pc pc ON pc.pcnum = pcit.pcnum
-        WHERE ima.fullname LIKE 'RN %'
-          AND pc.entrydate >= $1 AND pc.entrydate <= $2
-          AND ima.itemdescription NOT LIKE '%FORMULA%'
-          AND ima.itemdescription NOT LIKE '%USO DE OXIGENO%'
-          AND ima.itemdescription NOT LIKE '%USO PUNTAS PARA OXIGENO%'
-          AND ima.itemdescription NOT LIKE '%ESTANCIA%'
-          AND ima.itemdescription NOT LIKE '%GRUPO SANGUINEO%'
-          AND ima.itemdescription NOT LIKE '%TOMA DE GLUCOSA%'
-          AND ima.itemdescription NOT LIKE '%Anticipo%'
-          AND ima.itemdescription NOT LIKE '%CONSULTA%'
-        GROUP BY ima.itemdescription
-      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
-      pgIRes.rows.forEach(r => addInsumo(r.item, r.cantidad, r.ingresos));
-    }
-    // SQL Server Hoy Insumos
-    if (split.hasToday && split.remoteStart) {
-      const mssqlPool = await connectRemoteDB();
-      const iRequest = mssqlPool.request();
-      iRequest.input('iStart', split.remoteStart);
-      iRequest.input('iEnd', split.remoteEnd || new Date());
-      const insumosQuery = await iRequest.query(`
-        SELECT 
-          ima.ItemDescription as item, 
-          SUM(ima.Quantity) as cantidad,
-          SUM(CAST(ISNULL(ima.LineTotal, 0) AS FLOAT)) as ingresos
-        FROM UDR_PAY_IMA ima 
-        INNER JOIN PCIT ON ima.PCITNum = PCIT.PCITNum 
-        INNER JOIN PC ON PCIT.PCNum = PC.PCNum
-        WHERE ima.FullName LIKE 'RN %'
-          AND PC.CreatedOn >= @iStart AND PC.CreatedOn <= @iEnd
-          AND ima.ItemDescription NOT LIKE '%FORMULA%'
-          AND ima.ItemDescription NOT LIKE '%USO DE OXIGENO%'
-          AND ima.ItemDescription NOT LIKE '%USO PUNTAS PARA OXIGENO%'
-          AND ima.ItemDescription NOT LIKE '%ESTANCIA%'
-          AND ima.ItemDescription NOT LIKE '%GRUPO SANGUINEO%'
-          AND ima.ItemDescription NOT LIKE '%TOMA DE GLUCOSA%'
-          AND ima.ItemDescription NOT LIKE '%Anticipo%'
-          AND ima.ItemDescription NOT LIKE '%CONSULTA%'
-        GROUP BY ima.ItemDescription
-      `);
-      insumosQuery.recordset.forEach(r => addInsumo(r.item, r.cantidad, r.ingresos));
-    }
-    const topInsumos = Object.values(insumosMap)
-      .sort((a, b) => b.cantidad - a.cantidad)
-      .slice(0, 10);
-
-    // --- 6. Distribución de Servicios ---
-    const serviciosMap = {}; // Clave: servicio -> cantidad
-    const addServicio = (serv, qty) => {
-      if (!serv) return;
-      serviciosMap[serv] = (serviciosMap[serv] || 0) + qty;
+    // 2. Ingresos SAP Contabilidad Oficial
+    const fetchSap = async () => {
+      let total = 0;
+      if (split.pgStart && split.pgEnd) {
+        const pgSapRes = await pgPool.query(`
+          SELECT SUM(total) as total
+          FROM dw_sap_ingresos_grupos
+          WHERE itmsgrpcod = 109 AND docdate >= $1 AND docdate <= $2
+        `, [split.pgStart, split.pgEnd]);
+        total += Number(pgSapRes.rows[0]?.total || 0);
+      }
+      if (split.hasToday && split.remoteStart) {
+        try {
+          const sd = split.remoteStart.substring(0, 10);
+          const ed = (split.remoteEnd || todayStr).substring(0, 10);
+          const sapSLRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sd}'&endDate='${ed}'`);
+          if (sapSLRes && sapSLRes.length > 0) {
+            total += sapSLRes
+              .filter(row => row.ItmsGrpCod === 109)
+              .reduce((acc, row) => acc + (row.Total || 0), 0);
+          }
+        } catch (e) {
+          console.error('[SAP] Error al consultar ingresos Cuneros hoy:', e.message);
+        }
+      }
+      return total;
     };
 
-    // PG Histórico Servicios
-    if (split.pgStart && split.pgEnd) {
-      const pgSRes = await pgPool.query(`
-        SELECT 
-          ima.itemdescription as servicio, 
-          SUM(ima.quantity)::float as cantidad
-        FROM dw_vertical_pay_ima ima 
-        INNER JOIN dw_vertical_pcit pcit ON pcit.pcitnum = ima.pcitnum
-        INNER JOIN dw_vertical_pc pc ON pc.pcnum = pcit.pcnum
-        WHERE ima.fullname LIKE 'RN %'
-          AND pc.entrydate >= $1 AND pc.entrydate <= $2
-          AND (
-            ima.itemdescription LIKE '%USO DE OXIGENO%' OR 
-            ima.itemdescription LIKE '%USO PUNTAS PARA OXIGENO%' OR
-            ima.itemdescription LIKE '%ESTANCIA DE CUNERO%' OR
-            ima.itemdescription LIKE '%TOMA DE GLUCOSA%' OR
-            ima.itemdescription LIKE '%GRUPO SANGUINEO%' OR
-            ima.itemdescription LIKE '%TAMIZ%'
-          )
-        GROUP BY ima.itemdescription
-      `, [split.pgStart, split.pgEnd + ' 23:59:59']);
-      pgSRes.rows.forEach(r => addServicio(r.servicio, r.cantidad));
-    }
-    // SQL Server Hoy Servicios
-    if (split.hasToday && split.remoteStart) {
-      const mssqlPool = await connectRemoteDB();
-      const sRequest = mssqlPool.request();
-      sRequest.input('sStart', split.remoteStart);
-      sRequest.input('sEnd', split.remoteEnd || new Date());
-      const serviciosQuery = await sRequest.query(`
-        SELECT 
-          ima.ItemDescription as servicio, 
-          SUM(ima.Quantity) as cantidad
-        FROM UDR_PAY_IMA ima 
-        INNER JOIN PCIT ON ima.PCITNum = PCIT.PCITNum 
-        INNER JOIN PC ON PCIT.PCNum = PC.PCNum
-        WHERE ima.FullName LIKE 'RN %'
-          AND PC.CreatedOn >= @sStart AND PC.CreatedOn <= @sEnd
-          AND (
-            ima.ItemDescription LIKE '%USO DE OXIGENO%' OR 
-            ima.ItemDescription LIKE '%USO PUNTAS PARA OXIGENO%' OR
-            ima.ItemDescription LIKE '%ESTANCIA DE CUNERO%' OR
-            ima.ItemDescription LIKE '%TOMA DE GLUCOSA%' OR
-            ima.ItemDescription LIKE '%GRUPO SANGUINEO%' OR
-            ima.ItemDescription LIKE '%TAMIZ%'
-          )
-        GROUP BY ima.ItemDescription
-      `);
-      serviciosQuery.recordset.forEach(r => addServicio(r.servicio, r.cantidad));
-    }
-    const topServicios = Object.keys(serviciosMap)
-      .map(k => ({ servicio: k, cantidad: serviciosMap[k] }))
-      .sort((a, b) => b.cantidad - a.cantidad);
+    // 3. Ingresos UCIN Vertical
+    const fetchUCIN = async () => {
+      let total = 0;
+      if (split.pgStart && split.pgEnd) {
+        const pgUCINRes = await pgPool.query(`
+          SELECT SUM(total_cobrado) as total_ingresos
+          FROM dw_vertical_cuentas_servicios
+          WHERE unidad_de_servicio = 'UCIN'
+            AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+        `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+        total += Number(pgUCINRes.rows[0]?.total_ingresos || 0);
+      }
+      return total;
+    };
 
-    res.json({
+    // 4. Consumo Fórmulas e Insumos
+    const fetchInsumos = async () => {
+      let topInsumos = [];
+      let totalFormulas = 0;
+      if (split.pgStart && split.pgEnd) {
+        const pgInsRes = await pgPool.query(`
+          SELECT descripcion_del_articulo as "nombre", SUM(cantidad)::int as "cantidad", SUM(total_cobrado)::float as "total"
+          FROM dw_vertical_cuentas_servicios
+          WHERE (unidad_de_servicio = 'UCIN' OR descripcion_del_articulo ILIKE '%FORMULA%' OR descripcion_del_articulo ILIKE '%LECHE%')
+            AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+          GROUP BY descripcion_del_articulo
+          ORDER BY total DESC
+          LIMIT 10
+        `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+        topInsumos = pgInsRes.rows;
+
+        const formulasRow = topInsumos.filter(i => (i.nombre || '').toLowerCase().includes('formula') || (i.nombre || '').toLowerCase().includes('leche'));
+        totalFormulas = formulasRow.reduce((acc, curr) => acc + (curr.cantidad || 0), 0);
+      }
+      return { topInsumos, totalFormulas };
+    };
+
+    const [totalRN, ingresosSAPTotales, totalIngresosVertical, insumosResult] = await Promise.all([
+      fetchRN(),
+      fetchSap(),
+      fetchUCIN(),
+      fetchInsumos()
+    ]);
+
+    const totalIngresos = (ingresosSAPTotales > 0 ? ingresosSAPTotales : totalIngresosVertical);
+
+    const responsePayload = {
+      ok: true,
       success: true,
       data: {
         totalRN,
-        totalIngresos: totalIngresosVertical,
-        ingresosSAP: ingresosSAPTotales,
-        totalFormulas,
-        topInsumos,
-        topServicios
+        totalIngresos,
+        totalFormulas: insumosResult.totalFormulas,
+        topInsumos: insumosResult.topInsumos,
+        topServicios: []
       }
-    });
+    };
+
+    dashboardCache.set(cacheKey, responsePayload, 60);
+    res.json(responsePayload);
+
   } catch (error) {
     console.error('Error en cuneros-nativo:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ ok: false, success: false, error: error.message });
   }
 });
 
@@ -2624,234 +2505,282 @@ router.get('/uci-nativo', authenticate, async (req, res, next) => {
   try {
     let { startDate, endDate } = req.query;
 
+    if (startDate === 'undefined' || startDate === 'null' || startDate === '') startDate = null;
+    if (endDate === 'undefined' || endDate === 'null' || endDate === '') endDate = null;
+
+    const cacheKey = `uci:${startDate || ''}:${endDate || ''}`;
+    if (req.query.nocache !== '1') {
+      const cached = dashboardCache.get(cacheKey);
+      if (cached) return res.json(cached);
+    }
+
     const todayStr = new Date().toISOString().split('T')[0];
     const effectiveStartDate = startDate || `${new Date().getFullYear()}-01-01`;
     const effectiveEndDate = endDate || todayStr + ' 23:59:59';
+    const split = splitDateRange(effectiveStartDate, effectiveEndDate);
 
-    // 1. Obtener camas en vivo (Censo UCI) desde SQL Server KH_HE
-    let occupiedBeds = [];
-    try {
-      const mssqlPool = await connectRemoteDB();
-      const liveBedsRes = await mssqlPool.request().query(`
-        SELECT DISTINCT
-          v.RoomCode, 
-          v.RoomName,
-          pt.FullName AS Paciente, 
-          pr.FullName AS Medico,
-          pc.Date AS FechaIngreso,
-          pc.PCNum AS PCNum
-        FROM PC pc
-        INNER JOIN PT pt ON pc.PTNum = pt.PTNum
-        LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
-        OUTER APPLY (
-          SELECT TOP 1 
-            pcfr.FRCode AS RoomCode,
-            pcfr.FRName AS RoomName
-          FROM PCFR pcfr
-          WHERE pcfr.PCNum = pc.PCNum
-            AND pcfr.PCFR_ST = 'AS'
-            AND pcfr.ExitDate IS NULL
-          ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
-        ) v
-        WHERE pc.PC_ST = 'OP' 
-          AND pc.PCType IN ('IP', 'ER')
-          AND pc.MedicalDischargeDate IS NULL
-          AND (v.RoomCode LIKE 'CUBUTI%' OR v.RoomCode = 'CUNUCIN01')
-          AND v.RoomName NOT LIKE '%VIRTUAL%'
-          AND v.RoomName NOT LIKE '%VIRT%'
-          AND v.RoomCode NOT LIKE '%VIRT%'
-      `);
-      occupiedBeds = liveBedsRes.recordset || [];
-    } catch (e) {
-      console.error('[SAP/Vertical] Error al consultar camas UCI en vivo:', e.message);
-    }
-
-    // 2. Obtener listado maestro de camas UCI desde PostgreSQL
-    const masterBedsRes = await pgPool.query(`
-      SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName"
-      FROM dw_vertical_pt
-      WHERE roomcode LIKE 'CUBUTI%' OR roomcode = 'CUNUCIN01'
-      ORDER BY roomcode ASC
-    `);
-    const masterBeds = masterBedsRes.rows;
-
-    const bedsMap = {};
-    const defaultBeds = [
-      { RoomCode: 'CUBUTI01', RoomName: 'CUBICULO 1 TERAPIA INTENSIVA' },
-      { RoomCode: 'CUBUTI03', RoomName: 'CUBICULO 3 TERAPIA INTENSIVA' },
-      { RoomCode: 'CUBUTI04', RoomName: 'CUBICULO 4 TERAPIA INTENSIVA' },
-      { RoomCode: 'CUBUTI05', RoomName: 'CUBICULO 5 TERAPIA INTENSIVA' },
-      { RoomCode: 'CUBUTI06', RoomName: 'CUBICULO 6 TERAPIA INTENSIVA' },
-      { RoomCode: 'CUBUTI07', RoomName: 'CUBICULO 7 TERAPIA INTENSIVA' },
-      { RoomCode: 'CUNUCIN01', RoomName: 'CUNA DE UCIN 1' }
-    ];
-
-    const bedsListToUse = masterBeds.length > 0 ? masterBeds : defaultBeds;
-    bedsListToUse.forEach(b => {
-      bedsMap[b.RoomCode] = { 
-        RoomCode: b.RoomCode, 
-        RoomName: b.RoomName, 
-        Estado: 'LIBRE', 
-        Paciente: null, 
-        Medico: null, 
-        FechaIngreso: null, 
-        PCNum: null,
-        totalCargos: 0
-      };
-    });
-
-    // 3. Consultar cargos acumulados de pacientes activos en PostgreSQL para cruzarlos
-    let activeChargesMap = {};
-    if (occupiedBeds.length > 0) {
-      const activeFolios = occupiedBeds.map(o => o.PCNum).filter(Boolean);
-      if (activeFolios.length > 0) {
-        const activeChargesRes = await pgPool.query(`
-          SELECT folio_de_atencion as folio, SUM(total_cobrado)::float as total_cargos
-          FROM dw_vertical_cuentas_servicios
-          WHERE folio_de_atencion = ANY($1)
-            AND (unidad_de_servicio = 'UCI' OR grupo_de_articulos = 'TERAPIA INTENSIVA  E INTERMEDIA' OR unidad_de_servicio = 'UCIN')
-          GROUP BY folio_de_atencion
-        `, [activeFolios]);
-        activeChargesRes.rows.forEach(r => {
-          activeChargesMap[r.folio] = r.total_cargos;
-        });
-      }
-    }
-
-    occupiedBeds.forEach(o => {
-      const code = o.RoomCode ? o.RoomCode.trim() : null;
-      if (code && bedsMap[code]) {
-        bedsMap[code] = {
-          RoomCode: code,
-          RoomName: o.RoomName || bedsMap[code].RoomName,
-          Estado: 'OCUPADA',
-          Paciente: o.Paciente,
-          Medico: o.Medico,
-          FechaIngreso: o.FechaIngreso,
-          PCNum: o.PCNum,
-          totalCargos: activeChargesMap[o.PCNum] || 0
-        };
-      }
-    });
-
-    const censoCamas = Object.values(bedsMap).sort((a,b) => a.RoomCode.localeCompare(b.RoomCode));
-
-    // 4. Estadísticas Clínicas en vivo (Egresos, Mortalidad y Estancia) de SQL Server
-    let clinicalStats = { TotalEgresos: 0, Defunciones: 0, EstanciaPromedio: 0 };
-    try {
-      const mssqlPool = await connectRemoteDB();
-      const statsRes = await mssqlPool.request()
-        .input('startDate', effectiveStartDate.substring(0, 10))
-        .input('endDate', effectiveEndDate)
-        .query(`
-          SELECT 
-            COUNT(DISTINCT pc.PCNum) as TotalEgresos,
-            SUM(CASE WHEN pc.MedicalDischarge IN ('DEF', 'DEFUNCION', 'MD003') OR pc.DateOfDeath IS NOT NULL THEN 1 ELSE 0 END) as Defunciones,
-            AVG(CAST(DATEDIFF(day, pc.Date, pc.MedicalDischargeDate) AS FLOAT)) as EstanciaPromedio
+    // 1. Camas en vivo y censo
+    const fetchCenso = async () => {
+      let occupiedBeds = [];
+      try {
+        const mssqlPool = await connectRemoteDB();
+        const liveBedsRes = await mssqlPool.request().query(`
+          SELECT DISTINCT
+            v.RoomCode, 
+            v.RoomName,
+            pt.FullName AS Paciente, 
+            pr.FullName AS Medico,
+            pc.Date AS FechaIngreso,
+            pc.PCNum AS PCNum
           FROM PC pc
           INNER JOIN PT pt ON pc.PTNum = pt.PTNum
-          LEFT JOIN V_MRPT v ON pt.PTNum = v.PTNum
-          WHERE pc.PC_ST = 'CL'
-            AND pc.MedicalDischargeDate >= @startDate AND pc.MedicalDischargeDate <= @endDate
+          LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
+          OUTER APPLY (
+            SELECT TOP 1 
+              pcfr.FRCode AS RoomCode,
+              pcfr.FRName AS RoomName
+            FROM PCFR pcfr
+            WHERE pcfr.PCNum = pc.PCNum
+              AND pcfr.PCFR_ST = 'AS'
+              AND pcfr.ExitDate IS NULL
+            ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
+          ) v
+          WHERE pc.PC_ST = 'OP' 
+            AND pc.PCType IN ('IP', 'ER')
+            AND pc.MedicalDischargeDate IS NULL
             AND (v.RoomCode LIKE 'CUBUTI%' OR v.RoomCode = 'CUNUCIN01')
+            AND v.RoomName NOT LIKE '%VIRTUAL%'
+            AND v.RoomName NOT LIKE '%VIRT%'
+            AND v.RoomCode NOT LIKE '%VIRT%'
         `);
-      
-      if (statsRes.recordset && statsRes.recordset.length > 0) {
-        const stats = statsRes.recordset[0];
-        clinicalStats = {
-          TotalEgresos: stats.TotalEgresos || 0,
-          Defunciones: stats.Defunciones || 0,
-          EstanciaPromedio: stats.EstanciaPromedio != null ? parseFloat(stats.EstanciaPromedio.toFixed(1)) : 0
-        };
+        occupiedBeds = liveBedsRes.recordset || [];
+      } catch (e) {
+        console.error('[SAP/Vertical] Error al consultar camas UCI en vivo:', e.message);
       }
-    } catch (e) {
-      console.error('[SAP/Vertical] Error al consultar estadísticas clínicas de UCI:', e.message);
-    }
+
+      const masterBedsRes = await pgPool.query(`
+        SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName"
+        FROM dw_vertical_pt
+        WHERE roomcode LIKE 'CUBUTI%' OR roomcode = 'CUNUCIN01'
+        ORDER BY roomcode ASC
+      `);
+      const masterBeds = masterBedsRes.rows;
+
+      const bedsMap = {};
+      const defaultBeds = [
+        { RoomCode: 'CUBUTI01', RoomName: 'CUBICULO 1 TERAPIA INTENSIVA' },
+        { RoomCode: 'CUBUTI03', RoomName: 'CUBICULO 3 TERAPIA INTENSIVA' },
+        { RoomCode: 'CUBUTI04', RoomName: 'CUBICULO 4 TERAPIA INTENSIVA' },
+        { RoomCode: 'CUBUTI05', RoomName: 'CUBICULO 5 TERAPIA INTENSIVA' },
+        { RoomCode: 'CUBUTI06', RoomName: 'CUBICULO 6 TERAPIA INTENSIVA' },
+        { RoomCode: 'CUBUTI07', RoomName: 'CUBICULO 7 TERAPIA INTENSIVA' },
+        { RoomCode: 'CUNUCIN01', RoomName: 'CUNA DE UCIN 1' }
+      ];
+
+      const bedsListToUse = masterBeds.length > 0 ? masterBeds : defaultBeds;
+      bedsListToUse.forEach(b => {
+        bedsMap[b.RoomCode] = { 
+          RoomCode: b.RoomCode, RoomName: b.RoomName, Estado: 'LIBRE', 
+          Paciente: null, Medico: null, FechaIngreso: null, PCNum: null, totalCargos: 0
+        };
+      });
+
+      let activeChargesMap = {};
+      if (occupiedBeds.length > 0) {
+        const activeFolios = occupiedBeds.map(o => o.PCNum).filter(Boolean);
+        if (activeFolios.length > 0) {
+          const activeChargesRes = await pgPool.query(`
+            SELECT folio_de_atencion as folio, SUM(total_cobrado)::float as total_cargos
+            FROM dw_vertical_cuentas_servicios
+            WHERE folio_de_atencion = ANY($1)
+              AND (unidad_de_servicio = 'UCI' OR grupo_de_articulos = 'TERAPIA INTENSIVA  E INTERMEDIA' OR unidad_de_servicio = 'UCIN')
+            GROUP BY folio_de_atencion
+          `, [activeFolios]);
+          activeChargesRes.rows.forEach(r => {
+            activeChargesMap[r.folio] = r.total_cargos;
+          });
+        }
+      }
+
+      occupiedBeds.forEach(o => {
+        const code = o.RoomCode ? o.RoomCode.trim() : null;
+        if (code && bedsMap[code]) {
+          bedsMap[code] = {
+            RoomCode: code,
+            RoomName: o.RoomName || bedsMap[code].RoomName,
+            Estado: 'OCUPADA',
+            Paciente: o.Paciente,
+            Medico: o.Medico,
+            FechaIngreso: o.FechaIngreso,
+            PCNum: o.PCNum,
+            totalCargos: activeChargesMap[o.PCNum] || 0
+          };
+        }
+      });
+
+      return {
+        occupiedBeds,
+        censoCamas: Object.values(bedsMap).sort((a,b) => a.RoomCode.localeCompare(b.RoomCode))
+      };
+    };
+
+    // 2. Estadísticas Clínicas
+    const fetchClinical = async () => {
+      let totalEgresos = 0;
+      let defunciones = 0;
+      let totalDias = 0;
+
+      if (split.pgStart && split.pgEnd) {
+        const pgStats = await pgPool.query(`
+          SELECT 
+            COUNT(DISTINCT pc.pcnum)::int as total_egresos,
+            SUM(CASE WHEN (pt.roomcode LIKE '%DEF%' OR pc.medicaldischargedate = pc.entrydate) THEN 1 ELSE 0 END)::int as defunciones,
+            COALESCE(SUM(EXTRACT(EPOCH FROM (pc.medicaldischargedate - pc.entrydate)) / 86400.0), 0)::float as total_dias
+          FROM dw_vertical_pc pc
+          JOIN dw_vertical_pt pt ON pc.ptnum = pt.ptnum
+          WHERE pc.pc_st = 'CL'
+            AND pc.medicaldischargedate >= $1 AND pc.medicaldischargedate <= $2
+            AND (pt.roomcode LIKE 'CUBUTI%' OR pt.roomcode = 'CUNUCIN01')
+        `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+
+        if (pgStats.rows.length > 0) {
+          totalEgresos += pgStats.rows[0].total_egresos || 0;
+          defunciones += pgStats.rows[0].defunciones || 0;
+          totalDias += pgStats.rows[0].total_dias || 0;
+        }
+      }
+
+      if (split.hasToday && split.remoteStart) {
+        try {
+          const mssqlPool = await connectRemoteDB();
+          const statsRes = await mssqlPool.request()
+            .input('startDate', split.remoteStart.substring(0, 10))
+            .input('endDate', split.remoteEnd || new Date())
+            .query(`
+              SELECT 
+                COUNT(DISTINCT pc.PCNum) as TotalEgresos,
+                SUM(CASE WHEN pc.MedicalDischarge IN ('DEF', 'DEFUNCION', 'MD003') OR pc.DateOfDeath IS NOT NULL THEN 1 ELSE 0 END) as Defunciones,
+                COALESCE(SUM(CAST(DATEDIFF(day, pc.Date, pc.MedicalDischargeDate) AS FLOAT)), 0) as TotalDias
+              FROM PC pc
+              INNER JOIN PT pt ON pc.PTNum = pt.PTNum
+              WHERE pc.PC_ST = 'CL'
+                AND pc.MedicalDischargeDate >= @startDate AND pc.MedicalDischargeDate <= @endDate
+            `);
+          if (statsRes.recordset && statsRes.recordset.length > 0) {
+            totalEgresos += statsRes.recordset[0].TotalEgresos || 0;
+            defunciones += statsRes.recordset[0].Defunciones || 0;
+            totalDias += statsRes.recordset[0].TotalDias || 0;
+          }
+        } catch (e) {
+          console.error('[UCI Live Stats]', e.message);
+        }
+      }
+
+      const estanciaPromedio = totalEgresos > 0 ? parseFloat((totalDias / totalEgresos).toFixed(1)) : 0;
+      return { TotalEgresos: totalEgresos, Defunciones: defunciones, EstanciaPromedio: estanciaPromedio };
+    };
+
+    // 3. Consultas Financieras en PostgreSQL
+    const fetchFinanzas = async () => {
+      const [finRes, grupoRes, insumosRes, listaPacientesRes] = await Promise.all([
+        pgPool.query(`
+          SELECT 
+            COALESCE(SUM(total_cobrado), 0)::float as total_facturado, 
+            COUNT(DISTINCT folio_de_atencion)::int as total_pacientes
+          FROM dw_vertical_cuentas_servicios
+          WHERE (unidad_de_servicio = 'UCI' OR grupo_de_articulos = 'TERAPIA INTENSIVA  E INTERMEDIA' OR unidad_de_servicio = 'UCIN')
+            AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+        `, [effectiveStartDate, effectiveEndDate]),
+
+        pgPool.query(`
+          SELECT 
+            grupo_de_articulos as "grupo", 
+            COALESCE(SUM(total_cobrado), 0)::float as "total"
+          FROM dw_vertical_cuentas_servicios
+          WHERE (unidad_de_servicio = 'UCI' OR grupo_de_articulos = 'TERAPIA INTENSIVA  E INTERMEDIA' OR unidad_de_servicio = 'UCIN')
+            AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+          GROUP BY grupo_de_articulos
+          ORDER BY total DESC
+        `, [effectiveStartDate, effectiveEndDate]),
+
+        pgPool.query(`
+          SELECT 
+            descripcion_del_articulo as "nombre", 
+            SUM(cantidad)::float as "cantidad", 
+            COALESCE(SUM(total_cobrado), 0)::float as "total"
+          FROM dw_vertical_cuentas_servicios
+          WHERE (unidad_de_servicio = 'UCI' OR grupo_de_articulos = 'TERAPIA INTENSIVA  E INTERMEDIA' OR unidad_de_servicio = 'UCIN')
+            AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+            AND grupo_de_articulos NOT LIKE '%ESTANCIA%'
+          GROUP BY descripcion_del_articulo
+          ORDER BY total DESC
+          LIMIT 10
+        `, [effectiveStartDate, effectiveEndDate]),
+
+        pgPool.query(`
+          SELECT 
+            s.folio_de_atencion as "folio",
+            MAX(s.nombre_del_paciente) as "paciente",
+            MIN(pc.entrydate) as "entrydate",
+            MAX(pc.medicaldischargedate) as "medicaldischargedate",
+            COALESCE(MAX(s.medico_tratante), MAX(s.medico_solicitante)) as "medico",
+            SUM(s.total_cobrado)::float as "total_cargos_uci",
+            pc.pc_st as "status",
+            MAX(pt.roomname) as "room"
+          FROM dw_vertical_cuentas_servicios s
+          LEFT JOIN dw_vertical_pc pc ON s.folio_de_atencion = pc.pcnum
+          LEFT JOIN dw_vertical_pt pt ON pc.ptnum = pt.ptnum
+          WHERE (s.grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND s.unidad_de_servicio IN ('UCI', 'UCIN'))
+            AND s.fecha_de_cargo >= $1 AND s.fecha_de_cargo <= $2
+          GROUP BY s.folio_de_atencion, pc.pc_st
+          ORDER BY entrydate DESC
+          LIMIT 500
+        `, [effectiveStartDate, effectiveEndDate])
+      ]);
+
+      return {
+        totalFacturado: finRes.rows[0]?.total_facturado || 0,
+        totalPacientes: finRes.rows[0]?.total_pacientes || 0,
+        ingresosPorGrupo: grupoRes.rows,
+        topInsumos: insumosRes.rows,
+        listaPacientes: listaPacientesRes.rows
+      };
+    };
+
+    const [censoResult, clinicalStats, finanzasResult] = await Promise.all([
+      fetchCenso(),
+      fetchClinical(),
+      fetchFinanzas()
+    ]);
 
     const totalEgresos = clinicalStats.TotalEgresos;
     const defunciones = clinicalStats.Defunciones;
     const tasaMortalidad = totalEgresos > 0 ? parseFloat(((defunciones * 100) / totalEgresos).toFixed(1)) : 0;
-    const camasOcupadas = occupiedBeds.length;
-    const totalCamas = censoCamas.length;
+    const camasOcupadas = censoResult.occupiedBeds.length;
+    const totalCamas = censoResult.censoCamas.length;
     const ocupacionPct = totalCamas > 0 ? parseFloat(((camasOcupadas * 100) / totalCamas).toFixed(1)) : 0;
 
-    // 5. Métricas Financieras (PostgreSQL DW)
-    // A. Total Facturado y total pacientes históricos facturados en el periodo
-    const finRes = await pgPool.query(`
-      SELECT 
-        COALESCE(SUM(total_cobrado), 0)::float as total_facturado, 
-        COUNT(DISTINCT folio_de_atencion)::int as total_pacientes
-      FROM dw_vertical_cuentas_servicios
-      WHERE (unidad_de_servicio = 'UCI' OR grupo_de_articulos = 'TERAPIA INTENSIVA  E INTERMEDIA' OR unidad_de_servicio = 'UCIN')
-        AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
-    `, [effectiveStartDate, effectiveEndDate]);
-    const { total_facturado: totalFacturado, total_pacientes: totalPacientes } = finRes.rows[0];
-
-    // B. Desglose de ingresos por grupo de artículos
-    const grupoRes = await pgPool.query(`
-      SELECT 
-        grupo_de_articulos as "grupo", 
-        COALESCE(SUM(total_cobrado), 0)::float as "total"
-      FROM dw_vertical_cuentas_servicios
-      WHERE (unidad_de_servicio = 'UCI' OR grupo_de_articulos = 'TERAPIA INTENSIVA  E INTERMEDIA' OR unidad_de_servicio = 'UCIN')
-        AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
-      GROUP BY grupo_de_articulos
-      ORDER BY total DESC
-    `, [effectiveStartDate, effectiveEndDate]);
-
-    // C. Top 10 Insumos y Medicamentos
-    const insumosRes = await pgPool.query(`
-      SELECT 
-        descripcion_del_articulo as "nombre", 
-        SUM(cantidad)::float as "cantidad", 
-        COALESCE(SUM(total_cobrado), 0)::float as "total"
-      FROM dw_vertical_cuentas_servicios
-      WHERE (unidad_de_servicio = 'UCI' OR grupo_de_articulos = 'TERAPIA INTENSIVA  E INTERMEDIA' OR unidad_de_servicio = 'UCIN')
-        AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
-        AND grupo_de_articulos NOT LIKE '%ESTANCIA%'
-      GROUP BY descripcion_del_articulo
-      ORDER BY total DESC
-      LIMIT 10
-    `, [effectiveStartDate, effectiveEndDate]);
-
-    // D. Listado de Pacientes Histórico / Cuentas del periodo
-    const listaPacientesRes = await pgPool.query(`
-      SELECT 
-        s.folio_de_atencion as "folio",
-        MAX(s.nombre_del_paciente) as "paciente",
-        MIN(pc.entrydate) as "entrydate",
-        MAX(pc.medicaldischargedate) as "medicaldischargedate",
-        COALESCE(MAX(s.medico_tratante), MAX(s.medico_solicitante)) as "medico",
-        SUM(s.total_cobrado)::float as "total_cargos_uci",
-        pc.pc_st as "status",
-        MAX(pt.roomname) as "room"
-      FROM dw_vertical_cuentas_servicios s
-      LEFT JOIN dw_vertical_pc pc ON s.folio_de_atencion = pc.pcnum
-      LEFT JOIN dw_vertical_pt pt ON pc.ptnum = pt.ptnum
-      WHERE (s.unidad_de_servicio = 'UCI' OR s.grupo_de_articulos = 'TERAPIA INTENSIVA  E INTERMEDIA' OR s.unidad_de_servicio = 'UCIN')
-        AND s.fecha_de_cargo >= $1 AND s.fecha_de_cargo <= $2
-      GROUP BY s.folio_de_atencion, pc.pc_st
-      ORDER BY entrydate DESC
-    `, [effectiveStartDate, effectiveEndDate]);
-
-    res.json({
+    const responsePayload = {
       ok: true,
       data: {
         kpis: {
-          totalFacturado,
-          totalPacientes,
+          totalFacturado: finanzasResult.totalFacturado,
+          totalPacientes: finanzasResult.totalPacientes,
           estanciaPromedio: clinicalStats.EstanciaPromedio,
           tasaMortalidad,
           camasOcupadas,
           totalCamas,
           ocupacionPct
         },
-        censoCamas,
-        ingresosPorGrupo: grupoRes.rows,
-        topInsumos: insumosRes.rows,
-        listaPacientes: listaPacientesRes.rows
+        censoCamas: censoResult.censoCamas,
+        ingresosPorGrupo: finanzasResult.ingresosPorGrupo,
+        topInsumos: finanzasResult.topInsumos,
+        listaPacientes: finanzasResult.listaPacientes
       }
-    });
+    };
+
+    dashboardCache.set(cacheKey, responsePayload, 60);
+    res.json(responsePayload);
 
   } catch (err) {
     console.error('Error en uci-nativo:', err);
@@ -3049,10 +2978,18 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
   try {
     let { startDate, endDate, search } = req.query;
     
-    // Default to today if no dates
+    if (startDate === 'undefined' || startDate === 'null' || startDate === '') startDate = null;
+    if (endDate === 'undefined' || endDate === 'null' || endDate === '') endDate = null;
+    if (search === 'undefined' || search === 'null' || search === '') search = null;
+
+    const cacheKey = `consulta-externa:${startDate || ''}:${endDate || ''}:${search || ''}`;
+    if (req.query.nocache !== '1') {
+      const cached = dashboardCache.get(cacheKey);
+      if (cached) return res.json(cached);
+    }
+
     if (!startDate && !endDate) {
       const today = new Date();
-      // YYYY-MM-DD
       const dateStr = today.toISOString().split('T')[0];
       startDate = dateStr;
       endDate = dateStr;
@@ -3061,43 +2998,44 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
     if (endDate && endDate.length === 10) endDate += ' 23:59:59';
     
     const pool = await connectRemoteDB();
-    const request = pool.request();
     
     let whereV = ["1=1"];
     let whereP = ["1=1"];
+    const params = {};
     
     if (startDate) {
       whereV.push("Fecha >= @startDate");
       whereP.push("DesdeFecha >= @startDate");
-      request.input('startDate', startDate);
+      params.startDate = startDate;
     }
     if (endDate) {
       whereV.push("Fecha <= @endDate");
       whereP.push("DesdeFecha <= @endDate");
-      request.input('endDate', endDate);
+      params.endDate = endDate;
     }
-    
-    // Consultas programadas (UDR_CONSULTAS_PROG)
-    const progStr = `
-      SELECT *
-      FROM UDR_CONSULTAS_PROG
-      WHERE ${whereP.join(' AND ')}
-    `;
-    const progRes = await request.query(progStr);
+
+    // Ejecutar en paralelo consultas programadas y completadas con columnas específicas
+    const req1 = pool.request();
+    const req2 = pool.request();
+    if (params.startDate) { req1.input('startDate', params.startDate); req2.input('startDate', params.startDate); }
+    if (params.endDate) { req1.input('endDate', params.endDate); req2.input('endDate', params.endDate); }
+
+    const [progRes, diaRes] = await Promise.all([
+      req1.query(`
+        SELECT No_Cita, No_Medico, Medico, Especialidad, NoPaciente, Paciente, DesdeFecha, HastaFecha, UDF_Ejecutada, PCAP_ST_Descripcion
+        FROM UDR_CONSULTAS_PROG
+        WHERE ${whereP.join(' AND ')}
+      `),
+      req2.query(`
+        SELECT Numero_Cita, Folio_Medico, Medico, MSDescription_ES, Fecha, Hora, Numero_Paciente, Paciente, Estatus_Orden_Venta, Articulo
+        FROM V_UDR_CONSULTA_DIA
+        WHERE ${whereV.join(' AND ')}
+      `)
+    ]);
+
     const programadasData = progRes.recordset || [];
-
-
-    // Top Médicos por cantidad de consultas programadas (finalProgData will be used after filtering, but we can compute it on the initial programadasData and overwrite later, or just wait. Ah, we need to compute it AFTER filtering. Let's do it after.)
-    
-    // Consultas completadas / facturadas (V_UDR_CONSULTA_DIA)
-    const diaStr = `
-      SELECT *
-      FROM V_UDR_CONSULTA_DIA
-      WHERE ${whereV.join(' AND ')}
-    `;
-    const diaRes = await request.query(diaStr);
     const diaData = diaRes.recordset || [];
-    
+
     // Filtro Search
     let finalDiaData = diaData;
     let finalProgData = programadasData;
@@ -3140,52 +3078,22 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
       }
     });
     
-    // Si no hay asistencias claras en PROG, usamos diaData (las confirmadas / procesadas)
     if (asistencias === 0 && diaData.length > 0) {
       asistencias = diaData.length;
     }
     
     const tasaAsistencia = totalProgramadas > 0 ? Math.round((asistencias / totalProgramadas) * 100) : 0;
     
-    // Tendencia por día (últimos 7 días si están viendo hoy)
-    const tendencia = [];
-    if (startDate && endDate && startDate.substring(0,10) === endDate.substring(0,10)) {
-       // Calcular ultimos 7 dias
-       const request7 = pool.request();
-       const d7 = new Date(startDate);
-       d7.setDate(d7.getDate() - 7);
-       request7.input('start7', d7.toISOString().split('T')[0]);
-       request7.input('end7', endDate);
-       const tRes = await request7.query(`
-         SELECT CAST(DesdeFecha AS DATE) as fecha, COUNT(*) as valor
-         FROM UDR_CONSULTAS_PROG
-         WHERE DesdeFecha >= @start7 AND DesdeFecha <= @end7
-         GROUP BY CAST(DesdeFecha AS DATE)
-         ORDER BY fecha ASC
-       `);
-       tRes.recordset.forEach(r => {
-         // Create date from string by appending 'T12:00:00' to avoid UTC shift
-         const dStr = r.fecha instanceof Date ? r.fecha.toISOString().split('T')[0] : String(r.fecha).substring(0, 10);
-         const fixedDate = new Date(`${dStr}T12:00:00`);
-         tendencia.push({
-           nombre: fixedDate.toLocaleDateString('es-MX', {day: '2-digit', month: 'short'}),
-           valor: r.valor
-         });
-       });
-    } else {
-       // Agrupar por mes o día dentro del rango
-       const grouped = {};
-       programadasData.forEach(p => {
-         const dStr = p.DesdeFecha instanceof Date ? p.DesdeFecha.toISOString().split('T')[0] : String(p.DesdeFecha).substring(0, 10);
-         const fixedDate = new Date(`${dStr}T12:00:00`);
-         const d = fixedDate.toLocaleDateString('es-MX', {day: '2-digit', month: 'short'});
-         grouped[d] = (grouped[d] || 0) + 1;
-       });
-       Object.keys(grouped).forEach(k => {
-         tendencia.push({ nombre: k, valor: grouped[k] });
-       });
-    }
-    
+    // Tendencia por día
+    const tendenciaMap = {};
+    programadasData.forEach(p => {
+      if (p.DesdeFecha) {
+        const dStr = p.DesdeFecha instanceof Date ? p.DesdeFecha.toISOString().split('T')[0] : String(p.DesdeFecha).substring(0, 10);
+        tendenciaMap[dStr] = (tendenciaMap[dStr] || 0) + 1;
+      }
+    });
+    const tendencia = Object.keys(tendenciaMap).sort().map(k => ({ fecha: k, consultas: tendenciaMap[k] }));
+
     // Especialidades (Pie Chart)
     const espCount = {};
     finalProgData.forEach(p => {
@@ -3195,38 +3103,46 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
     const especialidades = Object.keys(espCount).map(k => ({
       nombre: k,
       valor: espCount[k]
-    })).sort((a,b) => b.valor - a.valor).slice(0, 5); // top 5
-    
-    res.json({
+    })).sort((a,b) => b.valor - a.valor).slice(0, 5);
+
+    const responsePayload = {
       ok: true,
       data: {
         kpis: {
           total: totalProgramadas,
-          asistencias: asistencias,
-          cancelaciones: cancelaciones,
-          tasaAsistencia: tasaAsistencia
+          asistencias,
+          cancelaciones,
+          tasaAsistencia
         },
         tendencia,
         especialidades,
         topMedicos,
-        lista: finalProgData // Mandamos la lista de programadas como base para la tabla
+        lista: finalProgData
       }
-    });
-    
+    };
+
+    dashboardCache.set(cacheKey, responsePayload, 60);
+    res.json(responsePayload);
+
   } catch (err) {
     console.error('Error Consulta Externa:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
-/**
- * GET /api/dashboard/aseguradoras-nativo
- * Dashboard nativo para Aseguradoras (VERTICAL + SAP)
- */
+
 router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     let { startDate, endDate } = req.query;
 
-    // Default to this year
+    if (startDate === 'undefined' || startDate === 'null' || startDate === '') startDate = null;
+    if (endDate === 'undefined' || endDate === 'null' || endDate === '') endDate = null;
+
+    const cacheKey = `aseguradoras:${startDate || ''}:${endDate || ''}`;
+    if (req.query.nocache !== '1') {
+      const cached = dashboardCache.get(cacheKey);
+      if (cached) return res.json(cached);
+    }
+
     if (!startDate && !endDate) {
       const now = new Date();
       startDate = `${now.getFullYear()}-01-01`;
@@ -3235,9 +3151,6 @@ router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR',
     
     if (endDate && endDate.length === 10) endDate += ' 23:59:59';
 
-    const { connectRemoteDB } = require('../config/remote-db');
-    const sapService = require('../services/sap.service');
-    
     // 1. Obtener de SAP el catálogo real de Aseguradoras (GroupCode = 109)
     let sapBPs = [];
     let bpNames = {};
@@ -3254,21 +3167,15 @@ router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR',
     }
 
     if (sapBPs.length === 0) {
-      // Fallback in case SAP fails, we don't want to crash but we can't filter precisely
-      sapBPs = ['CTE00005', 'CTE00014', 'CTE00024', 'CTE00187']; // Algunos defaults conocidos
+      sapBPs = ['CTE00005', 'CTE00014', 'CTE00024', 'CTE00187'];
     }
 
     const pool = await connectRemoteDB();
     const request = pool.request();
 
-    // 2. Obtener de Vertical Cuentas que pertenezcan EXCLUSIVAMENTE a esas Aseguradoras
-    // o que tengan un Acuerdo activo (PCAG) con alguna de esas Aseguradoras
     let wherePC = [];
-    
-    // Usar parámetros SQL seguros para la lista de BPCodes
     const bpParams = sapBPs.map((bp, i) => `@bp${i}`);
     
-    // Condición: El BPCode principal pertenece a Aseguradoras O existe un acuerdo de Aseguradora
     wherePC.push(`(
       pc.BPCode IN (${bpParams.join(',')}) 
       OR 
@@ -3308,7 +3215,6 @@ router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR',
     const verticalRes = await request.query(verticalQuery);
     const cuentas = verticalRes.recordset || [];
 
-    // Agrupación en Vertical (Pacientes atendidos por Aseguradora)
     const aseguradorasMap = {};
     cuentas.forEach(c => {
       const bp = c.BPCode || 'Desconocida';
@@ -3324,18 +3230,15 @@ router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR',
       aseguradorasMap[bp].count++;
       aseguradorasMap[bp].totalFacturado += parseFloat(c.Total || 0);
       
-      // Top 10 pacientes en general para la tabla interna (si hiciera falta)
       if (aseguradorasMap[bp].pacientes.length < 10) {
         aseguradorasMap[bp].pacientes.push(c);
       }
     });
 
-    // Top Aseguradoras por pacientes atendidos
     const topAseguradoras = Object.values(aseguradorasMap)
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    // Lista general de pacientes
     const listaPacientes = cuentas.map(c => ({
       ...c,
       AseguradoraNombre: aseguradorasMap[c.BPCode]?.nombre || c.BPCode
@@ -3345,7 +3248,8 @@ router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR',
     const totalMontoVertical = cuentas.reduce((acc, c) => acc + parseFloat(c.Total || 0), 0);
     const totalSaldoVertical = cuentas.reduce((acc, c) => acc + parseFloat(c.Balance || 0), 0);
 
-    res.json({
+    const responsePayload = {
+      ok: true,
       success: true,
       data: {
         kpis: {
@@ -3357,11 +3261,14 @@ router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR',
         topAseguradoras,
         listaPacientes
       }
-    });
+    };
+
+    dashboardCache.set(cacheKey, responsePayload, 60);
+    res.json(responsePayload);
 
   } catch (error) {
     console.error('Error en aseguradoras-nativo:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ ok: false, success: false, error: error.message });
   }
 });
 
@@ -3690,257 +3597,290 @@ router.get('/finanzas-nativo/ingreso/:docNum', authenticate, authorize(['ADMIN',
 router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
   try {
     let { startDate, endDate } = req.query;
+    
+    if (startDate === 'undefined' || startDate === 'null' || startDate === '') startDate = null;
+    if (endDate === 'undefined' || endDate === 'null' || endDate === '') endDate = null;
+
+    const cacheKey = `hospitalizacion:${startDate || ''}:${endDate || ''}`;
+    if (req.query.nocache !== '1') {
+      const cached = dashboardCache.get(cacheKey);
+      if (cached) return res.json(cached);
+    }
 
     const todayStr = new Date().toISOString().split('T')[0];
     const effectiveStartDate = startDate || `${new Date().getFullYear()}-01-01`;
     const effectiveEndDate = endDate || todayStr + ' 23:59:59';
+    const split = splitDateRange(effectiveStartDate, effectiveEndDate);
 
-    // 1. Obtener camas en vivo (Censo Hospitalización) desde SQL Server KH_HE
-    let occupiedBeds = [];
-    try {
-      const mssqlPool = await connectRemoteDB();
-      const liveBedsRes = await mssqlPool.request().query(`
-        SELECT DISTINCT
-          v.RoomCode, 
-          v.RoomName,
-          pt.FullName AS Paciente, 
-          pr.FullName AS Medico,
-          pc.Date AS FechaIngreso,
-          pc.PCNum AS PCNum
-        FROM PC pc
-        INNER JOIN PT pt ON pc.PTNum = pt.PTNum
-        LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
-        OUTER APPLY (
-          SELECT TOP 1 
-            pcfr.FRCode AS RoomCode,
-            pcfr.FRName AS RoomName
-          FROM PCFR pcfr
-          WHERE pcfr.PCNum = pc.PCNum
-            AND pcfr.PCFR_ST = 'AS'
-            AND pcfr.ExitDate IS NULL
-          ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
-        ) v
-        WHERE pc.PC_ST = 'OP' 
-          AND pc.PCType = 'IP'
-          AND pc.MedicalDischargeDate IS NULL
-          AND (v.RoomName LIKE '%CAMA 1%' OR v.RoomName LIKE '%CAMA 2%')
-          AND v.RoomName NOT LIKE '%URGENCIAS%'
-          AND (v.RoomCode NOT LIKE 'CUBUTI%' AND v.RoomCode != 'CUNUCIN01')
-          AND v.RoomName NOT LIKE '%VIRTUAL%'
-          AND v.RoomName NOT LIKE '%VIRT%'
-          AND v.RoomCode NOT LIKE '%VIRT%'
-      `);
-      occupiedBeds = liveBedsRes.recordset || [];
-    } catch (e) {
-      console.error('[SAP/Vertical] Error al consultar camas Hospitalización en vivo:', e.message);
-    }
-
-    // 2. Obtener listado maestro de camas Hospitalización desde PostgreSQL
-    const masterBedsRes = await pgPool.query(`
-      SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName"
-      FROM dw_vertical_pt
-      WHERE (roomname LIKE '%CAMA 1%' OR roomname LIKE '%CAMA 2%')
-        AND roomname NOT LIKE '%URGENCIAS%'
-        AND roomcode NOT LIKE 'CUBUTI%'
-        AND roomname NOT LIKE '%VIRTUAL%'
-        AND roomname NOT LIKE '%VIRT%'
-        AND roomcode NOT LIKE '%VIRT%'
-      ORDER BY roomcode ASC
-    `);
-    const masterBeds = masterBedsRes.rows;
-
-    const bedsMap = {};
-    const bedsListToUse = masterBeds;
-    bedsListToUse.forEach(b => {
-      bedsMap[b.RoomCode] = { 
-        RoomCode: b.RoomCode, 
-        RoomName: b.RoomName, 
-        Estado: 'LIBRE', 
-        Paciente: null, 
-        Medico: null, 
-        FechaIngreso: null, 
-        PCNum: null,
-        totalCargos: 0
-      };
-    });
-
-    // 3. Consultar cargos acumulados de pacientes activos en PostgreSQL para cruzarlos
-    let activeChargesMap = {};
-    if (occupiedBeds.length > 0) {
-      const activeFolios = occupiedBeds.map(o => o.PCNum).filter(Boolean);
-      if (activeFolios.length > 0) {
-        const activeChargesRes = await pgPool.query(`
-          SELECT folio_de_atencion as folio, SUM(total_cobrado)::float as total_cargos
-          FROM dw_vertical_cuentas_servicios
-          WHERE folio_de_atencion = ANY($1)
-            AND grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' 
-            AND unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2')
-          GROUP BY folio_de_atencion
-        `, [activeFolios]);
-        activeChargesRes.rows.forEach(r => {
-          activeChargesMap[r.folio] = r.total_cargos;
-        });
-      }
-    }
-
-    occupiedBeds.forEach(o => {
-      const code = o.RoomCode ? o.RoomCode.trim() : null;
-      if (code) {
-        if (!bedsMap[code]) {
-          bedsMap[code] = {
-            RoomCode: code,
-            RoomName: o.RoomName || code,
-            Estado: 'LIBRE',
-            Paciente: null, Medico: null, FechaIngreso: null, PCNum: null, totalCargos: 0
-          };
-        }
-        bedsMap[code] = {
-          ...bedsMap[code],
-          Estado: 'OCUPADA',
-        Paciente: o.Paciente,
-          Medico: o.Medico,
-          FechaIngreso: o.FechaIngreso,
-          PCNum: o.PCNum,
-          totalCargos: activeChargesMap[o.PCNum] || 0
-        };
-      }
-    });
-
-    const censoCamas = Object.values(bedsMap).sort((a,b) => a.RoomCode.localeCompare(b.RoomCode));
-
-    // 4. Estadísticas Clínicas en vivo de SQL Server
-    let clinicalStats = { TotalEgresos: 0, Defunciones: 0, EstanciaPromedio: 0 };
-    try {
-      const mssqlPool = await connectRemoteDB();
-      const statsRes = await mssqlPool.request()
-        .input('startDate', effectiveStartDate.substring(0, 10))
-        .input('endDate', effectiveEndDate)
-        .query(`
-          SELECT 
-            COUNT(DISTINCT pc.PCNum) as TotalEgresos,
-            SUM(CASE WHEN pc.MedicalDischarge IN ('DEF', 'DEFUNCION', 'MD003') OR pc.DateOfDeath IS NOT NULL THEN 1 ELSE 0 END) as Defunciones,
-            AVG(CAST(DATEDIFF(day, pc.Date, pc.MedicalDischargeDate) AS FLOAT)) as EstanciaPromedio
+    // 1. Censo de camas en vivo
+    const fetchCenso = async () => {
+      let occupiedBeds = [];
+      try {
+        const mssqlPool = await connectRemoteDB();
+        const liveBedsRes = await mssqlPool.request().query(`
+          SELECT DISTINCT
+            v.RoomCode, 
+            v.RoomName,
+            pt.FullName AS Paciente, 
+            pr.FullName AS Medico,
+            pc.Date AS FechaIngreso,
+            pc.PCNum AS PCNum
           FROM PC pc
           INNER JOIN PT pt ON pc.PTNum = pt.PTNum
-          LEFT JOIN V_MRPT v ON pt.PTNum = v.PTNum
-          WHERE pc.PC_ST = 'CL' AND pc.PCType = 'IP'
-            AND pc.MedicalDischargeDate >= @startDate AND pc.MedicalDischargeDate <= @endDate
+          LEFT JOIN PR pr ON pc.PRNum = pr.PRNum
+          OUTER APPLY (
+            SELECT TOP 1 
+              pcfr.FRCode AS RoomCode,
+              pcfr.FRName AS RoomName
+            FROM PCFR pcfr
+            WHERE pcfr.PCNum = pc.PCNum
+              AND pcfr.PCFR_ST = 'AS'
+              AND pcfr.ExitDate IS NULL
+            ORDER BY pcfr.EntryDate DESC, pcfr.PCFRNum DESC
+          ) v
+          WHERE pc.PC_ST = 'OP' 
+            AND pc.PCType = 'IP'
+            AND pc.MedicalDischargeDate IS NULL
+            AND (v.RoomName LIKE '%CAMA 1%' OR v.RoomName LIKE '%CAMA 2%')
+            AND v.RoomName NOT LIKE '%URGENCIAS%'
             AND (v.RoomCode NOT LIKE 'CUBUTI%' AND v.RoomCode != 'CUNUCIN01')
+            AND v.RoomName NOT LIKE '%VIRTUAL%'
+            AND v.RoomName NOT LIKE '%VIRT%'
+            AND v.RoomCode NOT LIKE '%VIRT%'
         `);
-      
-      if (statsRes.recordset && statsRes.recordset.length > 0) {
-        const stats = statsRes.recordset[0];
-        clinicalStats = {
-          TotalEgresos: stats.TotalEgresos || 0,
-          Defunciones: stats.Defunciones || 0,
-          EstanciaPromedio: stats.EstanciaPromedio != null ? parseFloat(stats.EstanciaPromedio.toFixed(1)) : 0
-        };
+        occupiedBeds = liveBedsRes.recordset || [];
+      } catch (e) {
+        console.error('[SAP/Vertical] Error al consultar camas Hospitalización en vivo:', e.message);
       }
-    } catch (e) {
-      console.error('[SAP/Vertical] Error al consultar estadísticas clínicas de Hospitalización:', e.message);
-    }
+
+      const masterBedsRes = await pgPool.query(`
+        SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName"
+        FROM dw_vertical_pt
+        WHERE (roomname LIKE '%CAMA 1%' OR roomname LIKE '%CAMA 2%')
+          AND roomname NOT LIKE '%URGENCIAS%'
+          AND roomcode NOT LIKE 'CUBUTI%'
+          AND roomname NOT LIKE '%VIRTUAL%'
+          AND roomname NOT LIKE '%VIRT%'
+          AND roomcode NOT LIKE '%VIRT%'
+        ORDER BY roomcode ASC
+      `);
+      const masterBeds = masterBedsRes.rows;
+
+      const bedsMap = {};
+      masterBeds.forEach(b => {
+        bedsMap[b.RoomCode] = { 
+          RoomCode: b.RoomCode, RoomName: b.RoomName, Estado: 'LIBRE', 
+          Paciente: null, Medico: null, FechaIngreso: null, PCNum: null, totalCargos: 0
+        };
+      });
+
+      let activeChargesMap = {};
+      if (occupiedBeds.length > 0) {
+        const activeFolios = occupiedBeds.map(o => o.PCNum).filter(Boolean);
+        if (activeFolios.length > 0) {
+          const activeChargesRes = await pgPool.query(`
+            SELECT folio_de_atencion as folio, SUM(total_cobrado)::float as total_cargos
+            FROM dw_vertical_cuentas_servicios
+            WHERE folio_de_atencion = ANY($1)
+              AND grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' 
+              AND unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2')
+            GROUP BY folio_de_atencion
+          `, [activeFolios]);
+          activeChargesRes.rows.forEach(r => {
+            activeChargesMap[r.folio] = r.total_cargos;
+          });
+        }
+      }
+
+      occupiedBeds.forEach(o => {
+        const code = o.RoomCode ? o.RoomCode.trim() : null;
+        if (code) {
+          if (!bedsMap[code]) {
+            bedsMap[code] = {
+              RoomCode: code, RoomName: o.RoomName || code, Estado: 'LIBRE',
+              Paciente: null, Medico: null, FechaIngreso: null, PCNum: null, totalCargos: 0
+            };
+          }
+          bedsMap[code] = {
+            ...bedsMap[code],
+            Estado: 'OCUPADA', Paciente: o.Paciente, Medico: o.Medico,
+            FechaIngreso: o.FechaIngreso, PCNum: o.PCNum,
+            totalCargos: activeChargesMap[o.PCNum] || 0
+          };
+        }
+      });
+
+      return {
+        occupiedBeds,
+        censoCamas: Object.values(bedsMap).sort((a,b) => a.RoomCode.localeCompare(b.RoomCode))
+      };
+    };
+
+    // 2. Estadísticas Clínicas: rápido desde PostgreSQL DW + SQL Server hoy si aplica
+    const fetchClinical = async () => {
+      let totalEgresos = 0;
+      let defunciones = 0;
+      let totalDias = 0;
+
+      if (split.pgStart && split.pgEnd) {
+        const pgStats = await pgPool.query(`
+          SELECT 
+            COUNT(DISTINCT pc.pcnum)::int as total_egresos,
+            SUM(CASE WHEN (pt.roomcode LIKE '%DEF%' OR pc.medicaldischargedate = pc.entrydate) THEN 1 ELSE 0 END)::int as defunciones,
+            COALESCE(SUM(EXTRACT(EPOCH FROM (pc.medicaldischargedate - pc.entrydate)) / 86400.0), 0)::float as total_dias
+          FROM dw_vertical_pc pc
+          JOIN dw_vertical_pt pt ON pc.ptnum = pt.ptnum
+          WHERE pc.pc_st = 'CL' AND pc.pctype = 'IP'
+            AND pc.medicaldischargedate >= $1 AND pc.medicaldischargedate <= $2
+            AND (pt.roomcode NOT LIKE 'CUBUTI%' AND pt.roomcode != 'CUNUCIN01')
+        `, [split.pgStart, split.pgEnd + ' 23:59:59']);
+
+        if (pgStats.rows.length > 0) {
+          totalEgresos += pgStats.rows[0].total_egresos || 0;
+          defunciones += pgStats.rows[0].defunciones || 0;
+          totalDias += pgStats.rows[0].total_dias || 0;
+        }
+      }
+
+      if (split.hasToday && split.remoteStart) {
+        try {
+          const mssqlPool = await connectRemoteDB();
+          const statsRes = await mssqlPool.request()
+            .input('startDate', split.remoteStart.substring(0, 10))
+            .input('endDate', split.remoteEnd || new Date())
+            .query(`
+              SELECT 
+                COUNT(DISTINCT pc.PCNum) as TotalEgresos,
+                SUM(CASE WHEN pc.MedicalDischarge IN ('DEF', 'DEFUNCION', 'MD003') OR pc.DateOfDeath IS NOT NULL THEN 1 ELSE 0 END) as Defunciones,
+                COALESCE(SUM(CAST(DATEDIFF(day, pc.Date, pc.MedicalDischargeDate) AS FLOAT)), 0) as TotalDias
+              FROM PC pc
+              WHERE pc.PC_ST = 'CL' AND pc.PCType = 'IP'
+                AND pc.MedicalDischargeDate >= @startDate AND pc.MedicalDischargeDate <= @endDate
+            `);
+          if (statsRes.recordset && statsRes.recordset.length > 0) {
+            totalEgresos += statsRes.recordset[0].TotalEgresos || 0;
+            defunciones += statsRes.recordset[0].Defunciones || 0;
+            totalDias += statsRes.recordset[0].TotalDias || 0;
+          }
+        } catch (e) {
+          console.error('[Hospitalizacion Live Stats]', e.message);
+        }
+      }
+
+      const estanciaPromedio = totalEgresos > 0 ? parseFloat((totalDias / totalEgresos).toFixed(1)) : 0;
+      return { TotalEgresos: totalEgresos, Defunciones: defunciones, EstanciaPromedio: estanciaPromedio };
+    };
+
+    // 3. Consultas Financieras en PostgreSQL en paralelo
+    const fetchFinanzas = async () => {
+      const [finRes, sapRes, grupoRes, insumosRes, listaPacientesRes] = await Promise.all([
+        pgPool.query(`
+          SELECT COUNT(DISTINCT folio_de_atencion)::int as total_pacientes
+          FROM dw_vertical_cuentas_servicios
+          WHERE (grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2'))
+            AND folio_de_atencion IN (SELECT pcnum FROM dw_vertical_pc WHERE pctype = 'IP')
+            AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+        `, [effectiveStartDate, effectiveEndDate]),
+
+        pgPool.query(`
+          SELECT SUM(total) as total_facturado 
+          FROM dw_sap_ingresos_grupos
+          WHERE docdate >= $1 AND docdate <= $2
+            AND itmsgrpcod NOT IN (104, 111, 101, 115, 117, 109, 105, 103)
+        `, [effectiveStartDate.substring(0,10), effectiveEndDate.substring(0,10)]).catch(() => ({ rows: [{ total_facturado: 0 }] })),
+
+        pgPool.query(`
+          SELECT 
+            grupo_de_articulos as "grupo", 
+            COALESCE(SUM(total_cobrado), 0)::float as "total"
+          FROM dw_vertical_cuentas_servicios
+          WHERE (grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2'))
+            AND folio_de_atencion IN (SELECT pcnum FROM dw_vertical_pc WHERE pctype = 'IP')
+            AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+          GROUP BY grupo_de_articulos
+          ORDER BY total DESC
+        `, [effectiveStartDate, effectiveEndDate]),
+
+        pgPool.query(`
+          SELECT 
+            descripcion_del_articulo as "nombre", 
+            SUM(cantidad)::float as "cantidad", 
+            COALESCE(SUM(total_cobrado), 0)::float as "total"
+          FROM dw_vertical_cuentas_servicios
+          WHERE (grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2'))
+            AND folio_de_atencion IN (SELECT pcnum FROM dw_vertical_pc WHERE pctype = 'IP')
+            AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
+            AND grupo_de_articulos NOT LIKE '%ESTANCIA%'
+          GROUP BY descripcion_del_articulo
+          ORDER BY total DESC
+          LIMIT 10
+        `, [effectiveStartDate, effectiveEndDate]),
+
+        pgPool.query(`
+          SELECT 
+            s.folio_de_atencion as "folio",
+            MAX(s.nombre_del_paciente) as "paciente",
+            MIN(pc.entrydate) as "entrydate",
+            MAX(pc.medicaldischargedate) as "medicaldischargedate",
+            COALESCE(MAX(s.medico_tratante), MAX(s.medico_solicitante)) as "medico",
+            SUM(s.total_cobrado)::float as "total_cargos",
+            pc.pc_st as "status",
+            MAX(pt.roomname) as "room"
+          FROM dw_vertical_cuentas_servicios s
+          LEFT JOIN dw_vertical_pc pc ON s.folio_de_atencion = pc.pcnum
+          LEFT JOIN dw_vertical_pt pt ON pc.ptnum = pt.ptnum
+          WHERE (s.grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND s.unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2'))
+            AND pc.pctype = 'IP'
+            AND s.fecha_de_cargo >= $1 AND s.fecha_de_cargo <= $2
+          GROUP BY s.folio_de_atencion, pc.pc_st
+          ORDER BY entrydate DESC
+          LIMIT 500
+        `, [effectiveStartDate, effectiveEndDate])
+      ]);
+
+      return {
+        totalPacientes: finRes.rows[0]?.total_pacientes || 0,
+        totalFacturado: parseFloat(sapRes.rows[0]?.total_facturado) || 0,
+        ingresosPorGrupo: grupoRes.rows,
+        topInsumos: insumosRes.rows,
+        listaPacientes: listaPacientesRes.rows
+      };
+    };
+
+    const [censoResult, clinicalStats, finanzasResult] = await Promise.all([
+      fetchCenso(),
+      fetchClinical(),
+      fetchFinanzas()
+    ]);
 
     const totalEgresos = clinicalStats.TotalEgresos;
     const defunciones = clinicalStats.Defunciones;
     const tasaMortalidad = totalEgresos > 0 ? parseFloat(((defunciones * 100) / totalEgresos).toFixed(1)) : 0;
-    const camasOcupadas = occupiedBeds.length;
-    const totalCamas = censoCamas.length;
+    const camasOcupadas = censoResult.occupiedBeds.length;
+    const totalCamas = censoResult.censoCamas.length;
     const ocupacionPct = totalCamas > 0 ? parseFloat(((camasOcupadas * 100) / totalCamas).toFixed(1)) : 0;
 
-    // 5. Métricas Financieras (PostgreSQL DW + SAP)
-    const finRes = await pgPool.query(`
-      SELECT 
-        COUNT(DISTINCT folio_de_atencion)::int as total_pacientes
-      FROM dw_vertical_cuentas_servicios
-      WHERE (grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2'))
-        AND folio_de_atencion IN (SELECT pcnum FROM dw_vertical_pc WHERE pctype = 'IP')
-        AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
-    `, [effectiveStartDate, effectiveEndDate]);
-    const { total_pacientes: totalPacientes } = finRes.rows[0];
-
-    // Ingresos SAP Facturados
-    let totalFacturado = 0;
-    try {
-      const sapRes = await pgPool.query(`
-        SELECT SUM(total) as total_facturado 
-        FROM dw_sap_ingresos_grupos
-        WHERE docdate >= $1 AND docdate <= $2
-          AND itmsgrpcod NOT IN (104, 111, 101, 115, 117, 109, 105, 103)
-      `, [effectiveStartDate.substring(0,10), effectiveEndDate.substring(0,10)]);
-      totalFacturado = parseFloat(sapRes.rows[0]?.total_facturado) || 0;
-    } catch (err) {
-      console.error('[SAP] Error al obtener facturación de Hospitalización:', err);
-    }
-
-
-    // B. Desglose de ingresos por grupo de artículos
-    const grupoRes = await pgPool.query(`
-      SELECT 
-        grupo_de_articulos as "grupo", 
-        COALESCE(SUM(total_cobrado), 0)::float as "total"
-      FROM dw_vertical_cuentas_servicios
-      WHERE (grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2'))
-        AND folio_de_atencion IN (SELECT pcnum FROM dw_vertical_pc WHERE pctype = 'IP')
-        AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
-      GROUP BY grupo_de_articulos
-      ORDER BY total DESC
-    `, [effectiveStartDate, effectiveEndDate]);
-
-    // C. Top 10 Insumos y Medicamentos
-    const insumosRes = await pgPool.query(`
-      SELECT 
-        descripcion_del_articulo as "nombre", 
-        SUM(cantidad)::float as "cantidad", 
-        COALESCE(SUM(total_cobrado), 0)::float as "total"
-      FROM dw_vertical_cuentas_servicios
-      WHERE (grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2'))
-        AND folio_de_atencion IN (SELECT pcnum FROM dw_vertical_pc WHERE pctype = 'IP')
-        AND fecha_de_cargo >= $1 AND fecha_de_cargo <= $2
-        AND grupo_de_articulos NOT LIKE '%ESTANCIA%'
-      GROUP BY descripcion_del_articulo
-      ORDER BY total DESC
-      LIMIT 10
-    `, [effectiveStartDate, effectiveEndDate]);
-
-    // D. Listado de Pacientes Histórico / Cuentas del periodo
-    const listaPacientesRes = await pgPool.query(`
-      SELECT 
-        s.folio_de_atencion as "folio",
-        MAX(s.nombre_del_paciente) as "paciente",
-        MIN(pc.entrydate) as "entrydate",
-        MAX(pc.medicaldischargedate) as "medicaldischargedate",
-        COALESCE(MAX(s.medico_tratante), MAX(s.medico_solicitante)) as "medico",
-        SUM(s.total_cobrado)::float as "total_cargos",
-        pc.pc_st as "status",
-        MAX(pt.roomname) as "room"
-      FROM dw_vertical_cuentas_servicios s
-      LEFT JOIN dw_vertical_pc pc ON s.folio_de_atencion = pc.pcnum
-      LEFT JOIN dw_vertical_pt pt ON pc.ptnum = pt.ptnum
-      WHERE (s.grupo_de_articulos != 'TERAPIA INTENSIVA  E INTERMEDIA' AND s.unidad_de_servicio NOT IN ('UCI', 'UCIN', 'URG1', 'URG2'))
-        AND pc.pctype = 'IP'
-        AND s.fecha_de_cargo >= $1 AND s.fecha_de_cargo <= $2
-      GROUP BY s.folio_de_atencion, pc.pc_st
-      ORDER BY entrydate DESC
-    `, [effectiveStartDate, effectiveEndDate]);
-
-    res.json({
+    const responsePayload = {
       ok: true,
       data: {
         kpis: {
-          totalFacturado,
-          totalPacientes,
+          totalFacturado: finanzasResult.totalFacturado,
+          totalPacientes: finanzasResult.totalPacientes,
           estanciaPromedio: clinicalStats.EstanciaPromedio,
           tasaMortalidad,
           camasOcupadas,
           totalCamas,
           ocupacionPct
         },
-        censoCamas,
-        ingresosPorGrupo: grupoRes.rows,
-        topInsumos: insumosRes.rows,
-        listaPacientes: listaPacientesRes.rows
+        censoCamas: censoResult.censoCamas,
+        ingresosPorGrupo: finanzasResult.ingresosPorGrupo,
+        topInsumos: finanzasResult.topInsumos,
+        listaPacientes: finanzasResult.listaPacientes
       }
-    });
+    };
+
+    dashboardCache.set(cacheKey, responsePayload, 60);
+    res.json(responsePayload);
 
   } catch (err) {
     console.error('Error en hospitalizacion-nativo:', err);

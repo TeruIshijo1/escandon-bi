@@ -25,6 +25,8 @@ const normalizedName = value => String(value || '').normalize('NFD').replace(/[\
 function mergeClassification(row, account) {
   if (!account) return row;
   const result = { ...row, TipoAtencion: row.TipoAtencion || account.TipoAtencion };
+  if (!result.NoPaciente && account.NoPaciente) result.NoPaciente = account.NoPaciente;
+  if (!result.Paciente && account.Paciente) result.Paciente = account.Paciente;
   // Médico es una identidad completa. No emparejar un nombre SAP con el ID de otro tratante.
   if (!hasDoctorName(row.Medico) && !row.NumeroMedico) {
     result.Medico = account.Medico;
@@ -88,11 +90,42 @@ function financialSections(financial, range) {
     result[key].quantity = money(ranking, 'IngresoTotal');
   }
   const shock = rows.filter(row => row.Categoria === 'choque' && Number(row.Cantidad) > 0);
-  const seen = new Set();
-  const shockAccounts = shock.filter(row => {
-    if (!row.FolioAtencion || seen.has(String(row.FolioAtencion))) return false;
-    seen.add(String(row.FolioAtencion)); return true;
-  }).map(row => ({ FolioAtencion: row.FolioAtencion, Fecha: row.Fecha, Cantidad: 1, Servicio: 'Sala de choque' }));
+  const shockByAccount = new Map();
+  for (const row of shock) {
+    const accountId = row.FolioAtencion;
+    if (!accountId) continue;
+    const key = String(accountId);
+    if (!shockByAccount.has(key)) {
+      shockByAccount.set(key, {
+        FolioAtencion: accountId,
+        NoPaciente: row.NoPaciente || null,
+        Paciente: row.Paciente || null,
+        Fecha: row.Fecha,
+        OrdenesVenta: new Set(),
+        CantidadTotal: 0,
+        ImporteTotal: 0,
+        Servicio: row.Servicio || 'Sala de choque'
+      });
+    }
+    const acc = shockByAccount.get(key);
+    if (!acc.Paciente && row.Paciente) acc.Paciente = row.Paciente;
+    if (!acc.NoPaciente && row.NoPaciente) acc.NoPaciente = row.NoPaciente;
+    if (row.Documento) acc.OrdenesVenta.add(row.Documento);
+    acc.CantidadTotal += Number(row.Cantidad || 0);
+    acc.ImporteTotal = roundMoney(acc.ImporteTotal + Number(row.ImporteTotal || row.IngresoNeto || 0));
+    if (new Date(row.Fecha) < new Date(acc.Fecha)) acc.Fecha = row.Fecha;
+  }
+  const shockAccounts = [...shockByAccount.values()].map(a => ({
+    FolioAtencion: a.FolioAtencion,
+    NoPaciente: a.NoPaciente,
+    Paciente: a.Paciente,
+    Fecha: a.Fecha,
+    Ordenes: a.OrdenesVenta.size || 1,
+    CantidadTotal: a.CantidadTotal,
+    ImporteTotal: a.ImporteTotal,
+    Cantidad: 1,
+    Servicio: a.Servicio
+  }));
   result.shock = measured(shockAccounts, 'atenciones', 'Atenciones con servicio de sala de choque en órdenes vigentes del periodo; una vez por atención. El nombre institucional del indicador no acredita el desenlace clínico.');
   if (shock.some(row => !row.FolioAtencion)) result.shock.warnings.push('Hay servicios de sala de choque sin folio de atención; no se incluyeron en el conteo de atenciones.');
   result.specialty = measured(rows.filter(row => row.Categoria === 'consulta'), 'consultas registradas', 'Servicios específicos de consulta de especialidad en órdenes de venta vigentes, por fecha de documento. Excluye rentas, insumos e interconsultas.', 'Cantidad', ['Un servicio registrado no acredita por sí solo que la consulta haya concluido.']);
@@ -101,7 +134,7 @@ function financialSections(financial, range) {
 
 async function enrichFinancial(financial) {
   const docs = financial.documents || [];
-  const unresolved = [...(financial.rows || []), ...docs].filter(row => row.FolioAtencion && (!row.TipoAtencion || !hasDoctorName(row.Medico) || !row.NumeroMedico));
+  const unresolved = [...(financial.rows || []), ...docs].filter(row => row.FolioAtencion);
   const classifications = unresolved.length ? await getAccountClassifications(unresolved.map(row => row.FolioAtencion)) : {};
   const enrich = row => {
     const account = classifications[String(row.FolioAtencion)];

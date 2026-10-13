@@ -302,7 +302,7 @@ async function syncConsultaDia(remotePool, startDateStr) {
       SELECT v.Numero_Cita, v.Folio_Medico, v.Medico, v.MSDescription_ES, v.Fecha, v.Hora, v.Numero_Paciente, v.Paciente, v.Edad_Anios, v.Telefono_1, v.Celular_2, v.Estatus_Orden_Venta, v.Articulo, p.CreatedOn AS FechaCreacion 
       FROM V_UDR_CONSULTA_DIA v
       LEFT JOIN PCAP p ON v.Numero_Cita = p.PCAPNum
-      WHERE v.Fecha >= @startDate OR p.CreatedOn >= @startDate
+      WHERE v.Fecha >= @startDate
     `);
 
   const records = res.recordset || [];
@@ -471,7 +471,7 @@ async function syncConsultasProg(remotePool, startDateStr) {
           AND RTRIM(LTRIM(bp.Convenio)) NOT IN ('', 'N/A')
         ORDER BY bp.AtencionMedica DESC
       ) p
-      WHERE c.Fecha >= @startDate OR pcap.CreatedOn >= @startDate
+      WHERE c.Fecha >= @startDate
     `);
 
   const records = res.recordset || [];

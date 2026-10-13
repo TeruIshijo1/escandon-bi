@@ -11,8 +11,9 @@ const range = { startDate: '2026-09-01', endDate: '2026-09-30', endExclusive: '2
 
 function fixture() {
   const sections = Object.fromEntries(SECTIONS.map(s => [s.key, { rows: [], quantity: 0, unit: s.unit, criterion: 'Criterio de prueba', warnings: [] }]));
-  sections.births.quantity = null;
-  sections.births.warnings = ['Falta evidencia del lugar de nacimiento.'];
+  sections.births.rows = [{ NoPaciente: 101, Fecha: '2026-09-04', FechaNacimiento: '2026-09-04', FechaCreacion: '2026-09-04', Cantidad: 1 }];
+  sections.births.quantity = 1;
+  sections.births.criterion = 'PT.CreatedOn coincide con PT.BirthDate dentro del periodo.';
   const financial = {
     rows: [
       { Fecha: '2026-09-30', Categoria: 'imagen', Cantidad: 2, IngresoNeto: 200.12 },
@@ -58,10 +59,18 @@ test('Top 10 independientes suman cabeceras únicas, con cuentas distintas y sin
   expect(top[9].IngresoTotal).toBe(3);
 });
 
-test('reporte no convierte nacimientos sin evidencia en cero', () => {
+test('reporte conserva el nacimiento que cumple el doble filtro de fechas', () => {
   const report = assembleReport(range, fixture());
-  expect(report.general.Nacimientos).toBeNull();
-  expect(report.warnings).toContain('Falta evidencia del lugar de nacimiento.');
+  expect(report.general.Nacimientos).toBe(1);
+  expect(report.sections.births.criterion).toContain('PT.CreatedOn');
+  expect(report.controls.find(row => row.Indicador.startsWith('Nacimientos'))).toMatchObject({ Manual: 2, Generado: 1, Diferencia: -1 });
+});
+
+test('el histórico mensual agrupa nacimientos confirmados por fecha de nacimiento', async () => {
+  getClinicalStatistics.mockResolvedValue(fixture().clinical);
+  const history = await getHistory('02_NACIMIENTOS');
+  expect(history.data[2026][8]).toBe(0);
+  expect(history.data[2026][9]).toBe(1);
 });
 
 test('nunca combina el nombre SAP con el identificador de un médico diferente', () => {
@@ -77,7 +86,7 @@ test('Excel incluye todas las secciones, detalle, importes tipados, filtros y re
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   expect(workbook.worksheets).toHaveLength(SECTIONS.length + 4);
-  expect(workbook.getWorksheet('02 Nacimientos').getCell('B4').value).toBe('No disponible');
+  expect(workbook.getWorksheet('02 Nacimientos').getCell('B4').value).toBe(1);
   const image = workbook.getWorksheet('10 Ingresos imagen');
   expect(image.getCell('B4').value).toBe(200.12);
   expect(image.autoFilter).toBeTruthy();

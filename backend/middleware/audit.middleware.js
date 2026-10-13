@@ -62,22 +62,44 @@ async function logAction(entry) {
     const db = getDb();
     if (!db) return; // BD no disponible (tests)
 
-    await db.prepare(`
-      INSERT INTO AuditLog
-        (UsuarioId, Username, Rol, Metodo, Ruta, EstadoHTTP, DuracionMs, IP, CuerpoRequest, FechaHora)
-      VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `).run(
-      entry.userId,
-      entry.username,
-      entry.role,
-      entry.method,
-      entry.path,
-      entry.status,
-      entry.duration,
-      entry.ip,
-      entry.body ? JSON.stringify(entry.body) : null
-    );
+    try {
+      await db.prepare(`
+        INSERT INTO AuditLog
+          (UsuarioId, Username, Rol, Metodo, Ruta, EstadoHTTP, DuracionMs, IP, CuerpoRequest, FechaHora)
+        VALUES
+          (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).run(
+        entry.userId,
+        entry.username,
+        entry.role,
+        entry.method,
+        entry.path,
+        entry.status,
+        entry.duration,
+        entry.ip,
+        entry.body ? JSON.stringify(entry.body) : null
+      );
+    } catch (fkErr) {
+      if (fkErr.message && (fkErr.message.includes('auditlog_usuarioid_fkey') || fkErr.message.includes('foreign key'))) {
+        await db.prepare(`
+          INSERT INTO AuditLog
+            (UsuarioId, Username, Rol, Metodo, Ruta, EstadoHTTP, DuracionMs, IP, CuerpoRequest, FechaHora)
+          VALUES
+            (NULL, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `).run(
+          entry.username,
+          entry.role,
+          entry.method,
+          entry.path,
+          entry.status,
+          entry.duration,
+          entry.ip,
+          entry.body ? JSON.stringify(entry.body) : null
+        );
+      } else {
+        throw fkErr;
+      }
+    }
   } catch (err) {
     // No fallar el request por un error de log
     console.error('[AuditLog] Error al registrar:', err.message);

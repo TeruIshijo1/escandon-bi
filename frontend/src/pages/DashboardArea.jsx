@@ -220,8 +220,8 @@ export default function DashboardArea() {
         if (json.ok) {
           setAreaData({ kpis: [], rawHospitalizacionData: json.data });
         }
-      } else if (area === AREAS.IMAGENOLOGIA || area === AREAS.LABORATORIO || area === AREAS.FARMACIA || area === AREAS.ASEGURADORAS) {
-        // Para Imagenología, Laboratorio, Farmacia y Aseguradoras no usamos las tarjetas de hospitalización (camas, egresos)
+      } else if (area === AREAS.IMAGENOLOGIA || area === AREAS.LABORATORIO || area === AREAS.FARMACIA || area === AREAS.ASEGURADORAS || area === AREAS.CUNEROS) {
+        // Para Imagenología, Laboratorio, Farmacia, Aseguradoras y Cuneros no usamos las tarjetas de hospitalización (camas, egresos)
         setAreaData({ kpis: [] });
       } else {
         // Flujo normal para otras áreas

@@ -461,7 +461,7 @@ Evidencia: `frontend/src/components/dashboard/DashboardAuxiliaresNativo.jsx:18`,
 | Top 10 Insumos y Medicamentos | Agrupa cantidades/importes de cargos `UDR_PAY_IMA` con paciente `RN %`; excluye descripciones con FORMULA, USO DE OXIGENO, USO PUNTAS PARA OXIGENO, ESTANCIA, GRUPO SANGUINEO, TOMA DE GLUCOSA, Anticipo y CONSULTA. |
 | Distribución de Servicios Neonatales | Cantidades de cargos del mismo conjunto cuyo texto contiene USO DE OXIGENO, USO PUNTAS PARA OXIGENO, ESTANCIA DE CUNERO, TOMA DE GLUCOSA, GRUPO SANGUINEO o TAMIZ. |
 
-**Filtros:** fechas, año actual hasta hoy por defecto; el buscador global no se aplica. **Exportación:** PDF del área; sin Excel propio montado aquí. **Origen exacto:** `PC`, `PT`, `V_MRPT`, `PCIT`, `UDR_PAY_IMA`, `UDR_CUENTAS_SERVICIOS`, sus copias DW y SAP grupos. Este KPI Recién Nacidos tiene criterio diferente del estadístico Nacimientos en el hospital, cuyo resultado actual está pendiente por falta de evidencia estructurada. Evidencia: `frontend/src/components/dashboard/DashboardCunerosNativo.jsx:25`, `:63`, `:119`, `:144`; `backend/routes/dashboard.routes.js:2347`, `:2363`, `:2392`, `:2420`, `:2448`, `:2494`.
+**Filtros:** fechas, año actual hasta hoy por defecto; el buscador global no se aplica. **Exportación:** PDF del área; sin Excel propio montado aquí. **Origen exacto:** `PC`, `PT`, `V_MRPT`, `PCIT`, `UDR_PAY_IMA`, `UDR_CUENTAS_SERVICIOS`, sus copias DW y SAP grupos. Este KPI Recién Nacidos conserva el criterio legado de cuenta `PC.Date` y cunero; el apartado 02 del estadístico usa `PT.CreatedOn` igual a `PT.BirthDate`, con ambas fechas dentro del periodo, por lo que los resultados pueden diferir. Evidencia: `frontend/src/components/dashboard/DashboardCunerosNativo.jsx:25`, `:63`, `:119`, `:144`; `backend/routes/dashboard.routes.js:2347`, `:2363`, `:2392`, `:2420`, `:2448`, `:2494`; `backend/services/statisticsVertical.service.js`.
 
 <a id="apartado-021"></a>
 
@@ -535,22 +535,22 @@ Evidencia: `frontend/src/components/dashboard/DashboardConsultaExternaNativo.jsx
 
 #### Las siete tarjetas generales y cuadros de distribución
 
+**Identificadores para configuración:** Egresos=`stats.egresos_total`; Promedio de edad=`stats.promedio_edad`; Género femenino=`stats.genero_femenino`; Defunciones=`stats.defunciones`; Nacimientos=`stats.nacimientos`; Estancia promedio=`stats.estancia_global`; Vidas salvadas=`stats.vidas_salvadas`; gráfica de importes=`stats.top_diagnosticos`. La tarjeta Nacimientos conserva su nombre visible, aunque exista otro nombre configurado. Las demás pueden tomar un nombre personalizado mediante `getKPI`; el identificador permite reconocer la métrica original. Evidencia: `frontend/src/pages/Estadisticas.jsx:156`, `:408`, `:450`.
+
 | Tarjeta / cuadro | Qué significa y fórmula actual |
 |---|---|
 | Egresos (periodo) | Cantidad de folios cerrados `PC_ST='CL'`, tipos IP/ER, con alta médica en periodo. |
 | Promedio de edad | Promedio de edades válidas al alta médica; edad calculada desde `PC.BirthDate` descontando el cumpleaños aún no ocurrido. |
 | % Género femenino | Egresos con F/FEMENINO / egresos con género F/M/FEMENINO/MASCULINO × 100. Desconocidos no entran al denominador. |
 | Defunciones | Suma de casos con `MedicalDischarge` DEF/DEFUNCION/MD003 o `DateOfDeath` presente, en egresos IP/ER. |
-| Nacimientos en el hospital | Actualmente **No disponible**: no existe evidencia estructurada del nacimiento en el hospital; no se sustituye por edad ni ocupación de cunero. |
+| Nacimientos en el hospital | Cuenta única por paciente cuyo expediente fue creado el mismo día calendario que su fecha de nacimiento, dentro del periodo elegido. |
 | Estancia promedio | Promedio de `DATEDIFF(day, ingreso, alta)` válido sólo de hospitalización IP; es diferente del conteo de servicios de estancia del Explorador. |
 | Vidas salvadas | Folios de atención distintos con servicio sala de choque registrado en órdenes vigentes SAP del periodo, no desenlace de supervivencia demostrado. Clic abre detalle SAP legado descrito más adelante. |
 | Distribución de importes por área/servicio | Suma de `IngresoNeto` de líneas de órdenes SAP, agrupadas Imagenología, Laboratorio, Consulta de especialidad, Sala de choque y Otros. El identificador interno es top_diagnosticos/diagnosticos, pero no contiene diagnósticos clínicos. |
 | Top 10 médicos por ingreso en hospitalización | Ranking IP por suma total de órdenes de venta vigentes por médico, con IVA si aplica. |
 | Top 10 médicos por ingreso en urgencias | Mismo cálculo para ER. |
 
-**Identificadores para configuración:** Egresos=`stats.egresos_total`; Promedio de edad=`stats.promedio_edad`; Género femenino=`stats.genero_femenino`; Defunciones=`stats.defunciones`; Nacimientos=`stats.nacimientos`; Estancia promedio=`stats.estancia_global`; Vidas salvadas=`stats.vidas_salvadas`; gráfica de importes=`stats.top_diagnosticos`. La tarjeta Nacimientos conserva su nombre visible, aunque exista otro nombre configurado. Las demás pueden tomar un nombre personalizado mediante `getKPI`; el identificador permite reconocer la métrica original. Evidencia: `frontend/src/pages/Estadisticas.jsx:156`, `:408`, `:450`.
-
-Evidencia: `frontend/src/pages/Estadisticas.jsx:148`, `:156`, `:450`, `:486`; `backend/services/statisticsVertical.service.js:29`, `:74`, `:111`; `backend/services/statistics.service.js:80`, `:95`, `:193`.
+Evidencia: `frontend/src/pages/Estadisticas.jsx:148`, `:156`, `:450`, `:486`; `backend/services/statisticsVertical.service.js:40`, `:85`, `:102`, `:146`; `backend/services/statistics.service.js:66`, `:113`, `:140`, `:177`, `:227`.
 
 <a id="apartado-027"></a>
 
@@ -559,7 +559,7 @@ Evidencia: `frontend/src/pages/Estadisticas.jsx:148`, `:156`, `:450`, `:486`; `b
 | Sección visible | Información consultable y unidad | Origen / criterio verificable |
 |---|---|---|
 | 01 Vidas Salvadas (Sala de Choque) | Atenciones con sala de choque; una vez por folio. | Órdenes de venta SAP `Orders` (`ORDR`/`RDR1`), códigos SER0515/SER0533, cantidad positiva, `U_PCNum`. Se filtra por `TaxDate` del documento, no se interpreta como resultado clínico. |
-| 02 Recién nacidos en el hospital | Nacimientos confirmados. Actual No disponible. | Requiere registro estructurado del lugar/nacimiento; el código no lo encontró. Histórico manual se conserva. |
+| 02 Recién nacidos en el hospital | Una fila por paciente. | Vertical `PT.PTNum`; tanto `PT.CreatedOn` (Creado en) como `PT.BirthDate` deben caer dentro del periodo y sus fechas calendario deben coincidir. Los expedientes creados después de la fecha de nacimiento se excluyen. |
 | 03 Egresos de Hospitalización | Cuentas cerradas IP con alta médica en periodo. | Vertical `PC.PCNum`, `MedicalDischargeDate`, `Date`, `PCType`, `PC_ST`, género/edad/días/defunción. |
 | 03 Cuentas de Urgencias | Cuentas cerradas ER con alta médica en periodo. | Mismo objeto Vertical. |
 | 03 Cuentas de VaSeguro | Cuentas cerradas con autorización de convenio VaSeguro. | Vertical PC, `EXISTS PCAG` con `AGCode='VAGSEG001'` y `PCAG_ST='AU'`. |
@@ -577,7 +577,7 @@ Evidencia: `frontend/src/pages/Estadisticas.jsx:148`, `:156`, `:450`, `:486`; `b
 | 14 Top 10 médicos por ingreso en hospitalización | MXN de los diez médicos con mayor suma de órdenes IP. | Órdenes SAP, `DocTotal` contado una vez por orden, incluye IVA si aplica; médico U_PRNum/U_PRName, tipo U_PCType y folio U_PCNum; enriquece datos faltantes con PC/PR por folio, sin mezclar identidades. |
 | 15 Top 10 médicos por ingreso en urgencias | Mismo ranking para órdenes ER. | Misma base. |
 
-**No se omite un 12:** el catálogo actual no define sección 12; no se inventa un indicador para completar la numeración. Las 18 entradas incluyen subdivisiones de cuentas y montos. **COVID:** hay una salida interna `covid` pendiente de fuente validada, pero no es una sección visible de las 18 ni un conteo certificado. Evidencia del catálogo completo: `frontend/src/pages/Estadisticas.jsx:21`; `backend/services/statisticsCatalog.js:4`; reglas: `backend/services/statisticsVertical.service.js:6`, `:11`, `:29`, `:43`, `:95`; `backend/services/statisticsSap.service.js:7`, `:12`, `:176`, `:198`, `:209`, `:267`; `backend/services/statistics.service.js:80`, `:109`.
+**No se omite un 12:** el catálogo actual no define sección 12; no se inventa un indicador para completar la numeración. Las 18 entradas incluyen subdivisiones de cuentas y montos. **COVID:** hay una salida interna `covid` pendiente de fuente validada, pero no es una sección visible de las 18 ni un conteo certificado. Evidencia del catálogo completo: `frontend/src/pages/Estadisticas.jsx:21`; `backend/services/statisticsCatalog.js:4`; reglas: `backend/services/statisticsVertical.service.js:6`, `:7`, `:8`, `:11`, `:21`, `:40`, `:54`, `:85`, `:102`; `backend/services/statisticsSap.service.js:7`, `:12`, `:176`, `:198`, `:209`, `:267`; `backend/services/statistics.service.js:66`, `:113`, `:140`.
 
 <a id="apartado-028"></a>
 
@@ -587,7 +587,7 @@ Evidencia: `frontend/src/pages/Estadisticas.jsx:148`, `:156`, `:450`, `:486`; `b
 - **Gráfico:** barras de total por año y línea mensual del año elegido; unidad puede ser cantidad o MXN según sección.
 - **Detalle mensual:** modal con criterio, cantidad, unidad, observaciones y filas de transacciones; búsqueda local y exportación Excel del detalle en `ModalDetalleEstadisticas`. Meses anteriores al corte no tienen detalle verificable.
 - **Exportar tabla actual:** `.xlsx` de la sección histórica presentada, con No disponible y aclaración de totales parciales.
-- **Generar estadístico / Descargar Excel completo:** resumen; las 18 hojas del catálogo; Órdenes por médico; Conciliación manual; Criterios y revisión. Las órdenes financieras y la facturación se concilian por separado; no se suman entre sí. Hoja de conciliación compara controles del archivo manual solamente cuando el rango es un mes completo y existe control, mostrando diferencia; no modifica cifras para igualarlas.
+- **Generar estadístico / Descargar Excel completo:** genera un libro Excel institucional de 22 hojas (`Resumen`, las 18 secciones del catálogo, `Órdenes por médico`, `Conciliación manual` y `Criterios y revisión`) mediante `statisticsWorkbook.service.js`. Aplica la identidad visual del Hospital Escandón (`#004687` azul marino, `#0088C9` azul cielo, `#E0EAF4` totales/KPI, alternado cebra `#F8FAFC`, bordes hairline `#CBD5E1`). Presenta información comprensible para personal médico y contable: incluye nombre completo del paciente, nombre del médico tratante, número de paciente, folio de atención/cuenta, código y descripción del servicio, cantidades formateadas (`#,##0`) e importes en moneda (`$#,##0.00`), omitiendo identificadores técnicos internos de base de datos. Cada hoja de sección dispone de tarjeta de KPI en fila 4 (`B4` con valor tipado), criterio en fila 5, nota en fila 6, encabezados con autofiltro en fila 7 (paneles congelados en ySplit 7), datos desde fila 8 y fila de totales con `=SUM(...)` y doble subrayado contable. La hoja `Resumen` vincula fórmulas `=B4` a cada hoja. Las órdenes financieras y la facturación se concilian por separado; no se suman entre sí. Hoja de conciliación compara controles del archivo manual solamente cuando el rango es un mes completo y existe control, mostrando diferencia; no modifica cifras para igualarlas.
 - **Datos financieros faltantes:** órdenes sin médico o sin tipo confirmado se mantienen fuera de los Top 10 y se reportan; documentos con más de una atención conservan la señal de atribución múltiple. Créditos buscan factura original cuando necesitan clasificarla; importes de descuento/IVA se distribuyen con redondeo y diferencia residual visible. Consulta SAP pagina todos los resultados con límites de seguridad; sobrepasarlos produce error en lugar de un total parcial silencioso.
 
 Evidencia: `frontend/src/pages/Estadisticas.jsx:175`, `:200`, `:222`, `:265`, `:492`, `:589`, `:692`; `frontend/src/components/dashboard/ModalDetalleEstadisticas.jsx`; `backend/routes/statistics.routes.js:47`, `:52`, `:68`; `backend/services/statistics.service.js:177`, `:215`; `backend/services/statisticsWorkbook.service.js:90`, `:100`, `:136`, `:144`, `:160`.
@@ -1121,7 +1121,7 @@ Evidencia del montaje: `frontend/src/App.jsx:339`, `frontend/src/components/hono
 
 **Instructivo operativo:** seleccionar fechas → Buscar servicios → revisar la cobertura → filtrar médico o servicio → abrir Ver servicios → confirmar médico, ejecución, cantidad, tarifa e IVA → aprobar o excluir con motivo → consultar Pagos y PDF. Para corregir al médico, registrar el motivo antes de guardar. Si falta configuración, completar el catálogo/tarifa; si falta cálculo fiscal, completar los datos fiscales.
 
-**Descargas:** PDF resumido, PDF detallado y Excel del periodo/filtros; el PDF de revisión, el PDF de servicios aprobados y el PDF para pago tienen finalidades distintas. Los PDF de revisión y de servicios aprobados incluyen la declaración de conformidad indicada para firma, seguida de una única firma/nombre de médico o prestador centrados; si el espacio restante no alcanza, el bloque pasa a una página de continuación. La descarga no registra ni descuenta pagos.
+**Descargas:** PDF resumido, PDF detallado y Excel del periodo/filtros; el PDF de revisión, el PDF de servicios aprobados y el PDF para pago tienen finalidades distintas. En los PDF de revisión y de servicios aprobados se optimiza el espacio vertical de la hoja omitiendo el recuadro anterior de notas/conteos de revisión y ajustando el margen inferior útil (12 mm), lo que permite aprovechar mejor la página y dar cabida al desglose de conceptos, el cuadro financiero resumido y la declaración de conformidad indicada para firma, seguida de una única firma/nombre de médico o prestador centrados; si el espacio restante no alcanza, el bloque pasa a una página de continuación. La descarga no registra ni descuenta pagos.
 
 Evidencia: `frontend/src/utils/honorariosPdfGenerator.js` (`HONORARIOS_DECLARATION`, `renderFinalSignature`, `generateDoctorHonorariosPdf`, `generateAllDoctorsHonorariosPdf`).
 
