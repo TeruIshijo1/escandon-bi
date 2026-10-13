@@ -25,6 +25,11 @@ function readQuantity(value) {
   return Number.isFinite(quantity) ? quantity : null;
 }
 
+export function getDoctorDisplayName(doctorData) {
+  const raw = doctorData?.providerName || doctorData?.medico || 'MÉDICO TRATANTE';
+  return formatHonorariosPdfText(raw).replace(/\s*[·•]?\s*#\S+\s*$/, '').replace(/\s+/g, ' ').trim() || 'Médico no identificado';
+}
+
 const reviewStatusLabel = row => row._reviewStatus === 'APROBADO' ? 'Aprobado'
   : row._reviewStatus === 'RECHAZADO' ? 'Excluido' : 'Por revisar';
 const reviewedFee = row => row._reviewStatus === 'APROBADO' && row._effectiveElegible
@@ -139,7 +144,7 @@ function drawDoctorPageHeader(doc, doctorData, periodInfo, { includeTableHeader 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
   doc.setTextColor(0, 70, 135);
-  const doctorLabel = formatHonorariosPdfText(doctorData.medico || 'MÉDICO TRATANTE').replace(/\s+/g, ' ').trim();
+  const doctorLabel = getDoctorDisplayName(doctorData);
   while (doc.getTextWidth(doctorLabel) > contentWidth - 8 && doc.getFontSize() > 7.5) doc.setFontSize(doc.getFontSize() - .5);
   doc.text(doctorLabel, margin + 4, 36.5, { maxWidth: contentWidth - 8 });
   doc.setFont('helvetica', 'normal');
@@ -408,7 +413,7 @@ function renderFinalSignature(doc, doctorData, periodInfo, startAtY) {
 
   const signatureWidth = contentWidth / 2;
   const center = pageWidth / 2;
-  const physicianName = formatHonorariosPdfText(doctorData.medico).trim() || 'Médico no identificado';
+  const physicianName = getDoctorDisplayName(doctorData);
 
   doc.setDrawColor(100, 116, 139);
   doc.setLineWidth(0.35);
@@ -444,7 +449,7 @@ export function generateDoctorHonorariosPdf(doctorData, startDate, endDate, incl
   renderFinalSignature(doc, doctorData, { startDate, endDate, periodLabel }, appendixEndY ?? receiptEndY);
   addPdfFooters(doc);
 
-  const cleanName = (doctorData.medico || 'Medico').replace(/[^a-zA-Z0-9]/g, '_');
+  const cleanName = (getDoctorDisplayName(doctorData) || 'Medico').replace(/[^a-zA-Z0-9]/g, '_');
   const typeStr = includeZeroAmounts ? 'Detallado' : 'Resumido';
   doc.save(`${approvedOnly ? 'Honorarios_Aprobados' : 'Resumen_Honorarios'}_${typeStr}_${cleanName}_${startDate}_a_${endDate}.pdf`);
   return true;
