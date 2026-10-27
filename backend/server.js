@@ -1,8 +1,5 @@
-/**
- * server.js — Entrada principal del Backend
- * Hospital Escandón BI Platform v2.0
- * Node.js + Express · PostgreSQL · JWT
- */
+
+
 'use strict';
 
 require('dotenv').config();
@@ -27,6 +24,7 @@ const aiRoutes               = require('./routes/ai.routes');
 const biRoutes               = require('./routes/bi.routes');
 const adminRoutes            = require('./routes/admin.routes');
 const auditRoutes            = require('./routes/audit.routes');
+const hospitalSalesRoutes    = require('./routes/hospitalSales.routes');
 const { auditMiddleware }    = require('./middleware/audit.middleware');
 const { initPostgresDW, pool }     = require('./config/pg-db');
 const { initCronJobs, runFullSync } = require('./services/sync.service');
@@ -39,10 +37,8 @@ const { publicMessages } = require('./middleware/publicMessages.middleware');
 
 app.use(publicMessages);
 
-// Habilitar trust proxy para Tailscale Serve/Funnel, Nginx y túneles inversos
 app.set('trust proxy', 1);
 
-/* ── Seguridad global ───────────────────────────────────────── */
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -60,12 +56,12 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-/* ── Configuración CORS dinámica (Intranet, Tailscale y Localhost) ── */
+/* Configuración CORS dinámica (Intranet, Tailscale y Localhost) */
 const configuredOrigins = (process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir peticiones sin origen (same-origin, herramientas de consola, scripts internos)
+     
     if (!origin) return callback(null, true);
 
     // Permitir orígenes explícitamente configurados o comodín '*'
@@ -73,7 +69,6 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // Permitir localhost, 127.0.0.1, rangos de IP privadas (192.168.x.x, 10.x.x.x, 172.16-31.x.x), Tailscale (100.x.x.x y *.ts.net) y hostnames locales
     const isAllowedHost = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|100\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+|([a-zA-Z0-9-]+\.)*ts\.net|([a-zA-Z0-9-]+)(\.local|\.lan)?)(:\d+)?$/i.test(origin);
     if (isAllowedHost || configuredOrigins.length === 0) {
       return callback(null, true);
@@ -87,19 +82,19 @@ app.use(cors({
   exposedHeaders: ['Content-Disposition']
 }));
 
-/* ── Rate limiting global ───────────────────────────────────── */
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
+  windowMs: 15 * 60 * 1000,  
   max:      500,
   standardHeaders: true,
   legacyHeaders: false,
+  skip:     (req) => !req.path.startsWith('/api') && req.path !== '/health',
   validate: { xForwardedForHeader: false, trustProxy: false },
   message: { message: 'Demasiadas solicitudes. Intente en 15 minutos.', error: 'Demasiadas solicitudes. Intente en 15 minutos.' },
 });
 
 const authLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 min
-  max:      200, // Límite alto por si están detrás del mismo NAT del hospital
+  windowMs: 5 * 60 * 1000,  
+  max:      200,  
   standardHeaders: true,
   legacyHeaders: false,
   validate: { xForwardedForHeader: false, trustProxy: false },
@@ -109,19 +104,17 @@ const authLimiter = rateLimit({
 app.use(globalLimiter);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
-app.use(xss()); // Sanitiza body, query y params contra inyecciones XSS
+app.use(xss());  
 
-/* ── Logging ────────────────────────────────────────────────── */
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(':method :url :status :response-time ms — :res[content-length]'));
 }
 
-/* ── Audit log (middleware global para rutas protegidas) ─────── */
+/* Audit log (middleware global para rutas protegidas) */
 app.use('/api', auditMiddleware);
 
 app.get('/api/ping', (req, res) => res.json({ ok: true, message: 'pong' }));
 
-// Configuración de Multer directamente en server.js para máxima fiabilidad
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let subfolder = '';
@@ -140,7 +133,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
 
-// Endpoint de subida directo (FUERA de /api para evitar middleware de auditoría y bloqueos)
 const { authenticate, authorize } = require('./middleware/auth.middleware');
 app.post('/upload-assets', authenticate, authorize(['ADMIN']), (req, res) => {
   upload.single('file')(req, res, (err) => {
@@ -154,7 +146,7 @@ app.post('/upload-assets', authenticate, authorize(['ADMIN']), (req, res) => {
   });
 });
 
-/* ── Rutas ──────────────────────────────────────────────────── */
+/* Rutas */
 const sitiRoutes = require('./routes/siti.routes');
 const dataQualityRoutes = require('./routes/dataQuality.routes');
 
@@ -166,6 +158,7 @@ const finanzasRoutes = require('./routes/finanzas.routes');
 const cexRoutes = require('./routes/cex.routes');
 const sapQueryBuilderRoutes = require('./routes/sapQueryBuilder.routes');
 const honorariosRoutes = require('./routes/honorarios.routes');
+const agreementsRoutes = require('./routes/agreements.routes');
 
 app.use('/api/auth',          authLimiter, authRoutes);
 app.use('/api/dashboard',     dashboardRoutes);
@@ -176,6 +169,7 @@ app.use('/api/bi',            biRoutes);
 app.use('/api/admin',         adminRoutes);
 app.use('/api/siti',          sitiRoutes);
 app.use('/api/audit',         auditRoutes);
+app.use('/api/audit/sales',   hospitalSalesRoutes);
 app.use('/api/data-quality',  dataQualityRoutes);
 app.use('/api/pharmacy',      pharmacyRoutes);
 app.use('/api/almacen',       almacenRoutes);
@@ -184,6 +178,7 @@ app.use('/api/sap',           sapRoutes);
 app.use('/api/sap-query',     sapQueryBuilderRoutes);
 app.use('/api/finanzas',      finanzasRoutes);
 app.use('/api/cex',           cexRoutes);
+app.use('/api/sistemas/agreements', agreementsRoutes);
 app.use('/api/files', authenticate, express.static(path.join(__dirname, 'uploads')));
 
 // Servir Frontend compilado en Producción
@@ -200,7 +195,7 @@ if (fs.existsSync(path.join(frontendPath, 'index.html'))) {
   });
 }
 
-/* ── Manejo de errores global ───────────────────────────────── */
+/* Manejo de errores global */
 app.use((err, req, res, next) => {
   console.error('[ERROR]', err.message);
 
@@ -209,7 +204,6 @@ app.use((err, req, res, next) => {
     return res.status(401).json({ error: 'Tu sesión terminó. Inicia sesión de nuevo.' });
   }
 
-  // Error de base de datos (códigos SQLSTATE de PostgreSQL o legacy SQLite)
   if (err.severity || (err.code && /^[0-9A-Z]{5}$/.test(err.code))) {
     return res.status(500).json({ error: 'No se pudo consultar la información. Intenta de nuevo en unos minutos.' });
   }
@@ -220,26 +214,33 @@ app.use((err, req, res, next) => {
   });
 });
 
-/* ── Health check ampliado ──────────────────────────────────── */
 let dbStatus = 'pendiente';
+// Readiness covers warehouse structure only, never SAP/Vertical data freshness.
+let dwStatus = 'pendiente';
+function failWindowsServiceStartup(phase) {
+  if (process.env.BI_WINDOWS_SERVICE !== '1') return;
+  console.error('[Backend] No se completó el arranque del servicio; Windows podrá reintentarlo.', {
+    code: 'BI_SERVICE_STARTUP_FAILED', phase
+  });
+  process.exit(1);
+}
 const { SERVICE_NAME, instanceId } = require('./utils/backendInstance');
 const installationId = instanceId(__dirname);
 
 app.get('/health', (req, res) => {
+  const windowsService = process.env.BI_WINDOWS_SERVICE === '1';
   res.json({
     service:   SERVICE_NAME,
     installationId,
     environment: process.env.NODE_ENV || 'development',
-    status:    dbStatus === 'ok' ? 'ok' : 'degradado',
+    status:    dbStatus === 'ok' && (!windowsService || dwStatus === 'ok') ? 'ok' : 'degradado',
     db:        dbStatus,
+    ...(windowsService ? { dw: dwStatus } : {}),
     timestamp: new Date().toISOString(),
     version:   '1.0.0',
   });
 });
 
-/* ── Arranque ───────────────────────────────────────────────── */
-// En modo test se importa `app` para supertest sin arrancar servidor,
-// conexiones a BD ni cron jobs.
 if (process.env.NODE_ENV !== 'test') { (async () => {
   let localIp = 'localhost';
   try {
@@ -254,7 +255,6 @@ if (process.env.NODE_ENV !== 'test') { (async () => {
     }
   } catch (e) {}
 
-  // El servidor arranca siempre, con o sin BD
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🏥  Hospital Escandón BI — Backend v2.0`);
     console.log(`🚀  Servidor corriendo en:`);
@@ -264,14 +264,13 @@ if (process.env.NODE_ENV !== 'test') { (async () => {
     console.log(`🔌  Intentando conectar a PostgreSQL...\n`);
   });
 
-  // Do not connect to databases or schedule ETLs until this process owns the port.
   await new Promise(resolve => {
     server.once('listening', resolve);
     server.once('error', err => {
       if (err.code === 'EADDRINUSE') {
         console.error(`\n❌ El puerto ${PORT} ya está ocupado. Usa npm start para comprobar si el backend está disponible o revisa qué proceso ocupa ese puerto.\n`);
       } else console.error('❌ No se pudo abrir el servidor:', err.message);
-      // Module imports may register timers; terminate before they can start SAP work.
+       
       process.exit(1);
     });
   });
@@ -292,22 +291,28 @@ if (process.env.NODE_ENV !== 'test') { (async () => {
     
     // Inicializar PostgreSQL Data Warehouse y sincronización ETL
     const dwInitialization = initPostgresDW();
+    const backgroundQueue = require('./services/backgroundQueue.service');
     dwInitialization.then(async () => {
+      dwStatus = 'ok';
       initCronJobs();
-      await initQuirofanoDW();
-      initQuirofanoCron();
 
-      // Sincronización de Quirófano (fullSync si está vacía)
+      const { startStatisticsSync } = require('./services/statistics.service');
+      setTimeout(() => {
+        startStatisticsSync().catch(error => console.warn('[Estadísticas] Actualización pendiente:', error.message));
+      }, 20000).unref();
+
       try {
+        await initQuirofanoDW();
+        initQuirofanoCron();
         const countQx = await pool.query('SELECT COUNT(*) as count FROM dw_quirofano_eventos');
         const isQxEmpty = parseInt(countQx.rows[0].count, 10) === 0;
         console.log(`[Quirofano Sync Startup] ¿Tabla de quirofano vacía?: ${isQxEmpty}`);
-        syncQuirofanoData({ fullSync: isQxEmpty }).catch(e => console.warn('⚠️ Sync Quirófano DW error:', e.message));
+        backgroundQueue.enqueue('quirofano', () => syncQuirofanoData({ activityFullSync: isQxEmpty }), { delayMs: 5000 })
+          .catch(error => console.warn('[Quirófano] Actualización pendiente:', error.message));
       } catch (err) {
-        syncQuirofanoData({ fullSync: false }).catch(e => console.warn('⚠️ Sync Quirófano DW error:', e.message));
+        console.warn('[Quirófano] Inicialización pendiente; los demás tableros continúan.');
       }
 
-      // Sincronizar todos los tableros en PostgreSQL DW (fullSync si alguna tabla clave está vacía)
       initDashboardCron();
 
       // Re-entrenamiento automático del modelo ML (diario 04:30)
@@ -318,64 +323,63 @@ if (process.env.NODE_ENV !== 'test') { (async () => {
         console.warn('⚠️ No se pudo inicializar el cron de ML Pipeline:', err.message);
       }
 
-      try {
-        const countPC = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_pc');
-        const countSrv = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_cuentas_servicios');
-        const countCons = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_consulta_dia');
-        const countSol = await pool.query('SELECT COUNT(*) as count FROM dw_vertical_solicitudes_estudios');
-        
-        const isDbEmpty = 
-          parseInt(countPC.rows[0].count, 10) === 0 ||
-          parseInt(countSrv.rows[0].count, 10) === 0 ||
-          parseInt(countCons.rows[0].count, 10) === 0 ||
-          parseInt(countSol.rows[0].count, 10) === 0;
+      // Una sola cola para los ciclos pesados: SAP no recibe dos sincronizaciones
+      // simultáneas y las consultas interactivas conservan prioridad.
+      backgroundQueue.enqueue('dashboards', () => syncAllDashboards())
+        .catch(error => console.warn('[Tableros] Actualización pendiente:', error.message));
 
-        console.log(`[Dashboard Sync Startup] ¿Base de datos local vacía o incompleta?: ${isDbEmpty}`);
-        syncAllDashboards({ fullSync: isDbEmpty }).catch(e => console.warn('⚠️ Sync Dashboard DW error:', e.message));
-      } catch (err) {
-        console.warn('⚠️ Error al comprobar estado de DW Dashboards, ejecutando incremental:', err.message);
-        syncAllDashboards({ fullSync: false }).catch(e => console.warn('⚠️ Sync Dashboard DW error:', e.message));
-      }
+      const freshness = await pool.query(`
+        SELECT
+          EXISTS (SELECT 1 FROM dw_sap_kardex WHERE lastsync >= CURRENT_TIMESTAMP - INTERVAL '15 minutes') AS almacen,
+          EXISTS (SELECT 1 FROM dw_sap_traslados WHERE lastsync >= CURRENT_TIMESTAMP - INTERVAL '15 minutes') AS traslados
+      `).then(result => result.rows[0] || {}).catch(() => ({}));
 
-      // Sincronizar traslados en PostgreSQL DW (si está vacía o para actualización rápida)
-      try {
-        const countT = await pool.query('SELECT COUNT(*) as count FROM dw_sap_traslados');
-        const isTEmpty = parseInt(countT.rows[0].count, 10) === 0;
-        console.log(`[Traslados Sync Startup] ¿Tabla de traslados vacía?: ${isTEmpty}`);
-        const { syncTraslados } = require('./services/sapTrasladosSync.service');
-        syncTraslados().then(c => console.log(`[Traslados Sync Startup] Sincronizados ${c} traslados desde SAP.`)).catch(e => console.warn('⚠️ Sync Traslados error:', e.message));
-      } catch (err) {
-        console.warn('⚠️ Error al comprobar estado de DW Traslados en inicio:', err.message);
-      }
-    }).catch(e => console.warn('⚠️ Falló la inicialización de Postgres DW.'));
+      const { syncTraslados } = require('./services/sapTrasladosSync.service');
+      backgroundQueue.enqueue('traslados', () => syncTraslados(), { delayMs: freshness.traslados ? 10 * 60000 : 15000 })
+        .catch(error => console.warn('[Traslados] Actualización pendiente:', error.message));
 
-    // El ETL de almacén requiere que las tablas del DW ya estén inicializadas.
-    // Esperar esta promesa evita que el sync de inicio compita con el DDL del DW.
-    dwInitialization.then(() => {
-      try {
-        const { runAlmacenSync } = require('./services/almacenSync.service');
-        runAlmacenSync().then(() => {
-          console.log('✅ Sincronización inicial de Almacén/Censo completada.');
-        }).catch(err => console.warn('⚠️ Sincronización inicial de Almacén incompleta:', err.message));
+      const { runAlmacenSync } = require('./services/almacenSync.service');
+      const syncAlmacen = async () => {
+        const inventoryService = require('./services/sapInventory.service');
+        const recent = await pool.query(`
+          SELECT
+            EXISTS (
+              SELECT 1 FROM dw_sap_inventory_cache
+              WHERE lastsync >= CURRENT_TIMESTAMP - INTERVAL '15 minutes'
+            ) AS inventory_fresh,
+            EXISTS (
+              SELECT 1 FROM ml_dataset_reorden_sku
+              WHERE fecha_calculo >= CURRENT_TIMESTAMP - INTERVAL '15 minutes'
+            ) AS dataset_fresh
+        `).then(result => result.rows[0] || {}).catch(() => ({}));
+        if (recent.inventory_fresh && recent.dataset_fresh && await inventoryService.loadInventoryFromDB()) {
+          console.log('[Almacén] Caché reciente cargada desde PostgreSQL; se omite la descarga completa de SAP al arranque.');
+        }
+        await runAlmacenSync({ skipInventoryDownload: Boolean(recent.inventory_fresh) });
+        console.log('✅ Sincronización inicial de Almacén/Censo completada.');
+      };
+      backgroundQueue.enqueue('almacen', syncAlmacen, { delayMs: freshness.almacen ? 10 * 60000 : 10000 })
+        .catch(error => console.warn('[Almacén] Actualización pendiente:', error.message));
 
-        // Ejecutar sincronización cada 15 minutos; runAlmacenSync impide solapamientos.
-        setInterval(() => {
-          runAlmacenSync().catch(err => console.warn('⚠️ Sync background almacén error:', err.message));
-        }, 15 * 60 * 1000);
-      } catch(err) {
-        console.warn('⚠️ No se pudo iniciar el servicio de sync de Almacén:', err.message);
-      }
-    }).catch(() => {
-      console.warn('⚠️ No se inicia la sincronización de Almacén porque no quedó listo el DW.');
+      // Se conserva el ciclo de 15 minutos; la cola impide solapamientos.
+      setInterval(() => {
+        backgroundQueue.enqueue('almacen', syncAlmacen)
+          .catch(error => console.warn('⚠️ Sync background almacén error:', error.message));
+      }, 15 * 60 * 1000).unref();
+    }).catch(e => {
+      dwStatus = 'sin_conexion';
+      console.warn('⚠️ Falló la inicialización de Postgres DW.');
+      failWindowsServiceStartup('warehouse');
     });
 
   } catch (err) {
     dbStatus = 'sin_conexion';
     console.warn('\n⚠️   PostgreSQL no disponible:', err.message);
+    failWindowsServiceStartup('postgres');
     console.warn('⚠️   El servidor sigue activo pero las rutas de datos fallarán.');
     console.warn('⚠️   Ejecute: node config/init-db.js para crear la BD.\n');
   }
 })();
 }
 
-module.exports = app; // para tests
+module.exports = app;  

@@ -9,13 +9,9 @@ router.use((req, res, next) => {
   next();
 });
 
-/* ── Todas las rutas SITI requieren ADMIN o DIRECTOR ──────── */
+/* Todas las rutas SITI requieren ADMIN o DIRECTOR */
 router.use(authenticate, authorize(['ADMIN', 'DIRECTOR']));
 
-/**
- * GET /api/siti/financiero
- * Obtiene métricas financieras (Ingresos, Costos, Utilidad) del historial SITI (2010 - 2017)
- */
 router.get('/financiero', async (req, res) => {
   try {
     const sitiRes = await querySiti(`
@@ -62,10 +58,7 @@ router.get('/financiero', async (req, res) => {
   }
 });
 
-/**
- * GET /api/siti/pacientes
- * Obtiene altas y demográficos históricos por año/mes
- */
+/* GET /api/siti/pacientes */
 router.get('/pacientes', async (req, res) => {
   try {
     const pRes = await querySiti(`
@@ -90,7 +83,7 @@ router.get('/pacientes', async (req, res) => {
         const count = parseInt(row.conteo || 0);
         demograficos[mStr].total += count;
         if (row.Sexo === 'True' || row.Sexo === true) {
-          demograficos[mStr].hombres += count; // Suposición: True = Hombre
+          demograficos[mStr].hombres += count;  
         } else {
           demograficos[mStr].mujeres += count;
         }
@@ -108,13 +101,9 @@ router.get('/pacientes', async (req, res) => {
   }
 });
 
-/**
- * GET /api/siti/cirugias
- * Obtiene estadísticas de cirugías del historial SITI (2010 - 2026)
- */
 router.get('/cirugias', async (req, res) => {
   try {
-    // 1. Tendencia anual de volumen e ingresos de cirugías
+    // Tendencia anual de volumen e ingresos de cirugías
     const tendenciaRes = await querySiti(`
       SELECT 
         EXTRACT(YEAR FROM TO_DATE(H."FechaIng", 'DD/MM/YYYY')) AS "Yr", 
@@ -131,7 +120,7 @@ router.get('/cirugias', async (req, res) => {
       ORDER BY 1, 2
     `);
     
-    // 2. Top Cirugías (Procedimientos)
+    // Top Cirugías (Procedimientos)
     const topCxRes = await querySiti(`
       SELECT 
         P."Descripcion" as "procedimiento",
@@ -145,7 +134,7 @@ router.get('/cirugias', async (req, res) => {
       LIMIT 10
     `);
 
-    // 3. Top Médicos (Cuentas x Médico)
+    // Top Médicos (Cuentas x Médico)
     const topMedRes = await querySiti(`
       SELECT 
         COALESCE(M."Nombre" || ' ' || M."ApePat" || ' ' || M."ApeMat", H."MedicoTratante") as "medico",
@@ -172,11 +161,6 @@ router.get('/cirugias', async (req, res) => {
   }
 });
 
-/**
- * GET /api/siti/auxiliares/:tipo
- * Obtiene estadísticas de auxiliares de diagnóstico del historial SITI (2010 - 2026)
- * :tipo puede ser 'laboratorio' o 'imagenologia'
- */
 router.get('/auxiliares/:tipo', async (req, res) => {
   try {
     const { tipo } = req.params;
@@ -222,7 +206,7 @@ router.get('/auxiliares/:tipo', async (req, res) => {
         ? "(P.\"CodTipo\" = 'ESTLAB' OR L.\"CodAlm\" ILIKE '%LAB%')"
         : "(P.\"CodTipo\" = 'ESTIMA' OR L.\"CodAlm\" ILIKE '%IMA%' OR L.\"CodAlm\" ILIKE '%RAYO%')";
 
-      // 1. AMBULATORIO (Cobros reales de Caja)
+      // AMBULATORIO (Cobros reales de Caja)
       const resAmb = await querySiti(`
         SELECT 
             EXTRACT(YEAR FROM TO_DATE(SUBSTRING("FechaTrans" FROM 1 FOR 10), 'DD/MM/YYYY')) AS "Yr",
@@ -235,7 +219,7 @@ router.get('/auxiliares/:tipo', async (req, res) => {
         GROUP BY 1, 2
       `);
 
-      // 2. HOSPITALIZADOS (Cargos reales de Cuentas)
+      // HOSPITALIZADOS (Cargos reales de Cuentas)
       const resHosp = await querySiti(`
         SELECT 
           EXTRACT(YEAR FROM TO_DATE(H."FechaIng", 'DD/MM/YYYY')) AS "Yr", 
@@ -269,7 +253,6 @@ router.get('/auxiliares/:tipo', async (req, res) => {
       processRes(resHosp);
       tendenciaAnualFinal = Object.values(dict).sort((a,b) => a.month.localeCompare(b.month));
 
-      // 3. Top Estudios Técnico (Este sí lo sacamos de OsMedEst para saber el nombre de los procedimientos más populares)
       const topEstudiosFilter = tipo === 'imagenologia' ? "EM.\"CodTipoEstuMed\" LIKE 'IM%'" : "EM.\"CodTipoEstuMed\" LIKE 'LAB%'";
       const topEstudiosRes = await querySiti(`
         SELECT 
@@ -287,7 +270,7 @@ router.get('/auxiliares/:tipo', async (req, res) => {
       topEstudiosFinal = topEstudiosRes.data || [];
 
     } else {
-      // Lógica para Farmacia, Consultas, etc.
+      // Lógica para Farmacia, Consultas, etc
       const tendenciaRes = await querySiti(`
         SELECT 
           EXTRACT(YEAR FROM TO_DATE(H."FechaIng", 'DD/MM/YYYY')) AS "Yr", 
@@ -345,10 +328,7 @@ router.get('/auxiliares/:tipo', async (req, res) => {
   }
 });
 
-/**
- * GET /api/siti/pacientes
- * Obtiene demografía y epidemiología (Edades, Género, Motivos de Ingreso)
- */
+/* GET /api/siti/pacientes */
 router.get('/pacientes-demografia', async (req, res) => {
   try {
     // Top Motivos de Ingreso
@@ -382,7 +362,6 @@ router.get('/pacientes-demografia', async (req, res) => {
       FROM "CtaH"
     `);
 
-    // Nuevos vs Recurrentes
     const retencionRes = await querySiti(`
       WITH ConteoPacientes AS (
         SELECT "NoPaciente", COUNT("NoCtaH") as admisiones
@@ -409,10 +388,7 @@ router.get('/pacientes-demografia', async (req, res) => {
   }
 });
 
-/**
- * GET /api/siti/medicos
- * Obtiene productividad por médico tratante
- */
+/* GET /api/siti/medicos */
 router.get('/medicos', async (req, res) => {
   try {
     const { year } = req.query;
@@ -458,9 +434,8 @@ router.get('/medicos', async (req, res) => {
   }
 });
 
-// ==========================================
-// 8. Demografía / Geografía (Consolidado Multifuente SITI)
-// ==========================================
+// Demografía / Geografía (Consolidado Multifuente SITI)
+ 
 router.get(
   '/demografia',
   async (req, res, next) => {
@@ -564,7 +539,6 @@ router.get(
         9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
       };
 
-      // Consultas paralelas para Geografía, Género, Rangos de Edad y Tablas Oficiales Dinámicas
       const yearFilterCtaH = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) = ${y}` : '';
       const yearFilterOsMed = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("FechaSol", 'DD/MM/YYYY')) = ${y}` : '';
       const yearFilterExp = isSpecificYear ? `AND EXTRACT(YEAR FROM TO_DATE("Fecha", 'DD/MM/YYYY')) = ${y}` : '';
@@ -580,7 +554,7 @@ router.get(
         prog22Res,
         ageSexDynRes
       ] = await Promise.all([
-        // 1. Geografía por Mes, Estado y Ciudad (1 paciente = 1 conteo único)
+         
         querySiti(`
           WITH Atenciones AS (
             SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS mes_num FROM "CtaH" WHERE "FechaIng" != '' AND "FechaIng" IS NOT NULL ${ctahFilter}
@@ -624,7 +598,7 @@ router.get(
           GROUP BY 1, 2, 3, 4
         `),
 
-        // 2. Género por Mes (1 paciente = 1 conteo único)
+        // Género por Mes (1 paciente = 1 conteo único)
         querySiti(`
           WITH Atenciones AS (
             SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS mes_num FROM "CtaH" WHERE "FechaIng" != '' AND "FechaIng" IS NOT NULL ${ctahFilter}
@@ -661,7 +635,7 @@ router.get(
           GROUP BY 1, 2, 3
         `),
 
-        // 3. Edad por Mes (1 paciente = 1 conteo único)
+        // Edad por Mes (1 paciente = 1 conteo único)
         querySiti(`
           WITH Atenciones AS (
             SELECT "NoPaciente", EXTRACT(YEAR FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS anio, EXTRACT(MONTH FROM TO_DATE("FechaIng", 'DD/MM/YYYY')) AS mes_num FROM "CtaH" WHERE "FechaIng" != '' AND "FechaIng" IS NOT NULL ${ctahFilter}
@@ -978,7 +952,7 @@ router.get(
       const finalDetalleEdad = Object.values(monthAgeMap)
         .sort((a, b) => a["Año"] - b["Año"] || b["Pacientes"] - a["Pacientes"]);
 
-      // 5. Procesar Tabla Oficial Dinámica de Población y Servicios
+      // Procesar Tabla Oficial Dinámica de Población y Servicios
       const p11 = (prog11Res.data && prog11Res.data[0]) || { recurrentes: 0, eventuales: 0, poblacion_total: 0, total_servicios: 0 };
       const p12 = (prog12Res.data && prog12Res.data[0]) || { recurrentes: 0, eventuales: 0, poblacion_total: 0, total_servicios: 0 };
       const p13 = (prog13Res.data && prog13Res.data[0]) || { recurrentes: 0, eventuales: 0, poblacion_total: 0, total_servicios: 0 };
@@ -1058,7 +1032,6 @@ router.get(
         }
       ];
 
-      // 6. Procesar Matriz Dinámica de Edades y Sexo cruzada por los 5 programas
       const RANGOS_EDAD_OFICIAL = ['Niños 0-6', 'Niños 7-17', 'Jóvenes 18-24', 'Adultos 25-44', 'Adulto 45-60', 'Tercera Edad >61'];
       const PROGRAMAS_OFICIAL = [
         '1.1 Procedimientos quirúrgicos',
@@ -1095,7 +1068,7 @@ router.get(
       });
 
       const finalEstadisticasEdadesSexo = [];
-      // Bloque Edades
+       
       RANGOS_EDAD_OFICIAL.forEach(r => {
         const rowObj = { "Grupo / Segmento": r };
         let sum = 0;
@@ -1107,7 +1080,6 @@ router.get(
         finalEstadisticasEdadesSexo.push(rowObj);
       });
 
-      // Fila Total Edades
       const totEdadesObj = { "Grupo / Segmento": "TOTAL POR PROGRAMA" };
       let sumGralEdades = 0;
       PROGRAMAS_OFICIAL.forEach(p => {
@@ -1176,10 +1148,7 @@ router.get(
   }
 );
 
-/**
- * GET /api/siti/imagen-detalle
- * Query IMG SITI: Detalle de estudios de imagenología (precios, cantidades, totales)
- */
+/* GET /api/siti/imagen-detalle */
 router.get('/imagen-detalle', async (req, res) => {
   try {
     const query = `

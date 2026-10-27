@@ -1,13 +1,5 @@
-/**
- * PBIModal.jsx — Modal de visualización de reporte Power BI
- * Hospital Escandón BI Platform v4.0
- *
- * Se abre cuando el usuario hace click en un KPICard con URL configurada.
- * Props:
- *   url    {string}  — URL del reporte PBI
- *   title  {string}  — Nombre del indicador
- *   onClose {fn}     — Cerrar el modal
- */
+
+
 import { useEffect } from 'react';
 import ExportButton from './ExportButton';
 
@@ -21,7 +13,6 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
 
   if (!url) return null;
 
-  // Append token for API routes since iframes don't send Authorization headers
   const token = sessionStorage.getItem('escandon_token');
   const finalUrl = isApiModal && token ? `${url}?token=${token}` : url;
 
@@ -116,7 +107,7 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
           animation: 'pbiPanelIn 250ms ease',
         }}
       >
-        {/* Header */}
+        {/* Encabezado */}
         <div id="pbi-modal-header" style={{
           background: 'linear-gradient(90deg, #004687, #0088C9)',
           padding: '0.9rem 1.5rem',
@@ -165,7 +156,6 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
           </div>
         </div>
 
-        {/* Print Only Header */}
         <div id="pbi-print-header" style={{
           display: 'none',
           padding: '1.5rem',
@@ -190,9 +180,8 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
           </div>
         </div>
 
-        {/* Iframe */}
         <div id="pbi-iframe-container" style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-          {/* Capa que recorta la barra de PBI (~36px) si no es multipágina */}
+          
           <div style={{ width: '100%', height: multiPagina ? '100%' : 'calc(100% + 36px)', position: 'absolute', top: 0, left: 0 }}>
             <iframe
               title={title}
@@ -206,10 +195,9 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
             />
           </div>
 
-          {/* Máscaras de seguridad para ocultar Logo y Compartir de Power BI si es multipágina */}
           {multiPagina && (
             <>
-              {/* Esquina Inferior Izquierda (Oculta "Microsoft Power BI") */}
+              
               <div style={{
                 position: 'absolute', bottom: 0, left: 0,
                 width: '180px', height: '36px',
@@ -227,7 +215,7 @@ export default function PBIModal({ url, title, multiPagina = false, reportId, ha
           )}
         </div>
 
-        {/* Footer */}
+        {/* Pie de página */}
         <div id="pbi-modal-footer" style={{
           padding: '0.45rem 1.5rem',
           background: '#F8FAFC',

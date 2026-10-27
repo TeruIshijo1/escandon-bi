@@ -11,11 +11,10 @@ export default function SurgicalKits() {
   const [selectedKit, setSelectedKit] = useState(null);
 
   useEscapeKey(() => setSelectedKit(null), !!selectedKit);
-  
-  // Filters & State
+
   const [months, setMonths] = useState(12);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('freq'); // 'freq', 'items', 'alpha'
+  const [sortBy, setSortBy] = useState('freq');  
   const [modalSearch, setModalSearch] = useState('');
   const [copied, setCopied] = useState(false);
   const [displayCount, setDisplayCount] = useState(30);
@@ -49,7 +48,6 @@ export default function SurgicalKits() {
     fetchKits(months);
   }, [months]);
 
-  // Filtered & Sorted Kits
   const filteredKits = useMemo(() => {
     let result = [...data];
     if (searchTerm.trim()) {
@@ -75,7 +73,6 @@ export default function SurgicalKits() {
     return filteredKits.slice(0, displayCount);
   }, [filteredKits, displayCount]);
 
-  // Modal Items Search
   const filteredModalItems = useMemo(() => {
     if (!selectedKit) return [];
     if (!modalSearch.trim()) return selectedKit.Items;
@@ -164,7 +161,7 @@ export default function SurgicalKits() {
 
   return (
     <div style={{ background: 'var(--card-bg, #ffffff)', borderRadius: '16px', padding: '2rem', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)', border: '1px solid var(--border-color, #e2e8f0)' }}>
-      {/* Header & Stats Banner */}
+      
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid var(--border-color, #e2e8f0)', paddingBottom: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.65rem', fontWeight: '800', color: 'var(--text-main, #0f172a)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -175,7 +172,6 @@ export default function SurgicalKits() {
           </p>
         </div>
 
-        {/* Stats Pills */}
         {!loading && !error && (
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <button
@@ -210,10 +206,8 @@ export default function SurgicalKits() {
         )}
       </div>
 
-      {/* Controls Bar: Search, Filters, Timeframe */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem', background: 'var(--sub-bg, #f8fafc)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color, #e2e8f0)' }}>
-        
-        {/* Search Bar */}
+
         <div style={{ gridColumn: 'span 2' }}>
           <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-muted, #64748b)', marginBottom: '0.35rem' }}>🔍 Buscar por Cirugía o Insumo:</label>
           <input 
@@ -234,7 +228,6 @@ export default function SurgicalKits() {
           />
         </div>
 
-        {/* Timeframe selector */}
         <div>
           <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-muted, #64748b)', marginBottom: '0.35rem' }}>📅 Ventana de Consumo:</label>
           <select 
@@ -256,7 +249,6 @@ export default function SurgicalKits() {
           </select>
         </div>
 
-        {/* Sorting options */}
         <div>
           <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-muted, #64748b)', marginBottom: '0.35rem' }}>↕️ Ordenar por:</label>
           <select 
@@ -279,8 +271,7 @@ export default function SurgicalKits() {
         </div>
 
       </div>
-      
-      {/* Content Area */}
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-muted, #64748b)' }}>
           <div style={{ fontSize: '2.5rem', marginBottom: '1rem', animation: 'spin 1.5s infinite linear' }}>⚙️</div>
@@ -354,7 +345,6 @@ export default function SurgicalKits() {
             ))}
           </div>
 
-          {/* Load More Button */}
           {visibleKits.length < filteredKits.length && (
             <div style={{ textAlign: 'center', marginTop: '2rem' }}>
               <button 
@@ -378,7 +368,6 @@ export default function SurgicalKits() {
         </>
       )}
 
-      {/* Selected Kit Modal */}
       {selectedKit && (
         <div style={{ 
           position: 'fixed', 
@@ -406,7 +395,7 @@ export default function SurgicalKits() {
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
             border: '1px solid var(--border-color, #cbd5e1)'
           }}>
-            {/* Modal Header */}
+            
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '2px solid var(--border-color, #e2e8f0)', paddingBottom: '1rem' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
@@ -427,7 +416,6 @@ export default function SurgicalKits() {
               </button>
             </div>
 
-            {/* Filter inside modal */}
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
               <input 
                 type="text" 
@@ -445,8 +433,7 @@ export default function SurgicalKits() {
                 }}
               />
             </div>
-            
-            {/* Modal Items List */}
+
             <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '0.75rem' }}>
                 {filteredModalItems.map((row, idx) => (
@@ -475,8 +462,7 @@ export default function SurgicalKits() {
                 ))}
               </div>
             </div>
-            
-            {/* Modal Footer */}
+
             <div style={{ marginTop: '1.25rem', textAlign: 'right', paddingTop: '1rem', borderTop: '1px solid var(--border-color, #e2e8f0)' }}>
               <button 
                 onClick={() => setSelectedKit(null)} 

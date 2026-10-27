@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <id>EscandonBI</id>
+  <name>Hospital Escandon BI</name>
+  <description>Plataforma Hospital Escandon BI. Backend y frontend en el puerto 5173.</description>
+  <executable>%BASE%\..\.runtime\node.exe</executable>
+  <arguments>"%BASE%\..\backend\scripts\start-server.js" --service</arguments>
+  <workingdirectory>%BASE%\..\backend</workingdirectory>
+  <env name="NODE_ENV" value="production"/>
+  <env name="PORT" value="5173"/>
+  <!-- SCM supplies the machine environment; never copy the installer's PATH. -->
+  <env name="PATH" value="%BASE%\..\.runtime;%PATH%"/>
+  <env name="TEMP" value="%BASE%\..\backend\logs\service-temp"/>
+  <env name="TMP" value="%BASE%\..\backend\logs\service-temp"/>
+  <serviceaccount>
+    <domain>NT AUTHORITY</domain>
+    <user>LocalService</user>
+  </serviceaccount>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="30 sec"/>
+  <onfailure action="restart" delay="60 sec"/>
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>30 sec</stoptimeout>
+  <stopparentprocessfirst>false</stopparentprocessfirst>
+  <logpath>%BASE%\..\backend\logs\servicio</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>

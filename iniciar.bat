@@ -9,7 +9,7 @@ echo   Hospital Escandon - Plataforma BI
 echo  ============================================
 echo.
 
-:: Obtener IP local
+:: Red local
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
     for /f "tokens=*" %%b in ("%%a") do set LOCAL_IP=%%b
 )

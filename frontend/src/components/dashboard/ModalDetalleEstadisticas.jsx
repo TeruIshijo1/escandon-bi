@@ -1,11 +1,7 @@
-/**
- * ModalDetalleEstadisticas.jsx
- * Modal para desglose interactivo (drill-down) y exportación a Excel de estadísticas 2026
- * Hospital Escandón BI Platform v4.0
- */
-import React, { useState, useMemo, useEffect } from 'react';
-import * as XLSX from 'xlsx';
-import { formatStatistic } from '../../utils/statisticsPresentation';
+
+
+import { useState, useMemo, useEffect } from 'react';
+import { formatStatistic, formatStatisticsPeriod, statisticsNumber, statisticsDescription } from '../../utils/statisticsPresentation';
 import { userMessage } from '../../utils/userMessages';
 
 const COLUMN_LABELS = {
@@ -15,6 +11,10 @@ const COLUMN_LABELS = {
   NumeroCargo: 'Número de cargo',
   FolioSolicitud: 'Folio Solicitud',
   NoCita: 'No. Cita',
+  NumeroCita: 'No. Cita',
+  EstadoCita: 'Estado de la cita',
+  EstadoOrdenVenta: 'Estado de la orden de venta',
+  Ejecutada: 'Ejecutada',
   NoPaciente: 'No. Paciente',
   Paciente: 'Paciente',
   PacienteBebe: 'Paciente (Bebé)',
@@ -31,6 +31,7 @@ const COLUMN_LABELS = {
   EstudioProcedimiento: 'Procedimiento / Estudio',
   Procedimientos: 'Procedimiento Quirúrgico',
   Servicio: 'Servicio',
+  AreaLaboratorio: 'Área',
   Codigo: 'Código',
   CodigoServicio: 'Código Servicio',
   Fecha: 'Fecha',
@@ -66,7 +67,8 @@ const COLUMN_LABELS = {
   GrupoCodigo: 'Código de grupo',
   ClasificacionesCatalogo: 'Clasificaciones del servicio',
   IngresoTotal: 'Importe de órdenes de venta',
-  IngresoNeto: 'Importe sin IVA',
+  ImporteLinea: 'Importe de línea sin IVA antes del descuento general',
+  IngresoNeto: 'Importe neto sin IVA después del descuento general',
   Cuentas: 'Atenciones',
   Ordenes: 'Órdenes de venta',
   HorasSalaChoque: 'Horas Sala Choque',
@@ -95,6 +97,7 @@ export default function ModalDetalleEstadisticas({
   seccionId,
   year,
   mesNombre,
+  period = null,
   data = [],
   loading = false,
   error = '',
@@ -105,8 +108,9 @@ export default function ModalDetalleEstadisticas({
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [exportError, setExportError] = useState('');
+  const [exportBusy, setExportBusy] = useState(false);
 
-  useEffect(() => { setSearchTerm(''); setExportError(''); }, [isOpen, seccionId, year, mesNombre]);
+  useEffect(() => { setSearchTerm(''); setExportError(''); }, [isOpen, seccionId, year, mesNombre, period]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -135,17 +139,14 @@ export default function ModalDetalleEstadisticas({
   }, [data]);
 
   if (!isOpen) return null;
+  const periodLabel = period ? formatStatisticsPeriod(period) : `${mesNombre} ${year}`;
 
   // Función para formatear valores en la tabla
   const formatCellValue = (key, val) => {
     if (val === null || val === undefined || val === '') return 'No disponible';
 
-    // Formatear montos
     if (isMoneyColumn(key)) {
-      const num = parseFloat(val);
-      if (!isNaN(num)) {
-        return `$${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      }
+      return formatStatistic(val, true);
     }
 
     // Formatear fechas
@@ -175,16 +176,18 @@ export default function ModalDetalleEstadisticas({
     return String(readableValue(key, val));
   };
 
-  // Exportar a Excel
-  const handleExportExcel = () => {
+  const handleExportExcel = async (onlyFiltered = false) => {
+    if (exportBusy) return;
     setExportError('');
+    setExportBusy(true);
     try {
-      if (!filteredData.length || error) return;
+      const exportedRows = onlyFiltered ? filteredData : data;
+      if (!exportedRows.length || error) return;
+      const { downloadStatisticsWorkbook } = await import('../../utils/statisticsWorkbook');
 
-      const excelRows = filteredData.map((row, idx) => {
+      const excelRows = exportedRows.map((row, idx) => {
         const item = { '#': idx + 1 };
         columns.forEach(col => {
-          const header = columnLabel(col);
           let val = readableValue(col, row[col]);
 
           // Formateo para Excel
@@ -195,33 +198,27 @@ export default function ModalDetalleEstadisticas({
           } else if (col.startsWith('Fecha') && typeof val === 'string' && val.includes('T') && !isNaN(new Date(val).getTime())) {
             val = new Date(val).toLocaleString('es-MX', { timeZone: 'America/Mexico_City' });
           }
-          item[header] = val !== null && val !== undefined ? val : 'No disponible';
+          item[col] = isMoneyColumn(col) ? statisticsNumber(val) ?? 'No disponible' : val !== null && val !== undefined && val !== '' ? val : 'No disponible';
         });
         return item;
       });
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(excelRows);
-      XLSX.utils.sheet_add_aoa(ws, [[], ['Criterio', criterion], ['Total del periodo', quantity ?? 'No disponible', unit],
-        ['Registros exportados', filteredData.length], ...warnings.map(warning => ['Observación', userMessage(warning)])], { origin: excelRows.length + 2 });
-
-      // Auto-ancho de columnas
-      const colWidths = Object.keys(excelRows[0] || {}).map(key => {
-        const maxLen = excelRows.reduce((maximum, row) => Math.max(maximum, String(row[key] ?? '').length), key.length);
-        return { wch: Math.min(Math.max(maxLen + 3, 10), 45) };
-      });
-      ws['!cols'] = colWidths;
 
       const safeName = (seccionLabel || seccionId || 'Detalle')
         .replace(/[^a-zA-Z0-9_\u00C0-\u017F\s-]/g, '')
         .trim()
         .replace(/\s+/g, '_');
 
-      XLSX.utils.book_append_sheet(wb, ws, 'Detalle');
-      XLSX.writeFile(wb, `${safeName}_${mesNombre}_${year}.xlsx`);
-    } catch (err) {
+      await downloadStatisticsWorkbook({
+        filename: `${safeName}_${period ? `${period.startDate}_${period.endDate}` : `${mesNombre}_${year}`}${onlyFiltered ? '_filtrado' : ''}.xlsx`, sheetName: 'Detalle', title: seccionLabel || seccionId, period: periodLabel,
+        columns: [{ key: '#', header: '#', width: 8, type: 'number' }, ...columns.map(key => ({ key, header: columnLabel(key), width: Math.min(45, excelRows.reduce((max, row) => Math.max(max, String(row[key] ?? '').length + 3), Math.max(18, columnLabel(key).length + 3))), type: isMoneyColumn(key) ? 'currency' : undefined }))],
+        rows: excelRows,
+        unit, scope: onlyFiltered ? `Filtrado: ${exportedRows.length} de ${data.length} filas` : `Detalle completo: ${data.length} filas`,
+        summary: { 'Total de todo el periodo': `${formatStatistic(quantity, unit === 'MXN')} ${unit}` },
+        footnotes: [onlyFiltered ? `Búsqueda: ${searchTerm}. El total del periodo incluye todas las filas, también las que no coinciden con esta búsqueda.` : '', ...warnings.map(warning => statisticsDescription(userMessage(warning)))],
+      });
+    } catch {
       setExportError('No se pudo exportar el detalle. Intenta de nuevo.');
-    }
+    } finally { setExportBusy(false); }
   };
 
   return (
@@ -234,7 +231,7 @@ export default function ModalDetalleEstadisticas({
       padding: '1.5rem',
       animation: 'fadeIn 0.2s ease-out'
     }}>
-      <div role="dialog" aria-modal="true" aria-label={`${seccionLabel}, ${mesNombre} ${year}`} style={{
+      <div role="dialog" aria-modal="true" aria-label={`${seccionLabel}, ${periodLabel}`} style={{
         background: '#FFFFFF',
         borderRadius: '20px',
         width: '95%',
@@ -247,7 +244,7 @@ export default function ModalDetalleEstadisticas({
         position: 'relative',
         animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
       }}>
-        {/* Header Modal */}
+        
         <div style={{
           padding: '1.25rem 2rem',
           borderBottom: '1px solid #E2E8F0',
@@ -269,7 +266,7 @@ export default function ModalDetalleEstadisticas({
               color: 'rgba(255,255,255,0.7)',
               marginBottom: '0.2rem'
             }}>
-              Detalle del estadístico &middot; {mesNombre} {year}
+              Detalle del estadístico &middot; {periodLabel}
             </div>
             <h2 style={{
               fontFamily: 'var(--font-display)',
@@ -284,8 +281,8 @@ export default function ModalDetalleEstadisticas({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
-              onClick={handleExportExcel}
-              disabled={loading || Boolean(error) || filteredData.length === 0}
+              onClick={() => handleExportExcel(false)}
+              disabled={loading || exportBusy || Boolean(error) || data.length === 0}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -304,8 +301,9 @@ export default function ModalDetalleEstadisticas({
                 transition: 'all 0.2s'
               }}
             >
-              <span>📥</span> Exportar a Excel ({filteredData.length})
+              <span>📥</span> {exportBusy ? 'Exportando…' : `Exportar a Excel (todos: ${data.length})`}
             </button>
+            {searchTerm.trim() && <button type="button" onClick={() => handleExportExcel(true)} disabled={loading || exportBusy || Boolean(error) || filteredData.length === 0} style={{ padding: '0.55rem 0.85rem', border: '1px solid rgba(255,255,255,0.5)', borderRadius: 10, color: '#fff', background: 'transparent', cursor: 'pointer' }}>Exportar filtrados ({filteredData.length})</button>}
 
             <button
               onClick={onClose}
@@ -336,12 +334,12 @@ export default function ModalDetalleEstadisticas({
         <div style={{ padding: '0.75rem 2rem', borderBottom: '1px solid #E2E8F0', fontSize: '0.82rem' }}>
           {!loading && !error && <p style={{ margin: '0 0 0.4rem', fontWeight: 700 }}>Total del periodo: {formatStatistic(quantity, unit === 'MXN')} {unit === 'MXN' ? '' : unit}</p>}
           {!loading && !error && quantity == null && data.length > 0 && <p style={{ margin: '0.4rem 0', color: '#92400E' }}>Estas filas se muestran para revisión. Aún no hay un total confirmado para este estadístico.</p>}
-          {criterion && <p style={{ margin: '0.4rem 0', color: '#475569' }}>{criterion}</p>}
-          {warnings.map((warning, index) => <p key={index} role="status" style={{ margin: '0.4rem 0', color: '#92400E' }}>{userMessage(warning)}</p>)}
+          {!loading && !error && searchTerm.trim() && <p style={{ margin: '0.4rem 0', color: '#475569' }}>La búsqueda muestra {filteredData.length} de {data.length} filas. El total de arriba corresponde a todo el periodo; puedes descargar todas las filas o solo las filtradas.</p>}
+          {criterion && <details style={{ margin: '0.4rem 0', color: '#475569' }}><summary style={{ cursor: 'pointer' }}>Cómo se calcula este estadístico</summary><p>{statisticsDescription(criterion)}</p></details>}
+          {warnings.map((warning, index) => <p key={index} role="status" style={{ margin: '0.4rem 0', color: '#92400E' }}>{statisticsDescription(userMessage(warning))}</p>)}
           {(error || exportError) && <p role="alert" style={{ margin: '0.4rem 0', color: '#B91C1C' }}>{error || exportError}</p>}
         </div>
 
-        {/* Toolbar & Search Filter */}
         <div style={{
           padding: '0.85rem 2rem',
           borderBottom: '1px solid #F1F5F9',
@@ -407,7 +405,6 @@ export default function ModalDetalleEstadisticas({
           </div>
         </div>
 
-        {/* Body Table Container */}
         <div style={{ flex: 1, overflow: 'auto', padding: '1rem 2rem' }}>
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem' }}>
@@ -450,12 +447,14 @@ export default function ModalDetalleEstadisticas({
                       key={col}
                       style={{
                         padding: '0.75rem 0.85rem',
-                        textAlign: col.includes('Total') || col.includes('Saldo') || col.includes('Monto') || col.includes('Cantidad') || col.includes('Dias') ? 'right' : 'left',
+                        textAlign: isMoneyColumn(col) || col.includes('Total') || col.includes('Cantidad') || col.includes('Dias') ? 'right' : 'left',
                         borderBottom: '2px solid #CBD5E1',
                         color: '#1E293B',
                         fontFamily: 'var(--font-display)',
                         fontWeight: 700,
-                        whiteSpace: 'nowrap'
+                        whiteSpace: ['ImporteLinea', 'IngresoNeto'].includes(col) ? 'normal' : 'nowrap',
+                        minWidth: ['ImporteLinea', 'IngresoNeto'].includes(col) ? '11rem' : undefined,
+                        maxWidth: ['ImporteLinea', 'IngresoNeto'].includes(col) ? '15rem' : undefined,
                       }}
                     >
                       {columnLabel(col)}
@@ -479,7 +478,7 @@ export default function ModalDetalleEstadisticas({
                       {idx + 1}
                     </td>
                     {columns.map(col => {
-                      const isNumeric = col.includes('Total') || col.includes('Saldo') || col.includes('Monto') || col.includes('Cantidad') || col.includes('Dias');
+                      const isNumeric = isMoneyColumn(col) || col.includes('Total') || col.includes('Cantidad') || col.includes('Dias');
                       const isMono = isNumeric || col.startsWith('Fecha') || col.startsWith('Folio') || col.startsWith('No');
                       return (
                         <td
@@ -487,7 +486,7 @@ export default function ModalDetalleEstadisticas({
                           style={{
                             padding: '0.65rem 0.85rem',
                             textAlign: isNumeric ? 'right' : 'left',
-                            color: col.includes('Total') || col.includes('Monto') ? 'var(--color-azul-fuerte)' : '#334155',
+                            color: isMoneyColumn(col) || col.includes('Total') ? 'var(--color-azul-fuerte)' : '#334155',
                             fontFamily: isMono ? 'var(--font-mono)' : 'var(--font-body)',
                             fontWeight: col === 'Paciente' || col === 'PacienteBebe' || col.includes('Total') ? 600 : 400,
                             borderBottom: '1px solid #E2E8F0',
@@ -505,7 +504,7 @@ export default function ModalDetalleEstadisticas({
           )}
         </div>
 
-        {/* Footer */}
+        {/* Pie de página */}
         <div style={{
           padding: '0.75rem 2rem',
           background: '#F8FAFC',

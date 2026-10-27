@@ -26,10 +26,20 @@ function resolveRuntime({ backendDir, platform = process.platform, hostPath = pr
   return { executable: portable, version: validateVersion(result.stdout, platform) };
 }
 
+function disableQuickEditMode(backendDir, platform = process.platform) {
+  if (platform !== 'win32') return;
+  const helper = path.resolve(backendDir, '..', 'scripts', 'disable-quick-edit.ps1');
+  if (!fs.existsSync(helper)) return;
+  spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helper], {
+    stdio: 'ignore', windowsHide: true, timeout: 5000
+  });
+}
+
 function startServer({ backendDir = path.resolve(__dirname, '..'), argv = process.argv.slice(2),
   runtimeOptions = {}, launch = spawn, parent = process, logger = console, relaunch = false } = {}) {
-  if (argv.some(argument => !['--watch', '--check'].includes(argument))) {
-    logger.error('[Backend] Opciones permitidas: --watch, --check.');
+  disableQuickEditMode(backendDir, runtimeOptions.platform || process.platform);
+  if (argv.some(argument => !['--watch', '--check', '--service'].includes(argument)) || (argv.includes('--service') && argv.includes('--watch'))) {
+    logger.error('[Backend] Opciones permitidas: --watch, --check, --service. El servicio no admite --watch.');
     parent.exitCode = 1;
     return null;
   }
@@ -45,8 +55,7 @@ function startServer({ backendDir = path.resolve(__dirname, '..'), argv = proces
   const stopChild = signal => {
     stoppingSignal = signal;
     if (argv.includes('--watch') && (runtimeOptions.platform || process.platform) === 'win32' && child.pid) {
-      // Windows kill() terminates the watcher without notifying its server child.
-      // Stop only the process tree created by this launcher.
+
       const taskkill = path.join(parent.env?.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe');
       const stopper = launch(taskkill, ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
       stopper.once('error', error => { logger.error('[Backend] No se pudo detener el watcher: ' + error.message); child.kill(signal); });
@@ -76,7 +85,7 @@ function startServer({ backendDir = path.resolve(__dirname, '..'), argv = proces
 
 function prepareProductionData({ backendDir, environment, logger = console }) {
   if (environment !== 'production') return;
-  const requiredFiles = ['excel_stats_history.json', 'statistics_manual_controls.json'];
+  const requiredFiles = ['excel_stats_history.json', 'statistics_manual_controls.json', 'statistics_base_references.json', 'statistics_historical_series.json'];
   const missing = requiredFiles.filter(file => !fs.existsSync(path.join(backendDir, 'data', file)));
   if (!missing.length) return;
   const root = path.resolve(backendDir, '..');
@@ -91,16 +100,17 @@ function prepareProductionData({ backendDir, environment, logger = console }) {
 async function runCli() {
   const backendDir = path.resolve(__dirname, '..');
   const argv = process.argv.slice(2);
-  if (argv.includes('--check') || argv.some(argument => !['--watch'].includes(argument))) {
+  if (argv.includes('--check') || argv.some(argument => !['--watch', '--service'].includes(argument)) || (argv.includes('--service') && argv.includes('--watch'))) {
     return startServer({ backendDir, argv });
   }
   try {
     const runtime = resolveRuntime({ backendDir });
-    // Do not open sockets in a host runtime affected by the Windows native crash.
+     
     if (fs.realpathSync(runtime.executable) !== fs.realpathSync(process.execPath)) {
       return startServer({ backendDir, argv, relaunch: true });
     }
     require('dotenv').config({ path: path.join(backendDir, '.env') });
+    if (argv.includes('--service')) process.env.BI_WINDOWS_SERVICE = '1';
     const { instanceId, probeExistingBackend } = require('../utils/backendInstance');
     const port = process.env.PORT || 4000;
     const environment = process.env.NODE_ENV || 'development';
@@ -115,6 +125,9 @@ async function runCli() {
       }
     }
     if (existing.state === 'reuse') {
+      if (argv.includes('--service')) {
+        throw new Error(`Ya existe un backend activo en el puerto ${port}. Detén la instancia anterior antes de iniciar el servicio de Windows.`);
+      }
       if (argv.includes('--watch')) {
         throw new Error(`El backend ya está activo en el puerto ${port}. Cierra su instancia antes de iniciar la recarga automática.`);
       }

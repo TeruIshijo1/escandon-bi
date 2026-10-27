@@ -1,8 +1,5 @@
-/**
- * audit.middleware.js
- * Registra acciones sensibles en la tabla AuditLog
- * Hospital Escandón BI Platform v1.0
- */
+
+
 'use strict';
 
 const { getDb } = require('../config/db');
@@ -32,11 +29,10 @@ async function auditMiddleware(req, res, next) {
 
   if (!shouldAudit) return next();
 
-  // Capturar respuesta
   const originalJson = res.json.bind(res);
   res.json = function (body) {
     const duration = Date.now() - start;
-    const user     = req.user; // disponible si authenticate corrió antes
+    const user     = req.user;  
 
     // Insertar log asíncronamente (no bloquea la respuesta)
     logAction({
@@ -60,7 +56,7 @@ async function auditMiddleware(req, res, next) {
 async function logAction(entry) {
   try {
     const db = getDb();
-    if (!db) return; // BD no disponible (tests)
+    if (!db) return;  
 
     try {
       await db.prepare(`
@@ -101,7 +97,7 @@ async function logAction(entry) {
       }
     }
   } catch (err) {
-    // No fallar el request por un error de log
+     
     console.error('[AuditLog] Error al registrar:', err.message);
   }
 }

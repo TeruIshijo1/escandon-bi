@@ -1,7 +1,5 @@
 'use strict';
 
-// Auditoría de lectura. No usa fetchAllPages: su caché y sus páginas parciales
-// no permiten acreditar que el mapa de SAP está cerrado en este momento.
 const sapService = require('./sap.service');
 const sapConfig = require('../config/sap.config');
 const { AsyncLocalStorage } = require('async_hooks');
@@ -80,9 +78,7 @@ const JOURNAL_TYPES = { ttARInvoice: 13, ttARCredItnote: 14, ttDelivery: 15, ttR
   ttAPInvoice: 18, ttAPCreditNote: 19, ttPurchaseDeliveryNote: 20, ttPurchaseReturn: 21,
   ttReceipt: 24, ttVendorPayment: 46, ttDownPayment: 203, ttPurchaseDownPayment: 204 };
 const TRANSFER_TYPES = { PurchaseDeliveryNotes: 20, InventoryGeneralEntry: 59, WarehouseTransfers: 67, InventoryTransferRequest: 1250000001 };
-// SAP SDK database-table constraints: header BaseType is the India transfer
-// association (67), not the generic line-copy link. RelatedTyp on these headers
-// permits only the types below (the other marketing headers reserve -1).
+
 const HEADER_RELATED_SOURCES = { Invoices: [24, 46], PurchaseInvoices: [24, 46], CreditNotes: [24, 46],
   PurchaseCreditNotes: [24, 46], ReturnRequest: [24, 46], GoodsReturnRequest: [24, 46], InventoryGenEntries: [59, 60], InventoryGenExits: [59, 60] };
 
@@ -124,9 +120,7 @@ async function transport(operation) {
   });
   const pending = Promise.resolve().then(operation);
   const release = () => { activeSapRequests -= 1; drainSapQueue(); };
-  // Keep the permit until the actual socket promise settles, including aborts
-  // and timeouts. Completing a response must never accumulate background SAP
-  // work beyond these two transports.
+
   pending.then(release, release);
   return timedRequest(() => pending);
 }
@@ -139,6 +133,7 @@ async function timedRequest(operation) {
       if (error.status !== 400) throw error;
       const wrapped = fail('SAP no pudo completar una consulta de lectura.', 502);
       wrapped.code = error.code;
+      wrapped.sapStatus = error.status;
       wrapped.sapMessage = String(error.message || '');
       throw wrapped;
     }), new Promise((_, reject) => {
@@ -238,14 +233,21 @@ async function sqlRows(code, parameters, validatedQueries = new Set()) {
   }
   if (!validatedQueries.has(code)) {
     const sql = SQL_QUERIES[code];
-    let queryDefinition = (await get(`/SQLQueries('${code}')`)).data;
-    // sap.service converts SQLQuery404 to {value:[]}. Missing infrastructure
-    // never proves an empty ledger. Create only our versioned SELECT template.
-    if (!queryDefinition?.SqlCode && Array.isArray(queryDefinition?.value) && !queryDefinition.value.length) {
+    const readDefinition = async () => {
+      try { return (await get(`/SQLQueries('${code}')`)).data; }
+      catch (error) {
+        const status = Number(error.sapStatus || error.status);
+        if (!(status >= 500) && (status === 404 || ['-2028', 'SQLQuery404'].includes(String(error.code)))) return null;
+        throw error;
+      }
+    };
+    let queryDefinition = await readDefinition();
+
+    if (queryDefinition === null) {
       let provisionError;
       try { await post('/SQLQueries', { SqlCode: code, SqlName: code, SqlText: sql }); }
-      catch (error) { provisionError = error; /* A concurrent request may have created the same key. */ }
-      queryDefinition = (await get(`/SQLQueries('${code}')`)).data;
+      catch (error) { provisionError = error;   }
+      queryDefinition = await readDefinition();
       if (!queryDefinition?.SqlCode && String(provisionError?.code) === '702') {
         sqlTableUnavailable.add(code);
         throw provisionError;
@@ -282,9 +284,7 @@ async function headerLinks(def, sources, relation) {
       sources.map(row => `(${properties[0]} eq ${row.def.type} and ${properties[1]} eq ${row.entry})`));
   } catch (error) {
     const message = error.sapMessage || '';
-    // Shared Document metadata contains union properties. The installed SAP
-    // explicitly rejects BaseType on most entity sets. Only a proven missing
-    // property can disable this capability; timeouts/errors never imply empty.
+
     if (String(error.code) === '-1000' && /is invalid/i.test(message) && properties.some(property => message.includes(`Property '${property}'`) || message.includes(`Property "${property}"`))) {
       unavailableHeaderRelations.add(capability);
       return { rows: [] };
@@ -328,8 +328,7 @@ async function accountKeys(def, account, validatedQueries) {
   try { entries = await sqlRows(def.accountQuery, { account: Number(account) }, validatedQueries); }
   catch (error) {
     if (String(error.code) !== '702') throw error;
-    // A SQL table allowlist rejection never proves that the account is absent.
-    // Verify native header and line folios in both search and detailed review.
+
     const parts = await Promise.all([
       readPages(endpoint(def.entity, { $select: 'DocEntry', $filter: `U_PCNum eq ${account}`, $orderby: 'DocEntry desc' })),
       readPages(lineQuery(def, `${def.entity}/${def.kind === 'transfer' ? 'StockTransferLines' : 'DocumentLines'}/U_PCNum eq ${account}`)),
@@ -427,14 +426,20 @@ function knownDocumentEdges(records) {
 
 async function reviewWithoutInvoice(account, validatedQueries) {
   const warnings = ['El mapa completo todavía no se ha consultado; los documentos mostrados son una revisión inicial.'];
-  // Show initial context promptly. An account without a current invoice can
-  // qualify only after explicitly checking its complete relation map.
-  const deadline = Math.min(requestScope.getStore()?.deadline ?? Infinity, Date.now() + 10000);
-  const knownDocuments = await requestScope.run({ ...requestScope.getStore(), deadline }, async () => {
-    const orders = await accountDocuments(account, message => warnings.push(message), [DOCUMENTS[1]], validatedQueries);
-    if (orders.length) return orders;
-    return accountDocuments(account, message => warnings.push(message), SEEDS.slice(2), validatedQueries);
-  });
+
+  const budget = Number(process.env.SAP_NO_INVOICE_BUDGET_MS) || 10000;
+  const deadline = Math.min(requestScope.getStore()?.deadline ?? Infinity, Date.now() + budget);
+  let knownDocuments = [];
+  try {
+    knownDocuments = await requestScope.run({ ...requestScope.getStore(), deadline }, async () => {
+      const orders = await accountDocuments(account, message => warnings.push(message), [DOCUMENTS[1]], validatedQueries);
+      if (orders.length) return orders;
+      return await accountDocuments(account, message => warnings.push(message), SEEDS.slice(2), validatedQueries);
+    });
+  } catch (err) {
+    console.warn(`[reviewWithoutInvoice] Advertencia en consulta rápida de cuenta ${account}:`, err.message);
+    warnings.push(`La consulta inicial de documentos no se completó totalmente: ${err.message || 'tiempo de espera agotado'}`);
+  }
   const nodes = knownDocuments.map(row => documentNode(row));
   const openDocuments = nodes.filter(node => node.status === 'open');
   const reasons = ['Consulta el mapa completo para confirmar que no hay documentos ni saldos abiertos.'];
@@ -474,9 +479,7 @@ async function search({ mode = 'patient', q } = {}) {
     for (const result of results) if (result.status === 'rejected') throw result.reason;
     return results.flatMap(result => result.value);
   };
-  // Preserve the fast path for the normal invoice/order account. A pending
-  // account may exist only on another commercial document, including a line;
-  // verify those families before reporting that SAP found no account.
+
   let matches;
   if (mode === 'order') {
     const page = await readPages(endpoint('Orders', {
@@ -496,8 +499,8 @@ async function search({ mode = 'patient', q } = {}) {
   };
   if (mode !== 'order' && !matches.some(hasIdentifiableAccount)) matches.push(...await searchDefinitions(SEEDS.slice(2)));
   for (const { def, doc } of matches) {
-    // U_PRName es el médico. U_PTName es el paciente. Las facturas consolidadas
-    // también pueden llevar el folio U_PCNum en cada línea.
+     
+    // también pueden llevar el folio U_PCNum en cada línea
     const lineAccounts = new Set((doc.DocumentLines || []).map(line => int(line.U_PCNum)).filter(Boolean));
     const headerAccount = int(doc.U_PCNum);
     const namedAccount = headerAccount || (!doc._accountKeyOnly && lineAccounts.size === 1 ? [...lineAccounts][0] : null);
@@ -518,8 +521,7 @@ async function search({ mode = 'patient', q } = {}) {
   }
   const rows = [...found.values()].sort((a, b) => Number(b.account) - Number(a.account));
   if (mode !== 'account' && rows.length) {
-    // A named order can have invoices with a blank/different header name.
-    // Count by the actual account keys instead of reporting a misleading zero.
+
     const counts = await parallel(rows.slice(0, SEARCH_LIMIT).map(row => async () => {
       const matches = await accountKeys(DOCUMENTS[0], row.account, validatedQueries);
       if (matches.some(doc => int(doc.DocEntry) === null)) throw fail('SAP devolvió un conteo de facturas incompleto.', 502);
@@ -543,8 +545,7 @@ async function search({ mode = 'patient', q } = {}) {
 async function review(value, { fullMap = false } = {}) {
   const account = accountNumber(value);
   const validatedQueries = new Set();
-  // Read fresh, complete invoice keys first. Without invoices, the initial
-  // view stays fast and unverified until the full map is explicitly requested.
+
   const ownInvoices = await accountDocuments(account, null, [DOCUMENTS[0]], validatedQueries);
   if (!ownInvoices.length && !fullMap) return reviewWithoutInvoice(account, validatedQueries);
   const warnings = new Set();
@@ -592,8 +593,6 @@ async function review(value, { fullMap = false } = {}) {
   const accountDocumentCount = records.size;
   const accountFound = accountDocumentCount > 0;
 
-  // Only typed application/reference/reconciliation keys create financial
-  // edges. BP codes scope the ledger checks and never substitute for a link.
   const reviewSqlRows = (code, parameters) => sqlRows(code, parameters, validatedQueries);
 
   async function financialCandidates(cardCodes, sources) {
@@ -667,9 +666,7 @@ async function review(value, { fullMap = false } = {}) {
         } else if (def.kind === 'payment') {
           for (const applied of arrays(doc, 'PaymentInvoices')) missing(PAYMENT_TYPES[applied.InvoiceType] ?? applied.InvoiceType, applied.DocEntry, id, 'Pago aplicado');
           for (const ref of arrays(doc, 'PaymentDocumentReferencesCollection')) missing(ref.ReferencedObjectType, ref.ReferencedDocEntry, id, 'Referencia SAP');
-          // Cancellation is historical state, not proof that accounting
-          // residuals are zero. Verify the original posting for cancelled
-          // payments too, and include its related journal in the map.
+
           if (cancellation(doc) !== null && doc.CardCode) {
             try {
               const ledger = await reviewSqlRows('sq_bi_reopen_balance_v2', { cardCode: doc.CardCode, objectType: String(def.type), objectEntry: row.entry });
@@ -695,8 +692,6 @@ async function review(value, { fullMap = false } = {}) {
     for (const row of fresh) if (['Invoices', 'CreditNotes', 'DownPayments', 'IncomingPayments', 'VendorPayments'].includes(row.def.entity) && !row.doc.CardCode) warn('SAP no informó el socio de negocio requerido para verificar los vínculos contables.');
     for (const item of await financialCandidates(cards, fresh)) candidates.set(key(item.def, identity(item.def, item.doc)), item);
 
-    // Reverse base/reference discovery is indispensable: Service Layer does not
-    // expose target pointers in DocumentLines in this SAP installation.
     if (fresh.length) {
       const queries = [];
       for (const def of [...DOCUMENTS, ...FINANCIAL.filter(item => item.kind === 'transfer')]) {
@@ -736,8 +731,7 @@ async function review(value, { fullMap = false } = {}) {
           if (!records.has(id)) pending.set(id, { def, entry });
         }
       });
-      // An invoice can draw an advance without a BaseEntry. Scan all invoices
-      // of its BP and inspect real DownPaymentsToDraw keys, never BP membership.
+
       const downCards = [...new Set(fresh.filter(row => [203, 204].includes(row.def.type)).map(row => row.doc.CardCode).filter(Boolean))].filter(code => !scannedDraws.has(code));
       downCards.forEach(code => scannedDraws.add(code));
       if (downCards.length) {
@@ -752,7 +746,6 @@ async function review(value, { fullMap = false } = {}) {
       }
     }
 
-    // Keep only candidate documents that have a typed link to the current map.
     for (const [candidateId, { def, doc }] of candidates) {
       const connections = [];
       if (def.kind === 'payment') {
@@ -840,15 +833,13 @@ async function review(value, { fullMap = false } = {}) {
       cancelled = cancelledBy === null ? null : cancelledBy > 0;
       sapStatus = cancelled ? 'Conciliación cancelada' : status === 'settled' ? 'Conciliación registrada' : null;
     } else if (def.kind === 'transfer') {
-      // Transfers expose BoStatus but no cancellation flag in this metadata.
+       
       const states = [doc.DocumentStatus, doc.DocStatus].filter(value => value != null);
       status = states.length && states.every(value => ['bost_Close', 'C'].includes(value)) ? 'closed' : states.length && states.every(value => ['bost_Open', 'O'].includes(value)) ? 'open' : 'unknown';
     }
     return { ...documentNode({ def, doc }, status), id, docEntry: entry, statusBasis, sapStatus, cancelled };
   });
-  // Related invoices remain in the map and contribute their verified status.
-  // The account itself must have been located through its actual account keys;
-  // a related document never proves that an otherwise missing account exists.
+
   const invoices = nodes.filter(node => accountInvoiceIds.has(node.id));
   const currentInvoices = invoices.filter(node => node.cancelled === false);
   const openDocuments = nodes.filter(node => node.status === 'open');

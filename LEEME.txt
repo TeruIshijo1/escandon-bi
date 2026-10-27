@@ -1,0 +1,12 @@
+Hospital Escandón BI
+
+Instalar o actualizar: ejecutar instalar.bat dentro del pase completo.
+Servicio Windows: después de instalar y configurar, abrir una consola como administrador y ejecutar administrar_servicio.bat -Accion Verificar. Revisar las dependencias y los permisos externos según README_PRODUCCION.md antes de instalar e iniciar el servicio.
+Consultar o administrar: administrar_servicio.bat -Accion Estado (también Detener, Reiniciar o Registros). Sin argumentos abre el menú.
+Alternativa de consola: iniciar_produccion.bat; mantener la ventana abierta. No iniciar ambos modos a la vez.
+Preparar el pase desde el código fuente: powershell -NoProfile -ExecutionPolicy Bypass -File build_deploy.ps1
+
+Instalación y configuración: README_PRODUCCION.md
+Guía de uso: docs\Guia_Operativa_Consulta_Plataforma.pdf
+
+La configuración privada, las bases, los archivos de usuarios y los modelos activos se conservan en sus ubicaciones de ejecución.

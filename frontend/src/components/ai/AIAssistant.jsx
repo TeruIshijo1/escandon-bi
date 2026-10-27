@@ -1,8 +1,5 @@
-/**
- * AIAssistant.jsx — Asistente de IA (chat flotante)
- * Hospital Escandón BI Platform v4.0
- * Rediseño premium con soporte para Quirófano, Almacén y Farmacia
- */
+
+
 import { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { useAuth } from '../../context/AuthContext';
@@ -27,24 +24,18 @@ function formatMarkdown(text) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // Headers
   formatted = formatted.replace(/^### (.*$)/gim, '<div style="font-weight:700; font-size:0.88rem; color:#004687; margin:0.3rem 0 0.15rem;">$1</div>');
   formatted = formatted.replace(/^## (.*$)/gim, '<div style="font-weight:800; font-size:0.92rem; color:#004687; margin:0.4rem 0 0.2rem;">$1</div>');
 
-  // Bold (**text** or __text__)
   formatted = formatted.replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="font-weight:700; color:#004687;">$1</strong>');
   formatted = formatted.replace(/__([\s\S]+?)__/g, '<strong style="font-weight:700; color:#004687;">$1</strong>');
 
-  // Italics (*text*)
   formatted = formatted.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
 
-  // Inline Code / Highlights (`text`)
   formatted = formatted.replace(/`([^`]+)`/g, '<code style="background:rgba(0,70,135,0.08); color:#005FA9; padding:2px 5px; border-radius:4px; font-family:var(--font-mono); font-size:0.78rem; font-weight:600;">$1</code>');
 
-  // Bullet Lists
   formatted = formatted.replace(/^\s*[-*]\s+(.*$)/gim, '<div style="display:flex; gap:6px; margin:2px 0 2px 6px;"><span style="color:#0088C9; font-weight:bold;">•</span><span>$1</span></div>');
 
-  // Line breaks
   formatted = formatted.replace(/\n/g, '<br/>');
 
   return formatted;
@@ -192,15 +183,13 @@ export default function AIAssistant() {
         }
       `}</style>
 
-      {/* FAB */}
       <button className="ai-fab" onClick={() => setOpen(o => !o)} title="Asistente Mar-IA">
         {open ? '✕' : '🤖'}
       </button>
 
-      {/* Panel */}
       {open && (
         <div className="ai-panel" style={{ boxShadow: 'var(--shadow-xl)', borderRadius: '16px', border: '1px solid rgba(0,70,135,0.08)' }}>
-          {/* Header */}
+          {/* Encabezado */}
           <div className="ai-panel-header" style={{ background: 'linear-gradient(135deg, var(--color-azul-fuerte) 0%, #083b66 100%)' }}>
             <span style={{ fontSize:'1.4rem' }}>🤖</span>
             <div style={{ flex:1 }}>
@@ -213,13 +202,11 @@ export default function AIAssistant() {
             >✕</button>
           </div>
 
-          {/* Mensajes */}
           <div className="ai-messages" style={{ background: '#FAFBFD' }}>
             {messages.map((msg, i) => (
               <div key={i} className={`ai-message ${msg.role}`} style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', padding: '0.75rem 0.9rem', borderRadius: '12px' }}>
                 <span dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }} />
 
-                {/* KPIs */}
                 {msg.kpis && msg.kpis.length > 0 && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginTop: '8px' }}>
                     {msg.kpis.map((kpi, kIdx) => (
@@ -263,7 +250,6 @@ export default function AIAssistant() {
               </div>
             ))}
 
-            {/* Preguntas sugeridas (solo si pocos mensajes) */}
             {messages.length < 3 && (
               <div style={{ display:'flex', flexDirection:'column', gap:'0.45rem', marginTop: '0.5rem' }}>
                 <span style={{ fontSize:'0.64rem', color:'var(--text-muted)', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.06em', fontFamily: 'var(--font-display)' }}>Preguntas sugeridas</span>
@@ -311,7 +297,6 @@ export default function AIAssistant() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
           <div className="ai-input-row" style={{ flexDirection: 'column', padding: '0.85rem', borderTop: '1px solid rgba(0,70,135,0.06)', gap: '0.5rem', background: '#FFFFFF' }}>
             {selectedFile && (
               <div style={{ fontSize: '0.72rem', color: 'var(--color-azul-fuerte)', background: 'rgba(0,70,135,0.06)', border: '1px solid rgba(0,70,135,0.1)', padding: '0.25rem 0.6rem', borderRadius: '8px', alignSelf: 'flex-start', display: 'flex', gap: '0.5rem', alignItems: 'center', fontFamily: 'var(--font-mono)' }}>

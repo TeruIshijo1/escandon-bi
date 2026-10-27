@@ -72,8 +72,7 @@ export default function DashboardAseguradorasNativo({ globalFilters, globalTrigg
 
   return (
     <div className="area-native-dashboard dashboard-view" style={{ padding: '1rem', background: '#F8FAFC', borderRadius: '16px' }}>
-      
-      {/* KPIs Principales */}
+
       <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
         <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #3B82F6` }}>

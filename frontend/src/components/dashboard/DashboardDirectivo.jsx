@@ -1,14 +1,5 @@
-/**
- * DashboardDirectivo.jsx
- * Dashboard de Mando Directivo — KPIs de Eficiencia, Eficacia y Macropanel Financiero
- * Hospital Escandón BI Platform v3.5
- *
- * Paleta aplicada:
- *   #004687 → Headers, sidebar (ya en globals)
- *   #0088C9 → Degradados, filtros
- *   #005FA9 → Botones acción, hover
- *   #00974A → Indicadores positivos, Exportar Excel, glow IA
- */
+
+
 import { useState, useEffect } from 'react';
 import EmbeddedBI    from './EmbeddedBI';
 import PremiumLoader from '../shared/PremiumLoader';
@@ -25,8 +16,7 @@ import { useAuth }   from '../../context/AuthContext';
 
 import { API_BASE } from '../../api/config';
 
-
-/* ── Colores por tipo de KPI ─────────────────────────────────── */
+/* Colores por tipo de KPI */
 const TIPO_COLOR = {
   success: '#00974A',
   info:    '#0088C9',
@@ -49,32 +39,31 @@ function SectionHeader({ title, subtitle, accent = '#004687' }) {
   );
 }
 
-
 const TAB_DETAILS = {
   eficiencia: {
     tag: 'Dashboard de Mando Directivo',
     title: 'Eficiencia Operativa',
-    color: '#0088C9', // Cyan
+    color: '#0088C9',  
   },
   eficacia: {
     tag: 'Dashboard de Mando Directivo',
     title: 'Eficacia Clínica',
-    color: '#00974A', // Green
+    color: '#00974A',  
   },
   financiero: {
     tag: 'Dashboard de Mando Directivo',
     title: 'Macropanel Financiero',
-    color: '#005FA9', // Blue
+    color: '#005FA9',  
   },
   finanzas: {
     tag: 'Dashboard de Mando Directivo',
     title: 'Ingresos y Egresos',
-    color: '#E8853D', // Orange
+    color: '#E8853D',  
   },
   demografia: {
     tag: 'Dashboard de Mando Directivo',
     title: 'Demografía Geográfica',
-    color: '#F59E0B', // Amber
+    color: '#F59E0B',  
   }
 };
 
@@ -86,8 +75,7 @@ export default function DashboardDirectivo() {
   const [data, setData]      = useState({ censo: [] });
   const [showExportApi, setShowExportApi] = useState(false);
   const [configList, setConfigList] = useState([]);
-  
-  // Global filters
+
   const [globalFilters, setGlobalFilters] = useState({
     search: '',
     startDate: '',
@@ -123,7 +111,6 @@ export default function DashboardDirectivo() {
         });
       }
 
-      // Fetch configurations to know if current tab has JSON
       const resCfg = await fetch(`${API_BASE}/admin/config/reports`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -149,11 +136,9 @@ export default function DashboardDirectivo() {
 
   return (
     <div className="dashboard-view" style={{ maxWidth: 'var(--content-max, 1300px)', margin: '0 auto' }}>
-      {/* <ExportApiModal isOpen={showExportApi} onClose={() => setShowExportApi(false)} /> */}
 
-      {/* ── Header del dashboard ── */}
       <div style={{
-        background:    '#0B132B', // Deep navy black
+        background:    '#0B132B',  
         borderRadius:  20,
         padding:       '2rem 2.25rem',
         marginBottom:  '1.5rem',
@@ -163,7 +148,7 @@ export default function DashboardDirectivo() {
         border:        '1px solid rgba(255, 255, 255, 0.05)',
         borderTop:     '1.5px solid rgba(255, 255, 255, 0.12)'
       }}>
-        {/* Glowing mesh gradient background shapes */}
+        
         <div style={{
           position: 'absolute',
           top: '-50%',
@@ -260,9 +245,7 @@ export default function DashboardDirectivo() {
         </div>
       </div>
 
-
-
-      {/* ── Tabs de categoría ── */}
+      {/* Tabs de categoría */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -312,7 +295,7 @@ export default function DashboardDirectivo() {
         activeTab={activeTab}
       />
 
-      {/* ── Contenido de tabs ── */}
+      {/* Contenido de tabs */}
       <div id="dashboard-directivo-content">
         {activeTab === 'eficiencia' && (
           <div>

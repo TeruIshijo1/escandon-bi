@@ -2,10 +2,10 @@ param()
 $ErrorActionPreference = 'Stop'
 $taskProjectRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $taskDeployDir = Join-Path $taskProjectRoot 'pase_a_produccion'
-$taskTempDir = Join-Path $taskProjectRoot 'tmp'
+$taskTempDir = Join-Path $taskProjectRoot 'IA\temporal\produccion'
 $taskId = [Guid]::NewGuid().ToString('N')
 $taskStaging = Join-Path $taskTempDir ('release-package-' + $taskId)
-$taskArchive = Join-Path $taskTempDir ('pase-anterior-' + $taskId)
+$taskArchive = Join-Path $taskProjectRoot ('IA\historial\pases-anteriores\pase-anterior-' + $taskId)
 $taskInputSnapshot = Join-Path $taskTempDir ('release-inputs-' + $taskId + '.json')
 $taskRuntime = Join-Path $taskProjectRoot '.runtime\node.exe'
 if (-not (Test-Path -LiteralPath $taskRuntime)) { throw 'Prepara primero el runtime con scripts\prepare-node-runtime.ps1.' }
@@ -14,6 +14,7 @@ Write-Host '[1/4] Validando runtime y compilando todo el frontend...'
 & $taskRuntime (Join-Path $taskProjectRoot 'backend\scripts\start-server.js') --check
 if ($LASTEXITCODE -ne 0) { throw 'Runtime no compatible.' }
 New-Item -ItemType Directory -Path $taskTempDir -Force | Out-Null
+New-Item -ItemType Directory -Path (Split-Path -Parent $taskArchive) -Force | Out-Null
 & $taskRuntime (Join-Path $taskProjectRoot 'scripts\production-package.cjs') inputs $taskInputSnapshot
 if ($LASTEXITCODE -ne 0) { throw 'No se pudo registrar el estado del frontend.' }
 Push-Location (Join-Path $taskProjectRoot 'frontend')
@@ -24,7 +25,7 @@ try {
 Write-Host '[2/4] Preparando paquete completo y manifiesto SHA256...'
 & $taskRuntime (Join-Path $taskProjectRoot 'scripts\production-package.cjs') build $taskStaging $taskInputSnapshot
 if ($LASTEXITCODE -ne 0) { throw 'Fallo la auditoria del paquete; se conserva el pase anterior.' }
-# Validate absolute paths before any directory move. Stay in this workspace.
+# Rutas de publicación y recuperación
 $taskRootPrefix = $taskProjectRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 foreach ($taskPath in @($taskDeployDir, $taskStaging, $taskArchive)) {
     $taskResolved = [IO.Path]::GetFullPath($taskPath)

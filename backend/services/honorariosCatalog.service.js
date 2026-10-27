@@ -1,10 +1,9 @@
 'use strict';
 
-// Vertical aporta datos de referencia mediante SELECT. Toda configuración y tarifa
-// autorizada se conserva exclusivamente en PostgreSQL de BI.
+// autorizada se conserva exclusivamente en PostgreSQL de BI
 const { getDb } = require('../config/db');
 const { canReview } = require('./honorariosReview.service');
-const { isExcludedHonorariosService, classifyProfessionalCandidate } = require('../utils/honorariosScope');
+const { isExcludedHonorariosService, isHonorariosScopeExcluded, classifyProfessionalCandidate } = require('../utils/honorariosScope');
 const { multiplyHonorario } = require('../utils/honorariosMoney');
 
 const CONTACT_CENTER_CODES = new Set(['SER1467', 'SER1470', 'SER1471']);
@@ -17,26 +16,23 @@ let schemaPromise;
 let syncPromise;
 
 const CATALOG_SQL = `SELECT ItemCode,ItemName,ItemDescription,ItemGroupName,ItemGroupCode,ItemType,Enabled
-  FROM V_IT WHERE ItemType='S' AND NULLIF(LTRIM(RTRIM(ItemCode)),'') IS NOT NULL
+  FROM V_IT i WHERE NULLIF(LTRIM(RTRIM(i.ItemCode)),'') IS NOT NULL
+    AND (i.ItemType='S' OR EXISTS (SELECT 1 FROM UT_Honorarios h WHERE h.ITEMCODE=i.ItemCode))
   UNION ALL SELECT c.CPTCode ItemCode,c.CPTName_ES ItemName,c.CPTName_ES ItemDescription,
     'PROCEDIMIENTO EN QUIROFANO' ItemGroupName,NULL ItemGroupCode,'S' ItemType,CAST(1 AS bit) Enabled
   FROM CP c WHERE NULLIF(LTRIM(RTRIM(c.CPTCode)),'') IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM V_IT i WHERE i.ItemCode=c.CPTCode)`;
 const REFERENCE_SQL = `SELECT Id_UT,ITEMCODE,ITEMDESCRIPTION,IMPORTE,NOTAS FROM UT_Honorarios`;
-// La fuente consultable de Vertical no registra autor ni fecha de edición de
-// estas referencias. El usuario y fecha de configuración BI no son sus editores.
+
 function referencePriceWithAudit(reference) {
   return { ...reference, changeAudit: { available: false, source: 'Vertical', reason: 'not_recorded',
     changedBy: null, changedAt: null } };
 }
 
-// Enriquecer la referencia con información de auditoría no cambia su contenido
-// de negocio ni debe activar el aviso. Se conserva el aviso previamente guardado.
 const referenceMaterialSql = expression => `(SELECT COALESCE(jsonb_agg(ref - 'changeAudit'
   ORDER BY ref->'id',ref->'amount',ref->'description',ref->'notes'),'[]'::jsonb)
   FROM jsonb_array_elements(${expression}) ref)`;
-// Un corte acotado descubre servicios con movimiento sin ficha visible en V_IT.
-// No presupone que todo artículo de venta sea un servicio.
+
 const DISCOVERY_SQL = `WITH Codes AS (
   SELECT DISTINCT l.ItemCode FROM SOLN l JOIN SO s ON s.SONum=l.SONum
     WHERE s.CreatedOn>=@sinceDate AND l.ItemCode LIKE 'SER%'
@@ -171,7 +167,7 @@ const CATALOG_TARIFF_COUNTS = `(SELECT COUNT(*) FROM bi_honorarios_tariffs t
   WHERE t.item_code=c.item_code AND t.active=true AND t.amount>0) approved_tariff_count`;
 
 function catalogRow(row) {
-  const scopeExcluded = row.scope_excluded || isExcludedHonorariosService(row);
+  const scopeExcluded = isHonorariosScopeExcluded(row);
   const scope = classifyProfessionalCandidate({ ...row, referencePrices: row.reference_prices });
   const approvedTariffCount = Number(row.approved_tariff_count || 0);
   return { itemCode: row.item_code, name: row.name, description: row.description, groupName: row.group_name,
@@ -214,7 +210,14 @@ function normalizeSource(items, references, discovered = []) {
     if (!code || source.has(code)) continue;
     source.set(code, { itemCode: code, name: referenceMap.get(code)?.[0]?.description || code,
       description: referenceMap.get(code)?.[0]?.description || '', groupName: '', active: true,
-      sourceMetadata: { itemType: 'S', source: 'Movimiento clínico; ficha pendiente de conciliación' } });
+      sourceMetadata: { itemType: 'S', source: 'Movimiento clínico; ficha pendiente de conciliación', masterRecordAvailable: false } });
+  }
+
+  for (const [code, prices] of referenceMap) {
+    if (source.has(code)) continue;
+    const description = prices.find(price => String(price.description).trim())?.description || '';
+    source.set(code, { itemCode: code, name: description || code, description, groupName: '', active: true,
+      sourceMetadata: { itemType: 'S', source: 'UT_Honorarios', masterRecordAvailable: false } });
   }
   for (const entry of source.values()) {
     entry.referencePrices = (referenceMap.get(entry.itemCode) || []).sort((a, b) => Number(a.id) - Number(b.id));
@@ -224,7 +227,7 @@ function normalizeSource(items, references, discovered = []) {
     if (entry.referencePrices.some(ref => ref.amount === null || ref.amount <= 0)) entry.referenceWarnings.push("Revisa el precio de referencia: debe ser mayor a cero.");
     if (entry.referencePrices.some(ref => ref.amount > 0 && ref.amount <= 1)) entry.referenceWarnings.push("El precio de referencia es de $1 o menos. Confirma el importe antes de pagar.");
     if (entry.referencePrices.some(ref => String(ref.notes).trim())) entry.referenceWarnings.push("Revisa las notas del precio de referencia antes de fijar la tarifa.");
-    entry.scopeExcluded = isExcludedHonorariosService(entry.itemCode, entry.groupName, entry.name);
+    entry.scopeExcluded = isExcludedHonorariosService(entry);
     entry.modality = CONTACT_CENTER_CODES.has(entry.itemCode) ? 'contact_center' : 'presencial';
   }
   return [...source.values()];
@@ -235,7 +238,17 @@ async function readSyncState() {
   const { rows } = await getDb().pool.query('SELECT * FROM bi_honorarios_catalog_sync WHERE singleton=true');
   const row = rows[0] || {};
   return { lastAttempt: row.last_attempt || null, lastSuccess: row.last_success || null,
-    lastError: row.last_error || null, sourceCount: Number(row.source_count || 0) };
+    lastError: row.last_error || null, sourceCount: Number(row.source_count || 0), intervalMinutes: catalogSyncMinutes() };
+}
+
+function catalogSyncMinutes() {
+  const configured = Number(process.env.HONORARIOS_CATALOG_SYNC_MINUTES || 30);
+  return Number.isFinite(configured) ? Math.max(1, configured) : 30;
+}
+
+function isCatalogSyncDue(state, now = Date.now()) {
+  const lastAttempt = state?.lastAttempt && new Date(state.lastAttempt).getTime();
+  return !Number.isFinite(lastAttempt) || now - lastAttempt >= catalogSyncMinutes() * 60000;
 }
 
 async function performSync(remotePool) {
@@ -255,7 +268,7 @@ async function performSync(remotePool) {
     try {
       await client.query('BEGIN');
       await client.query("SELECT pg_advisory_xact_lock(hashtext('bi_honorarios_catalog_sync'))");
-      // Una sola escritura evita un viaje a PostgreSQL por cada concepto.
+       
       const entries = source.map(entry => ({ item_code: entry.itemCode, name: entry.name,
         description: entry.description, group_name: entry.groupName, source_active: entry.active,
         source_metadata: entry.sourceMetadata, reference_prices: entry.referencePrices,
@@ -269,13 +282,22 @@ async function performSync(remotePool) {
           source_active boolean,source_metadata jsonb,reference_prices jsonb,reference_warnings jsonb,
           scope_excluded boolean,modality text)
         ON CONFLICT(item_code) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.description,
-          group_name=EXCLUDED.group_name,source_active=EXCLUDED.source_active,source_metadata=EXCLUDED.source_metadata,
+          group_name=EXCLUDED.group_name,
+          source_active=CASE WHEN EXCLUDED.source_metadata->>'masterRecordAvailable'='false'
+            THEN bi_honorarios_catalog.source_active ELSE EXCLUDED.source_active END,
+          source_metadata=EXCLUDED.source_metadata,
+          status=CASE WHEN bi_honorarios_catalog.scope_excluded=true AND EXCLUDED.scope_excluded=false
+            AND bi_honorarios_catalog.status='EXCLUIDO' AND bi_honorarios_catalog.revision=0
+            AND bi_honorarios_catalog.updated_by IS NULL AND bi_honorarios_catalog.reason=''
+            AND NOT EXISTS (SELECT 1 FROM bi_honorarios_catalog_history h
+              WHERE h.item_code=bi_honorarios_catalog.item_code AND h.entity_type='CONFIG')
+            THEN 'PENDIENTE' ELSE bi_honorarios_catalog.status END,
           reference_changed=bi_honorarios_catalog.reference_changed
             OR ${referenceMaterialSql('bi_honorarios_catalog.reference_prices')}<>${referenceMaterialSql('EXCLUDED.reference_prices')},
           reference_prices=EXCLUDED.reference_prices,reference_warnings=EXCLUDED.reference_warnings,
           scope_excluded=EXCLUDED.scope_excluded,last_seen_at=now()`, [JSON.stringify(entries)]);
-      // Sólo una baja explícita de V_IT cambia source_active. Ausencia de ficha y
-      // consulta incompleta no eliminan configuración ni precios históricos.
+       
+      // consulta incompleta no eliminan configuración ni precios históricos
       await client.query('UPDATE bi_honorarios_catalog_sync SET last_success=now(),last_error=NULL,source_count=$1 WHERE singleton=true', [source.length]);
       await client.query('COMMIT');
     } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -295,16 +317,12 @@ function syncCatalog(remotePool) {
 
 async function syncIfDue(remotePool) {
   const state = await readSyncState();
-  const configured = Number(process.env.HONORARIOS_CATALOG_SYNC_MINUTES || 30);
-  const minutes = Number.isFinite(configured) ? Math.max(1, configured) : 30;
-  if (!state.lastAttempt || Date.now() - new Date(state.lastAttempt).getTime() >= minutes * 60000) {
-    try { await syncCatalog(remotePool); } catch { /* El catálogo guardado sigue disponible con su error de sincronización. */ }
+  if (isCatalogSyncDue(state)) {
+    try { await syncCatalog(remotePool); } catch {   }
   }
   return readSyncState();
 }
 
-// Las lecturas y decisiones usan el catálogo guardado. La actualización explícita
-// obtiene nuevos precios de Vertical; sólo la primera consulta necesita inicializarlo.
 async function ensureCatalogReady(remotePool) {
   const state = await readSyncState();
   return state.lastSuccess ? state : syncCatalog(remotePool);
@@ -349,8 +367,7 @@ async function listCatalog(options = {}, remotePool) {
 
 async function readCatalogExport(options = {}) {
   const { values, where } = catalogQueryFilters(options);
-  // Una sola sentencia mantiene catálogo y tarifas en el mismo snapshot de BI,
-  // sin inicializar estructuras ni sincronizar fuentes durante la exportación.
+
   const { rows } = await getDb().pool.query(`
     SELECT statement_timestamp() AS snapshot_at,
       COALESCE(jsonb_agg(to_jsonb(export_item) ORDER BY export_item.item_code),'[]'::jsonb) AS items
@@ -382,7 +399,7 @@ async function saveCatalogConfig(input, user) {
     const previous = prior.rows[0];
     if (!previous) throw fail("El servicio aún no aparece en la lista. Busca servicios nuevos antes de configurarlo.", 404);
     if (previous.revision !== config.expectedRevision) throw fail('Otra persona modificó este servicio. Actualiza el catálogo.', 409);
-    if (config.status === 'INCLUIDO' && (previous.scope_excluded || isExcludedHonorariosService(config.itemCode, previous.group_name, previous.name))) {
+    if (config.status === 'INCLUIDO' && isHonorariosScopeExcluded(previous)) {
       throw fail("Este cargo, producto o paquete no se puede incluir en el pago a médicos.");
     }
     if (config.status === 'INCLUIDO' && !previous.source_active) throw fail("Este servicio está inactivo. Puedes consultar su historial, pero no incluirlo en nuevos pagos.");
@@ -414,11 +431,11 @@ async function saveTariff(input, user) {
   const client = await getDb().pool.connect();
   try {
     await client.query('BEGIN');
-    // Una cerradura por concepto serializa todas sus combinaciones y vigencias.
+     
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`honorarios-catalog:${tariff.itemCode}`]);
     const catalog = await client.query('SELECT * FROM bi_honorarios_catalog WHERE item_code=$1 FOR UPDATE', [tariff.itemCode]);
     if (!catalog.rows[0]) throw fail('El servicio no está en el catálogo.', 404);
-    if (tariff.active && (catalog.rows[0].scope_excluded || isExcludedHonorariosService(catalog.rows[0]))) throw fail('El concepto está fuera del alcance de honorarios.');
+    if (tariff.active && isHonorariosScopeExcluded(catalog.rows[0])) throw fail('El concepto está fuera del alcance de honorarios.');
     if (tariff.active && !catalog.rows[0].source_active) throw fail('El servicio está inactivo en Vertical.');
     const existing = await client.query('SELECT * FROM bi_honorarios_tariffs WHERE item_code=$1 FOR UPDATE', [tariff.itemCode]);
     const previous = existing.rows.find(row => Number(row.id) === tariff.id);
@@ -486,7 +503,9 @@ function enrichCandidate(candidate, config, tariffs) {
   const providerId = candidate.MedicoId ?? candidate.providerId ?? candidate.PRNum;
   const role = candidate.RolMedico || candidate.role || candidate.ProviderRole || null;
   const serviceDate = candidate.FechaAtencion || candidate.serviceDate || candidate.ServiceDate;
-  const hardExcluded = config?.scopeExcluded || isExcludedHonorariosService(config) || isExcludedHonorariosService(candidate);
+  const sameServiceConfig = config?.itemCode === itemCode ? config : null;
+  const candidateScope = sameServiceConfig ? { ...candidate, referencePrices: sameServiceConfig.referencePrices } : candidate;
+  const hardExcluded = isHonorariosScopeExcluded(config) || isHonorariosScopeExcluded(candidateScope);
   const tariffResult = hardExcluded ? { tariff: null, reason: null } : resolveTariff({ itemCode, providerId, role, serviceDate }, tariffs);
   const tariff = tariffResult.tariff;
   const scope = classifyProfessionalCandidate(config || candidate);
@@ -568,4 +587,4 @@ async function discoverCandidates(candidates) {
 module.exports = { ensureSchema, syncCatalog, syncIfDue, readSyncState, listCatalog, readCatalogExport, saveCatalogConfig,
   listTariffs, saveTariff, getCatalogHistory, resolveTariff, resolveTariffs, loadPricingContext, enrichCandidates, enrichCandidate,
   ensureCatalogReady, getCatalogItem, validateConfig, validateTariff, tariffOverlaps, normalizeSource, isExcludedHonorariosService,
-  discoverCandidates,dateOnly, CATALOG_SQL, REFERENCE_SQL, DISCOVERY_SQL };
+  discoverCandidates,dateOnly, isCatalogSyncDue, CATALOG_SQL, REFERENCE_SQL, DISCOVERY_SQL };

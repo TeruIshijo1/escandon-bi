@@ -56,7 +56,7 @@ export default function ResumenMaestro() {
   
   const [fechaDesde, setFechaDesde] = useState(getTodayStr());
   const [fechaHasta, setFechaHasta] = useState(getTodayStr());
-  const [almacen, setAlmacen] = useState(''); // Empty means all
+  const [almacen, setAlmacen] = useState('');  
 
   const [colFilters, setColFilters] = useState({});
   const [page, setPage] = useState(1);

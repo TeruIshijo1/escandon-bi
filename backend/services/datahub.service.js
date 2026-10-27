@@ -1,7 +1,5 @@
-/**
- * datahub.service.js — Motor de integración y mapeo de datos
- * Hospital Escandón BI v2.0
- */
+
+
 'use strict';
 
 const { getDb } = require('../config/db');
@@ -12,9 +10,6 @@ const knex = require('knex');
 
 class DataHubService {
 
-    /**
-     * Crea una instancia de conexión para bases de datos externas
-     */
     async getExternalConnection(connector) {
         const config = JSON.parse(connector.Configuracion);
         
@@ -36,9 +31,6 @@ class DataHubService {
         });
     }
 
-    /**
-     * Escanea un origen (Excel o SQL) y registra sus entidades (hojas/tablas)
-     */
     async scanFileSource(connectorId) {
         const db = getDb();
         const connector = await db.prepare('SELECT * FROM DataConnectors WHERE ConnectorId = ?').get(connectorId);
@@ -75,7 +67,7 @@ class DataHubService {
                 // Listar tablas (query genérica para INFORMATION_SCHEMA)
                 const tables = await externalDb('INFORMATION_SCHEMA.TABLES')
                     .select('TABLE_NAME as name')
-                    .where('TABLE_SCHEMA', 'public') // o 'dbo' para MSSQL
+                    .where('TABLE_SCHEMA', 'public')  
                     .orWhere('TABLE_SCHEMA', 'dbo');
 
                 for (const table of tables) {
@@ -103,9 +95,6 @@ class DataHubService {
         return entities;
     }
 
-    /**
-     * Obtiene el valor de una métrica basada en su mapeo
-     */
     async getMetricValue(seccionUI) {
         const db = getDb();
         const mapping = await db.prepare(`
@@ -119,7 +108,7 @@ class DataHubService {
         if (!mapping || !mapping.Tipo) return null;
 
         try {
-            if (mapping.Tipo === 'SQLITE') return null; // Fallback al router
+            if (mapping.Tipo === 'SQLITE') return null;  
 
             if (mapping.Tipo === 'EXCEL' || mapping.Tipo === 'CSV') {
                 return await this.calculateFromExcel(mapping);
@@ -197,7 +186,7 @@ class DataHubService {
                     result = await externalDb(table).count(`${column} as val`).first();
                     break;
                 case 'LAST':
-                    // Asumimos que hay una columna de fecha o ID para ordenar, si no, tomamos el último registro físico
+                     
                     result = await externalDb(table).select(`${column} as val`).limit(1).first();
                     break;
                 default:

@@ -1,4 +1,4 @@
-/** Barra de navegación con pulso decorativo del Hospital Escandón. */
+ 
 import { useState, useEffect, useRef, useId } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +11,7 @@ const ROUTE_TITLES = {
   '/dashboard/area':        'Tablero de Área',
   '/auditoria/inventarios': 'Inventarios y Consumos Clínicos',
   '/auditoria/cargos':      'Discrepancias en Consumos',
+  '/auditoria/ventas-hospitalarias': 'Ventas hospitalarias',
   '/estadisticas':          'Estadísticas',
   '/admin/usuarios':        'Gestión de Usuarios',
   '/admin/auditoria-log':   'Historial de actividad',

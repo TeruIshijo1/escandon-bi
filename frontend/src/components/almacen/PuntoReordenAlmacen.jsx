@@ -5,7 +5,7 @@ import { authHeaders } from '../../api/auth';
 import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function PuntoReordenAlmacen() {
-  const [activeTab, setActiveTab] = useState('reorden'); // 'reorden' | 'pedidos' | 'ml_dataset'
+  const [activeTab, setActiveTab] = useState('reorden');  
   const [items, setItems] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,15 +16,15 @@ export default function PuntoReordenAlmacen() {
   const [mlDataset, setMlDataset] = useState([]);
   const [mlHistory, setMlHistory] = useState([]);
   const [mlPredictions, setMlPredictions] = useState([]);
-  const [mlViewMode, setMlViewMode] = useState('today'); // 'today' | 'history' | 'predictions'
+  const [mlViewMode, setMlViewMode] = useState('today');  
   const [runningMLPredictions, setRunningMLPredictions] = useState(false);
   const [loadingML, setLoadingML] = useState(false);
   const [syncingML, setSyncingML] = useState(false);
-  const [mlRiskFilter, setMlRiskFilter] = useState('ALL'); // ALL | CRITICO | ALTO | MEDIO | BAJO
+  const [mlRiskFilter, setMlRiskFilter] = useState('ALL');  
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | CRITICO | REORDEN | OPTIMO | CON_PEDIDO | CON_NOTA
+  const [statusFilter, setStatusFilter] = useState('ALL');  
 
   // Modal para editar Min/Max, Notita y Solicitud Compra
   const [editingItem, setEditingItem] = useState(null);
@@ -38,7 +38,6 @@ export default function PuntoReordenAlmacen() {
   const [inlineEditCode, setInlineEditCode] = useState(null);
   const [inlineSolicitudVal, setInlineSolicitudVal] = useState('');
 
-  // Modal para ver detalle de Pedidos SAP de un SKU
   const [selectedItemOrders, setSelectedItemOrders] = useState(null);
 
   useEscapeKey(() => setEditingItem(null), !!editingItem);
@@ -411,7 +410,6 @@ export default function PuntoReordenAlmacen() {
     });
   }, [items, searchTerm, statusFilter]);
 
-  // KPIs
   const stats = useMemo(() => {
     let reordenCount = 0;
     let criticoCount = 0;
@@ -708,7 +706,6 @@ export default function PuntoReordenAlmacen() {
         </div>
       )}
 
-      {/* KPI Cards Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         
         <div className="reorder-kpi-card" style={{ borderTop: '4px solid #ef4444' }}>
@@ -894,7 +891,6 @@ export default function PuntoReordenAlmacen() {
                           {item.CalculoPromedio}
                         </td>
 
-                        {/* Solicitud Compra (Verde destacado como en Excel, editable por el usuario) */}
                         <td 
                           style={{ 
                             padding: '0.5rem 0.75rem', 
@@ -977,7 +973,6 @@ export default function PuntoReordenAlmacen() {
                           )}
                         </td>
 
-                        {/* Pedidos SAP en Curso (Crucial para evitar duplicados en el turno tarde) */}
                         <td style={{ padding: '0.75rem 1rem' }}>
                           {hasPedidos ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -1056,7 +1051,6 @@ export default function PuntoReordenAlmacen() {
         </div>
       )}
 
-      {/* Pestaña 2: Módulo de Pedidos y Solicitudes SAP en Curso */}
       {activeTab === 'pedidos' && (
         <div style={{ background: 'var(--color-bg-white, white)', borderRadius: '14px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid var(--border-color, #e2e8f0)', padding: '1.5rem' }}>
           
@@ -1345,7 +1339,7 @@ export default function PuntoReordenAlmacen() {
               Cargando datos...
             </div>
           ) : mlViewMode === 'today' ? (
-            /* RENDER SNAPSHOT TAB */
+             
             filteredMLDataset.length === 0 ? (
               <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)', background: 'var(--color-bg-base, #f8fafc)', borderRadius: '10px' }}>
                 No se encontraron registros en el inventario de hoy.
@@ -1429,7 +1423,7 @@ export default function PuntoReordenAlmacen() {
               </div>
             )
           ) : mlViewMode === 'history' ? (
-            /* RENDER HISTORY TAB */
+             
             filteredMLHistory.length === 0 ? (
               <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)', background: 'var(--color-bg-base, #f8fafc)', borderRadius: '10px' }}>
                 No hay registros en el historial de consumo para el filtro seleccionado.
@@ -1532,7 +1526,7 @@ export default function PuntoReordenAlmacen() {
               </div>
             )
           ) : (
-            /* RENDER PREDICTIONS TAB */
+             
             filteredMLPredictions.length === 0 ? (
               <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)', background: 'var(--color-bg-base, #f8fafc)', borderRadius: '10px' }}>
                 No hay pronósticos disponibles. Haz clic en "Calcular Alertas de Desabasto (IA)" para generarlos.
@@ -1578,8 +1572,6 @@ export default function PuntoReordenAlmacen() {
                       const outOfStockDateStr = row.fecha_desabasto ? new Date(row.fecha_desabasto).toLocaleString('es-MX') : null;
                       const estAgotDateStr = row.fecha_estimada_agotamiento ? new Date(row.fecha_estimada_agotamiento).toLocaleDateString('es-MX') : null;
 
-                      // Para items YA EN DESABASTO, mostrar la fecha en la que se acabó (nunca un pronóstico);
-                      // para los demás, la fecha estimada en que se agotará el stock
                       const isYaDesabasto = row.riesgo_ml === 'YA EN DESABASTO';
                       const desabastoDate = outOfStockDateStr || lastMovDateStr;
                       const daysRemainingNum = Number(row.dias_stock_restante);
@@ -1648,7 +1640,6 @@ export default function PuntoReordenAlmacen() {
         </div>
       )}
 
-      {/* Modal Editar Notita / Min / Max */}
       {editingItem && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'white', padding: '2rem', borderRadius: '16px', width: '90%', maxWidth: '520px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>

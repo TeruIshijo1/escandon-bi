@@ -1,13 +1,10 @@
-/* ═══════════════════════════════════════════════════════════════
-   Hospital Escandón — Design System v4.0
-   Rediseño premium · Tipografía con carácter · Profundidad atmosférica
-═══════════════════════════════════════════════════════════════ */
+
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/* ── Tokens de Color ─────────────────────────────────────────── */
+/* Tokens de Color */
 :root {
-  /* Paleta institucional (intacta) */
+  
   --color-azul-fuerte:      #004687;
   --color-azul-claro:       #0088C9;
   --color-azul-claro-rgb:   0, 136, 201;
@@ -15,12 +12,12 @@
   --color-verde-e:          #00974A;
   --color-verde-e-rgb:      0, 151, 74;
 
-  /* Acento cálido (nuevo) */
+  
   --color-accent-warm:      #E8853D;
   --color-accent-warm-rgb:  232, 133, 61;
   --color-accent-warm-soft: rgba(232, 133, 61, 0.12);
 
-  /* Fondos estructurales — con tint azul sutil */
+  
   --color-bg-base:      #F2F5FA;
   --color-bg-white:     #FFFFFF;
   --color-bg-sidebar:   #004687;
@@ -31,13 +28,13 @@
   --sub-bg:             #F8FAFC;
   --card-sub-bg:        #F8FAFC;
 
-  /* Gradientes */
+  
   --gradient-dash:      linear-gradient(135deg, #004687 0%, #0077B6 100%);
   --gradient-hero:      linear-gradient(160deg, #002E57 0%, #004687 40%, #005FA9 100%);
   --gradient-success:   linear-gradient(135deg, #00974A 0%, #00c060 100%);
   --gradient-header:    linear-gradient(135deg, #003B73 0%, #004687 50%, #0077B6 100%);
 
-  /* Glassmorphism */
+  
   --glass-bg:           rgba(255, 255, 255, 0.10);
   --glass-bg-strong:    rgba(255, 255, 255, 0.18);
   --glass-border:       rgba(255, 255, 255, 0.22);
@@ -46,19 +43,19 @@
   --glass-dark-bg:      rgba(0, 0, 0, 0.12);
   --glass-dark-border:  rgba(255, 255, 255, 0.10);
 
-  /* Tipografía — CON CARÁCTER */
+  
   --font-display:       'Plus Jakarta Sans', system-ui, sans-serif;
   --font-body:          'DM Sans', system-ui, sans-serif;
   --font-mono:          'JetBrains Mono', 'Fira Code', monospace;
 
-  /* Estructura Navbar y Tabla */
+  
   --navbar-bg:          rgba(255, 255, 255, 0.85);
   --navbar-border:      rgba(0, 70, 135, 0.08);
   --table-border:       rgba(0, 46, 87, 0.05);
   --table-row-even-bg:  rgba(0, 46, 87, 0.015);
   --table-row-hover-bg: rgba(0, 136, 201, 0.03);
 
-  /* Espaciado */
+  
   --sidebar-width:      210px;
   --navbar-height:      58px;
   --radius-xs:          4px;
@@ -68,7 +65,7 @@
   --radius-xl:          28px;
   --radius-pill:        100px;
 
-  /* Sombras — sistema escalonado */
+  
   --shadow-xs:          0 1px 2px rgba(0, 30, 60, 0.04);
   --shadow-sm:          0 1px 3px rgba(0, 30, 60, 0.06), 0 1px 2px rgba(0, 30, 60, 0.04);
   --shadow-md:          0 4px 14px rgba(0, 30, 60, 0.08);
@@ -79,36 +76,36 @@
   --shadow-glow-green:  0 0 20px rgba(0, 151, 74, 0.25);
   --shadow-inner:       inset 0 1px 3px rgba(0, 30, 60, 0.08);
 
-  /* Transiciones */
+  
   --ease-out-expo:      cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring:        cubic-bezier(0.34, 1.56, 0.64, 1);
   --transition-fast:    150ms var(--ease-out-expo);
   --transition-base:    280ms var(--ease-out-expo);
   --transition-slow:    450ms var(--ease-out-expo);
 
-  /* Texto */
+  
   --text-primary:       #0F1A2E;
   --text-secondary:     #3D4F65;
   --text-muted:         #7B8DA0;
   --text-on-dark:       #FFFFFF;
   --text-on-dark-muted: rgba(255,255,255,0.68);
 
-  /* Estados */
+  
   --color-success:      #00974A;
   --color-warning:      #E8853D;
   --color-danger:       #DC2626;
   --color-info:         #0088C9;
 
-  /* Glow IA */
+  
   --glow-ai:            0 0 24px rgba(0,151,74,0.40), 0 0 64px rgba(0,151,74,0.12);
 
-  /* Scrollbars */
+  
   --scrollbar-track:        rgba(0, 46, 87, 0.05);
   --scrollbar-thumb:        #64748B;
   --scrollbar-thumb-hover:  #334155;
   --scrollbar-thumb-active: #0F172A;
 }
-/* ── MODO OSCURO (Variables del Tema) ─────────────────────────── */
+/* MODO OSCURO (Variables del Tema) */
 [data-theme="dark"] {
   --color-bg-base:      #080E1E;
   --color-bg-white:     #0F172A;
@@ -154,12 +151,12 @@
   color-scheme: dark;
 }
 
-/* ── Transición suave para cambio de tema ─────────────────────── */
+/* Transición suave para cambio de tema */
 *, *::before, *::after {
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease, box-shadow 0.3s ease, fill 0.2s ease;
 }
 
-/* ▸ background: white / #FFFFFF / #fff / rgb(255, 255, 255) */
+
 [data-theme="dark"] [style*="background"][style*="white"],
 [data-theme="dark"] [style*="background"][style*="255, 255, 255"],
 [data-theme="dark"] [style*="background"][style*="255,255,255"],
@@ -168,7 +165,7 @@
   background: var(--color-bg-white) !important;
 }
 
-/* ▸ background: #F8FAFC / #FAFBFD / #F7FAFC / #F1F5F9 / #EDF2F7 and parsed rgb variants */
+
 [data-theme="dark"] [style*="background"][style*="248, 250, 252"],
 [data-theme="dark"] [style*="background"][style*="248,250,252"],
 [data-theme="dark"] [style*="background"][style*="250, 251, 253"],
@@ -192,23 +189,21 @@
   background: var(--surface-1) !important;
 }
 
-/* ▸ background: #e2e8f0 (badges, tags, pills) */
+
 [data-theme="dark"] [style*="background"][style*="#e2e8f0"],
 [data-theme="dark"] [style*="background"][style*="#E2E8F0"] {
   background: rgba(255, 255, 255, 0.1) !important;
   color: #CBD5E1 !important;
 }
 
-/* ▸ .lote-badge específico */
+
 [data-theme="dark"] .lote-badge {
   background: rgba(59, 130, 246, 0.18) !important;
   color: #93C5FD !important;
   border: 1px solid rgba(59, 130, 246, 0.25);
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Colores de texto oscuros (invertir a claro)
-   ───────────────────────────────────────────────────────────────── */
+
 
 /* ▸ color: #004687 (azul institucional en texto) */
 [data-theme="dark"] [style*="color: #004687"],
@@ -216,7 +211,7 @@
   color: #60A5FA !important;
 }
 
-/* ▸ Textos negros/oscuros → --text-primary */
+
 [data-theme="dark"] [style*="color: #0D1B2A"],
 [data-theme="dark"] [style*="color:#0D1B2A"],
 [data-theme="dark"] [style*="color: #0d1b2a"],
@@ -230,7 +225,7 @@
   color: var(--text-primary) !important;
 }
 
-/* ▸ Textos grises medios → --text-secondary */
+
 [data-theme="dark"] [style*="color: #3D4F65"],
 [data-theme="dark"] [style*="color: #3d4f65"],
 [data-theme="dark"] [style*="color: #475569"],
@@ -245,7 +240,7 @@
   color: var(--text-secondary) !important;
 }
 
-/* ▸ Textos grises claros → --text-muted */
+
 [data-theme="dark"] [style*="color: #7B8DA0"],
 [data-theme="dark"] [style*="color: #7b8da0"],
 [data-theme="dark"] [style*="color: #8A97A8"],
@@ -257,9 +252,7 @@
   color: var(--text-muted) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Bordes hardcodeados
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="border"][style*="226, 232, 240"],
 [data-theme="dark"] [style*="border"][style*="226,232,240"],
 [data-theme="dark"] [style*="border"][style*="203, 213, 225"],
@@ -274,9 +267,7 @@
 }
 
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Inputs, Selects, Textareas (incluye inline)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] input,
 [data-theme="dark"] select,
 [data-theme="dark"] textarea {
@@ -293,11 +284,9 @@
   color: var(--text-primary);
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Tablas (premium-table, audit-table, y genéricas)
-   ───────────────────────────────────────────────────────────────── */
 
-/* Thead con fondo gris claro (#F8FAFC / #F1F5F9) usado en farmacia, almacén, etc. */
+
+
 [data-theme="dark"] thead[style*="background: #F8FAFC"],
 [data-theme="dark"] thead[style*="background:#F8FAFC"],
 [data-theme="dark"] thead[style*="background: #f8fafc"],
@@ -340,9 +329,7 @@
   color: var(--text-secondary) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Badges de estado (DEVUELTO, PENDIENTE, etc.)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="background: #D1FAE5"] {
   background: rgba(16, 185, 129, 0.15) !important;
   color: #6EE7B7 !important;
@@ -367,7 +354,7 @@
   background: var(--surface-1) !important;
 }
 
-/* Cama badges, código badges, etc. */
+/* Cama badges, código badges, etc */
 [data-theme="dark"] span[style*="background"][style*="241, 245, 249"],
 [data-theme="dark"] span[style*="background"][style*="241,245,249"] {
   background: var(--surface-2) !important;
@@ -375,9 +362,7 @@
 }
 
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Error/Warning alerts
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="background: #FEF2F2"],
 [data-theme="dark"] [style*="background:#FEF2F2"] {
   background: rgba(220, 38, 38, 0.1) !important;
@@ -388,9 +373,7 @@
   color: #FBBF24 !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Pagination footer & buttons
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] button[style*="background: white"],
 [data-theme="dark"] button[style*="background:white"] {
   background: var(--color-bg-white) !important;
@@ -407,16 +390,12 @@
   opacity: 0.4;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Modals & Overlays
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="background: rgba(15, 26, 46, 0.4)"] {
   background: rgba(0, 0, 0, 0.7) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Recharts (tooltips, grids, text)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] .recharts-default-tooltip {
   background-color: var(--color-bg-white) !important;
   border: 1px solid var(--navbar-border) !important;
@@ -439,9 +418,7 @@
   color: var(--text-secondary) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Scrollbar adaptativa
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -460,32 +437,24 @@
   background: var(--scrollbar-thumb-active);
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Sidebar (el fondo ya es oscuro, ajustar detalles)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] .sidebar {
   border-right: 1px solid rgba(255,255,255,0.04);
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Noise texture overlay (atenuar en dark)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] body::after {
   opacity: 0.008;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Gradientes de fondo (linear-gradient con colores claros)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="linear-gradient(135deg, #f8fafc"],
 [data-theme="dark"] [style*="linear-gradient(135deg, #F8FAFC"] {
   background: var(--surface-1) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Badges de éxito/advertencia adicionales
-   ───────────────────────────────────────────────────────────────── */
-/* Success green badges */
+
+
 [data-theme="dark"] [style*="background"][style*="236, 253, 245"],
 [data-theme="dark"] [style*="background"][style*="236,253,245"],
 [data-theme="dark"] [style*="background"][style*="240, 253, 244"],
@@ -494,7 +463,7 @@
 [data-theme="dark"] [style*="background"][style*="#f0fdf4"] {
   background: rgba(16, 185, 129, 0.15) !important;
 }
-/* Info/Blue badges */
+
 [data-theme="dark"] [style*="background"][style*="239, 246, 255"],
 [data-theme="dark"] [style*="background"][style*="239,246,255"],
 [data-theme="dark"] [style*="background"][style*="224, 242, 254"],
@@ -506,7 +475,7 @@
 [data-theme="dark"] [style*="background"][style*="#e0e7ff"] {
   background: rgba(59, 130, 246, 0.15) !important;
 }
-/* Warning badges (#fffbeb, #fef3c7) */
+
 [data-theme="dark"] [style*="background"][style*="255, 251, 235"],
 [data-theme="dark"] [style*="background"][style*="255,251,235"],
 [data-theme="dark"] [style*="background"][style*="254, 243, 199"],
@@ -515,7 +484,7 @@
 [data-theme="dark"] [style*="background"][style*="#fef3c7"] {
   background: rgba(245, 158, 11, 0.15) !important;
 }
-/* Error badges (#fef2f2, #fee2e2) */
+
 [data-theme="dark"] [style*="background"][style*="254, 242, 242"],
 [data-theme="dark"] [style*="background"][style*="254,242,242"],
 [data-theme="dark"] [style*="background"][style*="254, 226, 226"],
@@ -526,15 +495,13 @@
 }
 
 
-/* Indigo/purple badges */
+
 [data-theme="dark"] [style*="background: linear-gradient(135deg, #e0e7ff, #c7d2fe)"] {
   background: rgba(99, 102, 241, 0.15) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Productividad por Especialidades (Excel Style Rows)
-   ───────────────────────────────────────────────────────────────── */
-/* Quirófano (Light Blue → Dark Blue) */
+
+
 [data-theme="dark"] [style*="background"][style*="230, 240, 250"],
 [data-theme="dark"] [style*="background"][style*="230,240,250"],
 [data-theme="dark"] [style*="background"][style*="#E6F0FA"],
@@ -548,7 +515,7 @@
   border-color: rgba(71, 132, 199, 0.3) !important;
 }
 
-/* Maternidad (Light Pink → Dark Burgundy) */
+
 [data-theme="dark"] [style*="background"][style*="252, 231, 235"],
 [data-theme="dark"] [style*="background"][style*="252,231,235"],
 [data-theme="dark"] [style*="background"][style*="#FCE7EB"],
@@ -562,7 +529,7 @@
   border-color: rgba(246, 188, 199, 0.25) !important;
 }
 
-/* Endoscopías (Light Yellow → Dark Amber) */
+
 [data-theme="dark"] [style*="background"][style*="253, 242, 226"],
 [data-theme="dark"] [style*="background"][style*="253,242,226"],
 [data-theme="dark"] [style*="background"][style*="#FDF2E2"],
@@ -576,7 +543,7 @@
   border-color: rgba(245, 213, 165, 0.25) !important;
 }
 
-/* Gastroenterología (Light Green → Dark Green) */
+
 [data-theme="dark"] [style*="background"][style*="234, 246, 232"],
 [data-theme="dark"] [style*="background"][style*="234,246,232"],
 [data-theme="dark"] [style*="background"][style*="#EAF6E8"],
@@ -590,16 +557,14 @@
   border-color: rgba(196, 230, 190, 0.25) !important;
 }
 
-/* Indigo row (TOTAL) */
+
 [data-theme="dark"] [style*="background"][style*="224, 231, 255"],
 [data-theme="dark"] [style*="background"][style*="224,231,255"] {
   background: #141738 !important;
 }
 
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Modal overlays (rgba(0,0,0,0.5) pattern)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="background: rgba(0, 0, 0, 0.5)"],
 [data-theme="dark"] [style*="background: rgba(0,0,0,0.5)"],
 [data-theme="dark"] [style*="background:rgba(0,0,0,0.5)"],
@@ -607,9 +572,7 @@
   background: rgba(0, 0, 0, 0.75) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Botones con bordes y fondos claros
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] button[style*="border: 1px solid #CBD5E1"],
 [data-theme="dark"] button[style*="border: 1px solid #cbd5e1"],
 [data-theme="dark"] button[style*="border: 1px solid #E2E8F0"],
@@ -617,10 +580,8 @@
   border-color: var(--navbar-border) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Colores de texto específicos en data cells y títulos
-   ───────────────────────────────────────────────────────────────── */
-/* ▸ color: #004687 (azul institucional en texto) / rgb(0, 70, 135) */
+
+
 [data-theme="dark"] [style*="color"][style*="0, 70, 135"],
 [data-theme="dark"] [style*="color"][style*="0,70,135"],
 [data-theme="dark"] [style*="color"][style*="#004687"],
@@ -628,7 +589,7 @@
   color: #60A5FA !important;
 }
 
-/* ▸ Textos negros/oscuros → --text-primary (rgb(15, 23, 42) y rgb(13, 27, 42)) */
+
 [data-theme="dark"] [style*="color"][style*="15, 23, 42"],
 [data-theme="dark"] [style*="color"][style*="15,23,42"],
 [data-theme="dark"] [style*="color"][style*="13, 27, 42"],
@@ -640,7 +601,7 @@
   color: var(--text-primary) !important;
 }
 
-/* ▸ Textos grises medios → --text-secondary (rgb(30, 41, 59) y rgb(51, 65, 85)) */
+
 [data-theme="dark"] [style*="color"][style*="30, 41, 59"],
 [data-theme="dark"] [style*="color"][style*="30,41,59"],
 [data-theme="dark"] [style*="color"][style*="51, 65, 85"],
@@ -650,7 +611,7 @@
   color: var(--text-secondary) !important;
 }
 
-/* ▸ Textos grises claros → --text-muted (rgb(71, 85, 105), rgb(100, 116, 139), rgb(148, 163, 184)) */
+
 [data-theme="dark"] [style*="color"][style*="71, 85, 105"],
 [data-theme="dark"] [style*="color"][style*="71,85,105"],
 [data-theme="dark"] [style*="color"][style*="100, 116, 139"],
@@ -664,17 +625,13 @@
 }
 
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Filas alternadas de tabla con fondo blanco/#f8fafc
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="background: #ffffff"],
 [data-theme="dark"] [style*="background:#ffffff"] {
   background: var(--color-bg-white) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Líneas de borde (#e2e8f0, #cbd5e1, #f1f5f9)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="border-bottom: 1px solid #e2e8f0"],
 [data-theme="dark"] [style*="border-bottom: 1px solid #f1f5f9"],
 [data-theme="dark"] [style*="border-bottom: 2px solid #e2e8f0"],
@@ -690,18 +647,14 @@
   border-color: rgba(255, 255, 255, 0.06) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — CargosSAP / ResumenMaestro (thead con #004687)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] th[style*="background: #004687"],
 [data-theme="dark"] th[style*="background:#004687"] {
   background: #0B2447 !important;
   border-color: rgba(0, 136, 201, 0.3) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Tailwind utility class overrides (ReportesAlmacen)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] .bg-white {
   background-color: var(--color-bg-white) !important;
 }
@@ -736,9 +689,7 @@
   background-color: rgba(59, 130, 246, 0.08) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — LoginPage
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] .login-input-field {
   background-color: var(--surface-1) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
@@ -752,17 +703,13 @@
   color: var(--text-secondary) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — SinAcceso (error 403) page
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] div[style*="background: #FFFFFF"][style*="border: 1px solid rgba(0, 70, 135"] {
   background: var(--color-bg-white) !important;
   border-color: var(--navbar-border) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — AdminUsuarios: focus states, table rows, modals
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] .search-input-field,
 [data-theme="dark"] .custom-select-perfil,
 [data-theme="dark"] .edit-form-input,
@@ -785,9 +732,7 @@
   background-color: var(--table-row-hover-bg) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — AdminAuditoriaLog: tables, focus states
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] .audit-search-input:focus {
   background-color: var(--color-bg-white) !important;
   border-color: rgba(0, 136, 201, 0.4) !important;
@@ -799,16 +744,12 @@
   background-color: var(--table-row-hover-bg) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — InventarioFarmacia/InventarioAlmacen: table hover
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] tbody tr:hover {
   background-color: var(--table-row-hover-bg) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — DashboardDirectivo/DashboardArea: tab buttons
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] button[style*="background: white"][style*="color: #4A5568"],
 [data-theme="dark"] button[style*="background: white"][style*="color: #4a5568"] {
   background: var(--color-bg-white) !important;
@@ -816,47 +757,37 @@
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Estadisticas page: period filter capsules
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] button[style*="background: #FFFFFF"][style*="color: var(--color-azul-fuerte)"],
 [data-theme="dark"] [style*="background: #FFFFFF"][style*="color: var(--color-azul-fuerte)"] {
   background: var(--surface-2) !important;
   color: #60A5FA !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — CargosSAP/ResumenMaestro: row hover (#EFF6FF)
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] .table-row-hover:hover {
   background-color: var(--table-row-hover-bg) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — DashboardArea: reportes asignados card gradients
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="background: linear-gradient(135deg, white, #f3e8ff)"] {
   background: linear-gradient(135deg, var(--color-bg-white), rgba(139, 92, 246, 0.08)) !important;
   border-color: rgba(139, 92, 246, 0.2) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — GlobalFilterBar: quick date buttons
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] [style*="background: #F1F5F9"][style*="border: 1px solid #CBD5E1"] {
   background: var(--surface-1) !important;
   border-color: var(--navbar-border) !important;
   color: var(--text-secondary) !important;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — AIAssistant / AriaCopilotWidget
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] .ai-messages[style*="background: #FAFBFD"] {
   background: var(--color-bg-white) !important;
 }
 
-/* ── Reset Base ──────────────────────────────────────────────── */
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
@@ -877,7 +808,7 @@ body {
   position: relative;
 }
 
-/* Subtle noise texture overlay */
+
 body::after {
   content: '';
   position: fixed;
@@ -899,7 +830,7 @@ code, pre, .mono {
   font-family: var(--font-mono);
 }
 
-/* ── Layout Principal ────────────────────────────────────────── */
+
 .app-shell {
   display: flex;
   min-height: 100vh;
@@ -917,7 +848,7 @@ code, pre, .mono {
   animation: fadeIn 0.4s var(--ease-out-expo);
 }
 
-/* ── Sidebar ─────────────────────────────────────────────────── */
+
 .sidebar {
   position: fixed;
   left: 0;
@@ -932,7 +863,7 @@ code, pre, .mono {
   box-shadow: var(--shadow-sidebar);
 }
 
-/* Sutil diagonal pattern */
+
 .sidebar::before {
   content: '';
   position: absolute;
@@ -948,7 +879,7 @@ code, pre, .mono {
   z-index: 0;
 }
 
-/* Luminous right edge */
+
 .sidebar::after {
   content: '';
   position: absolute;
@@ -994,7 +925,7 @@ code, pre, .mono {
   transform: scale(1.05);
 }
 
-/* ── Brand Logo Badge (Pill Container) ────────────────────────── */
+
 .brand-logo-badge {
   background: #ffffff;
   border-radius: 9999px;
@@ -1023,7 +954,7 @@ code, pre, .mono {
   filter: contrast(102%) brightness(98%);
 }
 
-/* Estilo para Modo Oscuro — Capsula suave flotante con brillo institucional */
+
 [data-theme="dark"] .brand-logo-badge {
   background: rgba(255, 255, 255, 0.94);
   border-radius: 9999px;
@@ -1227,7 +1158,7 @@ code, pre, .mono {
   font-weight: 500;
 }
 
-/* ── Navbar ──────────────────────────────────────────────────── */
+
 .navbar {
   position: fixed;
   top: 0;
@@ -1245,7 +1176,7 @@ code, pre, .mono {
   box-shadow: 0 1px 8px rgba(0, 30, 60, 0.04);
 }
 
-/* ── Cards — Sistema Unificado ───────────────────────────────── */
+
 .glass-card {
   background: var(--glass-bg-strong);
   backdrop-filter: var(--glass-blur);
@@ -1267,7 +1198,7 @@ code, pre, .mono {
   border-color: rgba(0, 46, 87, 0.10);
 }
 
-/* ── Botones ─────────────────────────────────────────────────── */
+/* Botones */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1346,7 +1277,7 @@ code, pre, .mono {
 
 .btn-ghost::after { display: none; }
 
-/* ── KPI Cards ───────────────────────────────────────────────── */
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1371,7 +1302,7 @@ code, pre, .mono {
   border-color: rgba(0, 46, 87, 0.08);
 }
 
-/* Decorative watermark — uses the top border color */
+
 .kpi-card::after {
   content: '';
   position: absolute;
@@ -1428,7 +1359,7 @@ code, pre, .mono {
 .kpi-delta.down { color: var(--color-danger);  background: rgba(220,38,38,0.08); }
 .kpi-delta.flat { color: var(--text-muted);    background: rgba(0,46,87,0.05); }
 
-/* ── AI Assistant ────────────────────────────────────────────── */
+
 .ai-fab {
   position: fixed;
   bottom: 1.5rem;
@@ -1506,7 +1437,7 @@ code, pre, .mono {
   overflow: hidden;
 }
 
-/* Subtle pattern on AI header */
+
 .ai-panel-header::after {
   content: '';
   position: absolute;
@@ -1597,7 +1528,7 @@ code, pre, .mono {
   background: var(--surface-raised);
 }
 
-/* ── Tabla de Auditoría ──────────────────────────────────────── */
+/* Tabla de Auditoría */
 .audit-table {
   width: 100%;
   border-collapse: collapse;
@@ -1630,7 +1561,7 @@ code, pre, .mono {
   background: var(--table-row-hover-bg);
 }
 
-/* Alternating subtle tint */
+
 .audit-table tbody tr:nth-child(even) td {
   background: var(--table-row-even-bg);
 }
@@ -1669,7 +1600,7 @@ code, pre, .mono {
   box-shadow: inset 0 0 0 1px rgba(220,38,38,0.15);
 }
 
-/* ── Utilidades ──────────────────────────────────────────────── */
+
 .page-title {
   font-family: var(--font-display);
   font-size: 1.4rem;
@@ -1704,7 +1635,7 @@ code, pre, .mono {
 .mb-md       { margin-bottom: 1rem; }
 .p-md        { padding: 1.25rem; }
 
-/* ── Animations ──────────────────────────────────────────────── */
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -1725,7 +1656,7 @@ code, pre, .mono {
   100% { background-position: -200% 0; }
 }
 
-/* Stagger delays for list/grid animations */
+
 .stagger-1 { animation-delay: 0.05s; }
 .stagger-2 { animation-delay: 0.10s; }
 .stagger-3 { animation-delay: 0.15s; }
@@ -1733,7 +1664,7 @@ code, pre, .mono {
 .stagger-5 { animation-delay: 0.25s; }
 .stagger-6 { animation-delay: 0.30s; }
 
-/* ── Scrollbar Global ────────────────────────────────────────── */
+
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
@@ -1766,19 +1697,19 @@ code, pre, .mono {
   background-clip: padding-box;
 }
 
-/* ── Focus Visible ───────────────────────────────────────────── */
+
 :focus-visible {
   outline: 2px solid var(--color-azul-claro);
   outline-offset: 2px;
 }
 
-/* ── Selection ───────────────────────────────────────────────── */
+
 ::selection {
   background: rgba(0, 136, 201, 0.18);
   color: var(--text-primary);
 }
 
-/* ── Responsive ──────────────────────────────────────────────── */
+
 @media (max-width: 768px) {
   :root { --sidebar-width: 0px; }
   .sidebar { transform: translateX(-100%); transition: transform var(--transition-base); }
@@ -1793,7 +1724,7 @@ code, pre, .mono {
   .kpi-grid { grid-template-columns: 1fr; }
 }
 
-/* ── Print Styles ────────────────────────────────────────────── */
+
 @media print {
   .sidebar,
   .navbar,
@@ -1823,7 +1754,7 @@ code, pre, .mono {
   }
 }
 
-/* ── Custom Table Horizontal Scrollbar & Table Styling (Excel Style) ── */
+
 .custom-table-scroll {
   overflow-x: auto !important;
   overflow-y: auto !important;
@@ -1940,7 +1871,7 @@ code, pre, .mono {
   background: var(--table-row-hover-bg) !important;
 }
 
-/* Columnas fijas / Sticky columns */
+
 .sticky-col-1 {
   position: sticky !important;
   left: 0 !important;
@@ -1981,6 +1912,69 @@ code, pre, .mono {
 .audit-table th.sticky-col-3 {
   background: #004687 !important;
   z-index: 12 !important;
+}
+
+/* Selector del explorador histórico de estadísticos */
+.statistics-history-select {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1 1 20rem;
+  width: min(100%, 28rem);
+  max-width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0.65rem 2.65rem 0.65rem 1rem;
+  border: 1px solid #CBD5E1;
+  border-radius: 12px;
+  color: var(--text-primary);
+  background-color: #FFFFFF;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%23004687' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  background-size: 1rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  font: 600 0.88rem/1.35 var(--font-body);
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.statistics-history-select:hover:not(:disabled) {
+  border-color: #6B91B8;
+}
+
+.statistics-history-select:focus-visible {
+  outline: none;
+  border-color: var(--color-azul-fuerte);
+  box-shadow: 0 0 0 3px rgba(0, 70, 135, 0.16);
+}
+
+.statistics-history-select:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.statistics-history-select option {
+  padding: 0.4rem 0.65rem;
+  color: #182b35;
+  background-color: #FFFFFF;
+  font: 500 0.9rem var(--font-body);
+}
+
+.statistics-history-select optgroup {
+  color: #475569;
+  background-color: #F1F5F9;
+  font: 700 0.82rem var(--font-body);
+}
+
+[data-theme="dark"] .statistics-history-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%23E2E8F0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+[data-theme="dark"] .statistics-history-select option,
+[data-theme="dark"] .statistics-history-select optgroup {
+  color: var(--text-primary);
+  background-color: var(--surface-1);
 }
 
 

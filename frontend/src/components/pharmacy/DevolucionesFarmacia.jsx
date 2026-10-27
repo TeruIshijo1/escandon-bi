@@ -30,9 +30,9 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
 };
 
 export default function DevolucionesFarmacia() {
-  // ----------------------------------------------------
+   
   // MANEJO DE DOBLE BARRA DE DESPLAZAMIENTO (ARRIBA Y ABAJO)
-  // ----------------------------------------------------
+   
   const topScrollRef = useRef(null);
   const tableScrollRef = useRef(null);
   const [tableScrollWidth, setTableScrollWidth] = useState(1200);
@@ -82,7 +82,7 @@ export default function DevolucionesFarmacia() {
   }, [fechaDesde, fechaHasta]);
 
   useEffect(() => {
-    // Mantener sincronizado el ancho del scroll de arriba con el tamaño real de la tabla
+     
     const tableContainer = tableScrollRef.current;
     if (!tableContainer) return;
 
@@ -98,13 +98,12 @@ export default function DevolucionesFarmacia() {
     }
 
     return () => observer.disconnect();
-  }, [data]); // Using data instead of paginated, since it re-renders the DOM elements
+  }, [data]);  
 
   const rows = data?.data || [];
 
   const printTicket = (p) => {
-    // 1. Agrupar todos los artículos que pertenecen a la misma devolución.
-    // Usaremos la misma Orden (PCPRNum) y la misma Fecha/Hora (CreatedOn) para agrupar.
+
     const ticketItems = rows.filter(r => 
       r.Orden === p.Orden && 
       r.FechaDevolucion === p.FechaDevolucion
@@ -119,7 +118,7 @@ export default function DevolucionesFarmacia() {
     const fechaNac = p.FechaNacimiento ? new Date(p.FechaNacimiento).toLocaleDateString('es-MX') : 'N/A';
     const fechaHora = p.FechaDevolucion ? new Date(p.FechaDevolucion).toLocaleString('es-MX') : 'N/A';
 
-    // 2. Calcular los totales sumando todos los artículos del ticket
+    // Calcular los totales sumando todos los artículos del ticket
     let suma = 0;
     let ivaTotal = 0;
     
@@ -143,13 +142,12 @@ export default function DevolucionesFarmacia() {
       `;
     }).join('');
 
-    const descuento = 0; // Por defecto $0.00
+    const descuento = 0;  
     const importeTotal = suma - descuento;
     const totalNeto = importeTotal + ivaTotal;
 
     const logoUrl = window.location.origin + '/logo-escandon.png';
-    
-    // HTML y estilos enfocados 100% en impresión térmica (80mm o 58mm ajustado)
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -391,7 +389,7 @@ export default function DevolucionesFarmacia() {
 
   return (
     <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-      {/* HEADER */}
+      {/* Encabezado */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '1rem 1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,70,135,0.1)' }}>
         <div>
           <h2 style={{ margin: 0, color: '#004687', fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -464,7 +462,6 @@ export default function DevolucionesFarmacia() {
         </div>
       )}
 
-      {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
         <div style={{ background: 'white', borderRadius: 8, padding: '0.8rem 1rem', border: '1px solid rgba(0,70,135,0.07)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -491,12 +488,11 @@ export default function DevolucionesFarmacia() {
         </div>
       </div>
 
-      {/* TABLE */}
+      {/* Tabla */}
       <div style={{ flex: 1, background: 'white', borderRadius: '12px', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', border: '1px solid rgba(0,70,135,0.1)', overflow: 'hidden' }}>
         
         {loading && <div style={{ padding: '0.5rem', background: '#FEF3C7', color: '#B45309', fontSize: '0.75rem', textAlign: 'center', fontWeight: 600 }}>Actualizando datos...</div>}
 
-        {/* Scrollbar Superior */}
         <div 
           ref={topScrollRef} 
           onScroll={handleTopScroll} 
@@ -570,7 +566,7 @@ export default function DevolucionesFarmacia() {
           </table>
         </div>
 
-        {/* FOOTER */}
+        {/* Pie de página */}
         <div style={{ padding: '0.75rem 1.5rem', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
             Mostrando <strong style={{ color: '#004687' }}>{paginated.length}</strong> de <strong style={{ color: '#004687' }}>{filtered.length}</strong> registros

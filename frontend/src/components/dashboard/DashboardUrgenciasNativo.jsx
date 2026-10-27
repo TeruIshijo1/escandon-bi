@@ -76,7 +76,6 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
   const occupiedBedsCount = censoCamas.filter(b => b.Estado === 'OCUPADA').length;
   const freeBedsCount = totalBeds - occupiedBedsCount;
 
-
   // Filtrar la tabla de pacientes localmente
   const filteredList = data.lista.filter(c => {
     // Filtro por estatus de la gráfica
@@ -99,9 +98,8 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
 
   return (
     <div className="area-native-dashboard dashboard-view" style={{ marginTop: '2rem' }}>
-      
 
-      {/* ── SECCIÓN: CENSO DE CAMAS EN VIVO ── */}
+      {/* SECCIÓN: CENSO DE CAMAS EN VIVO */}
       {censoCamas.length > 0 && (
       <div className="area-panel" style={{ background: '#FFFFFF', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '2rem', marginTop: '2rem' }}>
         <div className="area-panel-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -404,7 +402,7 @@ export default function DashboardUrgenciasNativo({ data, searchFilter, setSearch
         </div>
       </div>
 
-      {/* ── MODAL: ESTADO DE CUENTA DETALLADO ── */}
+      {/* MODAL: ESTADO DE CUENTA DETALLADO */}
       {selectedPatientDetail && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,

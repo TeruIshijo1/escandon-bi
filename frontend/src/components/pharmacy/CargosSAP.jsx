@@ -159,7 +159,7 @@ export default function CargosSAP() {
     <div style={{ padding: '0.5rem 0', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       <style>{tableStyles}</style>
 
-      {/* ── Encabezado ── */}
+      {/* Encabezado */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#1E293B', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -255,7 +255,7 @@ export default function CargosSAP() {
         )}
       </div>
 
-      {/* ── Filtros ── */}
+      {/* Filtros */}
       <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: '600', color: '#334155', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span>🔍</span> Filtros Generales
@@ -297,7 +297,7 @@ export default function CargosSAP() {
       ) : (
         <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
           
-          {/* ── Barra de resumen ── */}
+          {/* Barra de resumen */}
           <div style={{ 
             padding: '1rem 1.5rem', borderBottom: '1px solid #e2e8f0', 
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem',
@@ -336,13 +336,12 @@ export default function CargosSAP() {
               </button>
             )}
           </div>
-          
-          {/* ── Scroll superior ── */}
+
           <div ref={topScrollRef} onScroll={handleTopScroll} style={{ width: '100%', overflowX: 'auto', marginBottom: '-1px' }}>
             <div style={{ height: '12px', width: `${tableScrollWidth}px` }} />
           </div>
 
-          {/* ── Tabla ── */}
+          {/* Tabla */}
           <div ref={tableScrollRef} onScroll={handleTableScroll} style={{ overflowX: 'auto', maxHeight: '65vh' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1550px' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -379,7 +378,7 @@ export default function CargosSAP() {
                       borderBottom: '1px solid #f1f5f9', 
                       background: i % 2 === 0 ? '#ffffff' : '#f8fafc',
                     }}>
-                      {/* Folio */}
+                      
                       <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <span style={{ 
                           fontWeight: '700', color: '#004687', fontSize: '0.82rem',
@@ -388,12 +387,10 @@ export default function CargosSAP() {
                         }}>{r.OrdenId}</span>
                       </td>
 
-                      {/* Fecha */}
                       <td style={{ padding: '12px 10px', textAlign: 'center', fontSize: '0.78rem', color: '#64748b', whiteSpace: 'nowrap' }}>
                         {r.FechaCargo ? new Date(r.FechaCargo).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                       </td>
 
-                      {/* Paciente */}
                       <td style={{ padding: '12px 10px', maxWidth: '200px' }}>
                         <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '0.82rem' }}>{r.NombrePaciente}</div>
                         {r.Cuenta && (
@@ -410,12 +407,10 @@ export default function CargosSAP() {
                         }}>{r.Codigo}</span>
                       </td>
 
-                      {/* Insumo */}
                       <td style={{ padding: '12px 10px', maxWidth: '260px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
                         <div style={{ fontWeight: '500', color: '#1e293b', fontSize: '0.82rem', lineHeight: '1.3' }}>{r.Insumo}</div>
                       </td>
 
-                      {/* Cantidad */}
                       <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <span style={{ 
                           fontWeight: '700', fontSize: '0.88rem', color: '#334155',
@@ -423,21 +418,18 @@ export default function CargosSAP() {
                         }}>{r.CantidadCargada}</span>
                       </td>
 
-                      {/* Total $ */}
                       <td style={{ padding: '12px 10px', textAlign: 'right' }}>
                         <span style={{ fontWeight: '700', color: '#15803d', fontSize: '0.88rem' }}>
                           ${(r.MontoCobrado || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
 
-                      {/* Lote */}
                       <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <span style={{ fontWeight: '700', color: r.Lote ? '#b45309' : '#cbd5e1', fontSize: '0.8rem' }}>
                           {r.Lote || '—'}
                         </span>
                       </td>
 
-                      {/* Caducidad */}
                       <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         {r.Caducidad ? (
                           <span style={{ 
@@ -487,7 +479,6 @@ export default function CargosSAP() {
                         </span>
                       </td>
 
-                      {/* Usuario Solicitante */}
                       <td style={{ padding: '12px 10px', maxWidth: '180px' }}>
                         <div style={{ fontWeight: '500', color: '#334155', fontSize: '0.78rem', lineHeight: '1.2' }}>
                           {r.NombreUsuarioSolicita || r.UsuarioSolicita || '—'}
@@ -510,7 +501,7 @@ export default function CargosSAP() {
             </table>
           </div>
 
-          {/* ── Paginación ── */}
+          {/* Paginación */}
           <div style={{ 
             padding: '0.75rem 1.5rem', borderTop: '1px solid #e2e8f0', 
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', 

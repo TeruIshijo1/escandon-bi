@@ -49,7 +49,7 @@ export default function FacturaProveedorModal({ docNum, onClose }) {
         maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden'
       }}>
-        {/* Header */}
+        {/* Encabezado */}
         <div style={{
           background: 'linear-gradient(135deg, #0F172A, #1E293B)',
           padding: '1.25rem 1.5rem', color: '#FFF',
@@ -75,14 +75,13 @@ export default function FacturaProveedorModal({ docNum, onClose }) {
           </button>
         </div>
 
-        {/* Content */}
         <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
           {loading && <PremiumLoader text="Cargando factura…" style={{ height: '200px' }} />}
           {error && <div style={{ padding: '1.5rem', background: '#FEE2E2', color: '#991B1B', borderRadius: '12px' }}>{userMessage(error)}</div>}
 
           {!loading && !error && data && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* Proveedor Info */}
+              
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: '#F8FAFC', padding: '1.25rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Proveedor</div>
@@ -99,7 +98,6 @@ export default function FacturaProveedorModal({ docNum, onClose }) {
                 </div>
               </div>
 
-              {/* Items Table */}
               <div>
                 <h4 style={{ margin: '0 0 0.75rem 0', color: '#334155', fontSize: '0.95rem', fontWeight: 700 }}>Conceptos de la Factura</h4>
                 <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: '12px' }}>
@@ -134,7 +132,6 @@ export default function FacturaProveedorModal({ docNum, onClose }) {
                 </div>
               </div>
 
-              {/* Comentarios */}
               {data.Comments && (
                 <div style={{ fontSize: '0.8rem', color: '#64748B', fontStyle: 'italic', background: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '8px' }}>
                   💬 {data.Comments}
@@ -144,7 +141,7 @@ export default function FacturaProveedorModal({ docNum, onClose }) {
           )}
         </div>
 
-        {/* Footer */}
+        {/* Pie de página */}
         <div style={{ padding: '1rem 1.5rem', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', textAlign: 'right' }}>
           <button
             onClick={onClose}

@@ -7,7 +7,6 @@ import ExportToolbar from '../shared/ExportToolbar';
 // Highcharts TopoJSON de México
 const geoUrl = "/mx-all.topo.json"; 
 
-// Mapeo de estados del SITI y Nuevo Sistema al nombre exacto en el TopoJSON
 const NORMALIZED_STATES = {
   'df': 'Distrito Federal',
   'cdmx': 'Distrito Federal',
@@ -148,7 +147,6 @@ export default function DashboardMapaGeografico({
         />
       </div>
 
-      {/* KPIs si existen */}
       {kpis && (
         <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
           {kpis.map((kpi, idx) => (
@@ -174,7 +172,7 @@ export default function DashboardMapaGeografico({
               projection="geoMercator"
               projectionConfig={{
                 scale: 1300,
-                center: [-102, 23.5] // Centro geográfico de México
+                center: [-102, 23.5]  
               }}
               style={{ width: "100%", height: "100%" }}
             >

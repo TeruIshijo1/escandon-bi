@@ -1,92 +1,63 @@
-# Hospital Escandón — Plataforma BI v1.0
-## Árbol de Directorios
+# Estructura del proyecto — Hospital Escandón BI
 
-```
+Corte documental: **27 de octubre de 2026**. Este árbol resume la arquitectura y estructura de carpetas de la plataforma. El inventario funcional completo, fuentes de datos y permisos se detallan en el [mapa e instructivo](Mapa_Instructivo_Plataforma_y_Origen_Datos.md).
+
+## Árbol de directorios
+
+```text
 escandon-bi/
-├── frontend/                          # React SPA
-│   ├── public/
-│   │   └── index.html
+├── frontend/                       # Aplicación React y compilación Vite
+│   ├── index.html                  # Entrada de Vite
+│   ├── public/                     # Recursos públicos y estáticos
 │   ├── src/
-│   │   ├── context/
-│   │   │   └── AuthContext.jsx        # Contexto global de autenticación y RBAC
-│   │   ├── hooks/
-│   │   │   ├── useAuth.js             # Hook de autenticación
-│   │   │   └── useAIAssistant.js      # Hook para el asistente RAG
-│   │   ├── components/
-│   │   │   ├── layout/
-│   │   │   │   ├── Sidebar.jsx        # Navegación lateral con control de roles
-│   │   │   │   ├── Navbar.jsx         # Barra superior
-│   │   │   │   └── ProtectedRoute.jsx # HOC de protección de rutas
-│   │   │   ├── dashboard/
-│   │   │   │   ├── DashboardDirectivo.jsx   # KPIs + Macropanel
-│   │   │   │   ├── DashboardArea.jsx        # Tablero por área (Quirófano, UCI…)
-│   │   │   │   ├── KPICard.jsx              # Tarjeta de indicador reutilizable
-│   │   │   │   └── EmbeddedBI.jsx           # Wrapper PowerBI/Looker Embedded
-│   │   │   ├── audit/
-│   │   │   │   └── InventarioVsCargos.jsx   # Módulo Prioridad 1
-│   │   │   ├── ai/
-│   │   │   │   └── AIAssistant.jsx          # Chat RAG flotante
-│   │   │   └── shared/
-│   │   │       ├── ExportButton.jsx         # PDF / Excel
-│   │   │       └── LoadingGlass.jsx         # Skeleton glassmorphism
-│   │   ├── styles/
-│   │   │   ├── globals.css            # Variables CSS + fuentes
-│   │   │   └── glassmorphism.css      # Clases utilitarias de glass
-│   │   ├── utils/
-│   │   │   └── rbac.js                # Mapa de permisos por rol
-│   │   ├── App.jsx                    # Router principal con rutas protegidas
-│   │   └── main.jsx                   # Punto de entrada
-│   ├── package.json
-│   └── vite.config.js
-│
-├── backend/                           # Node.js / Express
-│   ├── config/
-│   │   ├── db.js                      # Conexión SQLite (better-sqlite3)
-│   │   ├── init-db.js                 # Script para inicializar la BD
-│   │   └── env.js                     # Variables de entorno validadas
-│   ├── middleware/
-│   │   ├── auth.middleware.js          # JWT verify + RBAC
-│   │   └── audit.middleware.js         # Log de acciones sensibles
-│   ├── routes/
-│   │   ├── auth.routes.js
-│   │   ├── dashboard.routes.js
-│   │   ├── audit.routes.js            # Inventarios vs Cargos
-│   │   ├── export.routes.js           # PDF / Excel
-│   │   └── ai.routes.js               # Endpoint RAG
-│   ├── controllers/
-│   │   ├── auth.controller.js
-│   │   ├── audit.controller.js
-│   │   ├── export.controller.js
-│   │   └── ai.controller.js
-│   ├── services/
-│   │   ├── etl.service.js             # Lógica ETL Inventarios vs Cargos
-│   │   ├── bi.service.js              # Tokens PowerBI Embedded
-│   │   └── rag.service.js             # Pipeline RAG → SQL → LLM
-│   ├── models/
-│   │   └── queries.js                 # Queries SQL parametrizadas
-│   ├── server.js                      # Entrada Express
+│   │   ├── components/             # Vistas y componentes modulares
+│   │   ├── pages/                  # Pantallas montadas en el router
+│   │   ├── context/                # Autenticación y sesión de usuario
+│   │   ├── hooks/                  # Hooks y comportamientos compartidos
+│   │   ├── services/               # Conexión cliente a servicios y endpoints
+│   │   ├── utils/                  # RBAC, utilidades numéricas y generadores de reportes
+│   │   ├── styles/                 # Estilos globales y de impresión
+│   │   ├── App.jsx                 # Configuración del router y protección de rutas
+│   │   └── main.jsx                # Punto de entrada de la aplicación React
+│   ├── tests/                      # Pruebas unitarias y de integración de frontend
 │   └── package.json
-│
-├── database/
-│   ├── 01_schema.sql                  # DDL: tablas principales
-│   ├── 02_seed_roles.sql              # Datos iniciales de roles
-│   └── 03_views_etl.sql               # Vistas para ETL Auditoría
-│
-└── docs/
-    ├── ai_system_prompt.md            # Prompt base para el LLM
-    └── api_spec.md                    # Endpoints documentados
+├── backend/                        # API Express y procesos de sincronización
+│   ├── config/                     # Conexiones PostgreSQL BI, SQL Server y SAP
+│   ├── middleware/                 # Autenticación JWT, permisos y auditoría
+│   ├── routes/                     # Endpoints HTTP por módulo
+│   ├── controllers/                # Controladores de negocio
+│   ├── services/                   # Servicios ETL, conciliación y lógica de negocio
+│   │   ├── aria/                   # Asistente analítico hospitalario
+│   │   └── prompts/                # Prompts institucionales del asistente
+│   ├── tests/                      # Pruebas unitarias e integración con Jest
+│   ├── scripts/                    # Scripts de arranque y migraciones
+│   ├── data/                       # Catálogos y datos iniciales de referencia
+│   ├── ml/                         # Modelos predictivos y scripts de Data Science
+│   ├── uploads/                    # Almacenamiento local de archivos y comprobantes
+│   ├── server.js                   # Configuración del servidor Express
+│   └── package.json
+├── database/                       # Esquemas SQL, vistas DDL y seeds de PostgreSQL
+├── docs/                           # Documentación técnica, manuales y mapa de la plataforma
+├── scripts/                        # Scripts de utilería, automatización y empaquetado
+├── .runtime/                       # Runtime Node.js portable para entornos Windows
+├── build_deploy.ps1                # Script para compilación y despliegue
+└── README.md                       # Documentación principal del repositorio
 ```
 
-## Stack Tecnológico
+## Tecnologías y fuentes de datos
 
-| Capa        | Tecnología            | Versión  |
-|-------------|-----------------------|----------|
-| Frontend    | React + Vite          | 18 / 5   |
-| Routing     | React Router DOM      | 6        |
-| Estilos     | CSS Variables + módulos | —      |
-| Backend     | Node.js + Express     | 20 / 4   |
-| Auth        | JWT (jsonwebtoken)    | 9        |
-| Base datos  | SQLite (better-sqlite3)| 3       |
-| BI Embed    | PowerBI REST API      | v1.0     |
-| IA          | OpenAI / Azure OAI    | GPT-4o   |
-| Exportación | pdfkit + exceljs      | —        |
+| Capa | Tecnología | Función |
+|---|---|---|
+| Interfaz | React 18, Vite 5 y React Router 6 | Pantallas interactivas, navegación y exportaciones cliente |
+| Servidor | Node.js y Express 4 | API REST, control de acceso y tareas programadas |
+| Data Warehouse BI | PostgreSQL (`pg`, `knex`) | Usuarios, permisos, históricos y copias estadísticas |
+| Operación hospitalaria | SQL Server / Vertical (`mssql`, `tedious`) | Consultas clínicas, expedientes, camas y cargos diarios |
+| ERP Institucional | SAP Business One Service Layer | Documentos contables, compras, inventarios y facturación |
+| Sistema Histórico | SITI (PostgreSQL) | Historial operativo legado |
+| Reportes y Exportación | ExcelJS y PDFKit | Generación automatizada de libros Excel y reportes PDF |
+
+## Pruebas y validación
+
+- **Backend:** `cd backend && npm test` ejecuta la suite de pruebas automatizadas con Jest (`backend/tests/`).
+- **Frontend:** `cd frontend && npm test` ejecuta las pruebas de componentes e integración (`frontend/tests/`).
+- **Empaquetado:** `node --test scripts/production-package.test.cjs` valida la integridad del empaquetador productivo.

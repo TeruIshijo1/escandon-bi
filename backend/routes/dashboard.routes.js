@@ -1,7 +1,5 @@
-/**
- * dashboard.routes.js — Endpoints de dashboard y KPIs
- * Hospital Escandón BI Platform v1.0
- */
+
+
 'use strict';
 
 const express  = require('express');
@@ -17,120 +15,15 @@ const path = require('path');
 const { splitDateRange } = require('../utils/dashboard-helper');
 const { pool: pgPool } = require('../config/pg-db');
 const dashboardCache = require('../utils/dashboardCache');
+const { hospitalToday, addDays } = require('../services/statisticsCommon');
+const { getQuirofanoRevenueStatus } = require('../services/quirofanoRevenue.service');
+const coversSnapshot = (state, start, end) => Boolean(state?.lastSuccessAt && state.coverageStartDate && state.throughDate
+  && state.coverageStartDate <= start.slice(0, 10) && state.throughDate >= end.slice(0, 10));
 
 async function fetchAllSapPages(sapService, initialUrl) {
-  let allData = [];
-  let nextLink = initialUrl;
-  
-  while (nextLink) {
-    const res = await sapService.get(nextLink);
-    if (res.data && res.data.value) {
-      allData = allData.concat(res.data.value);
-    }
-    
-    if (res.data && res.data['odata.nextLink']) {
-      let link = res.data['odata.nextLink'];
-      if (!link.startsWith('/')) link = '/' + link;
-      nextLink = link;
-    } else {
-      nextLink = null;
-    }
-  }
-  return allData;
+  return sapService.fetchAllPages(initialUrl);
 }
 
-// Asegurar que las consultas de analíticas de Quirófano de SAP B1 existan al arrancar
-const initSapQueries = async () => {
-  try {
-    const sqlMedText = `
-      SELECT 
-        T0.U_PRName AS nombre,
-        SUM(T1.LineTotal) AS ingresos
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      INNER JOIN OITM T2 ON T1.ItemCode = T2.ItemCode
-      WHERE T2.ItmsGrpCod = 111 
-        AND T0.DocDate >= :startDate 
-        AND T0.DocDate <= :endDate
-        AND T0.U_PRName IS NOT NULL AND T0.U_PRName <> ''
-      GROUP BY T0.U_PRName
-    `;
-
-    const sqlSrvText = `
-      SELECT 
-        T1.Dscription AS nombre,
-        SUM(T1.LineTotal) AS ingresos
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      INNER JOIN OITM T2 ON T1.ItemCode = T2.ItemCode
-      WHERE T2.ItmsGrpCod = 111 
-        AND T0.DocDate >= :startDate 
-        AND T0.DocDate <= :endDate
-      GROUP BY T1.Dscription
-    `;
-
-    const sqlTotalText = `
-      SELECT 
-        SUM(T1.LineTotal) AS ingresos
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      INNER JOIN OITM T2 ON T1.ItemCode = T2.ItemCode
-      WHERE T2.ItmsGrpCod = 111 
-        AND T0.DocDate >= :startDate 
-        AND T0.DocDate <= :endDate
-    `;
-
-    await sapService._ensureSession();
-
-    const ensureQuery = async (code, text) => {
-      try {
-        await sapService.post('/SQLQueries', { SqlCode: code, SqlName: code, SqlText: text });
-      } catch (e) {
-        try {
-          await sapService.patch(`/SQLQueries('${code}')`, { SqlName: code, SqlText: text });
-        } catch (err) {
-          // Ignorar si ya está registrada correctamente
-        }
-      }
-    };
-
-    await ensureQuery('sq_quirofano_top_medicos', sqlMedText);
-    await ensureQuery('sq_quirofano_top_servicios', sqlSrvText);
-    await ensureQuery('sq_quirofano_ingresos_totales', sqlTotalText);
-
-    // SQLQueries para KPIs Financieros (Dashboard Finanzas Nativo)
-    const sqlORCT = `
-      SELECT 
-        SUM(DocTotal) as "DocTotal", 
-        SUM(CashSum) as "CashSum", 
-        SUM(CreditSum) as "CreditSum", 
-        SUM(CheckSum) as "CheckSum", 
-        SUM(TrsfrSum) as "TrsfrSum" 
-      FROM ORCT 
-      WHERE DocDate >= :startDate AND DocDate <= :endDate AND Canceled = 'N'
-    `;
-    const sqlOPCH = `
-      SELECT 
-        SUM(DocTotal) as "DocTotal" 
-      FROM OPCH 
-      WHERE DocDate >= :startDate AND DocDate <= :endDate AND Canceled = 'N'
-    `;
-    await ensureQuery('sq_finanzas_kpi_ingresos', sqlORCT);
-    await ensureQuery('sq_finanzas_kpi_egresos', sqlOPCH);
-
-    console.log('[SAP] Queries de analítica de Quirófano y Finanzas inicializadas exitosamente.');
-  } catch (err) {
-    console.error('[SAP] Error al inicializar queries de Quirófano:', err.message);
-  }
-};
-// No ejecutar en modo test (evita timers y conexiones SAP durante los tests)
-if (process.env.NODE_ENV !== 'test') setTimeout(initSapQueries, 5000);
-
-/**
- * GET /api/dashboard/directivo
- * Retorna los KPIs consolidados para el Dashboard Directivo.
- * Roles: ADMIN, DIRECTOR
- */
 router.get(
   '/directivo',
   authenticate,
@@ -139,7 +32,7 @@ router.get(
     try {
       const db = getDb();
 
-      // 1. Ocupación global
+      // Ocupación global
       const ocupacion = await db.prepare(`
         SELECT
           COUNT(*)                                                           AS TotalCamas,
@@ -151,7 +44,7 @@ router.get(
         FROM Camas WHERE Activo = 1
       `).get();
 
-      // 2. KPIs de eficacia clínica
+      // KPIs de eficacia clínica
       const eficacia = await db.prepare(`
         SELECT
           ROUND(
@@ -165,7 +58,7 @@ router.get(
         WHERE e.FechaEgreso >= CURRENT_TIMESTAMP - INTERVAL '1 month'
       `).get();
 
-      // 3. Producción quirúrgica
+      // Producción quirúrgica
       const produccion = await db.prepare(`
         SELECT
           COUNT(*) AS CirugiasHoy,
@@ -176,9 +69,7 @@ router.get(
         WHERE FechaCirugia::date = CURRENT_DATE
       `).get();
 
-      // 4. Macropanel Financiero (Simulado con datos de cargos si existen, o valores base reales)
-      // En una implementación real, esto vendría de una tabla de Finanzas o Facturación.
-      // Aquí usaremos los montos de AuditoriaInventarioCargos como referencia.
+      // Aquí usaremos los montos de AuditoriaInventarioCargos como referencia
       const financiero = await db.prepare(`
         SELECT 
           COALESCE(SUM(MontoDisputa), 0) AS MontoEnDisputa,
@@ -187,7 +78,7 @@ router.get(
         WHERE FechaAuditoria >= DATE_TRUNC('month', CURRENT_TIMESTAMP)
       `).get();
 
-      // 5. Estado por Área (Censo)
+      // Estado por Área (Censo)
       const censo = await db.prepare(`
         SELECT Area, COUNT(*) as Ocupadas 
         FROM Camas 
@@ -195,7 +86,7 @@ router.get(
         GROUP BY Area
       `).all();
 
-      // 6. Sobrescribir con Mapeos Dinámicos (Data Hub)
+      // Sobrescribir con Mapeos Dinámicos (Data Hub)
       const dynamicKPIs = [
         'dir_ocupacion', 'dir_mortalidad', 'dir_cirugias',
         'mando_eficiencia', 'mando_eficacia', 'mando_satisfaccion', 'mando_presupuesto'
@@ -244,11 +135,6 @@ router.get(
   }
 );
 
-/**
- * GET /api/dashboard/area/:area
- * KPIs específicos del área solicitada.
- * Roles: todos (filtrado por área para Jefe y Operativo)
- */
 router.get(
   '/area/:area',
   authenticate,
@@ -297,7 +183,6 @@ router.get(
   }
 );
 
-// Datos del Excel histórico (2024 - marzo 2026) para KPIs consolidados
 const histPath = path.join(__dirname, '../data/excel_stats_history.json');
 let excelStatsHistory = {};
 try {
@@ -308,7 +193,6 @@ try {
   console.error('Error al cargar excel_stats_history.json:', e.message);
 }
 
-// Función para obtener valores proporcionales del Excel según el rango de fechas
 const getExcelProportionalValue = (table, startDate, endDate) => {
   let total = 0;
   const limit = new Date('2026-03-31T23:59:59');
@@ -317,7 +201,6 @@ const getExcelProportionalValue = (table, startDate, endDate) => {
   const targetEnd = endDate < limit ? endDate : limit;
   let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
 
-  // Mapear la tabla a las claves reales del archivo JSON del Excel
   let jsonKey = '';
   if (table === 'vidasSalvadas') jsonKey = '01_VIDAS SALVADAS';
   else if (table === 'nacimientos') jsonKey = '02_NACIMIENTOS';
@@ -348,14 +231,8 @@ const getExcelProportionalValue = (table, startDate, endDate) => {
   return total;
 };
 
-// Estadísticos: una fuente compartida para tarjetas, histórico, detalle y Excel.
 router.use(require('./statistics.routes'));
 
-/**
- * GET /api/dashboard/kpi-config
- * Devuelve la configuración de todos los KPIs para los dashboards.
- * Cualquier usuario autenticado puede leer esto.
- */
 router.get('/kpi-config', authenticate, async (req, res, next) => {
   try {
     const db   = getDb();
@@ -367,7 +244,6 @@ router.get('/kpi-config', authenticate, async (req, res, next) => {
       WHERE Activo = 1
     `).all();
 
-    // Convertir a mapa { elementoId: { nombre, icono, pbiUrl, pbiUrl2, pbiUrl3, multiPagina } } para acceso O(1) en el frontend
     const map = {};
     for (const kpi of kpis) {
       map[kpi.ElementoId] = {
@@ -388,16 +264,10 @@ router.get('/kpi-config', authenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/**
- * GET /api/dashboard/financiero-nativo
- * Pipeline de Calidad de Datos, Detección de Anomalías y Predicciones.
- */
-
 router.get('/financiero-nativo/cuenta/:pcNum', authenticate, authorize(['ADMIN', 'DIRECTOR']), async (req, res) => {
   try {
     const { pcNum } = req.params;
 
-    // Si pcNum no es un número (ej. CTE00029 o cve SAP), retornar respuesta vacía sin fallar en SQL
     if (isNaN(Number(pcNum)) || isNaN(parseInt(pcNum, 10))) {
       return res.json({ success: true, data: [] });
     }
@@ -405,7 +275,7 @@ router.get('/financiero-nativo/cuenta/:pcNum', authenticate, authorize(['ADMIN',
     const pcNumInt = parseInt(pcNum, 10);
     let records = [];
 
-    // 1. Intentar buscar en PostgreSQL DW (local)
+    // Intentar buscar en PostgreSQL DW (local)
     try {
       const pgRes = await pgPool.query(`
         SELECT 
@@ -436,7 +306,6 @@ router.get('/financiero-nativo/cuenta/:pcNum', authenticate, authorize(['ADMIN',
       console.warn('[PCIT pg lookup warning]', pgErr.message);
     }
 
-    // 2. Si no hay registros locales, consultar SQL Server (en vivo)
     if (records.length === 0) {
       const pool = await connectRemoteDB();
       const result = await pool.request()
@@ -457,14 +326,12 @@ router.get('/financiero-nativo/cuenta/:pcNum', authenticate, authorize(['ADMIN',
         `);
       records = result.recordset;
     }
-    
-    // Obtener los códigos de artículo distintos que no tienen descripción
+
     const missingDescItems = [...new Set(records.filter(r => !r.ItemDescription && r.ItemCode).map(r => r.ItemCode))];
     
     if (missingDescItems.length > 0) {
       const sapDescriptions = {};
-      
-      // Consultar SAP en lotes de 20 artículos por request para optimizar velocidad
+
       const chunkSize = 20;
       for (let i = 0; i < missingDescItems.length; i += chunkSize) {
         const chunk = missingDescItems.slice(i, i + chunkSize);
@@ -478,11 +345,10 @@ router.get('/financiero-nativo/cuenta/:pcNum', authenticate, authorize(['ADMIN',
             });
           }
         } catch (e) {
-          // ignorar si SAP no encuentra o hay un error en el lote
+           
         }
       }
-      
-      // Update records
+
       records.forEach(r => {
         if (!r.ItemDescription && sapDescriptions[r.ItemCode]) {
           r.ItemDescription = sapDescriptions[r.ItemCode];
@@ -502,10 +368,8 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
     let { startDate, endDate, search } = req.query;
     if (endDate && endDate.length === 10) endDate += ' 23:59:59';
 
-    // HARD CUTOFF: Ignorar datos antes del 1 de abril de 2026 (periodo de migración con errores)
     const MIN_DATE = '2026-04-01';
 
-    // Si todo el rango buscado es anterior al corte, regresamos 0 registros de inmediato
     if (endDate && endDate < MIN_DATE) {
       return res.json({
         success: true,
@@ -525,7 +389,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
     const split = splitDateRange(effectiveStartDate, effectiveEndDate);
     let rawData = [];
 
-    // 1. Obtener histórico desde PostgreSQL local
+    // Obtener histórico desde PostgreSQL local
     if (split.pgStart && split.pgEnd) {
       let pgWhere = ["c.entrydate >= $1", "c.entrydate <= $2"];
       let params = [split.pgStart, split.pgEnd + ' 23:59:59'];
@@ -566,7 +430,6 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       })));
     }
 
-    // 2. Obtener lo nuevo (del día de hoy) desde SQL Server
     if (split.hasToday && split.remoteStart) {
       const pool = await connectRemoteDB();
       const request = pool.request();
@@ -625,11 +488,11 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
 
     let validRecords = [];
 
-    // 1. Depuración (Reglas de Negocio)
+    // Depuración (Reglas de Negocio)
     rawData.forEach(row => {
       const isTest = row.FullName && (row.FullName.toUpperCase().includes('TEST') || row.FullName.toUpperCase().includes('PRUEBA'));
-      const isClosed = row.PC_ST === 'CL'; // Finalizada
-      const isPositive = (Number(row.Balance) > 0); // En Vertical, Balance es el Total Facturado de la cuenta
+      const isClosed = row.PC_ST === 'CL';  
+      const isPositive = (Number(row.Balance) > 0);  
       const isDateValid = row.MedicalDischargeDate && new Date(row.MedicalDischargeDate) >= new Date(row.EntryDate) && new Date(row.MedicalDischargeDate) <= new Date();
 
       if (isTest) {
@@ -661,7 +524,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
 
     audit.valido = validRecords.length;
 
-    // 2. Agrupación por Mes y Detección de Outliers (IQR)
+    // Agrupación por Mes y Detección de Outliers (IQR)
     let dataByMonth = {};
     validRecords.forEach(row => {
       let d = new Date(row.MedicalDischargeDate);
@@ -676,8 +539,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
     Object.keys(dataByMonth).forEach(month => {
       const mData = dataByMonth[month];
       const totals = mData.records.map(r => r.TotalAccount).sort((a,b) => a-b);
-      
-      // Calcular IQR
+
       if (totals.length >= 4) {
         const q1 = totals[Math.floor(totals.length * 0.25)];
         const q3 = totals[Math.floor(totals.length * 0.75)];
@@ -691,7 +553,6 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
 
       audit.outliersEncontrados += mData.outliersCount;
 
-      // Sumarizadores
       mData.records.forEach(r => {
         mData.Ingresos += r.TotalAccount || 0;
         mData.Utilidad += r.Profit || 0;
@@ -710,7 +571,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       isPrediction: false
     }));
 
-    // 3. Modelo Predictivo: Regresión Lineal Simple (Proyectar 3 meses)
+    // Modelo Predictivo: Regresión Lineal Simple (Proyectar 3 meses)
     if (tendenciaMensual.length >= 3) {
       const n = tendenciaMensual.length;
       let sumX = 0, sumY_ing = 0, sumY_ut = 0, sumXY_ing = 0, sumXY_ut = 0, sumX2 = 0;
@@ -732,7 +593,6 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
         const slope_ut = (n * sumXY_ut - sumX * sumY_ut) / denominator;
         const intercept_ut = (sumY_ut - slope_ut * sumX) / n;
 
-        // Ultimo mes real
         const lastMonthStr = tendenciaMensual[tendenciaMensual.length - 1].month;
         const lastDate = new Date(lastMonthStr + '-01T12:00:00Z');
 
@@ -756,7 +616,6 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       }
     }
 
-    // 3.5. Integrar Predicción de ML (IA) si existe
     try {
       const mlRes = await pgPool.query("SELECT periodo_predicho, ingreso_estimado FROM ml_forecast_ingresos_mensual WHERE area = 'GENERAL' AND servicio = 'TODOS'");
       if (mlRes.rows.length > 0) {
@@ -767,7 +626,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
           let existingPrediction = tendenciaMensual.find(m => m.month === mlMonth);
           if (existingPrediction) {
             existingPrediction.IngresosProyectados = mlIngreso;
-            existingPrediction.isML = true; // Flag for frontend if needed
+            existingPrediction.isML = true;  
           }
         });
       }
@@ -775,7 +634,6 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       console.error('[Dashboard] Error al mezclar ML forecast con dashboard financiero-nativo:', err);
     }
 
-    // KPIs Generales Acumulados
     let totalIng = 0, totalUt = 0, totalCuentas = 0, totalCostos = 0, totalCobrado = 0;
     Object.keys(dataByMonth).forEach(m => {
       totalIng += dataByMonth[m].Ingresos;
@@ -785,7 +643,7 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       totalCobrado += dataByMonth[m].Cobrado;
     });
 
-    // 4. Cartera de Cobranza (Aging)
+    // Cartera de Cobranza (Aging)
     const carteraCobranza = {
       '0-30 días': 0,
       '31-60 días': 0,
@@ -815,13 +673,11 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       }
     });
 
-    // Ordenar por balance pendiente descendente y limitar a 50 para no saturar frontend
     Object.keys(carteraCobranzaDetalle).forEach(bucket => {
       carteraCobranzaDetalle[bucket].sort((a,b) => b.PendingBalance - a.PendingBalance);
       carteraCobranzaDetalle[bucket] = carteraCobranzaDetalle[bucket].slice(0, 50);
     });
 
-    // Ordenar los registros válidos por fecha descendente y tomar los top 100
     const listaCuentas = validRecords
       .sort((a,b) => new Date(b.MedicalDischargeDate || b.EntryDate) - new Date(a.MedicalDischargeDate || a.EntryDate))
       .slice(0, 100);
@@ -850,10 +706,6 @@ router.get('/financiero-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
   }
 });
 
-/**
- * GET /api/dashboard/eficiencia-nativo
- * Consulta la vista UDR_BI_INDICADORES_OPERATIVOS creada por el usuario
- */
 router.get('/eficiencia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']), async (req, res, next) => {
   try {
     let { startDate, endDate } = req.query;
@@ -916,8 +768,7 @@ router.get('/eficiencia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
       EstadoImagenologia: row.EstadoImagenologia,
       EstadoEgreso: row.EstadoEgreso
     })).reverse();
-    
-    // Calcular promedios generales de los ultimos meses para los KPIs
+
     let totalCamas = 0, totalQuirofanos = 0, totalUrgencias = 0, totalHospitalizacion = 0;
     data.forEach(d => {
       totalCamas += d.CamasOcupadas || 0;
@@ -948,7 +799,7 @@ router.get('/eficiencia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR']),
 
 router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
-    // 1. Obtener listado maestro de camas reales (excluyendo virtuales) de PostgreSQL (local)
+     
     const bedsResult = await pgPool.query(`
       SELECT DISTINCT roomcode as "RoomCode", roomname as "RoomName" 
       FROM dw_vertical_pt 
@@ -960,7 +811,6 @@ router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
     `);
     const allBeds = bedsResult.rows;
 
-    // 2. Obtener camas ocupadas actualmente (en vivo de SQL Server con cama activa de PCFR)
     const mssqlPool = await connectRemoteDB();
     const occupiedResult = await mssqlPool.request().query(`
       SELECT 
@@ -990,7 +840,7 @@ router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
     `);
     const occupied = occupiedResult.recordset;
 
-    // 3. Cruzar datos
+    // Cruzar datos
     const bedsMap = {};
     allBeds.forEach(b => {
       bedsMap[b.RoomCode] = { RoomCode: b.RoomCode, RoomName: b.RoomName, Estado: 'LIBRE', Paciente: null, Medico: null };
@@ -1013,10 +863,10 @@ router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
       }
     });
 
-    // 4. Ordenar alfabéticamente
+    // Ordenar alfabéticamente
     const finalBeds = Object.values(bedsMap).sort((a,b) => (a.RoomName || '').localeCompare(b.RoomName || ''));
 
-    // 5. Estadísticas
+    // Estadísticas
     const total = finalBeds.length;
     const ocupadas = finalBeds.filter(b => b.Estado === 'OCUPADA').length;
     const libres = finalBeds.filter(b => b.Estado === 'LIBRE').length;
@@ -1034,10 +884,6 @@ router.get('/censo-camas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
   }
 });
 
-/**
- * GET /api/dashboard/urgencias-nativo
- * Dashboard nativo para Urgencias basado en tabla PC (PCType = 'ER')
- */
 router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     let { startDate, endDate, search } = req.query;
@@ -1058,7 +904,7 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
 
     const split = splitDateRange(effectiveStartDate, effectiveEndDate);
 
-    // 1. Obtener ingresos de servicios (sapData)
+    // Obtener ingresos de servicios (sapData)
     const fetchSapData = async () => {
       let sapRows = [];
       if (split.pgStart && split.pgEnd) {
@@ -1097,7 +943,7 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       return sapRows;
     };
 
-    // 2. Cruce con SAP Contabilidad Oficial
+    // Cruce con SAP Contabilidad Oficial
     const fetchSapIngresos = async () => {
       let total = 0;
       if (split.pgStart && split.pgEnd) {
@@ -1115,7 +961,7 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
           const sapSLRes = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${sdStr}'&endDate='${edStr}'`);
           if (sapSLRes && sapSLRes.length > 0) {
             const todayTotal = sapSLRes
-              .filter(row => row.ItmsGrpCod === 104) // 104 = AMBULANCIAS / URGENCIAS
+              .filter(row => row.ItmsGrpCod === 104)  
               .reduce((acc, row) => acc + (row.Total || 0), 0);
             total += todayTotal;
           }
@@ -1126,7 +972,7 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       return total;
     };
 
-    // 3. Obtener datos detallados
+    // Obtener datos detallados
     const fetchDetailedData = async () => {
       let list = [];
       if (split.pgStart && split.pgEnd) {
@@ -1191,7 +1037,6 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       return list;
     };
 
-    // 4. Censo Camas Urgencias
     const fetchCensoCamas = async () => {
       let censo = [];
       try {
@@ -1292,7 +1137,6 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       fetchCensoCamas()
     ]);
 
-    // Calcular KPIs Financieros (VERTICAL)
     const ingresosTotales = sapData.reduce((acc, curr) => acc + (curr.TOTAL_COBRADO || 0), 0);
 
     // Top Médicos
@@ -1319,11 +1163,9 @@ router.get('/urgencias-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       .sort((a, b) => b.ingresos - a.ingresos)
       .slice(0, 10);
 
-    // Calcular KPIs
     const atenciones = data.length;
     const egresos = data.filter(d => d.Estatus === 'CL' && d.Egreso).length;
-    
-    // Estancia promedio
+
     const estanciasValidas = data.filter(d => d.MinutosEstancia > 0);
     const minutosPromedio = estanciasValidas.length > 0 
       ? estanciasValidas.reduce((acc, curr) => acc + curr.MinutosEstancia, 0) / estanciasValidas.length 
@@ -1392,17 +1234,22 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
     let { startDate, endDate, search, especialidad } = req.query;
     if (endDate && endDate.length === 10) endDate += ' 23:59:59';
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const effectiveStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const todayStr = hospitalToday();
+    const effectiveStartDate = startDate || addDays(todayStr, -30);
     const effectiveEndDate = endDate || todayStr + ' 23:59:59';
+    const { getDashboardSyncStatus } = require('../services/dashboardSync.service');
+    const [productivityState, consultationState] = await Promise.all([
+      getDashboardSyncStatus('productividad').catch(() => null),
+      getDashboardSyncStatus('consulta').catch(() => null),
+    ]);
+    const dailyProductivity = Number(productivityState?.modelVersion) >= 2;
 
-    const split = splitDateRange(effectiveStartDate, effectiveEndDate);
+    const split = { pgStart: effectiveStartDate, pgEnd: effectiveEndDate };
 
-    // --- 1. Obtener datos de Productividad Médica ---
     let prodData = [];
     
     // Histórico de PostgreSQL
-    if (split.pgStart && split.pgEnd) {
+    if (split.pgStart && split.pgEnd && dailyProductivity) {
       let pgWhere = ["fecha >= $1", "fecha <= $2"];
       let params = [split.pgStart, split.pgEnd];
       let paramIndex = 3;
@@ -1434,31 +1281,8 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
     }
     
     // Hoy live de SQL Server
-    if (split.hasToday && split.remoteStart) {
-      const mssqlPool = await connectRemoteDB();
-      const request = mssqlPool.request();
-      let whereProd = ["Fecha >= @startDate", "Fecha <= @endDate"];
-      request.input('startDate', split.remoteStart);
-      request.input('endDate', split.remoteEnd || new Date());
-      
-      if (search) {
-        whereProd.push("Medico LIKE @search");
-        request.input('search', `%${search}%`);
-      }
-      if (especialidad) {
-        whereProd.push("Especialidad = @especialidad");
-        request.input('especialidad', especialidad);
-      }
-      
-      const mssqlRes = await request.query(`
-        SELECT Medico, Especialidad, Fecha, Primeras, Subsecuentes, TotalAtenciones
-        FROM UDR_BI_PRODUCTIVIDAD_MEDICOS
-        WHERE ${whereProd.join(' AND ')}
-      `);
-      prodData = prodData.concat(mssqlRes.recordset);
-    }
+    
 
-    // --- 2. Obtener datos de Consultas del Día ---
     let consData = [];
     
     // Histórico de PostgreSQL
@@ -1505,58 +1329,8 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
     }
     
     // Hoy live de SQL Server
-    if (split.hasToday && split.remoteStart) {
-      const mssqlPool = await connectRemoteDB();
-      const request = mssqlPool.request();
-      let whereCons = ["Fecha >= @startDate", "Fecha <= @endDate"];
-      request.input('startDate', split.remoteStart);
-      request.input('endDate', split.remoteEnd || new Date());
-      
-      if (search) {
-        whereCons.push("(Medico LIKE @search OR Paciente LIKE @search)");
-        request.input('search', `%${search}%`);
-      }
-      if (especialidad) {
-        whereCons.push("MSDescription_ES = @especialidad");
-        request.input('especialidad', especialidad);
-      }
-      
-      const mssqlRes = await request.query(`
-        SELECT Numero_Cita, Folio_Medico, Medico, MSDescription_ES as Especialidad, 
-               Fecha, Hora, Numero_Paciente, Paciente, Edad_Anios, Telefono_1, Celular_2, 
-               Estatus_Orden_Venta, Articulo
-        FROM V_UDR_CONSULTA_DIA
-        WHERE ${whereCons.join(' AND ')}
-      `);
-      
-      // Convertir Hora date a String para mantener formato
-      const formattedMssql = mssqlRes.recordset.map(row => {
-        let horaStr = '';
-        if (row.Hora instanceof Date) {
-          horaStr = row.Hora.toTimeString().split(' ')[0];
-        } else if (row.Hora) {
-          horaStr = String(row.Hora);
-        }
-        
-        let fechaStr = '';
-        if (row.Fecha instanceof Date) {
-          fechaStr = row.Fecha.toISOString().split('T')[0];
-        } else {
-          fechaStr = row.Fecha;
-        }
-
-        return {
-          ...row,
-          Hora: horaStr,
-          Fecha: fechaStr
-        };
-      });
-      consData = consData.concat(formattedMssql);
-    }
-
-    // --- 3. Procesar Agregaciones en JS ---
     
-    // A. Tendencia Mensual
+
     const tendenciaAgrupada = {};
     prodData.forEach(row => {
       let d = new Date(row.Fecha);
@@ -1570,7 +1344,6 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
     });
     const tendenciaMensual = Object.values(tendenciaAgrupada).sort((a,b) => a.monthStr.localeCompare(b.monthStr));
 
-    // B. Top Especialidades
     const especialidadesAgrupadas = {};
     prodData.forEach(row => {
       const esp = row.Especialidad || 'N/A';
@@ -1581,7 +1354,7 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
       .sort((a,b) => b.Total - a.Total)
       .slice(0, 10);
 
-    // C. Top Médicos
+    // Top Médicos
     const medicosAgrupados = {};
     prodData.forEach(row => {
       const key = `${row.Medico}||${row.Especialidad || 'N/A'}`;
@@ -1595,7 +1368,7 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
       .sort((a,b) => b.Total - a.Total)
       .slice(0, 10);
 
-    // D. Estatus Consultas Día (Gráfica Dona)
+    // Estatus Consultas Día (Gráfica Dona)
     const estatusAgrupados = {};
     consData.forEach(row => {
       const est = row.Estatus_Orden_Venta || 'SIN ESTATUS';
@@ -1603,7 +1376,6 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
     });
     const estatusConsultas = Object.keys(estatusAgrupados).map(k => ({ nombre: k, valor: estatusAgrupados[k] }));
 
-    // E. KPIs Totales
     let totalConsultas = 0;
     let totalPrimeras = 0;
     let totalSubsecuentes = 0;
@@ -1613,7 +1385,6 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
       totalSubsecuentes += row.Subsecuentes || 0;
     });
 
-    // F. Lista para la tabla (Últimas 100 consultas ordenadas por fecha/hora desc)
     const listaConsultas = consData
       .sort((a,b) => {
         const dateA = new Date(`${a.Fecha}T${a.Hora || '00:00:00'}`);
@@ -1622,7 +1393,7 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
       })
       .slice(0, 100);
 
-    // G. Detalle por estatus para drill-down
+    // Detalle por estatus para drill-down
     const detalleConsultas = {};
     listaConsultas.forEach(row => {
       const e = row.Estatus_Orden_Venta;
@@ -1634,9 +1405,24 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
 
     const topEspecialidadText = topEspecialidades.length > 0 ? topEspecialidades[0].Especialidad : 'N/A';
 
+    const productivityCovered = dailyProductivity && coversSnapshot(productivityState, effectiveStartDate, effectiveEndDate);
+    const consultationsCovered = coversSnapshot(consultationState, effectiveStartDate, effectiveEndDate);
+    const productivityAvailable = dailyProductivity && (prodData.length > 0 || productivityCovered);
+    const consultationsAvailable = consData.length > 0 || consultationsCovered;
+    const confirmed = productivityCovered && consultationsCovered && productivityState.status === 'complete' && consultationState.status === 'complete';
+    const sourceStatus = {
+      status: confirmed ? 'complete' : productivityAvailable || consultationsAvailable ? 'stale' : 'pending',
+      productivityAvailable, consultationsAvailable,
+      updatedAt: productivityState?.lastSuccessAt || null,
+      consultationsUpdatedAt: consultationState?.lastSuccessAt || null,
+      coverageStartDate: productivityState?.coverageStartDate || null, throughDate: productivityState?.throughDate || null,
+    };
+
+    res.set('Cache-Control', 'no-store');
     res.json({
       ok: true,
       data: {
+        sourceStatus,
         tendenciaMensual,
         topEspecialidades,
         topMedicos,
@@ -1644,10 +1430,10 @@ router.get('/eficacia-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
         listaConsultas,
         detalleConsultas,
         kpis: {
-          totalConsultas,
-          primeras: totalPrimeras,
-          subsecuentes: totalSubsecuentes,
-          topEspecialidad: topEspecialidadText
+          totalConsultas: productivityAvailable ? totalConsultas : null,
+          primeras: productivityAvailable ? totalPrimeras : null,
+          subsecuentes: productivityAvailable ? totalSubsecuentes : null,
+          topEspecialidad: productivityAvailable ? topEspecialidadText : 'No disponible'
         }
       }
     });
@@ -1703,7 +1489,7 @@ router.get('/quirofano-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
     const split = splitDateRange(effectiveStartDate, effectiveEndDate);
     let rawList = [];
 
-    // 1. Obtener histórico de PostgreSQL
+    // Obtener histórico de PostgreSQL
     if (split.pgStart && split.pgEnd) {
       let pgWhere = ["fecha_de_cargo >= $1", "fecha_de_cargo <= $2"];
       let params = [split.pgStart, split.pgEnd + ' 23:59:59'];
@@ -1774,7 +1560,7 @@ router.get('/quirofano-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       })));
     }
 
-    // 2. Obtener lo de hoy (en vivo de SQL Server)
+    // Obtener lo de hoy (en vivo de SQL Server)
     if (split.hasToday && split.remoteStart) {
       const pool = await connectRemoteDB();
       const request = pool.request();
@@ -1830,58 +1616,67 @@ router.get('/quirofano-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
       rawList = rawList.concat(mssqlRes.recordset);
     }
 
-    // SAP Revenue queries - Consultar base local PostgreSQL (DW)
-    let ingresosSAPTotales = 0;
+    let ingresosSAPTotales = null;
     let topMedicosIngresos = [];
     let topServiciosIngresos = [];
-    let ingresosTotales = 0;
-
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const sd = startDate ? new Date(startDate).toISOString().split('T')[0] : thirtyDaysAgo;
-    const ed = endDate ? new Date(endDate).toISOString().split('T')[0] : todayStr;
+    let sourceStatus = { status: 'pending', available: false, partial: false, updatedAt: null, coverageStartDate: null, throughDate: null };
+    const sd = startDate ? String(startDate).slice(0, 10) : effectiveStartDate.slice(0, 10);
+    const ed = endDate ? String(endDate).slice(0, 10) : todayStr;
 
     try {
-      // 1. Obtener total ingresos
-      const totalRes = await pgPool.query(`
-        SELECT COALESCE(SUM(ingresos), 0) as total 
-        FROM dw_sap_quirofano_analiticas 
-        WHERE tipo = 'TOTAL' AND startdate >= $1 AND startdate <= $2
+      let state = null;
+      try { state = await getQuirofanoRevenueStatus({ startDate: sd, endDate: ed }); }
+      catch (error) { console.warn('[Quirófano] No se pudo verificar la cobertura de ingresos:', error.message); }
+      const revenueRes = await pgPool.query(`
+        SELECT tipo, nombre, SUM(ingresos) AS ingresos, MAX(sync_date) AS updated_at
+        FROM dw_sap_quirofano_analiticas
+        WHERE startdate >= $1 AND startdate <= $2
+          AND startdate = enddate
+        GROUP BY tipo, nombre
       `, [sd, ed]);
-      ingresosSAPTotales = Number(totalRes.rows[0].total || 0);
-      ingresosTotales = ingresosSAPTotales;
-
-      // 2. Obtener top medicos
-      const medRes = await pgPool.query(`
-        SELECT nombre, SUM(ingresos) as ingresos 
-        FROM dw_sap_quirofano_analiticas 
-        WHERE tipo = 'MEDICO' AND startdate >= $1 AND startdate <= $2
-        GROUP BY nombre 
-        ORDER BY ingresos DESC 
-        LIMIT 10
-      `, [sd, ed]);
-      topMedicosIngresos = medRes.rows.map(row => ({ nombre: row.nombre, ingresos: Number(row.ingresos) }));
-
-      // 3. Obtener top servicios
-      const srvRes = await pgPool.query(`
-        SELECT nombre, SUM(ingresos) as ingresos 
-        FROM dw_sap_quirofano_analiticas 
-        WHERE tipo = 'SERVICIO' AND startdate >= $1 AND startdate <= $2
-        GROUP BY nombre 
-        ORDER BY ingresos DESC 
-        LIMIT 10
-      `, [sd, ed]);
-      topServiciosIngresos = srvRes.rows.map(row => ({ nombre: row.nombre, ingresos: Number(row.ingresos) }));
-
+      const rows = revenueRes.rows;
+      if (!Array.isArray(rows) || rows.some(row => row.ingresos == null || !Number.isFinite(Number(row.ingresos)))) {
+        throw new Error('No se pudo verificar la copia de ingresos de Quirófano.');
+      }
+      const totals = rows.filter(row => row.tipo === 'TOTAL');
+      const savedTotal = totals.length ? totals.reduce((sum, row) => sum + Number(row.ingresos), 0) : null;
+      const coverageConfirmed = [2, 3].includes(Number(state?.modelVersion)) && coversSnapshot(state, sd, ed);
+      const available = coverageConfirmed || (savedTotal !== null && savedTotal !== 0);
+      const coverageCounts = Object.fromEntries(['totalDays', 'completeDays', 'pendingDays', 'failedDays']
+        .filter(key => Number.isInteger(state?.[key]) && state[key] >= 0)
+        .map(key => [key, state[key]]));
+      if (Object.keys(coverageCounts).length && coverageCounts.totalDays == null) {
+        const totalDays = (Date.parse(`${ed}T00:00:00Z`) - Date.parse(`${sd}T00:00:00Z`)) / 86400000 + 1;
+        if (Number.isInteger(totalDays) && totalDays > 0) coverageCounts.totalDays = totalDays;
+      }
+      sourceStatus = {
+        status: available ? coverageConfirmed && state?.status === 'complete' ? 'complete' : 'stale' : 'pending',
+        available,
+        partial: available && !coverageConfirmed,
+        ...coverageCounts,
+        updatedAt: state?.lastSuccessAt || rows.map(row => row.updated_at).filter(Boolean).sort((left, right) => new Date(right) - new Date(left))[0] || null,
+        coverageStartDate: state?.coverageStartDate || null,
+        throughDate: state?.throughDate || null
+      };
+      if (available) {
+        ingresosSAPTotales = savedTotal ?? 0;
+        const ranking = type => rows.filter(row => row.tipo === type)
+          .map(row => ({ nombre: row.nombre, ingresos: Number(row.ingresos) }))
+          .sort((left, right) => right.ingresos - left.ingresos).slice(0, 10);
+        topMedicosIngresos = ranking('MEDICO');
+        topServiciosIngresos = ranking('SERVICIO');
+      }
     } catch (e) {
-      console.error('[PostgreSQL Error] Falló consulta de analíticas de Quirófano local:', e.message);
+      console.error('[PostgreSQL Error] No se pudo leer la copia de ingresos de Quirófano:', e.message);
     }
 
+    res.set('Cache-Control', 'no-store');
     res.json({
       ok: true,
+      sourceStatus,
       data: {
         lista: rawList,
-        kpisFinancieros: { ingresosTotales, ingresosSAP: ingresosSAPTotales },
+        kpisFinancieros: { ingresosTotales: ingresosSAPTotales, ingresosSAP: ingresosSAPTotales },
         topMedicosIngresos,
         topServiciosIngresos
       }
@@ -1894,10 +1689,6 @@ router.get('/quirofano-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
 
 const ExcelJS = require('exceljs');
 
-/**
- * GET /api/dashboard/export-excel
- * Exporta la tabla de datos cruda del dashboard a Excel con el logo y formato institucional
- */
 router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO', 'ALMACEN_GENERAL']), async (req, res, next) => {
   try {
     let { dashboard, startDate, endDate, search, especialidad } = req.query;
@@ -1908,14 +1699,13 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
     if (search === 'undefined' || search === 'null' || search === '') search = null;
     if (especialidad === 'undefined' || especialidad === 'null' || especialidad === '') especialidad = null;
 
-    const pool = await connectRemoteDB();
-    const request = pool.request();
+    const request = dashboard === 'eficacia' ? null : (await connectRemoteDB()).request();
     
     let query = '';
     let sheetName = 'Exportación';
     let rows = [];
 
-    // 1. Construir query según el dashboard
+    // Construir query según el dashboard
     if (dashboard === 'finanzas') {
       sheetName = 'Ingresos_Egresos_SAP';
       const cleanStart = (startDate || '2026-04-01').split(' ')[0];
@@ -2004,32 +1794,27 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
       rows = resPg.rows;
     } else if (dashboard === 'eficacia') {
       sheetName = 'Consultas_Eficacia';
-      let whereCons = ["1=1"];
-      if (startDate) { whereCons.push("Fecha >= @startDate"); request.input('startDate', startDate); }
-      if (endDate) { whereCons.push("Fecha <= @endDate"); request.input('endDate', endDate); }
-      if (search) { 
-        whereCons.push("(Medico LIKE @search OR Paciente LIKE @search)"); 
-        request.input('search', `%${search}%`); 
-      }
+      const today = hospitalToday();
+      const params = [startDate || addDays(today, -30), endDate ? `${endDate.slice(0, 10)} 23:59:59` : `${today} 23:59:59`];
+      const whereCons = ['fecha >= $1', 'fecha <= $2'];
+      if (search) { whereCons.push(`(medico ILIKE $${params.length + 1} OR paciente ILIKE $${params.length + 1})`); params.push(`%${search}%`); }
       if (especialidad) {
-        whereCons.push("MSDescription_ES = @especialidad");
-        request.input('especialidad', especialidad);
+        whereCons.push(`msdescription_es = $${params.length + 1}`);
+        params.push(especialidad);
       }
-      query = `
-        SELECT TOP 500
-          CONVERT(varchar(10), Fecha, 120) AS 'Fecha',
-          LEFT(CONVERT(varchar, Hora, 108), 5) AS 'Hora',
-          Numero_Cita AS 'Num Cita',
-          Paciente AS 'Paciente',
-          Medico AS 'Médico',
-          MSDescription_ES AS 'Especialidad',
-          Estatus_Orden_Venta AS 'Estatus'
-        FROM V_UDR_CONSULTA_DIA
+      const result = await pgPool.query(`
+        SELECT TO_CHAR(fecha, 'YYYY-MM-DD') AS "Fecha", LEFT(hora::text, 5) AS "Hora",
+          numero_cita AS "Num Cita", paciente AS "Paciente", medico AS "Médico",
+          msdescription_es AS "Especialidad", estatus_orden_venta AS "Estatus"
+        FROM dw_vertical_consulta_dia
         WHERE ${whereCons.join(' AND ')}
-        ORDER BY Fecha DESC, Hora DESC
-      `;
-      const result = await request.query(query);
-      rows = result.recordset;
+        ORDER BY fecha DESC, hora DESC LIMIT 500`, params);
+      rows = result.rows;
+      const { getDashboardSyncStatus } = require('../services/dashboardSync.service');
+      const state = await getDashboardSyncStatus('consulta').catch(() => null);
+      if (!rows.length && !coversSnapshot(state, params[0], params[1])) {
+        return res.status(409).json({ ok: false, error: 'Las consultas todavía no tienen una copia confirmada para exportar. Intenta de nuevo cuando termine la actualización.' });
+      }
     } else if (dashboard === 'eficiencia') {
       sheetName = 'Censo_Eficiencia';
       let whereClauses = ["1=1"];
@@ -2115,7 +1900,6 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
       return res.status(400).json({ error: 'Dashboard no reconocido para exportar' });
     }
 
-    // 2. Generar Excel
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet(sheetName);
 
@@ -2153,11 +1937,10 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
       keys.forEach((key, i) => {
         const cell = headerRow.getCell(i + 1);
         cell.value = key;
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF004687' } }; // Azul Institucional
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF004687' } };  
         cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, name: 'Arial', size: 11 };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        
-        // Ajustar ancho
+
         sheet.getColumn(i + 1).width = Math.max(15, key.length + 5);
       });
       headerRow.height = 25;
@@ -2169,13 +1952,11 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
           const cell = excelRow.getCell(colIndex + 1);
           let val = row[key];
           cell.value = val;
-          
-          // Formato moneda
+
           if (key === 'Ingresos' || key === 'Utilidad' || key === 'Saldo') {
             cell.numFmt = '$#,##0.00';
           }
-          
-          // Filas alternadas
+
           if (rowIndex % 2 === 0) {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F6F9' } };
           }
@@ -2201,14 +1982,14 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
   try {
     const { tipo } = req.params;
     let areaNombre = 'IMAGENOLOGIA';
-    let sapGroupCode = 117; // Imagenología
+    let sapGroupCode = 117;  
     if (tipo === 'laboratorio') {
       areaNombre = 'LABORATORIO';
-      sapGroupCode = 101; // Laboratorio
+      sapGroupCode = 101;  
     }
     if (tipo === 'farmacia') {
       areaNombre = 'FARMACIA';
-      sapGroupCode = 115; // Farmacia
+      sapGroupCode = 115;  
     }
 
     let { startDate, endDate } = req.query;
@@ -2219,10 +2000,9 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
     const effectiveEndDate = endDate || todayStr + ' 23:59:59';
 
     const split = splitDateRange(effectiveStartDate, effectiveEndDate);
-    const trendMap = {}; // Clave: Yr-Mes
-    const estudiosMap = {}; // Clave: Estudio
+    const trendMap = {};  
+    const estudiosMap = {};  
 
-    // Helper para agregar filas a la tendencia
     const addTrendRow = (yr, mes, volumen, ingresos) => {
       const key = `${yr}-${mes}`;
       if (!trendMap[key]) {
@@ -2232,13 +2012,12 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
       trendMap[key].ingresos += ingresos || 0;
     };
 
-    // Helper para agregar filas a los estudios
     const addEstudioRow = (procedimiento, cantidad) => {
       const p = procedimiento || 'Desconocido';
       estudiosMap[p] = (estudiosMap[p] || 0) + (cantidad || 0);
     };
 
-    // 1. Obtener histórico de PostgreSQL
+    // Obtener histórico de PostgreSQL
     if (split.pgStart && split.pgEnd) {
       const pgTrendRes = await pgPool.query(`
         SELECT 
@@ -2266,7 +2045,7 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
       pgTopRes.rows.forEach(r => addEstudioRow(r.procedimiento, r.cantidad));
     }
 
-    // 2. Obtener lo de hoy de SQL Server
+    // Obtener lo de hoy de SQL Server
     if (split.hasToday && split.remoteStart) {
       const mssqlPool = await connectRemoteDB();
       const request = mssqlPool.request();
@@ -2300,8 +2079,7 @@ router.get('/export-excel', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_
       mssqlTopRes.recordset.forEach(r => addEstudioRow(r.procedimiento, r.cantidad));
     }
 
-    // 3. Obtener Ingresos SAP (Cruce contabilidad)
-    const sapMap = {}; // Clave: Yr-Mes
+    const sapMap = {};  
     const addSapAmount = (yr, mes, total) => {
       const key = `${yr}-${mes}`;
       sapMap[key] = (sapMap[key] || 0) + total;
@@ -2388,7 +2166,7 @@ router.get('/cuneros-nativo', authenticate, async (req, res, next) => {
 
     const split = splitDateRange(effectiveStartDate, effectiveEndDate);
 
-    // 1. Total de Recién Nacidos
+    // Total de Recién Nacidos
     const fetchRN = async () => {
       let count = 0;
       if (split.pgStart && split.pgEnd) {
@@ -2406,7 +2184,6 @@ router.get('/cuneros-nativo', authenticate, async (req, res, next) => {
       return count;
     };
 
-    // 2. Ingresos SAP Contabilidad Oficial
     const fetchSap = async () => {
       let total = 0;
       if (split.pgStart && split.pgEnd) {
@@ -2434,7 +2211,6 @@ router.get('/cuneros-nativo', authenticate, async (req, res, next) => {
       return total;
     };
 
-    // 3. Ingresos UCIN Vertical
     const fetchUCIN = async () => {
       let total = 0;
       if (split.pgStart && split.pgEnd) {
@@ -2449,7 +2225,7 @@ router.get('/cuneros-nativo', authenticate, async (req, res, next) => {
       return total;
     };
 
-    // 4. Consumo Fórmulas e Insumos
+    // Consumo Fórmulas e Insumos
     const fetchInsumos = async () => {
       let topInsumos = [];
       let totalFormulas = 0;
@@ -2519,7 +2295,7 @@ router.get('/uci-nativo', authenticate, async (req, res, next) => {
     const effectiveEndDate = endDate || todayStr + ' 23:59:59';
     const split = splitDateRange(effectiveStartDate, effectiveEndDate);
 
-    // 1. Camas en vivo y censo
+    // Camas en vivo y censo
     const fetchCenso = async () => {
       let occupiedBeds = [];
       try {
@@ -2624,7 +2400,7 @@ router.get('/uci-nativo', authenticate, async (req, res, next) => {
       };
     };
 
-    // 2. Estadísticas Clínicas
+    // Estadísticas Clínicas
     const fetchClinical = async () => {
       let totalEgresos = 0;
       let defunciones = 0;
@@ -2680,7 +2456,7 @@ router.get('/uci-nativo', authenticate, async (req, res, next) => {
       return { TotalEgresos: totalEgresos, Defunciones: defunciones, EstanciaPromedio: estanciaPromedio };
     };
 
-    // 3. Consultas Financieras en PostgreSQL
+    // Consultas Financieras en PostgreSQL
     const fetchFinanzas = async () => {
       const [finRes, grupoRes, insumosRes, listaPacientesRes] = await Promise.all([
         pgPool.query(`
@@ -2846,25 +2622,21 @@ router.get('/geografia', authenticate, async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
-/**
- * GET /api/dashboard/sap/vidas-salvadas
- * Consulta directa a SAP B1 para obtener atenciones médicas con uso de sala de choque (Detalle)
- */
+
 router.get('/sap/vidas-salvadas', authenticate, async (req, res) => {
   try {
     let { startDate, endDate, periodo } = req.query;
-    
-    // Resolve date string for SAP Service Layer (YYYY-MM-DD)
+
     let d = new Date();
     if (periodo === 'semana') d.setDate(d.getDate() - 7);
     else if (periodo === 'trimestre') d.setMonth(d.getMonth() - 3);
-    else if (periodo === 'año') { d = new Date(d.getFullYear(), 0, 1); } // 1 de enero del año actual
+    else if (periodo === 'año') { d = new Date(d.getFullYear(), 0, 1); }  
     else if (periodo === 'mes') d.setMonth(d.getMonth() - 1);
-    else if (!startDate) d.setMonth(d.getMonth() - 1); // default to mes if no dates passed
+    else if (!startDate) d.setMonth(d.getMonth() - 1);  
 
     let sapDate = '';
     if (startDate) {
-      sapDate = startDate; // Assumes YYYY-MM-DD
+      sapDate = startDate;  
     } else {
       sapDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     }
@@ -2884,16 +2656,13 @@ router.get('/sap/vidas-salvadas', authenticate, async (req, res) => {
   }
 });
 
-/**
- * GET /api/dashboard/sap/vidas-salvadas/:atencion/detalle
- * Obtiene el detalle de la atencion (SAP y Vertical) para el modal
- */
+/* GET /api/dashboard/sap/vidas-salvadas/:atencion/detalle */
 router.get('/sap/vidas-salvadas/:atencion/detalle', authenticate, async (req, res) => {
   try {
     const atencion = req.params.atencion;
+    if (!/^\d{1,20}$/.test(atencion)) return res.status(400).json({ ok: false, error: 'Escribe un número de cuenta válido.' });
     const pool = await connectRemoteDB();
-    
-    // 1. SAP Details via Service Layer
+
     const sapService = require('../services/sap.service');
     await sapService._ensureSession();
     const queryName = 'EscandonBIDetalleAtencion';
@@ -2908,7 +2677,7 @@ router.get('/sap/vidas-salvadas/:atencion/detalle', authenticate, async (req, re
         T1.LineTotal AS "TotalLinea"
       FROM OINV T0
       INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      WHERE T0.U_PCNum = '${atencion}' AND T0.CANCELED = 'N'
+      WHERE T0.U_PCNum = :atencion AND T0.CANCELED = 'N'
       
       UNION ALL
       
@@ -2922,23 +2691,20 @@ router.get('/sap/vidas-salvadas/:atencion/detalle', authenticate, async (req, re
         T1.LineTotal AS "TotalLinea"
       FROM ORDR T0
       INNER JOIN RDR1 T1 ON T0.DocEntry = T1.DocEntry
-      WHERE T0.U_PCNum = '${atencion}' AND T0.CANCELED = 'N'
+      WHERE T0.U_PCNum = :atencion AND T0.CANCELED = 'N'
     `;
     
     let sapData = [];
     try {
-      try {
-        await sapService.post('/SQLQueries', { SqlCode: queryName, SqlName: queryName, SqlText: sapSqlText });
-      } catch(e) {
-        await sapService.patch(`/SQLQueries('${queryName}')`, { SqlText: sapSqlText });
-      }
-      const sapRes = await sapService.get(`/SQLQueries('${queryName}')/List`);
-      sapData = sapRes?.data?.value || [];
+      const { ensureSapQuery } = require('../services/sapQueryRegistration.service');
+      await ensureSapQuery(queryName, sapSqlText);
+      const parameters = new URLSearchParams({ atencion: `'${atencion}'` });
+      sapData = await sapService.fetchAllPages(`/SQLQueries('${queryName}')/List?${parameters}`);
     } catch(err) {
-      console.error('[SAP SL] Error en query de atencion:', err.error || err);
+      console.warn('[SAP SL] Detalle de atención pendiente:', err.status || err.code || 'SAP_SOURCE_FAILED');
+      throw err;
     }
 
-    // 2. Vertical Details (PCIT)
     const verticalQuery = `
       SELECT 
         PCITNum,
@@ -2966,14 +2732,11 @@ router.get('/sap/vidas-salvadas/:atencion/detalle', authenticate, async (req, re
 
   } catch (err) {
     console.error('Error en detalle de vidas salvadas:', err);
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(502).json({ ok: false, error: 'No se pudo completar el detalle de la atención. Intenta de nuevo cuando termine la actualización.' });
   }
 });
 
-/**
- * GET /api/dashboard/consulta-externa-nativo
- * Dashboard nativo para Consulta Externa (VERTICAL y SAP)
- */
+/* GET /api/dashboard/consulta-externa-nativo */
 router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     let { startDate, endDate, search } = req.query;
@@ -3014,7 +2777,6 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
       params.endDate = endDate;
     }
 
-    // Ejecutar en paralelo consultas programadas y completadas con columnas específicas
     const req1 = pool.request();
     const req2 = pool.request();
     if (params.startDate) { req1.input('startDate', params.startDate); req2.input('startDate', params.startDate); }
@@ -3036,7 +2798,6 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
     const programadasData = progRes.recordset || [];
     const diaData = diaRes.recordset || [];
 
-    // Filtro Search
     let finalDiaData = diaData;
     let finalProgData = programadasData;
     
@@ -3063,8 +2824,7 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
       nombre: k,
       valor: medicosCount[k]
     })).sort((a,b) => b.valor - a.valor).slice(0, 10);
-    
-    // KPIs
+
     const totalProgramadas = programadasData.length;
     let cancelaciones = 0;
     let asistencias = 0;
@@ -3094,7 +2854,6 @@ router.get('/consulta-externa-nativo', authenticate, authorize(['ADMIN', 'DIRECT
     });
     const tendencia = Object.keys(tendenciaMap).sort().map(k => ({ fecha: k, consultas: tendenciaMap[k] }));
 
-    // Especialidades (Pie Chart)
     const espCount = {};
     finalProgData.forEach(p => {
       const e = p.Especialidad || 'OTRA';
@@ -3151,7 +2910,6 @@ router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR',
     
     if (endDate && endDate.length === 10) endDate += ' 23:59:59';
 
-    // 1. Obtener de SAP el catálogo real de Aseguradoras (GroupCode = 109)
     let sapBPs = [];
     let bpNames = {};
     try {
@@ -3272,10 +3030,6 @@ router.get('/aseguradoras-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR',
   }
 });
 
-/**
- * GET /api/dashboard/finanzas-nativo
- * Dashboard de Ingresos y Egresos (Caja / Pagos)
- */
 router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res, next) => {
   try {
     let { startDate, endDate, search } = req.query;
@@ -3286,8 +3040,7 @@ router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
     if (!endDate || endDate === 'undefined' || endDate === 'null' || endDate.trim() === '') {
       endDate = new Date().toISOString().split('T')[0];
     }
-    
-    // Regla de negocio: Datos válidos a partir del 1 de abril de 2026
+
     if (startDate < '2026-04-01') {
       startDate = '2026-04-01';
     }
@@ -3295,7 +3048,6 @@ router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
     let sapStartDate = startDate.split(' ')[0];
     let sapEndDate = endDate.split(' ')[0];
 
-    // Si fecha inicio es mayor que fecha fin, ordenarlas cronológicamente
     if (sapStartDate > sapEndDate) {
       const tmp = sapStartDate;
       sapStartDate = sapEndDate;
@@ -3439,7 +3191,6 @@ router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
       console.error("[PostgreSQL Error - Finanzas] Error fetching PurchaseInvoices for Egresos:", e.message);
     }
 
-    // Sort all transactions by date descending
     transacciones.sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
 
     const metodosData = [
@@ -3470,10 +3221,6 @@ router.get('/finanzas-nativo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
   }
 });
 
-/**
- * GET /api/dashboard/finanzas-nativo/factura/:docNum
- * Detalle completo de una Factura de Proveedor (Egreso) desde SAP Service Layer
- */
 router.get('/finanzas-nativo/factura/:docNum', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     const { docNum } = req.params;
@@ -3516,10 +3263,6 @@ router.get('/finanzas-nativo/factura/:docNum', authenticate, authorize(['ADMIN',
   }
 });
 
-/**
- * GET /api/dashboard/finanzas-nativo/ingreso/:docNum
- * Detalle completo de un Ingreso (Incoming Payment) desde SAP Service Layer
- */
 router.get('/finanzas-nativo/ingreso/:docNum', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     const { docNum } = req.params;
@@ -3593,7 +3336,6 @@ router.get('/finanzas-nativo/ingreso/:docNum', authenticate, authorize(['ADMIN',
   }
 });
 
-
 router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
   try {
     let { startDate, endDate } = req.query;
@@ -3612,7 +3354,7 @@ router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
     const effectiveEndDate = endDate || todayStr + ' 23:59:59';
     const split = splitDateRange(effectiveStartDate, effectiveEndDate);
 
-    // 1. Censo de camas en vivo
+    // Censo de camas en vivo
     const fetchCenso = async () => {
       let occupiedBeds = [];
       try {
@@ -3716,7 +3458,6 @@ router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
       };
     };
 
-    // 2. Estadísticas Clínicas: rápido desde PostgreSQL DW + SQL Server hoy si aplica
     const fetchClinical = async () => {
       let totalEgresos = 0;
       let defunciones = 0;
@@ -3771,7 +3512,7 @@ router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
       return { TotalEgresos: totalEgresos, Defunciones: defunciones, EstanciaPromedio: estanciaPromedio };
     };
 
-    // 3. Consultas Financieras en PostgreSQL en paralelo
+    // Consultas Financieras en PostgreSQL en paralelo
     const fetchFinanzas = async () => {
       const [finRes, sapRes, grupoRes, insumosRes, listaPacientesRes] = await Promise.all([
         pgPool.query(`
@@ -3889,5 +3630,4 @@ router.get('/hospitalizacion-nativo', authenticate, async (req, res, next) => {
 });
 
 module.exports = router;
-
 

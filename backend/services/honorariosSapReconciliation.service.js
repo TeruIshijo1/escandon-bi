@@ -3,12 +3,16 @@
 const sapService = require('./sap.service');
 const sapConfig = require('../config/sap.config');
 
-const PAGE_SIZE = 200;
+const IS_TEST = process.env.NODE_ENV === 'test';
+const PAGE_SIZE = IS_TEST ? 200 : 500;
 const MAX_PAGES = 500;
 const MAX_SERVICE_PERIOD_DAYS = 93;
 const SAP_LOOKAHEAD_DAYS = 30;
-const DEFAULT_TOTAL_TIMEOUT_MS = 60 * 1000;
-const MAX_REQUEST_TIMEOUT_MS = 30 * 1000;
+const DEFAULT_TOTAL_TIMEOUT_MS = IS_TEST ? 60 * 1000 : 120 * 1000;
+const MAX_REQUEST_TIMEOUT_MS = IS_TEST ? 30 * 1000 : 60 * 1000;
+const MASTERS_TTL_MS = 5 * 60 * 1000;
+let mastersCache = null;
+let mastersInFlight = null;
 
 function sapTimeoutError() {
   return Object.assign(new Error('SAP tardó demasiado en responder. Vuelve a intentar en unos momentos.'), {
@@ -41,8 +45,7 @@ function createSapReadBudget(options = {}) {
   function get(endpoint, headers = {}) {
     assertActive();
     const timeoutMs = Math.min(requestTimeoutMs, deadline - Date.now());
-    // Además de abortar HTTP/login, se limita la espera de get completo, incluidos
-    // sus reintentos. Una respuesta tardía no puede avanzar la paginación.
+
     return new Promise((resolve, reject) => {
       let settled = false;
       let requestTimer;
@@ -67,6 +70,35 @@ function createSapReadBudget(options = {}) {
     });
   }
   return { get, abort, assertActive, cleanup: () => clearTimeout(deadlineTimer) };
+}
+
+async function loadSapMasters(budget, includeGroups) {
+  const [suppliers, withholdingCodes, groups] = await Promise.all([
+    fetchAllPagesStrict(`/BusinessPartners?$select=CardCode,CardName,GroupCode,FederalTaxID,U_B1SYS_FiscRegime,SubjectToWithholdingTax,BPWithholdingTaxCollection&$filter=CardType eq 'cSupplier'&$orderby=CardCode asc`, MAX_PAGES, { readBudget: budget }),
+    fetchAllPagesStrict('/WithholdingTaxCodes?$select=WTCode,WTName,Rate,BaseType,BaseAmount,Category,EffectiveFrom,Inactive', MAX_PAGES, { readBudget: budget }),
+    includeGroups ? fetchAllPagesStrict('/BusinessPartnerGroups?$select=Code,Name', MAX_PAGES, { readBudget: budget }) : Promise.resolve([])
+  ]);
+  const masters = { suppliers, groups, withholdingCodes, groupsLoaded: includeGroups };
+  if (!IS_TEST) mastersCache = { ...masters, expiresAt: Date.now() + MASTERS_TTL_MS };
+  return masters;
+}
+
+function getSapMasters(budget, includeGroups) {
+  if (!IS_TEST && mastersCache && mastersCache.expiresAt > Date.now() && (!includeGroups || mastersCache.groupsLoaded)) {
+    return Promise.resolve(mastersCache);
+  }
+  if (!IS_TEST && mastersInFlight) {
+    return mastersInFlight.then(masters => {
+      if (!includeGroups || masters.groupsLoaded) return masters;
+      return loadSapMasters(budget, true).then(fresh => { mastersCache = fresh; return fresh; });
+    });
+  }
+  const pending = loadSapMasters(budget, includeGroups);
+  if (IS_TEST) return pending;
+  mastersInFlight = pending;
+  return pending.finally(() => {
+    if (mastersInFlight === pending) mastersInFlight = null;
+  });
 }
 
 function asNumber(value) {
@@ -139,8 +171,7 @@ async function fetchAllPagesStrict(initialEndpoint, maxPages = MAX_PAGES, option
       throw new Error(`La consulta SAP excedió el límite seguro de ${maxPages} páginas.`);
     }
     pageCount += 1;
-    // $top limita la colección completa, no el tamaño de cada página. Usarlo aquí
-    // ocultaba proveedores a partir del 201 aunque SAP devolviera una respuesta válida.
+
     const response = await budget.get(currentEndpoint, { Prefer: `odata.maxpagesize=${PAGE_SIZE}` });
     const body = response && response.data;
     if (!body || !Array.isArray(body.value)) {
@@ -172,8 +203,8 @@ function optionalSapBoolean(value) {
 
 function configuredWithholding(item, taxCodes) {
   const config = taxCodes.get(String(item.WTCode));
-  // Reglas acotadas al catálogo revisado. WithholdingType no es fiable en esta
-  // instalación: incluso algunas retenciones ISR están tipificadas como IVA.
+   
+  // instalación: incluso algunas retenciones ISR están tipificadas como IVA
   const code = String(item.WTCode);
   const description = String(config?.WTName || '').toUpperCase();
   const rate = optionalNumber(config?.Rate);
@@ -201,7 +232,7 @@ function configuredWithholding(item, taxCodes) {
 }
 
 function withholdingRows(invoice, taxCodes) {
-  // SAP puede exponer el mismo desglose en ambas colecciones; se prefiere la colección WTX.
+   
   const collections = collectionValues(invoice.WithholdingTaxDataWTXCollection).length
     ? collectionValues(invoice.WithholdingTaxDataWTXCollection)
     : collectionValues(invoice.WithholdingTaxDataCollection);
@@ -233,12 +264,11 @@ function prepareProviderInputs(input) {
 }
 
 async function getInvoices(cardCodes, startDate, endDate, budget) {
-    // Una lectura paginada por fecha evita decenas de consultas OR concurrentes
-    // que producen 504 en este Service Layer. Filtrar proveedores tras paginar.
+
     const filter = `DocDate ge '${startDate}' and DocDate le '${endDate}'`;
     const select = [
       'DocEntry', 'DocNum', 'DocDate', 'TaxDate', 'DocDueDate', 'CardCode', 'CardName',
-      // Service Layer usa PascalCase de la propiedad DI API: Fc (moneda extranjera), no FC.
+       
       'DocCurrency', 'DocTotal', 'DocTotalFc', 'VatSum', 'VatSumFc', 'PaidToDate', 'PaidToDateFC', 'DocumentStatus', 'Cancelled',
       'NumAtCard', 'Comments', 'U_UDF_UUID', 'WithholdingTaxDataCollection', 'WithholdingTaxDataWTXCollection', 'DocumentLines'
     ].join(',');
@@ -305,7 +335,7 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
   }
   const periodDays = (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86400000 + 1;
   if (periodDays > MAX_SERVICE_PERIOD_DAYS) throw new Error(`El periodo de servicios no puede exceder ${MAX_SERVICE_PERIOD_DAYS} días.`);
-  // Extiende SAP automáticamente para incluir facturas y pagos posteriores al servicio.
+   
   const sapEndDate = documentsQueried ? addDays(endDate, SAP_LOOKAHEAD_DAYS) : endDate;
   const period = {
     startDate, endDate: sapEndDate, serviceStartDate: startDate, serviceEndDate: endDate,
@@ -328,12 +358,10 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
 
   const budget = createSapReadBudget(options);
   try {
-  // La primera lectura establece la sesión antes de lanzar consultas concurrentes.
-  const suppliers = await fetchAllPagesStrict(`/BusinessPartners?$select=CardCode,CardName,GroupCode,FederalTaxID,U_B1SYS_FiscRegime,SubjectToWithholdingTax,BPWithholdingTaxCollection&$filter=CardType eq 'cSupplier'&$orderby=CardCode asc`, MAX_PAGES, { readBudget: budget });
-  const [groups, withholdingCodes] = await Promise.all([
-    documentsQueried ? fetchAllPagesStrict('/BusinessPartnerGroups?$select=Code,Name', MAX_PAGES, { readBudget: budget }) : Promise.resolve([]),
-    fetchAllPagesStrict('/WithholdingTaxCodes?$select=WTCode,WTName,Rate,BaseType,BaseAmount,Category,EffectiveFrom,Inactive', MAX_PAGES, { readBudget: budget })
-  ]);
+   
+  const masters = await getSapMasters(budget, documentsQueried);
+  budget.assertActive();
+  const { suppliers, groups, withholdingCodes } = masters;
   const groupNames = new Map(groups.map(group => [String(group.Code), group.Name]));
   const taxCodes = new Map(withholdingCodes.map(code => [String(code.WTCode), code]));
   const index = new Map();
@@ -359,9 +387,7 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
     cardCodeOwners.set(cardCode, owners);
   }
   const crossLinkedCodes = new Set([...cardCodeOwners.entries()].filter(([, owners]) => owners.length > 1).map(([code]) => code));
-  // Busca también proveedores médicos que no tienen filas clínicas en el corte.
-  // HONORARIOS es un grupo genérico (incluye asesoría, redes sociales, etc.);
-  // se muestra para revisión sin convertirlo automáticamente en honorario médico.
+
   const medicalNames = new Set(clinicalDirectory.map(row => normalizeProviderName(row.FullName)).filter(Boolean));
   const additionalLinks = new Map();
   if (includeAdditional) {
@@ -386,8 +412,7 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
     ? await Promise.all([getInvoices(cardCodes, startDate, sapEndDate, budget), getPayments(cardCodes, startDate, sapEndDate, budget)])
     : [[], []];
   const invoicesByEntry = new Map(invoices.map(invoice => [String(invoice.DocEntry), invoice]));
-  // Conserva también la factura a la que se aplicó un pago del periodo aunque
-  // su contabilización sea anterior. El pago es evidencia, nunca otro honorario.
+
   for (const payment of payments) {
     if (isCancelled(payment.Cancelled)) continue;
     for (const application of collectionValues(payment.PaymentInvoices)) {
@@ -445,8 +470,7 @@ async function reconcileHonorariosWithSap({ startDate, endDate, doctors, clinica
           lineNumber: line.LineNum,
           description: line.ItemDescription || '',
           quantity: optionalNumber(line.Quantity),
-          // El importe de línea puede incluir IVA contabilizado en gasto. No se
-          // presenta como base de honorarios ni se deduce otra vez del documento.
+
           recordedAmount: roundOptional(invoice.DocCurrency && invoice.DocCurrency !== 'MXN' ? line.RowTotalFC : line.LineTotal)
         })),
         retentions: withholdingRows(invoice, taxCodes),

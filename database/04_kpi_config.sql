@@ -1,19 +1,19 @@
--- ═══════════════════════════════════════════════════════════════════
--- 04_kpi_config.sql — Configuración de Indicadores KPI (PostgreSQL)
--- Hospital Escandón BI Platform v4.0
--- Cada fila = un cuadro/indicador en la plataforma
--- ═══════════════════════════════════════════════════════════════════
+
+
+
+
+
 
 CREATE TABLE IF NOT EXISTS KPIConfig (
   KPIId         SERIAL PRIMARY KEY,
-  ElementoId    TEXT    NOT NULL UNIQUE,   -- 'directivo.ocupacion'
-  Seccion       TEXT    NOT NULL,          -- 'directivo' | 'mando' | 'area' | 'stats' | 'audit' | 'home'
-  NombreDefault TEXT    NOT NULL,          -- Nombre original del sistema (no cambia)
-  NombreCustom  TEXT    NULL,              -- Lo que escribe el Admin (NULL = usa NombreDefault)
+  ElementoId    TEXT    NOT NULL UNIQUE,   
+  Seccion       TEXT    NOT NULL,          
+  NombreDefault TEXT    NOT NULL,          
+  NombreCustom  TEXT    NULL,              
   Icono         TEXT    NOT NULL DEFAULT '📊',
-  PBIUrl        TEXT    NULL,              -- URL completa del reporte Power BI al que navega al hacer click
-  PBIUrl2       TEXT    NULL,              -- URL de la página 2 (opcional)
-  PBIUrl3       TEXT    NULL,              -- URL de la página 3 (opcional)
+  PBIUrl        TEXT    NULL,              
+  PBIUrl2       TEXT    NULL,              
+  PBIUrl3       TEXT    NULL,              
   Activo        INTEGER NOT NULL DEFAULT 1,
   FechaModif    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   MultiPagina   INTEGER DEFAULT 0,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS KPIConfig (
   JsonFilePath  TEXT    DEFAULT NULL
 );
 
--- ── Seed: Estadísticas Demográficas (8) ──────────────────────────
+
 INSERT INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
   ('stats.egresos_total',   'stats', 'Total Egresos',          '📋'),
   ('stats.promedio_edad',   'stats', 'Promedio de Edad',       '👤'),
@@ -33,7 +33,7 @@ INSERT INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
   ('stats.egresos_servicio', 'stats', 'Egresos por Servicio', '📊')
 ON CONFLICT (ElementoId) DO NOTHING;
 
--- ── Seed: Dashboard por Área (36 para las 9 áreas) ──────────────────
+
 INSERT INTO KPIConfig (ElementoId, Seccion, NombreDefault, Icono) VALUES
   ('area.quirofano.ocupacion', 'area', 'Ocupación - Quirófano', '🏥'),
   ('area.quirofano.egresos', 'area', 'Egresos Mes - Quirófano', '🚪'),

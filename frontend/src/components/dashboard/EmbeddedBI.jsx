@@ -1,29 +1,22 @@
-/**
- * EmbeddedBI.jsx — Visor de Tableros BI Protegido
- * 
- * Implementa medidas de seguridad para "Publish to Web":
- *  1. Ofuscación de URL (Base64)
- *  2. Bloqueo de Click Derecho (ContextMenu)
- *  3. Bloqueo de Teclas de Inspección (F12, Ctrl+Shift+I/J, Ctrl+U)
- *  4. UI Premium y Limpia
- */
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { API_BASE } from '../../api/config';
 import PremiumLoader from '../shared/PremiumLoader';
 
 export default function EmbeddedBI({ reportId, height = 480, filters = {}, multiPagina = false }) {
   const containerRef = useRef(null);
-  const [state, setState] = useState('loading'); // loading | ready | error
+  const [state, setState] = useState('loading');  
   const [embedUrl, setEmbedUrl] = useState('');
   const [isMultiPage, setIsMultiPage] = useState(multiPagina);
-  const [refreshKey, setRefreshKey] = useState(0); // Para forzar recarga del iframe
+  const [refreshKey, setRefreshKey] = useState(0);  
 
   // Función para decodificar URL si viene ofuscada (Base64)
   const getDecodedUrl = (id) => {
     if (!id) return '';
     if (id.startsWith('http')) return id;
     try {
-      // Intentar decodificar Base64
+       
       return atob(id);
     } catch (e) {
       return id;
@@ -43,7 +36,7 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
       if (params.get('autoPrint') === 'true') {
         setTimeout(() => {
           window.print();
-        }, 2000); // Dar tiempo a que el iframe cargue el contenido interno
+        }, 2000);  
       }
     } else if (reportId) {
       // Flujo de PowerBI Embedded (Token)
@@ -55,12 +48,11 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
           });
           if (!res.ok) throw new Error('No se pudo abrir el reporte. Intenta de nuevo.');
           const data = await res.json();
-          
-          // CRITICAL: Set the real URL from the database
+
           if (data.embedUrl && data.embedUrl.startsWith('http')) {
             setEmbedUrl(data.embedUrl);
           } else {
-            setEmbedUrl(''); // Blank state if invalid
+            setEmbedUrl('');  
           }
           if (data.multiPagina !== undefined) {
             setIsMultiPage(!!data.multiPagina);
@@ -79,14 +71,14 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
       })();
     }
 
-    // ── Medidas de Seguridad Anti-Inspección ──
+    // Medidas de Seguridad Anti-Inspección
     const handleKeyDown = (e) => {
-      // Bloquear F12
+       
       if (e.keyCode === 123) {
         e.preventDefault();
         return false;
       }
-      // Bloquear Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+       
       if (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) {
         e.preventDefault();
         return false;
@@ -108,7 +100,7 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
   };
 
   const handleRefresh = () => {
-    // En lugar de window.location.reload(), solo cambiamos el key del iframe
+     
     setRefreshKey(prev => prev + 1);
   };
 
@@ -163,7 +155,6 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
         }
       `}</style>
 
-      {/* Header del Embebido (Seguridad) */}
       <div className="bi-header-no-print" style={{ 
         padding: '0.75rem 1.25rem', 
         background: 'linear-gradient(90deg, #004687, #0088C9)',
@@ -219,7 +210,7 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
         className="bi-print-content"
         style={{ 
           width: '100%', 
-          flex: 1, // Usar flexbox para ocupar el resto del espacio
+          flex: 1,  
           position: 'relative', 
           background: '#F8FAFC' 
         }}
@@ -257,13 +248,9 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
             width: '100%', 
             height: '100%', 
             position: 'relative',
-            overflow: 'hidden' // Esencial para el recorte
+            overflow: 'hidden'  
           }}>
-            {/* 
-               Contenedor del Iframe con "Recorte" (Cropping)
-               Aumentamos el height del iframe y lo desplazamos para ocultar la barra inferior de PBI (aprox 36px)
-               No se recorta si es multipágina para permitir la barra de navegación nativa.
-            */}
+            {/* Contenedor del Iframe con "Recorte" (Cropping) */}
             <div style={{
               width: '100%',
               height: isMultiPage ? '100%' : 'calc(100% + 36px)',
@@ -295,10 +282,9 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
               background: 'transparent'
             }} />
 
-            {/* Máscaras de seguridad para ocultar Logo y Compartir de Power BI si es multipágina */}
             {isMultiPage && (
               <>
-                {/* Esquina Inferior Izquierda (Oculta "Microsoft Power BI") */}
+                
                 <div style={{
                   position: 'absolute', bottom: 0, left: 0,
                   width: '180px', height: '38px',
@@ -318,7 +304,6 @@ export default function EmbeddedBI({ reportId, height = 480, filters = {}, multi
         )}
       </div>
 
-      {/* Footer de seguridad */}
       <div className="bi-header-no-print" style={{
         padding: '0.5rem 1.5rem',
         background: '#F1F5F9',

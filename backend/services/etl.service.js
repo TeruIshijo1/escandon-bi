@@ -1,19 +1,9 @@
-/**
- * etl.service.js
- * Servicio ETL para Auditoría: Inventarios vs Cargos de Enfermería
- * Hospital Escandón BI Platform v1.0
- *
- * Proceso ETL Real desde SQL Server KH_HE (UDR_CUENTAS_SERVICIOS)
- */
+
+
 const { getDb } = require('../config/db');
 const { getRemoteDb, sql } = require('../config/remote-db');
 const sapInventoryService = require('./sapInventory.service');
 const sapService = require('./sap.service');
-
-/* ══════════════════════════════════════════════════════════════
-   ENDPOINT PRINCIPAL — /api/audit/inventarios-vs-cargos
-   Devuelve datos reales de conciliación cruzando la base KH_HE
-══════════════════════════════════════════════════════════════ */
 
   async function getDevolucionesFarmacia(fechaDesde, fechaHasta) {
     try {
@@ -149,7 +139,6 @@ const sapService = require('./sap.service');
         }
       }
 
-      // Si no hay filtro de fechas, limitamos los resultados para evitar colapsar la memoria y la BD
       if (!fechaDesde && !fechaHasta) {
         querySQL = querySQL.replace("SELECT *", "SELECT TOP 3000 *");
       }
@@ -235,7 +224,7 @@ async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, li
     request.input('area', sql.VarChar, `%${area}%`);
   }
   const parseDateStr = (dateStr, isEndOfDay) => {
-    // Si viene como DD/MM/YYYY, convertirlo a YYYY-MM-DD
+     
     if (dateStr.includes('/')) {
       const parts = dateStr.split('/');
       if (parts.length === 3 && parts[2].length === 4) {
@@ -261,9 +250,9 @@ async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, li
 
   // Mapear registros reales de la base KH_HE
   const partidas = rows.map(r => {
-    const cantSolicitada = r.CantAlmacen ?? 0; // CANTIDAD (Financiero)
-    const devuelto = parseFloat(r.Devuelto || 0); // DEVUELTO (Financiero)
-    const cantCargo = r.CantCargo ?? 0; // TOTAL (Consumo real financiero)
+    const cantSolicitada = r.CantAlmacen ?? 0;  
+    const devuelto = parseFloat(r.Devuelto || 0);  
+    const cantCargo = r.CantCargo ?? 0;  
     
     // Movimientos físicos
     const salidaFisica = parseFloat(r.SalidaFisica || 0);
@@ -343,7 +332,7 @@ async function getInventariosVsCargos({ area, estado, fechaDesde, fechaHasta, li
   };
 }
 
-/* ── Cálculo de métricas ─────────────────────────────────── */
+/* Cálculo de métricas */
 function calcularResumen(partidas) {
   const totales = {
     totalPartidas:  partidas.length,
@@ -354,12 +343,12 @@ function calcularResumen(partidas) {
     coincidencias: 0,
     diferencias: 0,
     montoDisputa: 0,
-    montoFuga: 0, // Nuevo: Monto no cobrado
+    montoFuga: 0,  
     porcentajeConciliado: 0
   };
 
   for (const p of partidas) {
-    totales.articulosSolicitados += p.salidaFisica; // Usar el dato físico para resumen
+    totales.articulosSolicitados += p.salidaFisica;  
     totales.articulosDevueltos += p.devolucionFisica;
     totales.articulosConsumidos += p.cantCargo;
     totales.montoCobrado += p.monto;
@@ -367,7 +356,7 @@ function calcularResumen(partidas) {
     // Lógica para detectar diferencias / faltantes Nivel 2
     if (p.estado === 'FALTANTE / NO COBRADO') {
         totales.diferencias++;
-        // Fuga = Diferencia entre lo que salió y lo que se cobró, multiplicado por el precio.
+         
         let diff = p.fisicoNeto - p.cantCargo;
         totales.montoFuga += (p.precioUnitario > 0 ? p.precioUnitario * diff : 0);
         totales.montoDisputa += (p.precioUnitario > 0 ? p.precioUnitario * diff : 0);
@@ -392,11 +381,7 @@ function calcularResumen(partidas) {
   return totales;
 }
 
-
-
-/* ══════════════════════════════════════════════════════════════
-   SERVICIO AUXILIAR — KPIs de Productividad (para Dashboard)
-══════════════════════════════════════════════════════════════ */
+/* SERVICIO AUXILIAR — KPIs de Productividad (para Dashboard) */
 async function getKPIsProductividad({ area } = {}) {
   const db = getDb();
   let sql = `
@@ -428,7 +413,7 @@ async function getKPIsProductividad({ area } = {}) {
   };
 }
 
-/* ── Tasa de Mortalidad ──────────────────────────────────── */
+/* Tasa de Mortalidad */
 async function getTasaMortalidad({ periodo = 'mes' } = {}) {
   const db = getDb();
   const dias = periodo === 'semana' ? 7 : periodo === 'año' ? 365 : 30;
@@ -582,7 +567,7 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
   // Enriquecer con caducidad/lotes de SAP (cruzando Vertical y SAP)
   try {
     const sapInventoryService = require('./sapInventory.service');
-    await sapInventoryService.syncInventoryCache();
+    await sapInventoryService.ensureInventoryData();
     const sapBatches = sapInventoryService.getBatchesCache() || [];
 
     records = records.map(row => {
@@ -594,12 +579,12 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
         
         if (itemBatches.length > 0) {
           if (lote) {
-            // Tenemos lote de Vertical, buscar su caducidad exacta en SAP
+             
             const exactBatch = itemBatches.find(b => b.Batch === lote);
             if (exactBatch && exactBatch.ExpirationDate) {
               caducidad = new Date(exactBatch.ExpirationDate);
             } else {
-              // El lote de Vertical NO está en SAP, aplicar FIFO
+               
               const fifoBatch = itemBatches.sort((a, b) => new Date(a.ExpirationDate) - new Date(b.ExpirationDate))[0];
               if (fifoBatch) {
                 lote = `${fifoBatch.Batch} (Auto-asignado SAP)`;
@@ -609,7 +594,7 @@ async function getCargosFarmaciaSAP({ area, fechaDesde, fechaHasta, limit = 5000
               }
             }
           } else {
-            // No hay lote en Vertical, tomar el FIFO de SAP
+             
             const fifoBatch = itemBatches.sort((a, b) => new Date(a.ExpirationDate) - new Date(b.ExpirationDate))[0];
             if (fifoBatch) {
               lote = `${fifoBatch.Batch} (Auto-asignado SAP)`;
@@ -663,8 +648,6 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
     request.input('fechaHasta', sql.DateTime, parseDateStr(fechaHasta, true));
   }
 
-  // Por ahora, como no tenemos las tablas de POS y Traspasos confirmadas,
-  // extraeremos los Cargos de Hospitalización y dejaremos la estructura preparada.
   const querySQL = `
     SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
     SELECT TOP (@limit)
@@ -726,21 +709,18 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
   const resultPOS = await request.query(querySQL_POS);
   let records = [...(resultCH.recordset || []), ...(resultPOS.recordset || [])];
 
-  // Obtener Transferencias (Traspasos) desde SAP Service Layer
   try {
     await sapService._ensureSession();
-    let sapFilter = "";
-    if (fechaDesde && fechaHasta) {
-      const fd = parseDateStr(fechaDesde, false).toISOString().split('T')[0];
-      const fh = parseDateStr(fechaHasta, true).toISOString().split('T')[0];
-      sapFilter = `&$filter=DocDate ge '${fd}' and DocDate le '${fh}'`;
-    }
+    const sapClauses = [];
+    if (fechaDesde) sapClauses.push(`DocDate ge '${parseDateStr(fechaDesde, false).toISOString().split('T')[0]}'`);
+    if (fechaHasta) sapClauses.push(`DocDate le '${parseDateStr(fechaHasta, true).toISOString().split('T')[0]}'`);
+    const sapFilter = sapClauses.length ? `&$filter=${encodeURIComponent(sapClauses.join(' and '))}` : '';
     const endpoint = `/StockTransfers?$select=DocNum,DocDate,CardCode,CardName,StockTransferLines${sapFilter}`;
-    const transfersRes = await sapService._request(endpoint, 'GET', null, { 'Cookie': sapService.sessionCookie });
+    const transfers = await sapService.fetchAllPages(endpoint);
     
-    if (transfersRes && transfersRes.data && transfersRes.data.value) {
+    if (transfers.length) {
       let sapTransfers = [];
-      transfersRes.data.value.forEach(t => {
+      transfers.forEach(t => {
         if (t.StockTransferLines) {
           t.StockTransferLines.forEach(line => {
             let lote = null;
@@ -765,17 +745,17 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
         }
       });
       records = records.concat(sapTransfers);
-      
-      // Ordenar todo nuevamente por FechaMovimiento descendente
+
       records.sort((a, b) => b.FechaMovimiento - a.FechaMovimiento);
     }
   } catch (err) {
     console.error('[ETL Service] Error al obtener traspasos de SAP SL:', err.message);
+    err.publicMessage = 'No se pudieron completar los movimientos. Intenta de nuevo cuando termine la actualización.';
+    throw err;
   }
 
-  // Enriquecer con caducidad/lotes de SAP para garantizar que esté respaldado
   try {
-    await sapInventoryService.syncInventoryCache();
+    await sapInventoryService.ensureInventoryData();
     const sapBatches = sapInventoryService.getBatchesCache() || [];
 
     records = records.map(row => {
@@ -783,8 +763,7 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
       let caducidad = row.Caducidad;
 
       if (!lote || !caducidad) {
-        // Si no hay lote en Vertical, buscar el lote más antiguo (FIFO) de este ItemCode en SAP
-        // O si hay lote pero no hay caducidad, buscar esa caducidad.
+
         const itemBatches = sapBatches.filter(b => b.ItemCode === row.Codigo);
         
         if (itemBatches.length > 0) {
@@ -794,7 +773,7 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
             if (exactBatch && exactBatch.ExpirationDate) {
               caducidad = new Date(exactBatch.ExpirationDate);
             } else {
-              // El lote de Vertical NO está en SAP, aplicar FIFO
+               
               const fifoBatch = itemBatches.sort((a, b) => new Date(a.ExpirationDate) - new Date(b.ExpirationDate))[0];
               if (fifoBatch) {
                 lote = `${fifoBatch.Batch} (Auto-asignado SAP)`;
@@ -804,7 +783,7 @@ async function getMasterOutputs({ fechaDesde, fechaHasta, almacen, limit = 5000 
               }
             }
           } else {
-            // No tenemos lote (ej. enfermería no lo registró), tomar el más próximo a caducar (FIFO)
+             
             const fifoBatch = itemBatches.sort((a, b) => new Date(a.ExpirationDate) - new Date(b.ExpirationDate))[0];
             if (fifoBatch) {
               lote = `${fifoBatch.Batch} (Auto-asignado SAP)`;

@@ -1,6 +1,6 @@
 const { Pool, types } = require('pg');
+const { ensureWarehouseBigintIdentities } = require('./kardexIdentityMigration');
 
-// INT8 (bigint) → number para que COUNT(*) etc. no lleguen como strings
 types.setTypeParser(20, (v) => (v === null ? null : parseInt(v, 10)));
 
 // Configuración del Pool de PostgreSQL para el Data Warehouse
@@ -10,6 +10,9 @@ const pool = new Pool({
   database: process.env.PGDATABASE || 'escandon_bi',
   port:     parseInt(process.env.PGPORT || '5432', 10),
   options:  "-c timezone=America/Mexico_City",
+  max:      parseInt(process.env.PGMAX || '25', 10),
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
   ...(process.env.PGPASSWORD ? { password: process.env.PGPASSWORD } : {}),
 });
 
@@ -60,8 +63,7 @@ async function initPostgresDW() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_sap_out_date ON sap_purchase_invoices (DocDate);`);
 
     // --- TABLAS PARA LOS TABLEROS DE CONTROL ---
-    
-    // Tabla PC (Cuentas)
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_vertical_pc (
         pcnum INT PRIMARY KEY,
@@ -308,6 +310,15 @@ async function initPostgresDW() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_v_pcit_pcnum ON dw_vertical_pcit (pcnum);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_v_cs_fecha ON dw_vertical_cuentas_servicios (fecha_de_cargo);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_v_cs_unidad ON dw_vertical_cuentas_servicios (unidad_de_servicio);`);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_dw_v_cs_identity
+      ON dw_vertical_cuentas_servicios (
+        COALESCE(folio_de_atencion, -1),
+        COALESCE(numero_de_orden, -1),
+        COALESCE(numero_de_cargo, -1),
+        COALESCE(codigo, '')
+      );
+    `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_v_prod_fecha ON dw_vertical_productividad_medicos (fecha);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_v_cons_fecha ON dw_vertical_consulta_dia (fecha);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_v_sol_fecha ON dw_vertical_solicitudes_estudios (fecha);`);
@@ -315,7 +326,6 @@ async function initPostgresDW() {
 
     // --- NUEVAS TABLAS DE NEGOCIO MIGRADAS DE SQLITE ---
 
-    // 1. Tabla SAP Traslados
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_sap_traslados (
         docentry INT PRIMARY KEY,
@@ -333,7 +343,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 2. Tabla de censo de Vertical
+    // Tabla de censo de Vertical
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_cirrus_censo (
         cuentahospitalaria VARCHAR(100) PRIMARY KEY,
@@ -344,10 +354,10 @@ async function initPostgresDW() {
       );
     `);
 
-    // 3. Tabla de consumos de Vertical
+    // Tabla de consumos de Vertical
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_cirrus_consumo (
-        idcargo SERIAL PRIMARY KEY,
+        idcargo BIGSERIAL PRIMARY KEY,
         cuentahospitalaria VARCHAR(100),
         fechacargo TIMESTAMP WITH TIME ZONE,
         codigo VARCHAR(100),
@@ -365,10 +375,10 @@ async function initPostgresDW() {
       );
     `);
 
-    // 4. Tabla SAP Kardex
+    // Tabla SAP Kardex
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_sap_kardex (
-        idkardex SERIAL PRIMARY KEY,
+        idkardex BIGSERIAL PRIMARY KEY,
         codigo VARCHAR(100),
         descripcion VARCHAR(255),
         almacenorigen VARCHAR(255),
@@ -384,10 +394,10 @@ async function initPostgresDW() {
       );
     `);
 
-    // 5. Tabla SAP Entradas
+    // Tabla SAP Entradas
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_sap_entradas (
-        identrada SERIAL PRIMARY KEY,
+        identrada BIGSERIAL PRIMARY KEY,
         fecha TIMESTAMP WITH TIME ZONE,
         numeroentrada VARCHAR(100),
         numerofactura VARCHAR(100),
@@ -402,7 +412,13 @@ async function initPostgresDW() {
       );
     `);
 
-    // 6. Tabla SAP Reorder Settings
+    const identities = await ensureWarehouseBigintIdentities(pool);
+    console.log('[PG DW] Identidades operativas BIGINT verificadas; contadores conservados.', {
+      ampliadas: identities.tables.filter(item => item.migrated).map(item => `${item.table}.${item.column}`),
+      sinCambios: identities.tables.filter(item => !item.migrated).map(item => `${item.table}.${item.column}`),
+    });
+
+    // Tabla SAP Reorder Settings
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_sap_reorder_settings (
         itemcode VARCHAR(100) PRIMARY KEY,
@@ -415,7 +431,6 @@ async function initPostgresDW() {
       );
     `);
 
-    // 6b. Snapshot persistente del inventario SAP (fallback offline cuando SAP no responde)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_sap_inventory_cache (
         itemcode VARCHAR(100),
@@ -435,7 +450,6 @@ async function initPostgresDW() {
     await pool.query(`ALTER TABLE dw_sap_inventory_cache ADD COLUMN IF NOT EXISTS price_hos DECIMAL(18,4) DEFAULT 0;`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_dw_sap_inv_cache_code ON dw_sap_inventory_cache (itemcode, whscode);`);
 
-    // 6c. Vínculos manuales producto-Excel -> código SAP (Configuración Dinámica Farmacia)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_reorder_excel_map (
         producto VARCHAR(255) PRIMARY KEY,
@@ -444,7 +458,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 7. Tabla SAP Pedidos
+    // Tabla SAP Pedidos
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_sap_pedidos (
         dockey VARCHAR(100) PRIMARY KEY,
@@ -465,7 +479,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 8. Tabla Recetas Ocultas (hidden prescriptions)
+    // Tabla Recetas Ocultas (hidden prescriptions)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dw_hidden_prescriptions (
         pcprit_num VARCHAR(100) PRIMARY KEY,
@@ -473,7 +487,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 9. Tabla Analítica para Machine Learning (Paso 1 DataScience)
+    // Tabla Analítica para Machine Learning (Paso 1 DataScience)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ml_dataset_reorden_sku (
         itemcode VARCHAR(100) PRIMARY KEY,
@@ -495,7 +509,6 @@ async function initPostgresDW() {
       );
     `);
 
-    // 10. Tabla Histórica para Entrenamiento de Machine Learning (Paso 2 DataScience)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ml_dataset_reorden_sku_history (
         snapshot_date DATE NOT NULL,
@@ -521,7 +534,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 11. Tabla de Predicciones de Machine Learning (Paso 3 DataScience)
+    // Tabla de Predicciones de Machine Learning (Paso 3 DataScience)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ml_predictions_reorden_sku (
         itemcode VARCHAR(100) PRIMARY KEY,
@@ -540,7 +553,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 12. Historial de corridas de entrenamiento ML (Paso 8 DataScience)
+    // Historial de corridas de entrenamiento ML (Paso 8 DataScience)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ml_model_runs (
         run_id SERIAL PRIMARY KEY,
@@ -557,7 +570,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 13. Dataset Histórico Mensual de Ingresos (Paso F1 DataScience)
+    // Dataset Histórico Mensual de Ingresos (Paso F1 DataScience)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ml_dataset_ingresos_mensual (
         periodo_mes VARCHAR(7), -- Formato 'YYYY-MM'
@@ -576,7 +589,7 @@ async function initPostgresDW() {
       );
     `);
 
-    // 14. Predicciones/Forecast de Ingresos (Paso F3 DataScience)
+    // Predicciones/Forecast de Ingresos (Paso F3 DataScience)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ml_forecast_ingresos_mensual (
         periodo_predicho VARCHAR(7), -- Formato 'YYYY-MM'
@@ -592,7 +605,6 @@ async function initPostgresDW() {
       );
     `);
 
-    // 15. Monitoreo y Registro de Ejecución de Jobs ML (Paso F4/Almacén DataScience)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ml_job_runs (
         job_id SERIAL PRIMARY KEY,
@@ -618,7 +630,6 @@ async function initPostgresDW() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_ml_hist_date ON ml_dataset_reorden_sku_history (snapshot_date);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_ml_job_runs_name_status ON ml_job_runs (job_name, status, started_at DESC);`);
 
-    // Migraciones: columnas para soporte de modelos de regresión en ml_model_runs
     await pool.query(`ALTER TABLE ml_model_runs ADD COLUMN IF NOT EXISTS model_type VARCHAR(50);`).catch(() => {});
     await pool.query(`ALTER TABLE ml_model_runs ADD COLUMN IF NOT EXISTS mae DECIMAL(18,4);`).catch(() => {});
     await pool.query(`ALTER TABLE ml_model_runs ADD COLUMN IF NOT EXISTS rmse DECIMAL(18,4);`).catch(() => {});
@@ -629,13 +640,11 @@ async function initPostgresDW() {
     await pool.query(`ALTER TABLE dw_sap_kardex ALTER COLUMN almacendestino TYPE VARCHAR(255);`).catch(() => {});
     await pool.query(`ALTER TABLE dw_sap_entradas ALTER COLUMN almacenreceptor TYPE VARCHAR(255);`).catch(() => {});
 
-    // Migraciones: columna fecha_desabasto (fecha en la que el SKU se agotó) en tablas ML
     await pool.query(`ALTER TABLE ml_dataset_reorden_sku ADD COLUMN IF NOT EXISTS fecha_desabasto TIMESTAMP WITH TIME ZONE;`).catch(() => {});
     await pool.query(`ALTER TABLE ml_dataset_reorden_sku_history ADD COLUMN IF NOT EXISTS fecha_desabasto TIMESTAMP WITH TIME ZONE;`).catch(() => {});
     await pool.query(`ALTER TABLE ml_predictions_reorden_sku ADD COLUMN IF NOT EXISTS fecha_desabasto TIMESTAMP WITH TIME ZONE;`).catch(() => {});
     await pool.query(`ALTER TABLE ml_predictions_reorden_sku ADD COLUMN IF NOT EXISTS fecha_estimada_agotamiento TIMESTAMP WITH TIME ZONE;`).catch(() => {});
 
-    // Nuevas migraciones a TEXT para evitar truncamientos y errores de inserción
     await pool.query(`ALTER TABLE dw_vertical_consulta_dia ALTER COLUMN medico TYPE TEXT;`).catch(() => {});
     await pool.query(`ALTER TABLE dw_vertical_consulta_dia ALTER COLUMN msdescription_es TYPE TEXT;`).catch(() => {});
     await pool.query(`ALTER TABLE dw_vertical_consulta_dia ALTER COLUMN paciente TYPE TEXT;`).catch(() => {});
@@ -706,7 +715,6 @@ async function initPostgresDW() {
     `);
     await require('../services/savedReportAccess.service').initAssignmentsTable(pool);
 
-    // Corrección de error de Excel en el código SAP del guante 8.5
     await pool.query(`UPDATE dw_sap_reorder_settings SET itemcode = 'ALG0065' WHERE itemcode = '#REF!';`).catch(() => {});
 
     // Sembrar configuraciones de reorden por defecto
@@ -737,6 +745,7 @@ async function initPostgresDW() {
     console.log('✅ Data Warehouse en PostgreSQL inicializado correctamente.');
   } catch (err) {
     console.error('❌ Error al inicializar PostgreSQL:', err.message);
+    throw err;
   }
 }
 

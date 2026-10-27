@@ -5,8 +5,6 @@ const { isExcludedHonorariosService } = require('../utils/honorariosScope');
 const numberOrNull = value => value === null || value === undefined || value === '' || !Number.isFinite(Number(value)) ? null : Number(value);
 const roundMoney = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
-// Sólo lecturas. La cita aporta identidad, fecha, realización y concepto;
-// el tabulador aporta la base. Nunca se usa el precio de venta como honorario.
 const APPOINTMENT_RECOVERY_SQL = `
   WITH Tariff AS (
     SELECT ITEMCODE, COUNT(*) TariffCount, MIN(IMPORTE) Fee, MIN(ITEMDESCRIPTION) Description
@@ -49,7 +47,7 @@ const APPOINTMENT_RECOVERY_SQL = `
     AND NULLIF(LTRIM(RTRIM(a.ItemCode)),'') IS NOT NULL
     AND (COALESCE(rt.ItemGroupName, item.ItemGroupName) IS NULL
       OR LTRIM(RTRIM(COALESCE(rt.ItemGroupName, item.ItemGroupName))) COLLATE Latin1_General_CI_AI
-        NOT IN ('ALMACEN GENERAL', 'FARMACIA', 'LABORATORIO', 'ESTUDIOS DE LABORATORIO', 'IMAGENOLOGIA'))
+        NOT IN ('ALMACEN GENERAL', 'FARMACIA', 'LABORATORIO', 'ESTUDIOS DE LABORATORIO'))
     AND NOT EXISTS (SELECT 1 FROM SOLN l WHERE l.SONum=a.SONum)
     AND NOT EXISTS (SELECT 1 FROM UDR_HON_PAGO v WHERE v.UDRKey=CONCAT('CITA-',a.PCAPNum))
   ORDER BY a.FromDate,a.PCAPNum`;
@@ -63,7 +61,7 @@ function mergeRecoveredAppointments(originalRows, candidates) {
   for (const candidate of scopedCandidates) {
     const key = `CITA-${candidate.PCAPNum}`;
     const existing = rows.filter(row => String(row.UDRKey) === key);
-    // Un renglón con concepto ya está representado: no agregar otro ni cambiarlo.
+     
     if (seen.has(key) || existing.some(row => row.CodigoServicio) || existing.length > 1) {
       coverage.duplicateCandidates += 1;
       continue;
@@ -117,6 +115,7 @@ function mergeRecoveredAppointments(originalRows, candidates) {
       SinTabulador: candidate.TariffCount !== 1 || !(fee > 0) ? 1 : 0,
       TieneSO: candidate.SONum ? 1 : 0, TieneCita: 1, MatchMedico: 1,
       PasaCatalogoHonorarios: candidate.TariffCount === 1, PasaIncluidoHonorarios: valid,
+      SourceHonorariosReference: Number(candidate.TariffCount) > 0,
       MensajeAuditoria: reason, MotivoExclusionOriginal: original?.MotivoExclusionOriginal || '',
       ObservacionCobertura: `${reason} IVA: ${vatRate === null ? 'pendiente; no se supone exención' : registeredVat !== null ? 'tasa registrada del prestador' : 'tasa coincidente de la liquidación del mismo médico y servicio en este periodo'}.`
     };

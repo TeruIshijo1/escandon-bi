@@ -73,8 +73,6 @@ export default function DashboardSitiAuxiliares({ type }) {
     </div>
   );
 
-
-
   return (
     <div className="fade-in dashboard-view" id={`dashboard-${type}-siti`}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -138,7 +136,7 @@ export default function DashboardSitiAuxiliares({ type }) {
       </div>
 
       <div className="dashboard-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
-        {/* Top Estudios */}
+        
         <div className="dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Top 10 {topLabel} Solicitados</h3>
           <div className="dashboard-chart-host" style={{ height: 350 }}>

@@ -24,7 +24,9 @@ if errorlevel 1 goto error
 cd ..
 node scripts/initialize-package-data.cjs
 if errorlevel 1 goto error
-echo Preparacion completada. Revisa backend\.env y ejecuta iniciar_produccion.bat.
+echo Preparacion completada. Revisa backend\.env.
+echo Para el servicio de Windows: ejecuta administrar_servicio.bat como administrador.
+echo Alternativa de consola: iniciar_produccion.bat.
 echo Para preparar el esquema nuevo de honorarios: node backend/scripts/migrate-honorarios.js
 pause
 exit /b 0

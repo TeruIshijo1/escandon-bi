@@ -1,7 +1,5 @@
-/**
- * auth.routes.js — Autenticación
- * Hospital Escandón BI Platform v1.0
- */
+
+
 'use strict';
 
 const express  = require('express');
@@ -10,10 +8,6 @@ const bcrypt   = require('bcryptjs');
 const { getDb }          = require('../config/db');
 const { authenticate, generateTokens } = require('../middleware/auth.middleware');
 
-/**
- * POST /api/auth/login
- * Autentica usuario y devuelve JWT
- */
 router.post('/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
@@ -79,10 +73,6 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-/**
- * GET /api/auth/me
- * Devuelve datos del usuario autenticado (valida token)
- */
 router.get('/me', authenticate, async (req, res, next) => {
   try {
     const db = getDb();
@@ -109,17 +99,13 @@ router.get('/me', authenticate, async (req, res, next) => {
   }
 });
 
-/**
- * POST /api/auth/logout
- * Invalida el refresh token (blacklist en BD)
- */
 router.post('/logout', authenticate, async (req, res) => {
   try {
     const db = getDb();
     await db.prepare(`UPDATE Usuarios SET RefreshToken = NULL WHERE UsuarioId = ?`).run(req.user.id);
     res.json({ ok: true, message: 'Sesión cerrada correctamente' });
   } catch (err) {
-    res.json({ ok: true }); // Logout siempre exitoso para el cliente
+    res.json({ ok: true });  
   }
 });
 

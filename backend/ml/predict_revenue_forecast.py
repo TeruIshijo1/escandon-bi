@@ -32,11 +32,11 @@ def main():
     model = joblib.load(model_path)
     categories = joblib.load(categories_path)
     
-    # Invertir el diccionario de categorías para búsqueda rápida
+    
     area_mapping = {v: k for k, v in categories['area'].items()}
     servicio_mapping = {v: k for k, v in categories['servicio'].items()}
     
-    # Obtener el último mes registrado en el dataset
+    
     query_latest = """
         SELECT MAX(periodo_mes) as ultimo_mes FROM ml_dataset_ingresos_mensual
     """
@@ -50,7 +50,7 @@ def main():
         
     print(f"[Predict] Último mes con datos: {ultimo_mes_str}")
     
-    # Obtener los datos del último mes para usarlos como rezagos (Lag-1) del siguiente
+    
     query_data = f"""
         SELECT 
             area,
@@ -69,7 +69,7 @@ def main():
         print("[Error] No hay registros para el mes base.")
         return
         
-    # Calcular el siguiente mes (periodo_predicho)
+    
     dt_ultimo = datetime.strptime(ultimo_mes_str, "%Y-%m")
     dt_siguiente = dt_ultimo + relativedelta(months=1)
     periodo_predicho = dt_siguiente.strftime("%Y-%m")
@@ -80,9 +80,9 @@ def main():
     df_pred = df_actual.copy()
     df_pred['month'] = mes_predicho_num
     
-    # Codificar area y servicio según el modelo
-    # Si un area/servicio es nuevo y no está en el training, lo mapearemos a -1, o lo ignoramos
-    # En RandomForest puede fallar si mandamos -1 si no fue entrenado con -1, pero como no son one-hot sino ordinales, lo dejamos en -1
+    
+    
+    
     df_pred['area_encoded'] = df_pred['area'].map(area_mapping).fillna(-1)
     df_pred['servicio_encoded'] = df_pred['servicio'].map(servicio_mapping).fillna(-1)
     
@@ -96,15 +96,15 @@ def main():
         'crecimiento_mensual_anterior'
     ]
     
-    # Limpiar posibles NaNs
+    
     df_pred[features] = df_pred[features].fillna(0)
     
     X = df_pred[features]
     
-    # Realizar predicción
+    
     predictions = model.predict(X)
     
-    # Estimar intervalo de predicción
+    
     try:
         if hasattr(model, 'estimators_') and hasattr(model.estimators_[0], 'predict'):
             preds_trees = np.array([tree.predict(X.values) for tree in model.estimators_])
@@ -125,18 +125,18 @@ def main():
     df_pred['modelo_version'] = "v1.1.0"
     df_pred['metodo'] = model_name
     
-    # Limpiar predicciones que den negativo
+    
     df_pred['ingreso_estimado'] = df_pred['ingreso_estimado'].clip(lower=0)
     df_pred['intervalo_bajo'] = df_pred['intervalo_bajo'].clip(lower=0)
     df_pred['intervalo_alto'] = df_pred['intervalo_alto'].clip(lower=0)
     
-    # Guardar en PostgreSQL
+    
     print("[Predict] Guardando proyecciones en la base de datos...")
     
     with engine.connect() as conn:
         trans = conn.begin()
         try:
-            # Borrar predicciones previas para ese mismo periodo si las hubiera
+            
             conn.execute(text("DELETE FROM ml_forecast_ingresos_mensual WHERE periodo_predicho = :periodo"), {"periodo": periodo_predicho})
             
             insert_query = text("""

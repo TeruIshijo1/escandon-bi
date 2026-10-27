@@ -6,13 +6,37 @@ const { validateAnalysis, getAnalysisCapabilities } = require('./reportAnalysis.
 const DEFAULT_FILTERS = { fechaDesde: '', fechaHasta: '', almacen: 'ALL', estatusDoc: 'ALL', clasificacionMedica: 'ALL', busqueda: '' };
 const supportsFilter = (entity, key) => Array.isArray(entity.filters) ? entity.filters.includes(key) : entity.fields.some(field => ({ almacen: ['WhsCode', 'Filler', 'ToWhsCode'], estatusDoc: ['DocStatus', 'Status'], clasificacionMedica: ['MedicalClassification'] }[key] || []).includes(field.key));
 const labels = value => normalize(value).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-// Units distinguish financial columns whose wording is otherwise identical.
+ 
 const fieldLabel = value => normalize(value).replace(/[^a-z0-9% ]/g, ' ').replace(/\s+/g, ' ').trim();
 const fieldReply = value => value.match(/^\s*me refiero a\s+[«“"]([^»”"]+)[»”"]\s*[.!]?\s*$/i)?.[1] || value;
+const columnReplacement = value => {
+  const match = String(value || '').match(/^\s*(?:cambia|sustituye)\s+[«“"]([^»”"]+)[»”"]\s+por\s+[«“"]([^»”"]+)[»”"]\s*[.!]?\s*$/i);
+  return match ? { from: match[1].trim(), to: match[2].trim() } : null;
+};
 const matchesFieldLabel = (field, value) => [field.label, ...(field.aliases || [])].some(label => fieldLabel(label) === fieldLabel(value));
 const stem = word => word.replace(/s$/, '');
-const FILLER = /\b(el|la|los|las|un|una|del|de|que|se|me|te|lo|le|en|a|y|por|para|con|sin|es|sea|este|esta|esten|estan|son|van|tenga|tengan|tiene|tienen|necesito|quiero|dame|dime|pasame|sacame|hazme|refiero|reporte|reportes|listado|lista|informacion|datos|dato|columna|columnas|salga|salgan|venga|vengan|nombre|nombres|ver|ahora|mejor|tambien|solo|mismo|agrega|incluye|muestra|quita|queda|quede|deja|favor|porfa|gracias|usa|ponlo|todos|todas|filtro|filtros|cualquier)\b/g;
+const FILLER = /\b(el|la|los|las|un|una|del|de|que|si|se|me|te|lo|le|en|a|y|por|para|con|sin|es|sea|este|esta|esten|estan|sigue|siguen|siga|sigan|son|van|tenga|tengan|tiene|tienen|necesito|quiero|dame|dime|pasame|sacame|hazme|refiero|reporte|reportes|listado|lista|informacion|datos|dato|columna|columnas|salga|salgan|venga|vengan|nombre|nombres|ver|ahora|mejor|tambien|solo|mismo|agrega|incluye|muestra|quita|queda|quede|deja|favor|porfa|gracias|usa|ponlo|todos|todas|filtro|filtros|cualquier)\b/g;
 const ACTIONS = /\b(agrega|incluye|muestra|quita|sin|solo|deja|con|cambia|sustituye)\b/g;
+function clearMissingColumn(missing, questions, rawText) {
+  const targetLabels = labels(rawText);
+  const targetKey = labels(String(rawText || '').replace(FILLER, ' '));
+  const targetTokens = targetKey.split(' ').filter(Boolean);
+  let removed = false;
+  for (const key of [targetKey, targetLabels].filter(Boolean)) {
+    if (missing.delete(key)) removed = true;
+    if (questions.delete(`column:${key}`)) removed = true;
+  }
+  for (const [entryKey, item] of [...missing.entries()]) {
+    const itemLabels = labels(item.text);
+    const itemKey = labels(String(item.text || '').replace(FILLER, ' '));
+    if (entryKey === targetKey || itemKey === targetKey || (targetLabels && itemLabels === targetLabels) || (targetTokens.length && targetTokens.every(token => entryKey.split(' ').includes(token)))) {
+      missing.delete(entryKey);
+      questions.delete(`column:${entryKey}`);
+      removed = true;
+    }
+  }
+  return removed;
+}
 const ORDER_TOPICS = ['sales_order_summary', 'vertical_sales_orders', 'sales_orders', 'vertical_service_orders'];
 const ORDER_SUMMARIES = ['sales_order_summary', 'vertical_sales_orders'];
 const ORDER_REQUEST = /\b(?:ovs?|orden(?:es)? de ventas?)\b/;
@@ -95,8 +119,7 @@ function columnResolutions(utterances, entity) {
     const reply = fieldReply(utterance);
     const exact = entity.fields.filter(field => matchesFieldLabel(field, reply));
     if (exact.length !== 1) continue;
-    // Schema fields without a vocabulary rule still answer their own earlier
-    // ambiguity. Only an exact authorized candidate can close that question.
+
     const fieldKey = `field:${exact[0].key}`;
     choices.delete(fieldKey);
     choices.set(fieldKey, exact[0].key);
@@ -157,8 +180,7 @@ function rankTopics(text, catalog) {
     const phraseScore = Math.max(0, ...phrases.filter(phraseIn).map(phrase => 12 + phrase.split(' ').length * 4 + (subjectIn(phrase) ? 20 : 0)));
     let baseScore = phraseIn(entity.title) ? 100 : phraseScore + words.reduce((sum, word) => sum + (titleWords.includes(word) ? 2 : 0), 0);
     if (baseScore) {
-      // A matching topic name must not win by omitting requested columns.
-      // Prefer its richer authorized resource only when those columns exist.
+
       const richer = requestedColumns.length && catalog.some(other => other.resourceMetadata && other.id !== entity.id
         && entitySources(other).join(',') === entitySources(entity).join(',') && topicPhrases(other).some(subjectIn)
         && requestedColumns.every(part => { const found = fieldMatch(part, other, text); return !found.missing && !found.unknown; }));
@@ -184,8 +206,7 @@ function fieldMatch(part, entity, hints, resolutions, contextFields = []) {
       : /^(?:pagos?|cobros?|cobranza)$/.test(request) ? ['CollectionStatus', 'PaymentFolios', 'InvoiceSettlement'] : null;
     if (financialFields) return { fields: entity.fields.filter(field => financialFields.includes(field.key)), concept: /factura/.test(request) ? 'billing' : 'collections' };
   }
-  // A qualifier is part of its measure: "descuento del convenio" requests
-  // the discount, just as "saldo del paciente" requests the patient balance.
+
   let rule = RULES.filter(([, request]) => request.test(text)).sort((a, b) => text.search(a[1]) - text.search(b[1]))[0];
   if (!rule && /\bnombre\b/.test(text)) {
     const topic = normalize(entity.title);
@@ -202,7 +223,7 @@ function fieldMatch(part, entity, hints, resolutions, contextFields = []) {
   }
   const [id, , match, required, excluded] = rule;
   if (['patient', 'doctor', 'provider', 'customer', 'payer'].includes(id)) {
-    const remainder = text.replace(rule[1], ' ').replace(FILLER, ' ').replace(/\b(completo|completa|registrados?|tratante|solicitante|anestesiologo|razon|social)\b/g, ' ').trim();
+    const remainder = text.replace(rule[1], ' ').replace(FILLER, ' ').replace(/\b(completo|completa|registrados?|tratante|solicitante|anestesiologo|razon|social|facturas?|resumen|documento|documentos|directorio|cartera|cuentas?|pedidos?|ordenes|anticipos?|notas|credito|cobros?|pagos?|entregas?|devoluciones|cotizaciones)\b/g, ' ').trim();
     if (remainder) return { unknown: text, question: '¿Quieres incluir el nombre como un dato del reporte o buscar una persona? Para buscar, puedes decir «busca Juan Pérez».' };
   }
   let fields = entity.fields.filter(field => match.test(normalize(field.label)) && (!required || required.test(normalize(field.label))) && (!excluded || !excluded.test(normalize(field.label))));
@@ -212,8 +233,7 @@ function fieldMatch(part, entity, hints, resolutions, contextFields = []) {
     if (!defaults && Array.isArray(entity.conditionFields)) fields = fields.filter(field => entity.conditionFields.includes(field.key));
   }
   if (['discount', 'deductible', 'copay', 'coinsurance'].includes(id) && /%|\bporcentajes?\b/.test(normalize(part))) fields=fields.filter(field=>field.type==='percent' || field.unit==='percent');
-  // The master has distinct general and percentage references for coinsurance.
-  // A generic request includes both, retaining the separate registered values.
+
   if (id === 'coinsurance' && entity.conditionFields && !/%|\b(?:porcentajes?|predeterminad[oa]s?|por defecto)\b/.test(normalize(part))) return fields.length ? { fields, concept: id } : { missing: text, concept: id };
   if (id === 'balance') {
     const patientBalance = /\b(?:paciente|cuenta(?: del? paciente)?|atencion)\b/.test(text) && !/\b(?:pagador|aseguradora|cliente|socio)\b/.test(text);
@@ -266,13 +286,14 @@ function parseFilters(message, entity, hints = '', choices = {}) {
   let text = naturalText(search ? message.replace(search.fragment, '') : message);
   const filters = {}, issues = [];
   let options = [];
-  let question = '', unsupported = '';
+  let question = '', unsupported = '', unsupportedKind = '', unsupportedOptions = [];
   const clearAll = /quita (?:todos )?(?:los )?filtros|sin filtros/.test(text);
   if (clearAll) Object.assign(filters, { almacen: 'ALL', estatusDoc: 'ALL', clasificacionMedica: 'ALL', busqueda: '' });
   if (/todos los almacenes|de todos lados|cualquier almacen|quita (?:el )?filtro (?:de )?(?:almacen|farmacia)/.test(text)) filters.almacen = 'ALL';
-  if (/todos los estados|abiert[oa]s? y cerrad[oa]s?|quita (?:el )?filtro (?:de )?estado/.test(text)) filters.estatusDoc = 'ALL';
+  if (/todos los estados|abiert[oa]s? y cerrad[oa]s?|quita (?:el )?filtro (?:de )?(?:estado|pago)|sin filtro (?:de )?(?:estado|pago)/.test(text)) filters.estatusDoc = 'ALL';
   if (/todos los (?:tipos|medicamentos)|quita (?:el )?filtro (?:de )?tipo/.test(text)) filters.clasificacionMedica = 'ALL';
   if (/quita (?:la )?busqueda|sin busqueda|todos los pacientes|todos los proveedores/.test(text)) filters.busqueda = '';
+  text = text.replace(/quita (?:todos )?(?:los )?filtros|sin filtros|todos los almacenes|de todos lados|cualquier almacen|abiert[oa]s? y cerrad[oa]s?|todos los estados|todos los tipos|todos los medicamentos|quita (?:el )?filtro (?:de )?\w+|sin filtro (?:de )?\w+|quita (?:la )?busqueda|sin busqueda|todos los pacientes|todos los proveedores/g, ' ');
   const warehousePatterns = [
     ['FAR', /\bfarmacia(?: central)?\b/], ['ALG', /\balmacen general\b|\bbodega general\b/],
     ['QX', /\bquirofano general\b/], ['QXCR', /\bcarro rojo (?:de )?quirofano\b/],
@@ -280,10 +301,10 @@ function parseFilters(message, entity, hints = '', choices = {}) {
     ['IMAGCR', /\bcarro rojo (?:de )?imagenologia\b/], ['CUNACR', /\bcarro rojo (?:de )?cuneros\b/],
   ];
   const warehouses = new Set();
-  for (const [code, pattern] of warehousePatterns) if (pattern.test(text)) { warehouses.add(code); text = text.replace(pattern, ' '); }
+  for (const [code, pattern] of warehousePatterns) if (pattern.test(text)) { warehouses.add(code); text = text.replace(new RegExp(pattern.source, 'gi'), ' '); }
   for (const code of Object.keys(WAREHOUSE_LABELS).filter(code => code !== 'ALL')) {
     const pattern = new RegExp(`\\b${code}\\b`, 'i');
-    if (pattern.test(text)) { warehouses.add(code); text = text.replace(pattern, ' '); }
+    if (pattern.test(text)) { warehouses.add(code); text = text.replace(new RegExp(`\\b${code}\\b`, 'gi'), ' '); }
   }
   const hintText = naturalText(hints);
   const hintCodes = new Set(warehousePatterns.filter(([, pattern]) => pattern.test(hintText)).map(([code]) => code));
@@ -305,16 +326,16 @@ function parseFilters(message, entity, hints = '', choices = {}) {
   if (filters.estatusDoc !== 'ALL' && open.test(text)) filters.estatusDoc = 'OPEN';
   if (filters.estatusDoc !== 'ALL' && closed.test(text)) filters.estatusDoc = 'CLOSED';
   if (open.test(text) && closed.test(text) && filters.estatusDoc !== 'ALL') question = '¿Quieres documentos abiertos, cerrados o todos?';
-  text = text.replace(open, ' ').replace(closed, ' ');
+  text = text.replace(new RegExp(open.source, 'g'), ' ').replace(new RegExp(closed.source, 'g'), ' ');
   const canceled = /\bcancelad[oa]s?\b/;
   const discharged = /\b(?:con|(?:dados?|dadas?) de) alta(?: medica)?\b/;
   const notDischarged = /\bsin alta(?: medica)?\b/;
   if (canceled.test(text) || discharged.test(text) || notDischarged.test(text)) {
     const state = canceled.test(text) ? 'CANCELED' : notDischarged.test(text) ? 'NO_MEDICAL_DISCHARGE' : 'MEDICAL_DISCHARGE';
-    if (!entity.statusOptions?.some(option => option.value === state)) unsupported = 'Este tema no permite aplicar ese estado. Puedes elegir otro tema o revisar los estados disponibles.';
+    if (!entity.statusOptions?.some(option => option.value === state)) { unsupported = 'Este tema no permite aplicar ese estado. Puedes elegir otro tema o revisar los estados disponibles.'; unsupportedKind = 'state'; }
     else if ((filters.estatusDoc && filters.estatusDoc !== 'ALL' && filters.estatusDoc !== state) || (canceled.test(text) && (discharged.test(text) || notDischarged.test(text))) || (discharged.test(text) && notDischarged.test(text))) question = '¿Qué filtro quieres usar: cuentas abiertas, cerradas, canceladas, con alta médica o sin alta médica? Puedo aplicar uno de estos filtros a la vez.';
     else filters.estatusDoc = state;
-    text = text.replace(canceled, ' ').replace(discharged, ' ').replace(notDischarged, ' ');
+    text = text.replace(new RegExp(canceled.source, 'g'), ' ').replace(new RegExp(discharged.source, 'g'), ' ').replace(new RegExp(notDischarged.source, 'g'), ' ');
   }
   if (/^¿Qué filtro quieres usar: cuentas|^¿Quieres documentos abiertos/.test(question)) {
     const hintStates = [open.test(hintText) && 'OPEN', closed.test(hintText) && 'CLOSED', canceled.test(hintText) && 'CANCELED', discharged.test(hintText) && 'MEDICAL_DISCHARGE', notDischarged.test(hintText) && 'NO_MEDICAL_DISCHARGE'].filter(Boolean);
@@ -333,12 +354,11 @@ function parseFilters(message, entity, hints = '', choices = {}) {
     }
   }
   if (question) issues.push({ question, options });
-  for (const [, pattern] of MEDICATION_TYPES) text = text.replace(pattern, ' ');
+  for (const [, pattern] of MEDICATION_TYPES) text = text.replace(new RegExp(pattern.source, 'g'), ' ');
   if (search) filters.busqueda = search.value;
   if (entity.id === 'assistant_account_billing_collections') {
     const states = FINANCIAL_STATES;
-    // A comparison asks for the status columns of all accounts; a selection
-    // asks for one financial condition, with no silent partial filtering.
+
     const matches = states.filter(([,pattern])=>pattern.test(text));
     const selected = matches.filter(([state])=>!(state==='BILLED'&&matches.some(([candidate])=>candidate==='UNBILLED'))&&!(state==='COLLECTED'&&matches.some(([candidate])=>candidate==='UNPAID')));
     const comparison = /\bcuales\b/.test(text) && selected.some(([state])=>['BILLED','UNBILLED'].includes(state)) && selected.some(([state])=>['COLLECTED','UNPAID','PARTIAL'].includes(state));
@@ -354,14 +374,36 @@ function parseFilters(message, entity, hints = '', choices = {}) {
     text=text.replace(/\bcuales\b|\bal hospital\b/g,' ');
     if (matches.length) text=text.replace(/\b(?:cuentas(?: hospitalarias)?|ya|estan|las|los)\b/g,' ');
   }
-  if (/\b(pagad[oa]s?|sin pagar|falta pagar|faltan pagar)\b/.test(text) && !['accounts_receivable', 'accounts_payable', 'incoming_payments', 'outgoing_payments','assistant_account_billing_collections'].includes(entity.id)) unsupported = 'El estado abierto o cerrado no indica si una factura está pagada. Este tema no permite aplicar ese filtro de pago.';
-  if (/\b(joven(?:es)?|mayores?|menores?|adultos?|ninos?|mujeres|hombres)\b|\bsolo (?:los? |las? )?(?:del? |de la )(?:medico|paciente|proveedor)\s+[^,;.]+/.test(text)) unsupported = 'Ese tema no permite aplicar ese filtro a personas. Para encontrar un nombre puedes pedir «busca Juan Pérez»; la búsqueda revisa los textos del reporte.';
+  const paymentPattern = /\b(?:que (?:esten|estan) |ya )?(?:pagad[oa]s?|sin pagar|no (?:estan )?pagad[oa]s?|falta pagar|faltan pagar|pendientes? de pago)\b/g;
+  if (paymentPattern.test(text)) {
+    if (!['accounts_receivable', 'accounts_payable', 'incoming_payments', 'outgoing_payments', 'assistant_account_billing_collections'].includes(entity.id)) {
+      unsupported = 'El estado abierto o cerrado no indica si una factura está pagada. Este tema no permite aplicar ese filtro de pago.';
+      unsupportedKind = 'payment';
+      if (supportsFilter(entity, 'estatusDoc')) {
+        unsupportedOptions = [
+          ...(entity.statusOptions || [{ value: 'OPEN', label: 'Abiertas' }, { value: 'CLOSED', label: 'Cerradas' }]).filter(option => option.value !== 'ALL').map(option => ({ label: `Solo ${option.label.toLowerCase()}`, message: `Solo ${option.label.toLowerCase()}.` })),
+          { label: 'Abiertas y cerradas', message: 'Abiertas y cerradas.' },
+        ];
+      }
+    }
+    text = text.replace(paymentPattern, ' ');
+  }
+  if (/\b(joven(?:es)?|mayores?|menores?|adultos?|ninos?|mujeres|hombres)\b|\bsolo (?:los? |las? )?(?:del? |de la )(?:medico|paciente|proveedor)\s+[^,;.]+/.test(text)) {
+    unsupported = 'Ese tema no permite aplicar ese filtro a personas. Para encontrar un nombre puedes pedir «busca Juan Pérez»; la búsqueda revisa los textos del reporte.';
+    unsupportedKind = 'person';
+    text = text.replace(/\b(joven(?:es)?|mayores?|menores?|adultos?|ninos?|mujeres|hombres)\b|\bsolo (?:los? |las? )?(?:del? |de la )(?:medico|paciente|proveedor)\s+[^,;.]+/g, ' ');
+  }
   if (/mayor que|menor que|mas de \d|menos de \d|ordena|ordenar|agrupa|agrupar|sumar|\bsuma\b|promedio (?:por|de todos)|sin (?:stock|existencias)|con (?:stock|existencias)/.test(text)
-    || /\b(?:combina|cruza)\b/.test(text) && entitySources(entity).length < 2) unsupported = 'Ese cálculo, orden o condición todavía no está disponible en este tema. Puedo preparar el detalle con los datos y filtros disponibles.';
-  for (const key of ['almacen', 'estatusDoc', 'clasificacionMedica']) if (filters[key] && filters[key] !== 'ALL' && !supportsFilter(entity, key)) unsupported = `El tema «${entity.title}» no permite filtrar por ${key === 'almacen' ? 'almacén' : key === 'estatusDoc' ? 'estado' : 'tipo de medicamento'}. Puedes elegir otro tema.`;
-  text = text.replace(/quita (?:todos )?(?:los )?filtros|sin filtros|todos los almacenes|de todos lados|cualquier almacen|todos los estados|todos los tipos|todos los medicamentos|quita (?:el )?filtro (?:de )?\w+|quita (?:la )?busqueda|sin busqueda|todos los pacientes|todos los proveedores/g, ' ');
+    || /\b(?:combina|cruza)\b/.test(text) && entitySources(entity).length < 2) {
+    unsupported = 'Ese cálculo, orden o condición todavía no está disponible en este tema. Puedo preparar el detalle con los datos y filtros disponibles.';
+    unsupportedKind = 'calc';
+  }
+  for (const key of ['almacen', 'estatusDoc', 'clasificacionMedica']) if (filters[key] && filters[key] !== 'ALL' && !supportsFilter(entity, key)) {
+    unsupported = `El tema «${entity.title}» no permite filtrar por ${key === 'almacen' ? 'almacén' : key === 'estatusDoc' ? 'estado' : 'tipo de medicamento'}. Puedes elegir otro tema.`;
+    unsupportedKind = `filter:${key}`;
+  }
   const active = issues.at(-1) || { question: '', options: [] };
-  return { filters, text, ...active, unsupported, recognized: Object.keys(filters).length > 0 };
+  return { filters, text, ...active, unsupported, unsupportedKind, unsupportedOptions, clearAll, recognized: Object.keys(filters).length > 0 };
 }
 
 function removeDates(text) {
@@ -383,8 +425,7 @@ function splitColumns(body) {
     while ((match = pattern.exec(chunk))) {
       const prefix = chunk.slice(start, match.index);
       const next = chunk.slice(match.index).trim();
-      // A procedure starts another list item only after an existing column;
-      // keep introductory wording attached to a standalone procedure request.
+
       if (/^procedimientos?\b/.test(next) && !RULES.some(([, request]) => request.test(prefix))) continue;
       if (/\b(del?|id)\s*$/.test(prefix) || /\b(nombre|numero|codigo|folio)\s*$/.test(prefix) && /^(pacientes?|medicos?|productos?|insumos?|medicamentos?)\b/.test(next)) continue;
       parts.push(chunk.slice(start, match.index)); start = match.index + match[0].length;
@@ -393,8 +434,6 @@ function splitColumns(body) {
   });
 }
 
-// Recognize bounded operations separately from visible columns. Field choices
-// always come from the authorized metadata; values never become expressions.
 function parseAnalysis(message, entity, resolutions) {
   const literals = [];
   let dateText = String(message);
@@ -406,12 +445,11 @@ function parseAnalysis(message, entity, resolutions) {
   let searchToken;
   if (search) {
     searchToken = search.fragment;
-    // The quoted literal may be masked. Global search remains a legacy filter.
+     
     const protectedSearch = text.match(/\b(?:busca|buska|buscar|buskar|encuentra|que diga|que contenga|contengan|coincida con)\s+(?:a\s+)?zzanalysisvalue\d+zz/);
     text = protectedSearch ? text.replace(protectedSearch[0], 'zzanalysissearchzz') : text.replace(normalize(search.fragment), 'zzanalysissearchzz');
   }
-  // Periods are interpreted from the original request below, so they cannot be
-  // consumed by the field phrase of a later condition or aggregation.
+
   text = text.replace(/\b(?:el|del?|en|durante|de la)?\s*(?:este mes|mes pasado|mes anterior|esta semana|semana pasada|semana anterior|hoy|ayer|anteayer|este ano|ano actual)\b/g, ' ')
     .replace(/\b(?:de|en|durante)?\s*(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)(?: de)?(?: \d{4})?\b/g, ' ');
   const delta = {}, questions = [], usedFields = new Set();
@@ -560,7 +598,7 @@ function mergeAnalysis(previous, delta, replaceConditions = false) {
       if (!result.predicates.some(current => JSON.stringify(current) === JSON.stringify(predicate))) result.predicates.push(predicate);
     }
   }
-  // A summed field has a generated output key; source keys stay source keys.
+   
   if (result.measures.length) result.orderBy = result.orderBy.map(order => {
     const metric = result.measures.findIndex(measure => measure.field === order.field);
     return metric >= 0 && !result.groupBy.includes(order.field) ? { ...order, field: `metric_${metric}` } : order;
@@ -591,8 +629,7 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
   const allTopics = topicTexts.join('. ');
   const ranking = rankTopics(allTopics, catalog);
   const replyRanking = rankTopics(latestTopic, catalog);
-  // Topic buttons are conversation answers, not column requests. Keep the
-  // last exact authorized selection when a later answer supplies the dates.
+
   const selections = utterances.map(utterance => {
     const selection = topicSelection(utterance, catalog);
     if (selection) return selection;
@@ -613,8 +650,7 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
   const pointNameRequest = /\b(?:dime|estado de cuenta|cuenta del paciente|datos del paciente|saldo del paciente|paciente (?:llamado|de nombre)|consulta al paciente)\b/.test(latestTopic);
   const nameIsRequest = pointNameRequest && personWords.length && !/^(?:numero|nombre|medico|paciente|procedimientos?|con|sin|y|de|del|en|que|saldo|fecha|folio|estado|total|doctor|codigo|id|mayor|mayo|menor|igual|contiene|contenga|porcentaje|edad|apellidos?|joven|adulto|hombre|mujer)$/.test(personWords[0]);
   if (nameIsRequest && !accountId && !patientId) return { proposal: { status: 'clarification', message: 'Para consultar a ese paciente, indica su número de paciente o el folio de atención. Los nombres pueden repetirse; necesito el identificador para elegir la cuenta correcta.', plan: null, choices: [] }, pending: nextPending, normalizedText: allText, confident: true, hasUnresolved: true };
-  // This server-owned case resource is the only way to combine account finance
-  // and item charges for a single exact account. Never infer a person by name.
+
   if (!entity && accountId && chargesRequest && (financeRequest || /\bsaldo\b/.test(allTopics))) entity = catalog.find(item => item.id === 'assistant_account_case');
   if (!entity && accountId && chargesRequest && !financeRequest && !/\bsaldo\b/.test(allTopics)) entity = catalog.find(item => item.id === 'vertical_account_charges');
   if (!entity && (accountId || patientId) && financeRequest && !chargesRequest) entity = catalog.find(item => item.id === 'assistant_account_billing_collections');
@@ -631,11 +667,9 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
   const replySources = ['sap', 'vertical'].filter(source => new RegExp(`\\b${source}\\b`).test(latestTopic));
   const sources = replySources.length === 1 ? replySources : ['sap', 'vertical'].filter(source => new RegExp(`\\b${source}\\b`).test(allTopics));
   const wantsBoth = BOTH_SOURCES.test(latestTopic) || !replySources.length && BOTH_SOURCES.test(allTopics);
-  // "OV" exists in both catalogues. Ask for the authorized source before
-  // interpreting it as a column or reusing an unrelated report's context.
+
   const genericOrders = ORDER_REQUEST.test(allTopics) && !/\b(?:detalle|lineas|ordenes? de servicios|ov de servicios)\b/.test(allTopics);
-  // A source combination is executable only when an authorized definition
-  // already implements it. An AI selection cannot silently drop one source.
+
   if (!chosenTitle && !genericOrders && (sources.length > 1 || wantsBoth) && entity && entitySources(entity).length < 2) {
     return { proposal: { status: 'unsupported', message: 'No tengo disponible una combinación de SAP y Vertical que reúna todos los datos de esta solicitud. Dime qué información necesitas de cada origen para revisar una combinación disponible.', plan: null, choices: [] }, pending: nextPending, normalizedText: allText, confident: true, hasUnresolved: true };
   }
@@ -661,35 +695,49 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
   const filters = { ...DEFAULT_FILTERS, ...(sameTopic ? context.filters : {}) };
   let analysis = sameTopic ? context.analysis || null : null, analysisRequested = false;
   const analysisFields = new Set();
-  const missing = new Map(), questions = new Map(), changes = [], requestedFilters = {};
+  const missing = new Map(), questions = new Map(), unsupportedReasons = new Map(), changes = [], requestedFilters = {};
   let explicitFields = false, dateInput = { range: null, requested: false, error: '' }, unsupported = '';
   const hints = previous ? latest : allText;
   const toProcess = switchTopic ? [message] : utterances;
   const resolutions = columnResolutions(toProcess, entity);
   const filterChoices = filterResolutions(previous ? [...previous.answers, message] : [], entity);
   for (const utterance of toProcess) {
-    // A topic choice answers the earlier question; its title is not a new
-    // request for columns or filters, even when replaying pending answers.
-    // Any additional request after that choice still needs interpretation.
+
     const choice = topicSelection(utterance, catalog);
+    const replacement = columnReplacement(utterance);
+    if (replacement) {
+      if (clearMissingColumn(missing, questions, replacement.from)) changes.push('columns');
+      const fromField = fieldMatch(replacement.from, entity, hints, resolutions, selected);
+      if (fromField.fields?.length) selected = selected.filter(key => !fromField.fields.some(column => column.key === key));
+      const toExact = entity.fields.filter(field => matchesFieldLabel(field, replacement.to));
+      const toField = toExact.length === 1 ? { fields: toExact } : fieldMatch(replacement.to, entity, hints, resolutions, selected);
+      if (toField.fields?.length) {
+        explicitFields = true; changes.push('columns');
+        for (const column of toField.fields) if (!selected.includes(column.key)) selected.push(column.key);
+      }
+      continue;
+    }
     const reply = fieldReply(utterance);
     const replyFields = reply !== utterance ? entity.fields.filter(field => matchesFieldLabel(field, reply)) : [];
     const exactReply = replyFields.length === 1 ? replyFields[0] : null;
     const input = choice ? choice.remainder : exactReply ? `Agrega ${exactReply.label}` : utterance;
     if (!input.trim()) continue;
     if (ORDER_TOPICS.includes(entity.id) && /^(?:ambas|ambos|las dos|los dos|(?:de )?sap|(?:de )?vertical)[.!]?$/i.test(utterance.trim())) continue;
+    if (utterance !== toProcess[0] && !choice && rankTopics(naturalText(utterance), catalog).some(item => item.entity.id === entity.id && item.score >= 16)) {
+      unsupportedReasons.clear();
+    }
     const operation = parseAnalysis(input, entity, resolutions);
     if (operation.requested) {
       analysisRequested = true; changes.push('analysis');
+      if (!operation.unsupported) { unsupportedReasons.delete('analysis'); unsupportedReasons.delete('calc'); }
       const lookupFields = (operation.delta.predicates || []).filter(predicate => predicate.op === 'eq' && (entity.pointLookupFields || []).includes(predicate.field)).map(predicate => predicate.field);
       if (lookupFields.length && analysis) analysis = { ...analysis, predicates: (analysis.predicates || []).filter(predicate => !(entity.pointLookupFields || []).includes(predicate.field)) };
       analysis = mergeAnalysis(analysis, operation.delta, /\b(?:mejor|cambia|ajusta|ahora)\b/.test(normalize(input)));
       for (const field of operation.usedFields) analysisFields.add(field);
       for (const question of operation.questions) questions.set(question.key, question);
-      if (operation.unsupported) unsupported = operation.unsupported;
+      if (operation.unsupported) unsupportedReasons.set('analysis', { message: operation.unsupported, options: [] });
     }
-    // A field answer resolves the original operation on replay. It does not
-    // silently replace the requested visible detail with that single column.
+
     if (exactReply && analysisFields.has(exactReply.key)) continue;
     let filterInput = operation.text;
     const exactLookup = (analysis?.predicates || []).some(predicate => predicate.op === 'eq' && (entity.pointLookupFields || []).includes(predicate.field));
@@ -697,8 +745,7 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
       && /\b(?:dime si|si (?:la |el )?|(?:ya )?tiene|esta|hay|saber|verifica|revisa|estado de cuenta)\b/.test(naturalText(input))
       && /\b(?:facturas?|pagad[oa]s?|cerrad[oa]s?|estado de cuenta)\b/.test(naturalText(input));
     if (pointStatusQuestion) {
-      // Asking whether an account is paid/closed asks for evidence. Filtering
-      // it to paid/closed records would hide the very answer being requested.
+
       const evidenceFields = [...(entity.defaultFields || []), 'AccountStatus', 'BillingStatus', 'CollectionStatus', 'InvoiceSettlement', 'Evidence'];
       selected = [...new Set([...selected, ...evidenceFields.filter(key => entity.fields.some(field => field.key === key))])];
       explicitFields = true; changes.push('columns');
@@ -710,8 +757,21 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
     const parsed = parseFilters(filterInput, entity, hints, filterChoices);
     Object.assign(filters, parsed.filters);
     Object.assign(requestedFilters, parsed.filters);
+    if (parsed.clearAll) {
+      unsupportedReasons.clear();
+      for (const key of questions.keys()) if (key.startsWith('filter:')) questions.delete(key);
+    }
+    if (parsed.filters.estatusDoc !== undefined) {
+      unsupportedReasons.delete('payment');
+      unsupportedReasons.delete('state');
+      if (parsed.filters.estatusDoc === 'ALL') unsupportedReasons.delete('filter:estatusDoc');
+      for (const key of questions.keys()) if (key.startsWith('filter:¿Quieres documentos') || key.startsWith('filter:¿Qué filtro quieres usar') || key.startsWith('filter:¿Qué condición quieres aplicar')) questions.delete(key);
+    }
+    if (parsed.filters.almacen === 'ALL') unsupportedReasons.delete('filter:almacen');
+    if (parsed.filters.clasificacionMedica === 'ALL') unsupportedReasons.delete('filter:clasificacionMedica');
+    if (parsed.filters.busqueda !== undefined) unsupportedReasons.delete('person');
     if (parsed.question) questions.set(`filter:${parsed.question}`, { message: parsed.question, options: parsed.options });
-    if (parsed.unsupported) unsupported = parsed.unsupported;
+    if (parsed.unsupported) unsupportedReasons.set(parsed.unsupportedKind || 'filter', { message: parsed.unsupported, options: parsed.unsupportedOptions || [] });
     if (parsed.recognized) changes.push('filters');
     const dates = interpretDates(operation.dateText, today, filters);
     if (dates.range || dates.error || dates.requested) dateInput = dates;
@@ -722,7 +782,7 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
       text = text.replace(/\bresumen\s+por\s+orden\b/g, ' ');
       changes.push('presentation');
     }
-    if (dates.requested && sameTopic && !/\b(agrega|incluye|muestra|quita|con|sin)\b/.test(parsed.text)) text = '';
+    if (dates.requested && sameTopic && !/\b(agrega|incluye|muestra|quita|con|sin|cambia|sustituye|solo|deja)\b/.test(parsed.text)) text = '';
     const firstAction = text.search(ACTIONS);
     for (const phrase of topicPhrases(entity).sort((a, b) => b.length - a.length)) {
       const pattern = new RegExp(`\\b${labels(phrase).replace(/ /g, '[\\s·:—–-]+')}\\b`, 'g');
@@ -730,12 +790,11 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
     }
     if (genericOrders && ORDER_TOPICS.includes(entity.id)) text = text.replace(/\b(?:de )?(?:sap|vertical)\b/g, ' ');
     else if (entity.assistantOnly) {
-      // Source descriptors identify the capability. Source words in requested
-      // column labels still distinguish, for example, account and SAP balances.
+
       const columnAction = text.search(ACTIONS);
       text = text.replace(/\b(?:de )?(?:sap|vertical)\b/g, (match, offset) => columnAction < 0 || offset < columnAction ? ' ' : match);
     }
-    // A change from A to B is two independent column operations.
+     
     text = text.replace(/\b(?:cambia|sustituye)\s+(.+?)\s+por\s+(.+)/g, 'quita $1 agrega $2');
     const markers = [...text.matchAll(ACTIONS)];
     let segments = markers.map((match, index) => ({ mode: match[1], body: text.slice(match.index + match[0].length, markers[index + 1]?.index ?? text.length) }));
@@ -746,8 +805,7 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
       const parts = splitColumns(segment.body).map(part => part.replace(/[.!?]+$/, '').trim()).filter(Boolean);
       let replacing = segment.mode === 'solo' || segment.mode === 'deja';
       for (const part of parts) {
-        // The draft retains completed choices even after the bounded answer
-        // history rolls over. A fresh request cannot infer choices from it.
+
         let field = fieldMatch(part, entity, hints, resolutions, previous && sameTopic ? context.selectedFields : []);
         if ((!field.fields && !field.ambiguous || !sameTopic && segment.mode === 'muestra') && topicPhrases(entity).some(topic => labels(part.replace(FILLER, ' ')) === labels(naturalText(topic).replace(FILLER, ' ')))) continue;
         if (field.empty) continue;
@@ -759,7 +817,7 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
           else if (!included.length) { questions.delete(`column:${key}`); missing.delete(key); changes.push('columns'); continue; }
         }
         if (field.missing || field.unknown) {
-          if (removing) { missing.delete(key); questions.delete(`column:${key}`); }
+          if (removing) { if (clearMissingColumn(missing, questions, part) || missing.delete(key) || questions.delete(`column:${key}`)) changes.push('columns'); }
           else {
             missing.set(key, { text: field.missing || field.unknown, known: Boolean(field.missing), concept: field.concept });
             if (field.question) questions.set(`column:${key}`, { message: field.question, options: [] });
@@ -783,6 +841,8 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
       }
     }
   }
+  const activeUnsupported = [...unsupportedReasons.values()].at(-1);
+  if (activeUnsupported) unsupported = activeUnsupported.message;
   const requestedColumns = explicitFields || missing.size > 0 || [...questions.keys()].some(key => key.startsWith('column:'));
   if (analysis) {
     try { analysis = validateAnalysis(entity, analysis); }
@@ -794,7 +854,7 @@ function interpretRequest({ message, pending, context, catalog, today, forcedEnt
   const draftFields = knownFields.length ? knownFields : context?.selectedFields?.filter(key => entity.fields.some(field => field.key === key)) || [];
   const plan = draftFields.length ? { entity: entity.id, selectedFields: draftFields, filters, ...(analysis ? { analysis } : {}) } : null;
   const question = questions.values().next().value;
-  let proposal, options = question?.options || [];
+  let proposal, options = (unsupported ? activeUnsupported?.options : question?.options) || [];
   if (unsupported) proposal = { status: 'unsupported', message: unsupported, plan: null, choices: [] };
   else if (dateInput.error) proposal = { status: 'clarification', message: dateInput.error, plan, choices: [] };
   else if (sameTopic && dateInput.requested && !dateInput.range && !explicitFields) proposal = { status: 'clarification', message: 'No pude identificar el nuevo período. ¿Desde qué día y hasta qué día necesitas el reporte?', plan, choices: [] };

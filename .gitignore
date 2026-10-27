@@ -9,26 +9,31 @@ node_modules/
 .env.*
 !.env.example
 
-# Build
+# Build y empaquetado
 dist/
 build/
 .vite/
 coverage/
+backend/coverage/
+pase_a_produccion/
 
 # Logs
 *.log
 logs/
+debug.log
+frontend/debug.log
 
-# IDE
+# IDE y editores
 .vscode/
 .idea/
 *.swp
+.obsidian/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# SQLite database
+# Bases de datos y locks locales
 *.db
 *.db-wal
 *.db-shm
@@ -36,12 +41,13 @@ Thumbs.db
 *.sqlite-wal
 *.sqlite-shm
 
-# Archivos privados generados en runtime
+# Archivos de datos y cargas en runtime
 *.xlsx
 *.pbix
 backend/uploads/
 scratch/
 backend/scratch/
+backend/.test_artifacts/
 
 # Python
 __pycache__/
@@ -55,29 +61,19 @@ env/
 *.egg-info/
 backend/ml/models/*_backup.joblib
 
-
-# Scripts temporales
-scratch_*.js
-test_*.js
-check_*.js
-search_*.js
-pase_a_produccion/
-.obsidian/
-
-
-
-frontend/.codex-build-check/
-*.pdf
-Respuestas/
-hoja membretada-02.png
+# Temporales de compilación y pruebas
 tmp/
-frontend/.codex-build-check/
+frontend/tmp/
+backend/tmp/
+
+# Documentos generados / PDFs (conservar PDFs oficiales en docs/)
 *.pdf
+!docs/*.pdf
+
+# Recursos locales y runtime
+.runtime/
 Respuestas/
 hoja membretada-02.png
 
-# Runtime portable local (no versionar binarios)
-.runtime/
-
-# Mapa vigente de la plataforma: conservar su PDF junto a la fuente Markdown
-!docs/Mapa_Plataforma_Hospital_Escandon_BI.pdf
+# Directorios de soporte y mantenimiento local
+IA/

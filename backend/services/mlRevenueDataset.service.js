@@ -2,10 +2,7 @@
 
 const { pool } = require('../config/pg-db');
 
-/**
- * Genera el dataset histórico de ingresos mensuales
- * y lo guarda en ml_dataset_ingresos_mensual.
- */
+/* Genera el dataset histórico de ingresos mensuales */
 async function syncRevenueDataset() {
   console.log('[ML Revenue Dataset] Iniciando generación de dataset de ingresos mensuales...');
   
@@ -14,7 +11,7 @@ async function syncRevenueDataset() {
     await client.query('BEGIN');
     await client.query('DELETE FROM ml_dataset_ingresos_mensual');
     
-    // 1. Ingresos Totales por Mes desde SAP Incoming Payments (GENERAL)
+    // Ingresos Totales por Mes desde SAP Incoming Payments (GENERAL)
     const resTotal = await client.query(`
       SELECT 
         to_char(docdate, 'YYYY-MM') as periodo_mes,
@@ -51,7 +48,7 @@ async function syncRevenueDataset() {
       previousMonthTotal = ingresosTotal;
     }
     
-    // 2. Ingresos por Área y Servicio (dw_vertical_cuentas_servicios)
+    // Ingresos por Área y Servicio (dw_vertical_cuentas_servicios)
     const resAreaServicio = await client.query(`
       SELECT 
         to_char(fecha_de_cargo, 'YYYY-MM') as periodo_mes,
@@ -82,7 +79,7 @@ async function syncRevenueDataset() {
       if (prevArea === area && prevServ === servicio && prevIngreso !== null && prevIngreso > 0) {
         crecimiento = (ingresosTotal - prevIngreso) / prevIngreso;
       } else {
-        prevIngreso = 0; // Se resetea para nueva area/servicio
+        prevIngreso = 0;  
       }
       
       await client.query(`

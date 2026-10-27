@@ -59,7 +59,6 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
   return (
     <div className="dashboard-view" id="dashboard-eficiencia" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
 
-      {/* 🧠 Barra Inteligente Eficiencia (Removed as we use GlobalFilterBar) */}
       <div style={{ display: 'none' }}>
         <button onClick={handleApply} style={{ background: '#0088C9', color: 'white', border: 'none', padding: '0.65rem 1.5rem', borderRadius: 6, fontWeight: 600, cursor: 'pointer', height: 42 }}>Aplicar</button>
         <button onClick={handleClear} style={{ background: 'transparent', color: '#64748B', border: '1px solid #CBD5E1', padding: '0.65rem 1rem', borderRadius: 6, fontWeight: 600, cursor: 'pointer', height: 42 }}>Limpiar</button>
@@ -75,9 +74,6 @@ export default function DashboardEficienciaNativo({ globalFilters, globalTrigger
         </div>
       </div>
 
-
-
-      {/* KPIs Cards */}
       <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         <KPICard title="Camas Ocupadas (Promedio)" value={kpis.camasOcupadas} color="#0088C9" icon="🛏️" />
         <KPICard title="Quirófanos Activos" value={kpis.quirofanosActivos} color="#8B5CF6" icon="⚕️" />

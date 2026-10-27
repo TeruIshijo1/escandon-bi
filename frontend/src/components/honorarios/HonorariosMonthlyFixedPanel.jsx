@@ -158,7 +158,7 @@ export default function HonorariosMonthlyFixedPanel({ canManage = false, onChang
       <h3>{editor.mode === 'remove' ? 'Quitar pago mensual' : editor.id ? 'Cambiar pago mensual' : 'Agregar jefe de área'}</h3>
       {editor.id && <p><strong>{editor.providerName}</strong> · {editor.area}</p>}
       <p className="hon-monthly-help">{editor.mode === 'remove' ? 'Se dejará de presentar este pago desde el mes elegido. Los pagos ya preparados conservan sus valores.'
-        : 'Indica el mes desde el que debe usarse este importe. Los pagos ya preparados conservan sus valores. Si cambias una configuración pendiente de pago, revisa nuevamente su aprobación.'}</p>
+        : 'Elige el mes de servicio al que corresponde este pago, aunque se liquide uno o dos meses después. El importe y el área aplican desde el mes elegido; puedes retrocederlo si no se traslapa otra vigencia. Revisa las aprobaciones pendientes. Los pagos ya preparados o cerrados conservan sus valores.'}</p>
       <AssignmentFields value={editor} onChange={setEditor} providers={providers} disabled={busy || !allowed || (editor.mode !== 'remove' && !!providerError)}
         editing={!!editor.id} removing={editor.mode === 'remove'} />
       <div className="hon-monthly-actions"><button type="submit" className="hon-friendly-button primary" disabled={busy || !allowed || (editor.mode !== 'remove' && !!providerError)}>

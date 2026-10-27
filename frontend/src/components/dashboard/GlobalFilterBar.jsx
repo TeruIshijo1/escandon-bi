@@ -57,7 +57,7 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
       start = formatDate(today);
       end = formatDate(today);
     } else if (type === 'semana') {
-      // Lunes a Domingo
+       
       const d = new Date();
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -79,7 +79,7 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
     } else if (type === 'anio') {
       const startD = new Date(today.getFullYear(), 0, 1);
       start = formatDate(startD);
-      end = formatDate(new Date()); // Hasta hoy
+      end = formatDate(new Date());  
     }
 
     setFilters({ ...filters, startDate: start, endDate: end });
@@ -246,7 +246,7 @@ export default function GlobalFilterBar({ filters, setFilters, onApply, showSear
           className="area-filter-bar__reset"
           onClick={() => {
             setFilters({ search: '', startDate: '', endDate: '', medico: '', especialidad: '' });
-            setTimeout(onApply, 50); // Small delay to let state update
+            setTimeout(onApply, 50);  
           }}
           style={{
             background: 'transparent',

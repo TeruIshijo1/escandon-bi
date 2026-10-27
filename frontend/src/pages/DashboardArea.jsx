@@ -1,10 +1,6 @@
 import '../components/dashboard/DashboardVisuals.css';
-/**
- * DashboardArea.jsx — Tablero por Área Hospitalaria
- * Hospital Escandón BI Platform v4.0
- * Rediseño premium con identidad de marca y micro-interacciones
- */
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth }     from '../context/AuthContext';
 import EmbeddedBI      from '../components/dashboard/EmbeddedBI';
@@ -28,6 +24,7 @@ import { useKPIConfig } from '../hooks/useKPIConfig';
 import AreaSwitcher from '../components/dashboard/AreaSwitcher';
 import AreaIcon from '../components/dashboard/AreaIcon';
 import { areaPalette } from '../components/dashboard/areaColors';
+import { userMessage } from '../utils/userMessages';
 import './DashboardArea.css';
 
 const KPI_DB_MAP = {
@@ -39,7 +36,7 @@ const KPI_DB_MAP = {
 
 const API_BASE = '/api';
 
-/* ── Config visual por área ──────────────────────────────── */
+/* Config visual por área */
 const AREA_CONFIG = {
   [AREAS.QUIROFANO]: { icon: 'surgery', color: '#004687', description: 'Cirugías, tiempos de atención e ingresos del área.' },
   [AREAS.UCI]: { icon: 'intensive', color: '#EF4444', chartAccent: '#0088C9', description: 'Ocupación de camas, estancias y atención de pacientes.' },
@@ -58,7 +55,6 @@ const AREA_CONFIG = {
 
 const DEFAULT_AREA = AREAS.URGENCIAS;
 
-/* ── Sub-componente KPI mini ─────────────────────────────── */
 function AreaKPICard({ label, value, delta, up }) {
   const deltaColor = up === true ? 'var(--color-verde-e)' : up === false ? 'var(--color-danger)' : '#52647a';
   return (
@@ -79,7 +75,6 @@ export default function DashboardArea() {
   const { getKPI }       = useKPIConfig();
   const isRestricted     = user?.role === 'JEFE_AREA' || user?.role === 'USUARIO_OPERATIVO';
 
-  // Calcular las áreas permitidas a partir de los permisos individuales del usuario
   const permissionToArea = Object.fromEntries(
     Object.entries(AREA_TO_PERMISSION).map(([areaKey, permId]) => [permId, areaKey])
   );
@@ -89,15 +84,12 @@ export default function DashboardArea() {
     .map(p => permissionToArea[p])
     .filter(Boolean);
 
-  // Determinar el área inicial:
-  // 1) Si el usuario tiene AreaAsignada fija, usar esa
-  // 2) Si tiene permisos individuales de área, usar la primera permitida
-  // 3) Fallback al área por defecto
+  // Determinar el área inicial
+
   const initialArea = user?.area || (allowedAreas.length > 0 ? allowedAreas[0] : DEFAULT_AREA);
 
-  // Determinar si el usuario puede cambiar de área:
-  // - ADMIN/DIRECTOR pueden ver todos los tableros
-  // - Usuarios con múltiples permisos de área pueden elegir entre sus áreas permitidas
+  // Determinar si el usuario puede cambiar de área
+
   const canSwitchArea = can(user?.role, 'verTodosTableros') || (!user?.area && allowedAreas.length > 1);
 
   const navigate = useNavigate();
@@ -111,16 +103,20 @@ export default function DashboardArea() {
   const [loadingReport, setLoadingReport] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [areaData, setAreaData] = useState({ kpis: [] });
+  const [quirofanoError, setQuirofanoError] = useState(null);
+  const quirofanoRequest = useRef(0);
   const [pbiModal, setPBIModal] = useState(null);
   const [showExportApi, setShowExportApi] = useState(false);
 
-  // Global filters
   const [globalFilters, setGlobalFilters] = useState({
     search: '',
     startDate: '',
     endDate: ''
   });
   const [applyTrigger, setApplyTrigger] = useState(0);
+  const quirofanoQuery = new URLSearchParams(Object.entries({ startDate: globalFilters.startDate, endDate: globalFilters.endDate, search: globalFilters.search }).filter(([, value]) => value)).toString();
+  const currentQuirofanoData = areaData.quirofanoQuery === quirofanoQuery ? areaData.rawQuirofanoData : null;
+  const currentQuirofanoError = quirofanoError?.key === quirofanoQuery ? quirofanoError.message : null;
 
   const handleApplyFilters = () => {
     setApplyTrigger(prev => prev + 1);
@@ -132,18 +128,21 @@ export default function DashboardArea() {
   };
 
   useEffect(() => {
-    fetchAreaData();
+    const controller = area === AREAS.QUIROFANO ? new AbortController() : null;
+    const id = ++quirofanoRequest.current;
+    fetchAreaData(controller?.signal, id);
     fetchAreaReport();
+    return () => controller?.abort();
   }, [area, applyTrigger]);
 
-  const fetchAreaData = async () => {
+  const fetchAreaData = async (quirofanoSignal, quirofanoId) => {
     setLoadingData(true);
-    setAreaData(prev => ({ ...prev, kpis: [] })); // Limpiar KPIs del área anterior para evitar "flasheos"
+    setAreaData(prev => ({ ...prev, kpis: [] }));  
     try {
       const token = sessionStorage.getItem('escandon_token');
       
       if (area === AREAS.URGENCIAS) {
-        // Para Urgencias usamos el endpoint nativo especializado
+         
         let url = `/api/dashboard/urgencias-nativo?`;
         if (globalFilters.startDate) url += `startDate=${globalFilters.startDate}&`;
         if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
@@ -162,33 +161,42 @@ export default function DashboardArea() {
               { label: 'Estancia Promedio', value: `${kpis.estanciaHoras} hrs`, delta: 'tiempo por paciente', up: null },
               { label: 'Rotación Camas', value: kpis.rotacion, delta: 'pacientes por día', up: null },
             ],
-            rawUrgenciasData: json.data // Guardamos la data completa para pasarla al DashboardUrgenciasNativo
+            rawUrgenciasData: json.data  
           });
         }
       } else if (area === AREAS.QUIROFANO) {
-        // Endpoint nativo para Quirófanos
-        let url = `/api/dashboard/quirofano-nativo?`;
-        if (globalFilters.startDate) url += `startDate=${globalFilters.startDate}&`;
-        if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
-        if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
-
-
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` }
+        const query = new URLSearchParams();
+        if (globalFilters.startDate) query.set('startDate', globalFilters.startDate);
+        if (globalFilters.endDate) query.set('endDate', globalFilters.endDate);
+        if (globalFilters.search) query.set('search', globalFilters.search);
+        const queryKey = query.toString();
+        setQuirofanoError(null);
+        setAreaData(previous => ({ kpis: [], quirofanoQuery: queryKey, rawQuirofanoData: previous.quirofanoQuery === queryKey ? previous.rawQuirofanoData : null }));
+        const res = await fetch(`/api/dashboard/quirofano-nativo?${queryKey}`, {
+          headers: { Authorization: `Bearer ${token}` }, signal: quirofanoSignal
         });
         const json = await res.json();
-        if (json.ok) {
-          setAreaData({
-            kpis: [], // No renderizamos las tarjetas estandar, usaremos custom cards en el nativo
-            rawQuirofanoData: json.data
-          });
-        }
+        if (quirofanoSignal?.aborted || quirofanoId !== quirofanoRequest.current) return;
+        if (!res.ok || !json.ok || !json.data) throw new Error(userMessage(json.error || 'No se pudo consultar el tablero de Quirófano.', res.status));
+        setAreaData(previous => {
+          const next = { ...json.data, sourceStatus: json.sourceStatus || json.data.sourceStatus };
+          const saved = previous.quirofanoQuery === queryKey ? previous.rawQuirofanoData : null;
+          const savedValue = saved?.kpisFinancieros?.ingresosSAP;
+          const savedAvailable = savedValue != null && String(savedValue).trim() !== '' && Number.isFinite(Number(savedValue))
+            && (saved.sourceStatus ? saved.sourceStatus.available === true : Number(savedValue) !== 0);
+          if (next.sourceStatus?.available === false && savedAvailable) {
+            next.kpisFinancieros = saved.kpisFinancieros;
+            next.topMedicosIngresos = saved.topMedicosIngresos;
+            next.topServiciosIngresos = saved.topServiciosIngresos;
+            next.sourceStatus = { ...saved.sourceStatus, status: 'stale', available: true };
+          }
+          return { kpis: [], quirofanoQuery: queryKey, rawQuirofanoData: next };
+        });
       } else if (area === AREAS.CONSULTA_EXTERNA) {
         let url = `/api/dashboard/consulta-externa-nativo?`;
         if (globalFilters.startDate) url += `startDate=${globalFilters.startDate}&`;
         if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
         if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
-
 
         console.log('[DashboardArea] Fetching CEX data from:', url);
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -202,7 +210,6 @@ export default function DashboardArea() {
         if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
         if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
 
-
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         const json = await res.json();
         if (json.ok) {
@@ -214,14 +221,13 @@ export default function DashboardArea() {
         if (globalFilters.endDate) url += `endDate=${globalFilters.endDate}&`;
         if (globalFilters.search) url += `search=${encodeURIComponent(globalFilters.search)}&`;
 
-
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         const json = await res.json();
         if (json.ok) {
           setAreaData({ kpis: [], rawHospitalizacionData: json.data });
         }
       } else if (area === AREAS.IMAGENOLOGIA || area === AREAS.LABORATORIO || area === AREAS.FARMACIA || area === AREAS.ASEGURADORAS || area === AREAS.CUNEROS) {
-        // Para Imagenología, Laboratorio, Farmacia, Aseguradoras y Cuneros no usamos las tarjetas de hospitalización (camas, egresos)
+         
         setAreaData({ kpis: [] });
       } else {
         // Flujo normal para otras áreas
@@ -243,9 +249,11 @@ export default function DashboardArea() {
         }
       }
     } catch (err) {
-      console.error('[DashboardArea]', err);
+      if (area === AREAS.QUIROFANO) {
+        if (!quirofanoSignal?.aborted && quirofanoId === quirofanoRequest.current) setQuirofanoError({ key: quirofanoQuery, message: userMessage(err.message) });
+      } else console.error('[DashboardArea]', err);
     } finally {
-      setLoadingData(false);
+      if (area !== AREAS.QUIROFANO || (!quirofanoSignal?.aborted && quirofanoId === quirofanoRequest.current)) setLoadingData(false);
     }
   };
 
@@ -280,7 +288,7 @@ export default function DashboardArea() {
   const cfg = AREA_CONFIG[area] || AREA_CONFIG[DEFAULT_AREA];
   const selectableAreas = Object.entries(AREAS_LABELS)
                 .filter(([key]) => {
-                  // Ocultar Farmacia, Finanzas, Almacén General y Cardiología (ya que tienen sus propios módulos dedicados o no requieren tablero clínico)
+                   
                   if (key === AREAS.FARMACIA || key === AREAS.FINANZAS || key === AREAS.ALMACEN_GENERAL || key === AREAS.CARDIOLOGIA) {
                     return user?.area === key;
                   }
@@ -290,7 +298,7 @@ export default function DashboardArea() {
                   if (user?.area) return key === user.area;
                   // Usuario con permisos individuales: solo sus áreas permitidas
                   if (allowedAreas.length > 0) return allowedAreas.includes(key);
-                  // Sin restricciones de permisos
+                   
                   return true;
                 })
     .map(([value, label]) => ({ value, label, color: (AREA_CONFIG[value] || cfg).color }));
@@ -300,7 +308,6 @@ export default function DashboardArea() {
       {pbiModal && (
         <PBIModal {...pbiModal} onClose={() => setPBIModal(null)} />
       )}
-      {/* <ExportApiModal isOpen={showExportApi} onClose={() => setShowExportApi(false)} /> */ }
 
       <header className="area-dashboard__header">
         <div className="area-dashboard__identity">
@@ -343,10 +350,9 @@ export default function DashboardArea() {
         <p>Indicadores y actividad del periodo consultado</p>
       </div>
 
-      {/* KPIs Grid */}
       {tab === 'kpis' && (
         <>
-          {loadingData ? (
+          {loadingData && !(area === AREAS.QUIROFANO && currentQuirofanoData) ? (
             <div style={{ background: 'var(--color-bg-white, white)', borderRadius: 14, padding: '5rem 3rem', textAlign: 'center', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '350px', marginTop: '1rem' }}>
               <PremiumLoader text={`Cargando información de ${(AREAS_LABELS[area] || 'tu área').toLowerCase()}...`} />
             </div>
@@ -374,10 +380,9 @@ export default function DashboardArea() {
                   
                   {/* KPIs ADICIONALES ASIGNADOS AL USUARIO (solo para no admins) */}
                   {user?.role !== 'ADMIN' && user?.role !== 'DIRECTOR' && user?.permisos?.map((permId, i) => {
-                    // No duplicar los KPIs que ya se muestran en el área actual
+                     
                     if (permId.startsWith(`area.${area.toLowerCase()}`)) return null;
-                    
-                    // Filtrar permisos estructurales (rutas, áreas, IA) para que no se dibujen como tarjetas sin sentido
+
                     if (Object.values(ROUTE_TO_PERMISSION).includes(permId)) return null;
                     if (Object.values(AREA_TO_PERMISSION).includes(permId)) return null;
                     if (permId.startsWith('ia-')) return null;
@@ -432,9 +437,15 @@ export default function DashboardArea() {
                   setSearchFilter={setUrgenciasSearch}
                 />
               ) : area === AREAS.QUIROFANO ? (
-                <DashboardQuirofanoNativo 
-                  data={areaData.rawQuirofanoData} 
-                />
+                <>
+                  {loadingData && <p role="status" className="area-text-muted">Actualizando Quirófano… Se conserva la copia consultada para estos filtros.</p>}
+                  {currentQuirofanoError && <div role="alert" className="area-panel dashboard-panel" style={{ color: 'var(--dash-text)', marginBottom: '1rem' }}>
+                    <p>{currentQuirofanoError}</p>
+                    {currentQuirofanoData && <p>Se conserva la última copia consultada para estos filtros.</p>}
+                    <button type="button" onClick={handleApplyFilters}>Reintentar</button>
+                  </div>}
+                  {(!currentQuirofanoError || currentQuirofanoData) && <DashboardQuirofanoNativo data={currentQuirofanoData} />}
+                </>
               ) : area === AREAS.IMAGENOLOGIA ? (
                 <div>
                   <DashboardAuxiliaresNativo type="imagenologia" globalFilters={globalFilters} globalTrigger={applyTrigger} />
@@ -483,11 +494,7 @@ export default function DashboardArea() {
         </>
       )}
 
-
-
-
-
-      {/* Toast Notification */}
+      {/* Avisos */}
       {toast && (
         <div style={{
           position:'fixed', bottom:30, left:'50%', transform:'translateX(-50%)',

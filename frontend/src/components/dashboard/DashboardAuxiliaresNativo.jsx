@@ -82,8 +82,6 @@ export default function DashboardAuxiliaresNativo({ type, globalFilters, globalT
     </div>
   );
 
-
-
   return (
     <div className="fade-in area-native-dashboard dashboard-view" id={`dashboard-${type}-siti`}>
       <div className="area-native-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -147,7 +145,7 @@ export default function DashboardAuxiliaresNativo({ type, globalFilters, globalT
       </div>
 
       <div className="area-chart-grid area-chart-grid--single" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
-        {/* Top Estudios */}
+        
         <div className="area-panel dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>{topLabel} más solicitados</h3>
           <p className="dashboard-chart-description">Cantidad registrada para cada servicio en el periodo seleccionado.</p>

@@ -10,7 +10,7 @@ import { formatConfiguredWithholdings, formatHonorariosRate, formatHonorariosRat
 import { calculateHonorarios, summarizeHonorarios, reviewFingerprint, annotateSapInvoiceCoverage, hasPhysicianChange } from '../../utils/honorariosCalculation';
 import { isHonorarioReviewEligible } from '../../utils/honorariosEligibility';
 import { formatHonorarioReference, formatHonorarioSalesOrder } from '../../utils/honorariosIdentifiers';
-import { isExcludedHonorariosGroup, isExcludedHonorariosService } from '../../utils/honorariosScope';
+import { isExcludedHonorariosService } from '../../utils/honorariosScope';
 import HonorariosCatalogPanel from './HonorariosCatalogPanel';
 import HonorariosDoctorReviewCard, { HonorariosPhysicianCorrection } from './HonorariosDoctorReviewCard';
 import HonorariosLiquidationsPanel from './HonorariosLiquidationsPanel';
@@ -76,7 +76,7 @@ export default function HonorariosAuditView() {
   const [medicoFilter, setMedicoFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState('medicos'); // 'medicos' | 'inteligente' | 'plana'
+  const [viewMode, setViewMode] = useState('medicos');  
   const [detailPage, setDetailPage] = useState(0);
   const [doctorPages, setDoctorPages] = useState({});
 
@@ -93,15 +93,15 @@ export default function HonorariosAuditView() {
   // Acordeones expandidos en vista por médico
   const [expandedMedicos, setExpandedMedicos] = useState({});
 
-  // ── Estado de Ajustes Manuales (Overrides de Auditoría) ──
-  // Estructura: { [rowId]: { action: 'APROBAR' | 'EXCLUIR', customAmount: number, motivo: string, timestamp: string } }
+  // Estado de Ajustes Manuales (Overrides de Auditoría)
+   
   const [overrides, setOverrides] = useState({});
 
   // Modal para capturar Justificación y Monto de Ajuste Manual
   const [overrideModal, setOverrideModal] = useState({
     isOpen: false,
     row: null,
-    action: 'APROBAR', // 'APROBAR' | 'EXCLUIR'
+    action: 'APROBAR',  
     customAmount: '',
     motivo: '',
     error: null
@@ -468,7 +468,6 @@ export default function HonorariosAuditView() {
 
       setLoading(false);
 
-      // El cálculo necesita la configuración fiscal del médico, sin consultar su historial documental.
       const doctorNames = [...new Set(reportRows.flatMap(row => [String(row.Medico || '').trim(),
         row.ReviewBeneficiary?.providerName, loadedReviews[row.SourceIdentity || row.UDRKey]?.snapshot?.providerName]).filter(Boolean))];
       if (doctorNames.length) {
@@ -520,7 +519,6 @@ export default function HonorariosAuditView() {
     setWorkspace('review'); fetchReport();
   };
 
-  // Formateadores
   const formatMoney = (val) => {
     if (val === null || val === undefined || !Number.isFinite(Number(val))) return 'Pendiente';
     const num = Number(val);
@@ -547,12 +545,12 @@ export default function HonorariosAuditView() {
     return str;
   };
 
-  // Lista única de los grupos incluidos en Honorarios Médicos.
+  // Lista única de los grupos incluidos en Honorarios Médicos
   const uniqueGrupos = useMemo(() => {
     const set = new Set();
     effectiveData.forEach(item => {
       const g = item.GrupoServicio;
-      if (g && g.trim() && !isExcludedHonorariosGroup(g)) {
+      if (g && g.trim() && !isExcludedHonorariosService(item)) {
         set.add(g.trim());
       }
     });
@@ -569,7 +567,7 @@ export default function HonorariosAuditView() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [effectiveData]);
 
-  // Filtros de búsqueda compartidos por las pestañas de estado.
+  // Filtros de búsqueda compartidos por las pestañas de estado
   const filteredByCriteria = useMemo(() => {
     if (!Array.isArray(effectiveData)) return [];
     let list = effectiveData;
@@ -599,8 +597,6 @@ export default function HonorariosAuditView() {
     return list;
   }, [effectiveData, grupoFilter, medicoFilter, debouncedSearchTerm]);
 
-  // La pestaña filtra después de conservar el universo coincidente, para poder
-  // explicar cuántos resultados de esa búsqueda están en las otras pestañas.
   const filteredData = useMemo(() => {
     if (statusTab === 'elegibles') return filteredByCriteria.filter(r => !!r._effectiveElegible);
     if (statusTab === 'exclusiones') return filteredByCriteria.filter(r => r._reviewStatus === 'RECHAZADO');
@@ -703,8 +699,7 @@ export default function HonorariosAuditView() {
     });
 
     Object.values(groups).forEach(g => {
-      // El cuerpo principal respeta la pestaña elegida; el anexo del PDF conserva
-      // también los registros del médico que coinciden con los demás filtros.
+
       g.filasRevision = rowsByMedico.get(g.medico) || [];
       const allMatchingRows = g.filasRevision;
       g.approvedCount = allMatchingRows.filter(row => row._effectiveElegible).length;
@@ -726,8 +721,6 @@ export default function HonorariosAuditView() {
   const expandAllVisibleRows = groupedByMedico.reduce((sum, group) => sum + Math.min(group.filas.length, HONORARIOS_PAGE_SIZE), 0);
   const allowExpandAll = expandAllVisibleRows <= 500;
 
-  // El PDF de revisión conserva el contexto de todos los estados coincidentes.
-  // El Excel usa filteredData y respeta también la pestaña activa.
   const exportGroups = useMemo(() => {
     const groups = new Map();
     const sourceRowsByMedico = new Map();
@@ -793,7 +786,6 @@ export default function HonorariosAuditView() {
     };
   }, [sapReconciliation]);
 
-  // Exportación a Excel completa y unificada con Estilo Institucional Escandón
   const exportToExcel = async () => {
     if (!filteredData.length || searchTerm !== debouncedSearchTerm || loading || sapLoading || !reviewReady) return;
 
@@ -817,7 +809,7 @@ export default function HonorariosAuditView() {
       const filteredTotals = { base: summary.totalBase, iva: summary.totalIVA, isr: summary.totalISR,
         retIVA: summary.totalRetIVA, net: summary.totalNeto };
 
-      // 1. Datos para Hoja 1: Liquidación y Auditoría Detallada
+      // Datos para Hoja 1: Liquidación y Auditoría Detallada
       const filasDetalle = exportData.map(row => {
         let ajusteTexto = 'Sin modificación';
         if (row._isOverridden) {
@@ -932,7 +924,7 @@ export default function HonorariosAuditView() {
         'Total Médicos en filtro': `${excelGroups.length}`
       };
 
-      // 2. Datos para Hoja 2: Resumen por Médico
+      // Datos para Hoja 2: Resumen por Médico
       const filasMedicos = excelGroups.map(g => ({
         medico: g.medico,
         especialidad: g.especialidad,
@@ -1132,7 +1124,7 @@ export default function HonorariosAuditView() {
 
   return (
     <div className="hon-page-container">
-      {/* ── Estilos Scoped con Soporte Completo para Modo Oscuro y Modo Claro ── */}
+      
       <style>{`
         .hon-page-container {
           padding: 1.5rem 2rem;
@@ -1593,7 +1585,7 @@ export default function HonorariosAuditView() {
       {workspace === 'fiscal' && <HonorariosFiscalPanel key={fiscalProviderId} providers={providers} profiles={fiscalProfiles} initialProviderId={fiscalProviderId} referenceDate={startDate} canManage={canManage}
         onSaved={profile => { setFiscalProfiles(previous => ({ ...previous, [profile.providerId]: profile })); setFiscalError(''); }}
         onBack={paymentProviderId ? () => setWorkspace('liquidations') : undefined} />}
-      {catalogVisited && <div hidden={workspace !== 'catalog'}><HonorariosCatalogPanel canManage={canManage} onChanged={onCatalogChanged} onReviewServices={reviewCatalogService} /></div>}
+      {catalogVisited && <div hidden={workspace !== 'catalog'}><HonorariosCatalogPanel canManage={canManage} active={workspace === 'catalog'} onChanged={onCatalogChanged} onReviewServices={reviewCatalogService} /></div>}
       {workspace === 'liquidations' && <HonorariosLiquidationsPanel key={String(user?.id || user?.username || '')} preparationOwnerId={String(user?.id || user?.username || '')} canManage={canManage} startDate={startDate} endDate={endDate} initialProviderId={paymentProviderId}
         onViewApproved={() => changeWorkspace('approved')} onEditFiscal={id => { setFiscalProviderId(String(id || '')); setWorkspace('fiscal'); }}
         onDownloadApproved={paymentProviderId && approvedExportGroups.find(group => String(group.filasRevision[0]?.MedicoId) === paymentProviderId)
@@ -1637,10 +1629,9 @@ export default function HonorariosAuditView() {
           </div>
         )}
 
-      {/* 5. Área Principal de Contenido */}
+      {/* Área Principal de Contenido */}
       <div className="hon-card" style={{ overflow: 'hidden' }}>
-        
-        {/* Loader */}
+
         {loading && (
           <div style={{ padding: '4.5rem 2rem', textAlign: 'center' }}>
             <div style={{
@@ -1688,9 +1679,8 @@ export default function HonorariosAuditView() {
           </div>
         )}
 
-        {/* ========================================================================= */}
         {/* VISTA 1: AGRUPADA POR MÉDICO (MODO LIQUIDACIÓN) */}
-        {/* ========================================================================= */}
+        
         {!loading && hasSearched && filteredData.length > 0 && viewMode === 'medicos' && (
           <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             
@@ -1733,9 +1723,8 @@ export default function HonorariosAuditView() {
           </div>
         )}
 
-        {/* ========================================================================= */}
         {/* VISTA 2: TABLA DETALLADA INTELIGENTE */}
-        {/* ========================================================================= */}
+        
         {!loading && hasSearched && filteredData.length > 0 && viewMode === 'inteligente' && (
           <>
           <div className="hon-table-wrapper">
@@ -1835,7 +1824,6 @@ export default function HonorariosAuditView() {
                       </div>
                     </td>
 
-                    {/* Base Honorario */}
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
                       <div style={{ fontSize: '1rem', fontWeight: '700' }}>
                         {row.TipoCalculo === 'SAP_DOCUMENTO' ? 'Según factura' : formatMoney(row._effectiveElegible ? row._effectiveBase : Number(row.BaseImporte) > 0 ? row.BaseImporte : row.BasePropuesta)}
@@ -1852,7 +1840,6 @@ export default function HonorariosAuditView() {
                       </div>
                     </td>
 
-                    {/* Neto a Pagar */}
                     <td style={{ padding: '1rem', textAlign: 'right' }}>{formatMoney(row._effectiveIVA)}</td>
                     <td style={{ padding: '1rem', textAlign: 'right', color: '#dc2626' }}>{row._effectiveRetIVA === null ? row.TipoCalculo === 'SAP_DOCUMENTO' ? 'Sin desglose' : 'Pendiente' : '-' + formatMoney(row._effectiveRetIVA)}</td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
@@ -1878,7 +1865,6 @@ export default function HonorariosAuditView() {
                       </div>
                     </td>
 
-                    {/* Ficha */}
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleOpenDetail(row); }}
@@ -1905,9 +1891,6 @@ export default function HonorariosAuditView() {
           </>
         )}
 
-        {/* ========================================================================= */}
-        {/* VISTA 3: MATRIZ COMPLETA (TODAS LAS COLUMNAS UNIFICADAS) */}
-        {/* ========================================================================= */}
         {!loading && hasSearched && filteredData.length > 0 && viewMode === 'plana' && (
           <>
           <div className="hon-table-wrapper" style={{ maxHeight: '600px' }}>
@@ -2008,9 +1991,8 @@ export default function HonorariosAuditView() {
 
       </div>
 
-      {/* ========================================================================= */}
-      {/* 6. MODAL DIÁLOGO DE AJUSTE MANUAL (APROBAR O EXCLUIR) */}
-      {/* ========================================================================= */}
+      {/* MODAL DIÁLOGO DE AJUSTE MANUAL (APROBAR O EXCLUIR) */}
+      
       </div>
       {bulkDialog.open && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
         <section role="dialog" aria-modal="true" aria-label="Revisar selección" className="hon-card" style={{ width: '100%', maxWidth: 680, maxHeight: 'calc(100dvh - 2rem)', overflowY: 'auto', padding: '1.25rem' }}>
@@ -2130,7 +2112,6 @@ export default function HonorariosAuditView() {
                 </div>
               </div>
 
-              {/* Si se va a aprobar, capturar o validar el Monto Base */}
               {overrideModal.action === 'APROBAR' && overrideModal.row.ModeBI && !overrideModal.row.FixedMonthly && <details open={overridePhysicianChanged || undefined}>
                 <summary>Corregir médico o cantidad (opcional)</summary>
                 <label>Médico beneficiario
@@ -2299,9 +2280,8 @@ export default function HonorariosAuditView() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 7. MODAL FICHA DE AUDITORÍA MÉDICA */}
-      {/* ========================================================================= */}
+      {/* MODAL FICHA DE AUDITORÍA MÉDICA */}
+      
       {modalOpen && selectedRow && (
         <div style={{
           position: 'fixed',
@@ -2325,7 +2305,7 @@ export default function HonorariosAuditView() {
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
             overflow: 'hidden'
           }}>
-            {/* Header Modal */}
+            
             <div style={{
               padding: '1.5rem 2rem',
               background: 'linear-gradient(135deg, #0f172a 0%, #004687 100%)',
@@ -2362,7 +2342,6 @@ export default function HonorariosAuditView() {
               </button>
             </div>
 
-            {/* Body Modal */}
             <div style={{ padding: '1.75rem 2rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               
               {/* Sección de Ajuste Manual Activo en Modal */}
@@ -2539,7 +2518,6 @@ export default function HonorariosAuditView() {
 
             </div>
 
-            {/* Footer Modal */}
             <div style={{ padding: '1rem 2rem', background: 'var(--surface-1, #f8fafc)', borderTop: '1px solid var(--table-border, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               {/* Botón de descarga de PDF individual desde la Ficha */}
               <button 

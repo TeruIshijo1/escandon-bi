@@ -1,7 +1,7 @@
--- ═══════════════════════════════════════════════════════════════════
--- 02_seed_roles.sql — Datos iniciales de Roles (PostgreSQL)
--- Hospital Escandón BI v1.0
--- ═══════════════════════════════════════════════════════════════════
+
+
+
+
 
 INSERT INTO Roles (NombreRol, Descripcion, Nivel) VALUES
 ('ADMIN', 'Acceso total al sistema. Gestión de usuarios, auditoría completa y configuración.', 1)
@@ -22,8 +22,8 @@ INSERT INTO Roles (NombreRol, Descripcion, Nivel) VALUES
 ('CONSULTA_EXTERNA', 'Gestión operativa de la agenda, pacientes y citas de Consulta Externa.', 4)
 ON CONFLICT (NombreRol) DO NOTHING;
 
--- El administrador inicial se crea desde backend/config/init-db.js únicamente
--- cuando SEED_ADMIN_PASSWORD está configurada en el archivo .env local.
+
+
 
 -- Configuración BI
 INSERT INTO ConfiguracionBI (ReporteId, Titulo, PowerBIWorkspace, RolesPermitidos, AreaRequerida) VALUES

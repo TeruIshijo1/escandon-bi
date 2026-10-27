@@ -15,18 +15,18 @@ import joblib
 def main():
     print("=== Iniciando Entrenamiento del Modelo de Riesgo (Multi-Model Classifier) ===")
 
-    # 1. Cargar variables de entorno del archivo .env de backend
+    # Cargar variables de entorno del archivo .env de backend
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dotenv_path = os.path.join(base_dir, '..', '.env')
     load_dotenv(dotenv_path)
 
-    # Crear carpetas de destino si no existen
+    
     models_dir = os.path.join(base_dir, 'models')
     reports_dir = os.path.join(base_dir, 'reports')
     os.makedirs(models_dir, exist_ok=True)
     os.makedirs(reports_dir, exist_ok=True)
 
-    # 2. Conectarse a PostgreSQL
+    # Conectarse a PostgreSQL
     db_user = os.getenv("PGUSER", "postgres")
     db_host = os.getenv("PGHOST", "localhost")
     db_pass = os.getenv("PGPASSWORD")
@@ -42,7 +42,7 @@ def main():
         port=db_port
     )
 
-    # 3. Extraer historial maduro de la base de datos
+    # Extraer historial maduro de la base de datos
     query = """
         SELECT 
             snapshot_date,
@@ -75,12 +75,12 @@ def main():
 
     print(f"[Train] Cargados {len(df)} registros para entrenamiento.")
 
-    # 4. Preprocesamiento de Datos
-    # Mapeo de riesgo_base a variables numéricas
+    # Preprocesamiento de Datos
+    
     risk_map = {'CRITICO': 3, 'ALTO': 2, 'MEDIO': 1, 'BAJO': 0}
     df['riesgo_base_enc'] = df['riesgo_base'].map(risk_map).fillna(0)
 
-    # Convertir todas las columnas requeridas a numéricas y llenar nulos
+    
     numeric_cols = [
         'stock_actual', 'consumo_7d', 'consumo_15d', 'consumo_30d',
         'consumo_promedio_diario', 'variabilidad_consumo', 'minstock',
@@ -92,14 +92,14 @@ def main():
 
     df['target_desabasto_7d'] = pd.to_numeric(df['target_desabasto_7d'], errors='coerce').astype(int)
 
-    # 4b. Validar que existan al menos dos clases para clasificación supervisada
+    # Validar que existan al menos dos clases para clasificación supervisada
     num_classes = df['target_desabasto_7d'].nunique()
     if num_classes < 2:
         single_class = df['target_desabasto_7d'].unique()[0] if len(df) > 0 else 'N/A'
         print(f"[Train Warning] El historial analitico contiene solo una clase ({single_class}) en target_desabasto_7d.")
         print("[Train] Se omite el entrenamiento de modelos de clasificación supervisada hasta contar con eventos de ambas clases.")
         
-        # Guardar reporte de baseline
+        
         reports_dir = os.path.join(base_dir, 'reports')
         os.makedirs(reports_dir, exist_ok=True)
         metrics_report = {
@@ -140,8 +140,8 @@ def main():
             conn.close()
         return
 
-    # 5. División Temporal (Train/Test)
-    # Agrupar por fechas de snapshot únicas y dividir (80% train, 20% test)
+    # División Temporal
+    
     unique_dates = df['snapshot_date'].unique()
     unique_dates = sorted(unique_dates)
     
@@ -154,7 +154,7 @@ def main():
         cand_train = df[df['snapshot_date'].isin(train_dates)]
         cand_test = df[df['snapshot_date'].isin(test_dates)]
         
-        # Validar que ambas particiones tengan al menos 1 muestra de cada clase si es posible
+        
         if cand_train['target_desabasto_7d'].nunique() >= 2:
             train_df = cand_train
             test_df = cand_test
@@ -176,9 +176,9 @@ def main():
     print(f"[Train] Clase positiva en Train: {y_train.sum()} de {len(y_train)} ({y_train.mean():.2%})")
     print(f"[Train] Clase positiva en Test: {y_test.sum()} de {len(y_test)} ({y_test.mean():.2%})")
 
-    # 6. Entrenar Modelos
-    # Usamos balanced class weights debido a la alta probabilidad de desbalance en la BD
-    # Hyperparameter search configurations
+    # Entrenar Modelos
+    
+    
     print("[Train] Iniciando Optimizacion de Hiperparametros (AutoML)...")
     models = {
         'HistGradientBoosting': {
@@ -208,7 +208,7 @@ def main():
         }
     }
     
-    # Train and Tune
+    
     tuned_models = {}
     for name, config in models.items():
         print(f"  -> Tuneando {name}...")
@@ -218,8 +218,8 @@ def main():
         print(f"     Mejores parametros: {search.best_params_}")
     models = tuned_models
 
-    # 6b. Baseline de reglas de negocio (riesgo_base >= ALTO predice desabasto)
-    # Sirve para demostrar que el ML aporta valor sobre la regla actual
+    # Baseline de reglas de negocio
+    
     baseline_pred_test = (test_df['riesgo_base'].isin(['CRITICO', 'ALTO'])).astype(int)
     baseline_acc = accuracy_score(y_test, baseline_pred_test)
     baseline_prec = precision_score(y_test, baseline_pred_test, zero_division=0)
@@ -237,9 +237,9 @@ def main():
         print(f"[Train] Entrenando {name}...")
         model.fit(X_train, y_train)
 
-        # Predecir
+        
         y_pred = model.predict(X_test)
-        # Manejar caso de que haya una sola clase en y_test para evitar fallas en roc_auc
+        
         if len(np.unique(y_test)) > 1:
             y_prob = model.predict_proba(X_test)[:, 1]
             roc_auc = roc_auc_score(y_test, y_prob)
@@ -248,7 +248,7 @@ def main():
             roc_auc = None
             roc_auc_str = "N/A"
 
-        # Calcular métricas
+        
         acc = accuracy_score(y_test, y_pred)
         prec = precision_score(y_test, y_pred, zero_division=0)
         rec = recall_score(y_test, y_pred, zero_division=0)
@@ -257,8 +257,8 @@ def main():
 
         print(f"  -> {name} | Acc: {acc:.4f} | Prec: {prec:.4f} | Recall: {rec:.4f} | F1: {f1:.4f} | AUC: {roc_auc_str}")
 
-        # Priorizar Recall de la clase 1 (detectar desabasto es prioridad crítica de negocio)
-        # En caso de empate en Recall, comparamos por F1-Score
+        
+        
         if (rec > best_recall) or (rec == best_recall and f1 > (best_metrics.get('f1_score', 0) if best_metrics else -1)):
             best_recall = rec
             best_model_name = name
@@ -274,7 +274,7 @@ def main():
 
     print(f"\n[BEST MODEL] Mejor Modelo Seleccionado: {best_model_name} (Recall clase 1: {best_recall:.4f}, F1: {best_metrics['f1_score']:.4f})")
 
-    # 7. Guardar modelo y metadatos con backup seguro
+    # Guardar modelo y metadatos con backup seguro
     model_data = {
         'model': best_model,
         'features': numeric_cols,
@@ -296,7 +296,7 @@ def main():
     joblib.dump(model_data, model_path)
     print(f"[Success] Modelo guardado en {model_path}")
 
-    # 8. Guardar métricas de reporte
+    # Guardar métricas de reporte
     metrics_report = {
         'model_name': best_model_name,
         'model_version': '1.1.0',
@@ -320,7 +320,7 @@ def main():
         json.dump(metrics_report, f, indent=2, ensure_ascii=False)
     print(f"[Success] Reporte de métricas guardado en {report_path}")
 
-    # 9. Registrar corrida en ml_model_runs (historial de desempeño del modelo)
+    # Registrar corrida en ml_model_runs
     try:
         run_cursor = conn.cursor()
         run_cursor.execute("""

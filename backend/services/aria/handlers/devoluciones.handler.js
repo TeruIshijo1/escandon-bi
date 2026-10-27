@@ -6,8 +6,8 @@ async function queryDevolucionesFarmacia(normalizedQuery) {
   try {
     let fecha = null;
     if (normalizedQuery.includes('hoy')) {
-      // Usar fecha local
-      fecha = new Date().toLocaleDateString('en-GB'); // Formato DD/MM/YYYY que parsea etl.service.js
+       
+      fecha = new Date().toLocaleDateString('en-GB');  
     }
     
     const data = await etlService.getDevolucionesFarmacia(fecha, fecha);

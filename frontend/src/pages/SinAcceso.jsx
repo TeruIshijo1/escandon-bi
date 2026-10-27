@@ -1,8 +1,5 @@
-/**
- * SinAcceso.jsx — Página de error 403
- * Hospital Escandón BI Platform v4.0
- * Rediseño premium con shield animado
- */
+
+
 import { useNavigate } from 'react-router-dom';
 import { useAuth }     from '../context/AuthContext';
 
@@ -32,7 +29,6 @@ export default function SinAcceso() {
         }
       `}</style>
 
-      {/* Background Medical Cross Pattern Grid */}
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -50,7 +46,7 @@ export default function SinAcceso() {
         zIndex: 1,
         animation: 'sin-acceso-in 400ms cubic-bezier(0.16,1,0.3,1) both',
       }}>
-        {/* Animated Shield Icon */}
+        
         <div style={{
           position: 'relative',
           width: 88,
@@ -60,7 +56,7 @@ export default function SinAcceso() {
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-          {/* Ring animation */}
+          
           <div style={{
             position: 'absolute',
             inset: 0,
@@ -68,7 +64,7 @@ export default function SinAcceso() {
             border: '2px solid rgba(220,38,38,0.3)',
             animation: 'shield-ring 2s ease-out infinite',
           }}/>
-          {/* Icon container */}
+          
           <div style={{
             width: 80,
             height: 80,
@@ -89,7 +85,6 @@ export default function SinAcceso() {
           </div>
         </div>
 
-        {/* Error code badge */}
         <div style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -159,7 +154,6 @@ export default function SinAcceso() {
           </button>
         </div>
 
-        {/* Footer version */}
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--text-muted)', margin: '1.75rem 0 0', letterSpacing: '0.04em' }}>
           HE-BI v4.0 · Hospital Escandón
         </p>

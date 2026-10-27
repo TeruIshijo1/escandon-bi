@@ -1,12 +1,5 @@
-/**
- * auth.middleware.js
- * Middleware de autenticación JWT y validación de roles (RBAC)
- * Hospital Escandón BI Platform v1.0
- *
- * Uso:
- *   router.get('/ruta', authenticate, authorize(['ADMIN','DIRECTOR']), handler)
- *   router.get('/ruta-area', authenticate, authorizeArea(['QUIROFANO']), handler)
- */
+
+
 'use strict';
 
 const jwt = require('jsonwebtoken');
@@ -18,7 +11,7 @@ if (!JWT_SECRET || !JWT_REFRESH) {
   throw new Error('JWT_SECRET and JWT_REFRESH must be set in environment variables.');
 }
 
-/* ── Roles válidos del sistema ─────────────────────────────── */
+/* Roles válidos del sistema */
 const VALID_ROLES = new Set([
   'ADMIN',
   'DIRECTOR',
@@ -28,7 +21,7 @@ const VALID_ROLES = new Set([
   'CONSULTA_EXTERNA',
 ]);
 
-/* ── Áreas válidas del hospital ────────────────────────────── */
+/* Áreas válidas del hospital */
 const VALID_AREAS = new Set([
   'QUIROFANO', 'IMAGENOLOGIA', 'URGENCIAS', 'CUNEROS',
   'UCI', 'CONSULTA_EXTERNA', 'CARDIOLOGIA', 'LABORATORIO',
@@ -36,9 +29,6 @@ const VALID_AREAS = new Set([
   'ALMACEN_GENERAL',
 ]);
 
-/* ══════════════════════════════════════════════════════════════
-   1. authenticate — Verifica el JWT en el header Authorization
-══════════════════════════════════════════════════════════════ */
 async function authenticate(req, res, next) {
   try {
     const authHeader = req.headers['authorization'];
@@ -99,11 +89,6 @@ async function authenticate(req, res, next) {
   }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   2. authorize — Verifica que el usuario tenga al menos uno
-      de los roles permitidos para la ruta.
-      Uso: authorize(['ADMIN', 'DIRECTOR'])
-══════════════════════════════════════════════════════════════ */
 function authorize(allowedRoles = []) {
   return (req, res, next) => {
     if (!req.user) {
@@ -112,20 +97,16 @@ function authorize(allowedRoles = []) {
 
     const { role, id, username, permisos } = req.user;
 
-    // REGLA MAESTRA: amendoza pasa incondicionalmente
     if (username && username.toLowerCase() === 'amendoza') {
       return next();
     }
 
-    // Permitir acceso si el rol está en la lista de permitidos
     if (allowedRoles.includes(role)) {
       return next();
     }
 
-    // NUEVA REGLA (Quitar tipo de perfil para permisos explícitos):
-    // Si el usuario no tiene el rol adecuado, pero se le asignaron permisos manualmente (ej. 'consulta-externa'),
-    // permitimos el acceso a los endpoints de dashboard. El frontend también realiza el bloqueo visual.
-    // Esto evita el error de "0s" cuando un USUARIO_OPERATIVO entra a un área fuera de su rol.
+    // NUEVA REGLA (Quitar tipo de perfil para permisos explícitos)
+
     if (permisos && permisos.length > 0) {
       return next();
     }
@@ -140,12 +121,6 @@ function authorize(allowedRoles = []) {
   };
 }
 
-/* ══════════════════════════════════════════════════════════════
-   3. authorizeArea — Para JEFE_AREA y USUARIO_OPERATIVO:
-      valida que el área solicitada coincida con el área del usuario.
-      ADMIN y DIRECTOR pasan sin restricción de área.
-      Uso: authorizeArea() — área se toma del query o body
-══════════════════════════════════════════════════════════════ */
 function authorizeArea(allowedRolesForAll = ['ADMIN', 'DIRECTOR']) {
   return (req, res, next) => {
     if (!req.user) {
@@ -160,7 +135,6 @@ function authorizeArea(allowedRolesForAll = ['ADMIN', 'DIRECTOR']) {
     // Roles globales: sin restricción de área
     if (allowedRolesForAll.includes(role)) return next();
 
-    // Para roles restringidos: validar área
     const requestedArea =
       req.params.area  ||
       req.query.area   ||
@@ -168,7 +142,7 @@ function authorizeArea(allowedRolesForAll = ['ADMIN', 'DIRECTOR']) {
       null;
 
     if (!requestedArea) {
-      // Si no se especifica área, solo puede ver la suya
+       
       req.areaFilter = userArea;
       return next();
     }
@@ -191,11 +165,6 @@ function authorizeArea(allowedRolesForAll = ['ADMIN', 'DIRECTOR']) {
   };
 }
 
-/* ══════════════════════════════════════════════════════════════
-   4. authorizeCapability — Verifica una capacidad específica
-      del payload de permisos (granular).
-      Uso: authorizeCapability('exportarPDF')
-══════════════════════════════════════════════════════════════ */
 function authorizeCapability(capability) {
   const ROLE_CAPABILITIES = {
     ADMIN:            ['exportarPDF','exportarExcel','gestionarUsuarios','verAuditoria','verLogAuditoria','verMacropanelFinanciero','usarAsistenteIA', 'verCEX', 'gestionCEX'],
@@ -234,9 +203,6 @@ function authorizeCapability(capability) {
   };
 }
 
-/* ══════════════════════════════════════════════════════════════
-   5. generateTokens — Genera access + refresh token
-══════════════════════════════════════════════════════════════ */
 function generateTokens(user) {
   const payload = {
     sub:      user.id,

@@ -54,8 +54,7 @@ export default function DashboardCunerosNativo({ globalFilters, globalTrigger })
 
   return (
     <div className="area-native-dashboard dashboard-view" style={{ padding: '1rem', background: '#F8FAFC', borderRadius: '16px' }}>
-      
-      {/* KPIs Principales */}
+
       <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
         <div className="area-metric-card dashboard-metric-card" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', borderLeft: `6px solid #F472B6` }}>
@@ -113,8 +112,7 @@ export default function DashboardCunerosNativo({ globalFilters, globalTrigger })
       </div>
 
       <div className="area-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
-        
-        {/* Top Insumos */}
+
         <div className="area-panel dashboard-panel" style={{ background: '#fff', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
           <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: '1.5rem', fontSize: '1.2rem' }}>Top 10 Insumos y Medicamentos</h3>
           <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ height: 350 }}>

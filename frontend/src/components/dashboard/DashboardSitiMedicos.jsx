@@ -10,7 +10,7 @@ const COLORS = ['#0891b2', '#06b6d4', '#22d3ee', '#67e8f9', '#a5f3fc', '#cffafe'
 export default function DashboardSitiMedicos() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [year, setYear] = useState('Histórico'); // 'Histórico' by default
+  const [year, setYear] = useState('Histórico');  
 
   useEffect(() => {
     setLoading(true);

@@ -48,7 +48,7 @@ function probeExistingBackend({ port, environment, installationId, timeoutMs = 2
       response.on('end', () => {
         if (settled) return;
         let health;
-        try { health = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* Foreign response. */ }
+        try { health = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch {   }
         if (response.statusCode !== 200 || health?.service !== SERVICE_NAME || health?.installationId !== installationId) {
           fail(`El puerto ${port} está ocupado por otra aplicación o instalación. Revisa ese proceso antes de iniciar BI.`);
         } else if (health.environment !== environment) {

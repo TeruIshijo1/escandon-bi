@@ -79,7 +79,7 @@ export default function EstadoCuentaModal({ pcNum, onClose }) {
           animation: 'panelIn 250ms ease',
         }}
       >
-        {/* Header */}
+        {/* Encabezado */}
         <div style={{
           background: 'linear-gradient(90deg, #004687, #0088C9)',
           padding: '0.9rem 1.5rem',
@@ -114,7 +114,6 @@ export default function EstadoCuentaModal({ pcNum, onClose }) {
           >✕</button>
         </div>
 
-        {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', background: '#f8fafc' }}>
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>Cargando estado de cuenta...</div>

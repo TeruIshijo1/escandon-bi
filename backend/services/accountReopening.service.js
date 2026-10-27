@@ -156,7 +156,7 @@ function createAccountReopeningService(dependencies = {}) {
     const request = dependencies.request ? dependencies.request(transaction) : new sql.Request(transaction, { requestTimeout: 30000 });
     request.overrides = { ...request.overrides, requestTimeout: 30000 };
     for (const [name, value] of Object.entries(parameters)) request.input(name, sql.Int, value);
-    const onAbort = () => { try { request.cancel(); } catch { /* The socket may already have completed. */ } };
+    const onAbort = () => { try { request.cancel(); } catch {   } };
     signal?.addEventListener('abort', onAbort, { once: true });
     try { const result = await request.query(text); cancelled(signal); return result; }
     finally { signal?.removeEventListener('abort', onAbort); }
@@ -170,9 +170,7 @@ function createAccountReopeningService(dependencies = {}) {
     return transaction;
   }
   async function snapshot(transaction, account, signal) {
-    // Acquire and retain table intent / account range locks before consulting
-    // schema metadata, so concurrent DDL cannot introduce an unreviewed trigger
-    // or cascading relation between validation and the eventual writes.
+
     const raw = (await query(transaction, SNAPSHOT_SQL, { account: Number(account) }, signal)).recordset?.[0];
     if (typeof raw?.pcJson !== 'string' || typeof raw?.pcdlJson !== 'string') throw failure('No se pudo respaldar la información completa de Vertical.', 'VERTICAL_SNAPSHOT_INVALID');
     const pc = jsonArray(raw.pcJson);
@@ -272,7 +270,7 @@ function createAccountReopeningService(dependencies = {}) {
       return { account, status: 'ready', previewToken, expiresAt: new Date((issuedAt + TOKEN_SECONDS) * 1000).toISOString(),
         verticalStatus: 'CL', record: recordPreview(state), recordCount: 1, backupDirectory: directory(), sapCheckedAt: sap.checkedAt };
     } catch (error) {
-      if (transaction) try { await transaction.rollback(); } catch { /* No writes in preparation. */ }
+      if (transaction) try { await transaction.rollback(); } catch {   }
       if (error.publicMessage) throw error;
       cancelled(signal);
       throw failure('No se pudo verificar la cuenta y sus relaciones en Vertical. No se realizaron cambios.', 'VERTICAL_PREPARATION_FAILED', 502);
@@ -347,8 +345,7 @@ function createAccountReopeningService(dependencies = {}) {
     cancelled(signal);
     await verifiedDirectory();
     const entry = await receipt(files(account, payload.operationId).receiptFile, payload);
-    // A missing file does not prove that a different process or an earlier
-    // request cannot still claim the receipt and proceed. Keep uncertainty.
+
     if (!entry) return { account, operationId: payload.operationId, status: active.has(payload.operationId) ? 'pending' : 'unknown', backupFile: null };
     if (entry.status === 'applied') return entry.result;
     return { account, operationId: payload.operationId, status: entry.status === 'pending' && !active.has(payload.operationId) ? 'unknown' : entry.status,

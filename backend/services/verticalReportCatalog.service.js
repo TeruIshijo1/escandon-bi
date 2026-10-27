@@ -1,9 +1,8 @@
 'use strict';
 
 const { connectRemoteDB, sql } = require('../config/remote-db');
+const { DAILY_PRODUCTIVITY_FROM } = require('./verticalProductivitySql');
 
-// Las expresiones SQL pertenecen a este catálogo cerrado. Los valores del usuario
-// sólo entran como parámetros. Se consulta Vertical sin modificar sus tablas.
 const definitions = Object.create(null);
 const catalog = Object.create(null);
 const field = (key, label, type = 'string', expression = `v.[${key}]`) => ({
@@ -158,9 +157,10 @@ define('vertical_surgeries', {
 
 define('vertical_physician_productivity', {
   title: 'Productividad médica diaria', icon: '📊', category: 'Productividad e Indicadores',
-  description: 'Primeras consultas, subsecuentes y atenciones por médico, especialidad y día.',
-  grain: 'Una fila por médico, especialidad y fecha de la vista de productividad.',
-  dateFieldLabel: 'Fecha de atención', date: 'v.Fecha', from: 'UDR_BI_PRODUCTIVIDAD_MEDICOS v',
+  description: 'Primeras consultas, subsecuentes y atenciones por médico, especialidad y día; la primera atención se determina en toda la historia del paciente con ese médico.',
+  grain: 'Una fila por médico, especialidad y fecha civil de atención, con clasificación histórica de primera o subsecuente.',
+  sourceTables: ['PC', 'PR', 'MS'],
+  dateFieldLabel: 'Fecha de atención', date: 'v.Fecha', from: DAILY_PRODUCTIVITY_FROM,
   order: 'v.Fecha DESC, v.Medico, v.Especialidad',
   summary: { quantityField: 'TotalAtenciones', quantityLabel: 'Atenciones' }
 }, [
@@ -231,7 +231,7 @@ define('vertical_sales_orders', {
   grain: 'Una fila por orden de venta (SONum). Los importes corresponden a la cabecera de cada orden.',
   defaultFields: ['SONum', 'CreatedOn', 'PatientName', 'PCNum', 'SO_ST', 'BPCode', 'Subtotal', 'Total'],
   dateFieldLabel: 'Fecha de creación de orden', date: 'v.CreatedOn',
-  // PTNum es clave primaria única y activa, comprobada por metadata el 2026-10-06.
+   
   from: 'SO v LEFT JOIN PT patient ON patient.PTNum = v.PTNum',
   order: 'v.CreatedOn DESC, v.SONum DESC',
   summary: { amountField: 'Total', amountLabel: 'Total de órdenes de venta' }
@@ -430,8 +430,7 @@ function civilDate(value) {
   if (!(value instanceof Date)) return value;
   if (!Number.isFinite(value.getTime())) return null;
   const pad = number => String(number).padStart(2, '0');
-  // remote-db usa useUTC:false. Las fechas civiles se conservan en hora local,
-  // incluso para cargos de las 23:xx, sin desplazarlas con toISOString().
+
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
 }
 
@@ -441,8 +440,6 @@ function validDate(value) {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-// Exact hospital identities may be consulted without guessing an admission
-// period. The scope is derived by the report engine, never from a request body.
 for (const [id, keys] of Object.entries({
   vertical_accounts: ['PCNum', 'PTNum'], vertical_account_charges: ['PCNum'],
   vertical_sales_orders: ['PCNum', 'PTNum'], vertical_service_orders: ['PCNum', 'PTNum'],
@@ -493,8 +490,7 @@ async function execute(entityId, options = {}) {
   }
   const search = busqueda?.trim();
   if (search) {
-    // La búsqueda se aplica antes de TOP. Los comodines escritos por el usuario
-    // se tratan como texto literal, no como patrones ni fragmentos de SQL.
+
     request.input('busqueda', sql.NVarChar(1002), `%${search.replace(/[\\%_[]/g, '\\$&')}%`);
     conditions.push(`(${definition.fields.map(column => {
       const style = ['date', 'datetime'].includes(column.type) ? ', 126' : '';
@@ -506,7 +502,10 @@ async function execute(entityId, options = {}) {
     FROM ${definition.from}
     ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
     ORDER BY ${definition.order}`);
-  const recordset = result.recordset || [];
+  if (!Array.isArray(result?.recordset)) {
+    throw Object.assign(new Error('Vertical no confirmó un conjunto completo de registros.'), { status: 502, code: 'SOURCE_INVALID_RESPONSE' });
+  }
+  const recordset = result.recordset;
   if (pointLookup && recordset.some(row => Number(row[pointLookup.field]) !== pointLookup.value)) {
     throw new Error('No se pudo verificar la identidad de todos los registros de la cuenta o paciente.');
   }

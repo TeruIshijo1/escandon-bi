@@ -1,6 +1,7 @@
 'use strict';
 
-// Decisiones internas de BI. Este servicio nunca usa las conexiones de SAP o clínica.
+const { isHonorariosScopeExcluded } = require('../utils/honorariosScope');
+
 const { getDb } = require('../config/db');
 let ready;
 async function ensureTables() {
@@ -22,7 +23,7 @@ async function ensureTables() {
 }
 
 function canReview(user) {
-  // Mismo permiso que la ruta Honorarios en el catálogo existente de BI.
+   
   return String(user?.username || '').toLowerCase() === 'amendoza'
     || user?.permisos?.includes('interconsultas-jornadas') === true;
 }
@@ -73,8 +74,7 @@ function recordPhysicianCorrection(decision, previous, user) {
   const sameCorrection = previous?.action === 'APROBAR' && previousCorrection && original.sourceFingerprint === snapshot.sourceFingerprint
     && original.rowId === snapshot.rowId && String(original.providerId) === String(snapshot.providerId)
     && fields.every(key => previousCorrection[key] === correction[key]);
-  // Autor y fecha sólo se conservan desde la revisión bloqueada en BI. Cualquier
-  // identidad o fecha incluida en la petición queda fuera del registro nuevo.
+
   const attribution = sameCorrection ? {
     correctedBy: previousCorrection.correctedBy, correctedAt: previousCorrection.correctedAt
   } : {
@@ -102,16 +102,16 @@ async function saveReview(input, user, { sourceValidated = false } = {}) {
   const client = await getDb().pool.connect();
   try {
     await client.query('BEGIN');
-    // El bloqueo también protege la primera aprobación de un registro inexistente.
+     
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [rowId]);
     const closed = await client.query('SELECT liquidation_id FROM bi_honorarios_finalized_rows WHERE row_id=$1', [rowId]);
     if (closed.rows.length) throw Object.assign(new Error('Este servicio pertenece a una liquidación cerrada. Registra un ajuste en el cierre para conservar el historial.'), { status: 409 });
     if (decision.action === 'APROBAR' && decision.snapshot) {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`honorarios-catalog:${decision.snapshot.itemCode}`]);
-      const config = await client.query('SELECT revision,status,source_active,scope_excluded FROM bi_honorarios_catalog WHERE item_code=$1 FOR UPDATE', [decision.snapshot.itemCode]);
+      const config = await client.query('SELECT revision,status,source_active,scope_excluded,item_code,name,description,group_name,reference_prices,source_metadata FROM bi_honorarios_catalog WHERE item_code=$1 FOR UPDATE', [decision.snapshot.itemCode]);
       const tariff = await client.query('SELECT revision,active FROM bi_honorarios_tariffs WHERE id=$1 FOR UPDATE', [decision.snapshot.tariff.id]);
       if (config.rows[0]?.revision !== decision.snapshot.catalog.revision || config.rows[0]?.status !== 'INCLUIDO'
-        || config.rows[0]?.source_active !== true || config.rows[0]?.scope_excluded
+        || config.rows[0]?.source_active !== true || isHonorariosScopeExcluded(config.rows[0])
         || tariff.rows[0]?.revision !== decision.snapshot.tariff.revision || !tariff.rows[0]?.active) {
         throw Object.assign(new Error('Cambió la configuración o tarifa durante la aprobación. Actualiza el reporte.'), { status: 409 });
       }

@@ -1,8 +1,5 @@
-/**
- * HomePage.jsx — Página de inicio / resumen general
- * Hospital Escandón BI Platform v4.0
- * Rediseño premium con identidad de marca y micro-interacciones
- */
+
+
 import { useState, useEffect } from 'react';
 import { useNavigate }         from 'react-router-dom';
 import { useAuth }             from '../context/AuthContext';
@@ -13,7 +10,7 @@ import EditableKPIWrapper from '../components/shared/EditableKPIWrapper';
 import PBIModal from '../components/shared/PBIModal';
 import { useKPIConfig } from '../hooks/useKPIConfig';
 
-/* ── Widget de acceso rápido ──────────────────────────────── */
+/* Widget de acceso rápido */
 function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 0 }) {
   const navigate = useNavigate();
   const [hovered, setHovered] = useState(false);
@@ -39,7 +36,7 @@ function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 
         animationDelay: `${index * 60}ms`,
       }}
     >
-      {/* Dynamic light sweep on hover */}
+      
       {hovered && (
         <div style={{
           position: 'absolute',
@@ -50,7 +47,7 @@ function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-        {/* Large icon with gradient background */}
+        
         <div style={{
           width: '42px',
           height: '42px',
@@ -85,7 +82,6 @@ function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 
         overflow: 'hidden'
       }}>{desc}</p>
 
-      {/* Ir al módulo button with underline reveal & arrow slide */}
       <div style={{
         marginTop: '0.875rem',
         display: 'flex',
@@ -122,9 +118,6 @@ function QuickCard({ icon, title, desc, path, color = '#004687', badge, index = 
   );
 }
 
-
-
-/* ── Componente principal ─────────────────────────────────── */
 export default function HomePage() {
   const { user }       = useAuth();
   const { getKPI }     = useKPIConfig();
@@ -143,20 +136,20 @@ export default function HomePage() {
   const fecha = new Date().toLocaleDateString('es-MX', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
   const SECTION_COLORS = {
-    'dirección': '#0088C9',       // Cyan-blue
-    'mi área': '#00974A',         // Green
+    'dirección': '#0088C9',        
+    'mi área': '#00974A',          
     'mi area': '#00974A',
-    'históricos siti': '#8A97A8', // Cool gray
-    'auditoría': '#8B5CF6',       // Purple
-    'farmacia': '#EC4899',        // Pink
-    'almacén general': '#E8853D', // Orange
-    'administración': '#6366F1',  // Indigo
+    'históricos siti': '#8A97A8',  
+    'auditoría': '#8B5CF6',        
+    'farmacia': '#EC4899',         
+    'almacén general': '#E8853D',  
+    'administración': '#6366F1',   
   };
 
   /* Tarjetas dinámicas según permisos (No un menú general) */
   const rawCards = getNavItems(user?.role, user?.area, user?.username);
   const cards = rawCards
-    .filter(item => item.path !== '/') // No mostrar la tarjeta de Inicio
+    .filter(item => item.path !== '/')  
     .filter(item => hasPermission(user, item.path))
     .map(item => {
       const sectionKey = (item.section || '').toLowerCase().trim();
@@ -185,7 +178,7 @@ export default function HomePage() {
         <PBIModal {...pbiModal} onClose={() => setPBIModal(null)} />
       )}
 
-      {/* ── Hero / Título con ECG pattern ── */}
+      {/* Hero / Título con ECG pattern */}
       <div style={{
         position: 'relative',
         background: 'linear-gradient(135deg, var(--color-azul-fuerte) 0%, #083b66 100%)',
@@ -195,7 +188,7 @@ export default function HomePage() {
         boxShadow: 'var(--shadow-md)',
         overflow: 'hidden',
       }}>
-        {/* ECG Pattern in Background */}
+        
         <div style={{
           position: 'absolute',
           inset: 0,
@@ -231,9 +224,7 @@ export default function HomePage() {
         </div>
       </div>
 
-
-
-      {/* ── Accesos rápidos ── */}
+      {/* Accesos rápidos */}
       <div style={{ marginBottom:'2rem' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1.25rem' }}>
           <div style={{ width:4, height:18, background:'var(--color-azul-fuerte)', borderRadius:2 }}/>

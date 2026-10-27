@@ -26,13 +26,18 @@ function validDate(value) {
 }
 
 function interpretDates(message, today, context = {}) {
-  const original = normalize(normalizeWords(message)).replace(/(?:busca|buscar|contenga|contengan|coincida con)\s+["“][^"”]+["”]/g, '');
+  const original = normalize(normalizeWords(message))
+    .replace(/(?:busca|buscar|contenga|contengan|coincida con)\s+["“][^"”]+["”]/g, '')
+    .replace(/\b(?:cambia|sustituye)\s+[«“"][^»”"]+[»”"]\s+por\s+[«“"][^»”"]+[»”"]/g, ' ')
+    .replace(/\bme refiero a\s+[«“"][^»”"]+[»”"]/g, ' ');
   const text = original.replace(/\btreinta y uno\b/g, '31').replace(new RegExp(`\\b(${Object.keys(DAY_WORDS).join('|')})\\b`, 'g'), word => DAY_WORDS[word]).replace(/\b1(?:ro|ero)\b/g, '1');
   const current = new Date(`${today}T12:00:00Z`);
   const contextDate = validDate(context.fechaDesde || '') ? context.fechaDesde : today;
   const year = Number(contextDate.slice(0, 4));
   const sameMonth = context.fechaDesde && context.fechaHasta && context.fechaDesde.slice(0, 7) === context.fechaHasta.slice(0, 7);
-  const requested = new RegExp(`\\b(${MONTH_PATTERN}|hoy|ayer|anteayer|mes|semana|quincena|navidad)\\b`).test(text) || /\b\d{1,4}[/-]\d{1,2}\b|\b(?:del?|entre|desde)\s+(?:el\s+)?\d+\s+(?:al|hasta|y)\s+(?:el\s+)?\d+/.test(text) || /\b(cambia|cambiar|mejor|pon|usa|ajusta)\b.*\b(fecha|fechas|periodo)\b/.test(text);
+  const dateColumn = /\bfecha(?:s)?\s+(?:de\s+)?(?:alta|cierre|ingreso|nacimiento|caducidad|vencimiento|cargo|creacion|emision|atencion|solicitud|registro|proceso|devolucion|salida|contabilizacion|documento|entrega|inicio|fin|programada|consulta|estudio|orden|ticket|estancia|tratamiento|modificacion|pago|cobro|factura)\b/g;
+  const periodText = text.replace(dateColumn, ' ');
+  const requested = new RegExp(`\\b(${MONTH_PATTERN}|hoy|ayer|anteayer|mes|semana|quincena|navidad)\\b`).test(periodText) || /\b\d{1,4}[/-]\d{1,2}\b|\b(?:del?|entre|desde)\s+(?:el\s+)?\d+\s+(?:al|hasta|y)\s+(?:el\s+)?\d+/.test(periodText) || /\b(cambia|cambiar|mejor|pon|usa|ajusta)\b(?![^.;]*\bpor\b).*\b(fecha|fechas|periodo)\b/.test(periodText);
   const clarification = '¿Qué período quieres usar? Puedes decir «del 1 al 15 de septiembre» o indicar las fechas de inicio y fin.';
   const finish = (range, error = '') => {
     if (range && (!validDate(range.fechaDesde) || !validDate(range.fechaHasta))) return { range: null, requested: true, error: 'Alguna fecha no existe en el calendario. ¿Qué días y mes quieres consultar?' };
@@ -43,8 +48,6 @@ function interpretDates(message, today, context = {}) {
   const fullMonth = (selectedYear, selectedMonth) => range(selectedYear, selectedMonth, 1, selectedYear, selectedMonth, new Date(Date.UTC(selectedYear, selectedMonth + 1, 0)).getUTCDate());
   const daysAgo = count => { const date = new Date(current); date.setUTCDate(date.getUTCDate() - count); return date.toISOString().slice(0, 10); };
 
-  // Full endpoints go first, so crossing a month or year does not become a
-  // shared-month range. Omitted years follow the report already being edited.
   const endpoints = text.match(new RegExp(`\\b(?:(?:del?|desde|entre)\\s+)?(?:el\\s+)?(\\d{1,2})\\s+(?:de\\s+)?(${MONTH_PATTERN})\\.?${YEAR}\\s*(?:al|a|hasta|y|-)\\s*(?:el\\s+)?(\\d{1,2})\\s+(?:de\\s+)?(${MONTH_PATTERN})\\.?${YEAR}\\b`));
   if (endpoints) {
     const startMonth = monthNumber(endpoints[2]), endMonth = monthNumber(endpoints[5]);
@@ -100,8 +103,7 @@ function interpretDates(message, today, context = {}) {
     if (/\b(antes|despues|hasta|desde|entre|alrededor|aproximadamente)\b|a partir/.test(text)) return finish(null, '¿Desde qué día y hasta qué día necesitas el reporte?');
     return range(Number(single[3] || year), monthNumber(single[2]), Number(single[1]), Number(single[3] || year), monthNumber(single[2]), Number(single[1]));
   }
-  // A lone month means the full month; an incomplete day range must never
-  // silently widen into that month or retain the previous period.
+
   const named = [...text.matchAll(new RegExp(`\\b(${MONTH_PATTERN})\\.?${YEAR}\\b`, 'g'))];
   if (named.length) {
     if (named.length > 1 || /\b\d{1,2}\b|\b(antes|despues|hasta|desde|entre|alrededor|aproximadamente)\b/.test(text.replace(/\b(?:19|20|21)\d{2}\b/g, ''))) return finish(null, clarification);

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "WinSW",
+  "version": "2.12.0",
+  "asset": "WinSW.NET461.exe",
+  "downloadUrl": "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW.NET461.exe",
+  "releaseUrl": "https://github.com/winsw/winsw/releases/tag/v2.12.0",
+  "licenseUrl": "https://raw.githubusercontent.com/winsw/winsw/v2.12.0/LICENSE.txt",
+  "sha256": "b5066b7bbdfba1293e5d15cda3caaea88fbeab35bd5b38c41c913d492aadfc4f",
+  "bytes": 655872,
+  "fileVersion": "2.12.0.0",
+  "productVersion": "2.12.0+eef5bade59fca0254e387ac73ed7625ba6aa7147",
+  "downloadedOn": "2026-10-22",
+  "checksumBasis": "SHA-256 calculado sobre el binario descargado por HTTPS desde el release oficial; no se encontro checksum del fabricante entre los assets.",
+  "requires": ".NET Framework 4.6.1 o superior",
+  "license": "MIT",
+  "configurationSha256": "92f0152b0ca867812aee7232267cfb86830cc7ccc8f408b76302f0f5c6cfe16c"
+}

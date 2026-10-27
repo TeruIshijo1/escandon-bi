@@ -1,11 +1,5 @@
-/**
- * honorarios.routes.js — Reporte Unificado de Liquidación y Auditoría de Honorarios Médicos
- * Hospital Escandón BI Platform
- *
- * Unifica las dos vistas del motor de honorarios de Vertical:
- * 1. UDR_HON_PAGO_Audit: Universo total de atenciones, cargos y diagnóstico de reglas de negocio
- * 2. UDR_HON_PAGO: Motor de liquidación con tabulador, impuestos, retenciones ISR y neto a pagar
- */
+
+
 'use strict';
 
 const express = require('express');
@@ -159,9 +153,11 @@ router.post('/reviews/bulk', api(async req => {
 
 router.get('/catalog', api(async req => {
   const cached = await catalog.listCatalog({ ...req.query, autoSync: false });
-  if (cached.sync.lastSuccess) return cached;
+  if (cached.sync.lastSuccess && !catalog.isCatalogSyncDue(cached.sync)) return cached;
   try {
-    await catalog.ensureCatalogReady(await connectRemoteDB());
+    const remote = await connectRemoteDB();
+    if (cached.sync.lastSuccess) await catalog.syncIfDue(remote);
+    else await catalog.ensureCatalogReady(remote);
     return catalog.listCatalog({ ...req.query, autoSync: false });
   } catch {
     return { ...cached, sync: { ...cached.sync, lastError: 'Vertical no está disponible para actualizar el catálogo.' } };
@@ -227,11 +223,7 @@ router.post('/liquidations/:id/provider-payment', api(async req => ({ liquidatio
 router.post('/liquidations/:id/payments', api(async req => ({ liquidation: await liquidation.recordApplication(req.params.id, req.body, req.user) })));
 router.post('/liquidations/:id/adjustments', api(async req => ({ liquidation: await liquidation.recordApplication(req.params.id, req.body, req.user, true) })));
 
-/**
- * POST /api/honorarios/sap-reconciliation
- * Lee documentos y aplicaciones de pago de SAP sin modificar datos de SAP.
- * Los nombres recibidos son solo candidatos para localizar proveedores; no validan identidad.
- */
+/* POST /api/honorarios/sap-reconciliation */
 router.post('/sap-reconciliation', authenticate, authorize(ALLOWED_ROLES), async (req, res) => {
   const { startDate, endDate, doctors, scope = 'documents' } = req.body || {};
   if (!Array.isArray(doctors) || doctors.length > 500) {
@@ -253,16 +245,6 @@ router.post('/sap-reconciliation', authenticate, authorize(ALLOWED_ROLES), async
   }
 });
 
-/**
- * GET /api/honorarios/audit
- * Consulta unificada de honorarios médicos con cálculo de liquidación y diagnóstico de exclusiones
- * Parámetros de consulta:
- *  - startDate (YYYY-MM-DD)
- *  - endDate (YYYY-MM-DD)
- *  - status ('elegibles' | 'exclusiones' | 'todos')
- *  - grupoServicio (opcional)
- *  - medico (opcional)
- */
 router.get('/audit-vertical', authenticate, authorize(ALLOWED_ROLES), async (req, res) => {
   try {
     const { startDate, endDate, status, grupoServicio, medico } = req.query;
@@ -459,15 +441,15 @@ router.get('/audit-vertical', authenticate, authorize(ALLOWED_ROLES), async (req
       WHERE a.PCDate >= CAST(@startDate AS DATETIME) 
         AND a.PCDate < DATEADD(day, 1, CAST(@endDate AS DATETIME))
         AND (a.ItemGroupName IS NULL OR LTRIM(RTRIM(a.ItemGroupName)) COLLATE Latin1_General_CI_AI
-          NOT IN ('ALMACEN GENERAL', 'FARMACIA', 'LABORATORIO', 'ESTUDIOS DE LABORATORIO', 'IMAGENOLOGIA'))
+          NOT IN ('ALMACEN GENERAL', 'FARMACIA', 'LABORATORIO', 'ESTUDIOS DE LABORATORIO'))
+        AND (LTRIM(RTRIM(ISNULL(a.ItemGroupName,''))) COLLATE Latin1_General_CI_AI <> 'IMAGENOLOGIA'
+          OR EXISTS (SELECT 1 FROM UT_Honorarios h WHERE h.ITEMCODE=a.ItemCode))
     `;
 
     const request = pool.request();
     request.input('startDate', startDate);
     request.input('endDate', endDate);
 
-    /* Los filtros se aplican después de recuperar citas para que el mismo
-       universo se use en Todos, Incluidos y Exclusiones. */
     query += ` ORDER BY a.PCDate DESC, a.Medico ASC, a.PCNum DESC`;
 
     const result = await request.query(query);

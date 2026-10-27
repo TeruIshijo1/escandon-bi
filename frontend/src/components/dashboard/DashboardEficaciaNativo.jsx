@@ -1,143 +1,121 @@
 import DashboardMetricCard from './DashboardMetricCard';
 import { userMessage } from '../../utils/userMessages';
-import { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area, PieChart, Pie, Cell, LineChart, Line, ComposedChart } from 'recharts';
+import { useState, useEffect, useRef } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
 import DashboardChart from './DashboardChart';
 import { API_BASE } from '../../api/config';
 import ExportButton from '../shared/ExportButton';
 import PremiumLoader from '../shared/PremiumLoader';
 
 export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }) {
-  const [data, setData] = useState(null);
+  const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const [options, setOptions] = useState({ medicos: [], especialidades: [] });
-  const [filters, setFilters] = useState({
-    medico: '',
-    especialidad: '',
-    search: ''
-  });
-
+  const [filters, setFilters] = useState({ medico: '', especialidad: '', search: '' });
   const [applyTrigger, setApplyTrigger] = useState(0);
   const [selectedEstatus, setSelectedEstatus] = useState(null);
+  const requestId = useRef(0);
+  const params = new URLSearchParams();
+  if (globalFilters?.startDate) params.set('startDate', globalFilters.startDate);
+  if (globalFilters?.endDate) params.set('endDate', globalFilters.endDate);
+  const medico = globalFilters?.medico || filters.medico || '';
+  const especialidad = globalFilters?.especialidad || filters.especialidad || '';
+  const search = medico || especialidad || filters.search;
+  if (search) params.set('search', search);
+  if (especialidad) params.set('especialidad', especialidad);
+  const queryKey = params.toString();
+  const data = snapshot?.key === queryKey ? snapshot.data : null;
+  const currentError = error?.key === queryKey ? error.message : null;
 
+  // Cada respuesta pertenece a los filtros que la solicitaron.
   useEffect(() => {
-    fetchOptions();
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [applyTrigger, globalTrigger]);
-
-  const fetchOptions = async () => {
-    try {
-      const token = sessionStorage.getItem('escandon_token');
-      const res = await fetch(`${API_BASE}/dashboard/filtros-eficacia`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const json = await res.json();
-      if (json.ok) {
-        setOptions(json.data);
+    const controller = new AbortController();
+    const id = ++requestId.current;
+    setLoading(true);
+    setError(null);
+    setSelectedEstatus(null);
+    (async () => {
+      try {
+        const token = sessionStorage.getItem('escandon_token');
+        const res = await fetch(`${API_BASE}/dashboard/eficacia-nativo?${queryKey}`, {
+          headers: { Authorization: `Bearer ${token}` }, signal: controller.signal
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok || !json.data) throw new Error(userMessage(json.error || 'No se pudieron cargar los indicadores.'));
+        if (controller.signal.aborted || id !== requestId.current) return;
+        setSnapshot({ key: queryKey, data: json.data });
+      } catch (err) {
+        if (controller.signal.aborted || id !== requestId.current) return;
+        setError({ key: queryKey, message: userMessage(err.message || 'Error de conexión con el servidor.') });
+      } finally {
+        if (!controller.signal.aborted && id === requestId.current) setLoading(false);
       }
-    } catch (err) {
-      console.error('Error fetching options', err);
-    }
-  };
+    })();
+    return () => controller.abort();
+  }, [queryKey, applyTrigger, globalTrigger]);
 
-  const fetchData = async () => {
-    try {
-      const token = sessionStorage.getItem('escandon_token');
-
-      let url = `${API_BASE}/dashboard/eficacia-nativo?`;
-      if (globalFilters?.startDate) url += `startDate=${globalFilters.startDate}&`;
-      if (globalFilters?.endDate) url += `endDate=${globalFilters.endDate}&`;
-      
-      // We will combine 'medico' and 'search' conceptually in the backend by just passing the exact Medico if selected.
-      // But we can just use the search parameter for both text search and exact dropdown selection for now.
-      // Actually, if we have a specific Medico, let's pass it as search. 
-      // If we have an especialidad, we need to update the backend to accept 'especialidad' filter. Wait, backend efficacy doesn't accept 'especialidad' yet.
-      
-      let medico = globalFilters?.medico || filters.medico || '';
-      let especialidad = globalFilters?.especialidad || filters.especialidad || '';
-      
-      let searchQuery = medico || especialidad;
-      if (searchQuery) url += `search=${encodeURIComponent(searchQuery)}&`;
-      if (especialidad) url += `especialidad=${encodeURIComponent(especialidad)}&`;
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const json = await res.json();
-      
-      if (json.ok) {
-        setData(json.data);
-      } else {
-        setError(userMessage(json.error || 'Error al cargar datos'));
-      }
-    } catch (err) {
-      setError('Error de conexión con el servidor.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  const retry = () => setApplyTrigger(value => value + 1);
+  if (!data) {
+    if (currentError) return <div role="alert" className="dashboard-panel" style={{ padding: 20 }}>
+      <p>{currentError}</p><button type="button" onClick={retry}>Reintentar</button>
+    </div>;
     return <PremiumLoader text="Cargando Indicadores de Eficacia Médica..." style={{ height: '300px' }} />;
   }
 
-  if (error) {
-    return <div style={{ padding: 20, color: '#EF4444', background: '#FEE2E2', borderRadius: 8 }}>{userMessage(error)}</div>;
-  }
-
-  const { tendenciaMensual, topEspecialidades, topMedicos, estatusConsultas, kpis } = data;
+  const source = data.sourceStatus;
+  const productivityAvailable = source?.productivityAvailable !== false;
+  const consultationsAvailable = source?.consultationsAvailable !== false;
+  const tendenciaMensual = productivityAvailable && Array.isArray(data.tendenciaMensual) ? data.tendenciaMensual : [];
+  const topEspecialidades = productivityAvailable && Array.isArray(data.topEspecialidades) ? data.topEspecialidades.filter(row => numberOrNull(row.Total) !== null) : [];
+  const topMedicos = productivityAvailable && Array.isArray(data.topMedicos) ? data.topMedicos.filter(row => numberOrNull(row.Total) !== null) : [];
+  const estatusConsultas = consultationsAvailable && Array.isArray(data.estatusConsultas) ? data.estatusConsultas.filter(row => numberOrNull(row.valor) !== null) : [];
+  const kpis = data.kpis || {};
+  const dates = [source?.updatedAt && `Productividad: ${formatSnapshotDate(source.updatedAt)}`, source?.consultationsUpdatedAt && `Citas: ${formatSnapshotDate(source.consultationsUpdatedAt)}`].filter(Boolean).join(' · ');
   const STATUS_COLORS = ['#0088C9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
-
-  const handleApply = () => setApplyTrigger(prev => prev + 1);
-  const handleClear = () => {
-    setFilters({ medico: '', especialidad: '', search: '' });
-    setSelectedEstatus(null);
-    setTimeout(() => setApplyTrigger(prev => prev + 1), 50);
-  };
 
   const handleBarClick = (entry) => {
     if (entry && entry.Medico) {
       setFilters(prev => ({ ...prev, medico: entry.Medico, search: entry.Medico }));
-      setTimeout(() => setApplyTrigger(prev => prev + 1), 50);
     }
   };
 
   return (
-    <div className="dashboard-view" id="dashboard-eficacia" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
+    <div className="dashboard-view" id="dashboard-eficacia" aria-busy={loading} style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'var(--dash-bg, transparent)' }}>
       
-      <div style={{ display: 'none' }}>
+      {!loading && !currentError && productivityAvailable && consultationsAvailable && <div style={{ display: 'none' }}>
         <ExportButton id="export-pdf-btn" type="pdf" targetId="dashboard-eficacia" compact={true} />
         <ExportButton 
           id="export-excel-btn"
           type="excel" 
-          directUrl={`/dashboard/export-excel?dashboard=eficacia&startDate=${globalFilters?.startDate || ''}&endDate=${globalFilters?.endDate || ''}&search=${encodeURIComponent(globalFilters?.medico || filters.medico || '')}&especialidad=${encodeURIComponent(globalFilters?.especialidad || filters.especialidad || '')}`} 
+          directUrl={`/dashboard/export-excel?dashboard=eficacia&${queryKey}`} 
           compact={true} 
         />
-      </div>
-      
+      </div>}
 
+      {(source?.status === 'pending' || source?.status === 'stale' || currentError) && <div role="status" className="dashboard-panel" style={{ padding: '1rem 1.25rem', marginBottom: '1rem', color: 'var(--dash-text)', borderLeft: '4px solid #D99817' }}>
+        {currentError ? <><p style={{ margin: 0 }}>No se pudo actualizar la información. Se conserva la última copia consultada para estos filtros.</p><p>{currentError}</p><button type="button" onClick={retry}>Reintentar</button></>
+          : source.status === 'stale' ? <p style={{ margin: 0 }}>Se muestra la última copia guardada. La actualización más reciente no pudo completarse.</p>
+          : <p style={{ margin: 0 }}>{!productivityAvailable ? 'La productividad médica está pendiente de su primera actualización. Las cifras se mostrarán cuando estén confirmadas.' : 'Hay información pendiente de actualizar.'}{!consultationsAvailable ? ' Las citas aún no tienen una copia confirmada.' : ''}</p>}
+        {dates && <p style={{ margin: '0.5rem 0 0' }}>Fecha de la copia guardada · {dates}</p>}
+      </div>}
+      {loading && <p role="status">Actualizando información… Se conserva la copia consultada para estos filtros.</p>}
+      {source?.status === 'complete' && dates && <p style={{ color: 'var(--dash-muted)', fontSize: '0.85rem' }}>Última actualización · {dates}</p>}
 
-      {/* Tarjetas de KPIs */}
+      {/* Indicadores confirmados de productividad. */}
       <div className="dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <KPICard title="Consultas en el año" value={kpis.totalConsultas.toLocaleString()} color="#0088C9" icon="🩺" />
-        <KPICard title="Top Especialidad" value={kpis.topEspecialidad} color="#10B981" icon="🏆" isText={true} />
-        <KPICard title="Primeras Veces" value={kpis.primeras.toLocaleString()} color="#8B5CF6" icon="👤" />
-        <KPICard title="Subsecuentes" value={kpis.subsecuentes.toLocaleString()} color="#F59E0B" icon="🔄" />
+        <KPICard title="Consultas en el año" value={productivityAvailable ? formatNumber(kpis.totalConsultas) : 'No disponible'} color="#0088C9" icon="🩺" />
+        <KPICard title="Top Especialidad" value={productivityAvailable && kpis.topEspecialidad ? kpis.topEspecialidad : 'No disponible'} color="#10B981" icon="🏆" isText={true} />
+        <KPICard title="Primeras Veces" value={productivityAvailable ? formatNumber(kpis.primeras) : 'No disponible'} color="#8B5CF6" icon="👤" />
+        <KPICard title="Subsecuentes" value={productivityAvailable ? formatNumber(kpis.subsecuentes) : 'No disponible'} color="#F59E0B" icon="🔄" />
       </div>
 
       {/* Gráficas Principales */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '2rem' }}>
-        
-        {/* Tendencia Mensual (AreaChart) */}
+
         <div className="dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Volumen de Consultas por Mes</h3>
           <div className="dashboard-chart-host" style={{ width: '100%', height: 300 }}>
-            <DashboardChart>
+            {productivityAvailable ? (<DashboardChart>
               <AreaChart data={tendenciaMensual} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
@@ -153,7 +131,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                 <Area isAnimationActive={false} type="monotone" dataKey="Total" name="Consultas Totales" stroke="#0088C9" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
                 <Area isAnimationActive={false} type="monotone" dataKey="Primeras" name="Primeras Veces" stroke="#8B5CF6" strokeWidth={2} fillOpacity={0} />
               </AreaChart>
-            </DashboardChart>
+            </DashboardChart>) : <EmptyChart message="Productividad pendiente de confirmar." />}
           </div>
         </div>
 
@@ -161,7 +139,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
         <div className="dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Estado de Citas del Día</h3>
           <div className="dashboard-chart-host" style={{ width: '100%', height: 300 }}>
-            <DashboardChart>
+            {consultationsAvailable ? (<DashboardChart>
               <PieChart>
                 <Pie
                   isAnimationActive={false}
@@ -179,22 +157,21 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                     <Cell key={`cell-${index}`} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => value.toLocaleString()} />
+                <Tooltip formatter={formatNumber} />
                 <Legend layout="vertical" verticalAlign="middle" align="right" />
               </PieChart>
-            </DashboardChart>
+            </DashboardChart>) : <EmptyChart message="Citas pendientes de confirmar." />}
           </div>
         </div>
       </div>
 
       {/* Top Especialidades y Médicos */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
-        
-        {/* Top 10 Especialidades */}
+
         <div className="dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Especialidades</h3>
           <div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
-            <DashboardChart>
+            {productivityAvailable ? (<DashboardChart>
               <BarChart layout="vertical" data={topEspecialidades} margin={{ top: 10, right: 30, left: 100, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tick={{fill: '#64748B'}} axisLine={false} tickLine={false} />
@@ -210,13 +187,12 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                   onClick={(entry) => {
                     if(entry && entry.Especialidad) {
                       setFilters(prev => ({ ...prev, especialidad: entry.Especialidad }));
-                      setTimeout(() => setApplyTrigger(prev => prev + 1), 50);
-                    }
+                                    }
                   }} 
                   style={{ cursor: 'pointer' }}
                 />
               </BarChart>
-            </DashboardChart>
+            </DashboardChart>) : <EmptyChart message="Productividad pendiente de confirmar." />}
           </div>
         </div>
 
@@ -224,7 +200,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
         <div className="dashboard-panel" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Top 10 Médicos (Productividad)</h3>
           <div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
-            <DashboardChart>
+            {productivityAvailable ? (<DashboardChart>
               <BarChart layout="vertical" data={topMedicos} margin={{ top: 10, right: 30, left: 120, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tick={{fill: '#64748B'}} axisLine={false} tickLine={false} />
@@ -232,14 +208,14 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                 <Tooltip cursor={{fill: 'rgba(0,136,201,0.05)'}} />
                 <Bar isAnimationActive={false} dataKey="Total" name="Consultas" fill="#0088C9" radius={[0, 4, 4, 0]} barSize={20} onClick={handleBarClick} style={{ cursor: 'pointer' }} />
               </BarChart>
-            </DashboardChart>
+            </DashboardChart>) : <EmptyChart message="Productividad pendiente de confirmar." />}
           </div>
         </div>
 
       </div>
 
       {/* Tabla de Detalle de Pacientes/Consultas (Drill-down) */}
-      {selectedEstatus && data.detalleConsultas && data.detalleConsultas[selectedEstatus] && (
+      {consultationsAvailable && selectedEstatus && data.detalleConsultas && data.detalleConsultas[selectedEstatus] && (
         <div data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)', marginTop: '1.5rem', animation: 'fadeIn 0.3s' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div>
@@ -270,7 +246,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                     <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{c.Fecha} {c.Hora && <span style={{fontSize: '0.75rem', marginLeft: '0.2rem'}}>{c.Hora.substring(0,5)}</span>}</td>
                     
                     <td 
-                      onClick={() => { setFilters({...filters, search: c.Numero_Cita.toString()}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      onClick={() => { setFilters({...filters, search: c.Numero_Cita.toString()});  }}
                       style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#005FA9', cursor: 'pointer', textDecoration: 'underline' }}
                       title="Filtrar por Cita"
                     >
@@ -278,7 +254,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                     </td>
                     
                     <td 
-                      onClick={() => { setFilters({...filters, search: c.Paciente}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      onClick={() => { setFilters({...filters, search: c.Paciente});  }}
                       style={{ padding: '0.75rem 1rem', cursor: 'pointer', color: '#0D1B2A' }}
                       title="Filtrar por Paciente"
                       onMouseOver={(e) => e.currentTarget.style.color = '#005FA9'}
@@ -288,7 +264,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                     </td>
                     
                     <td 
-                      onClick={() => { setFilters({...filters, medico: c.Medico, search: c.Medico}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      onClick={() => { setFilters({...filters, medico: c.Medico, search: c.Medico});  }}
                       style={{ padding: '0.75rem 1rem', color: '#005FA9', cursor: 'pointer', fontWeight: 600 }}
                       title="Filtrar por Médico"
                     >
@@ -296,7 +272,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                     </td>
                     
                     <td 
-                      onClick={() => { setFilters({...filters, especialidad: c.Especialidad}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      onClick={() => { setFilters({...filters, especialidad: c.Especialidad});  }}
                       style={{ padding: '0.75rem 1rem', cursor: 'pointer', color: '#0D1B2A' }}
                       title="Filtrar por Especialidad"
                       onMouseOver={(e) => e.currentTarget.style.color = '#005FA9'}
@@ -313,7 +289,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
       )}
 
       {/* Tabla de Detalle General (Top 100) */}
-      {data.listaConsultas && data.listaConsultas.length > 0 && (
+      {consultationsAvailable && data.listaConsultas && data.listaConsultas.length > 0 && (
         <div data-html2canvas-ignore="true" style={{ background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)', marginTop: '1.5rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ margin: 0, color: '#0D1B2A', fontSize: '1.1rem' }}>Últimas Consultas (General)</h3>
@@ -337,7 +313,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                     <td style={{ padding: '0.75rem 1rem', color: '#64748B' }}>{c.Fecha} {c.Hora && <span style={{fontSize: '0.75rem', marginLeft: '0.2rem'}}>{c.Hora.substring(0,5)}</span>}</td>
                     
                     <td 
-                      onClick={() => { setFilters({...filters, search: c.Numero_Cita.toString()}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      onClick={() => { setFilters({...filters, search: c.Numero_Cita.toString()});  }}
                       style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#005FA9', cursor: 'pointer', textDecoration: 'underline' }}
                       title="Filtrar por Cita"
                     >
@@ -345,7 +321,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                     </td>
                     
                     <td 
-                      onClick={() => { setFilters({...filters, search: c.Paciente}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      onClick={() => { setFilters({...filters, search: c.Paciente});  }}
                       style={{ padding: '0.75rem 1rem', cursor: 'pointer', color: '#0D1B2A' }}
                       title="Filtrar por Paciente"
                       onMouseOver={(e) => e.currentTarget.style.color = '#005FA9'}
@@ -355,7 +331,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                     </td>
                     
                     <td 
-                      onClick={() => { setFilters({...filters, medico: c.Medico, search: c.Medico}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      onClick={() => { setFilters({...filters, medico: c.Medico, search: c.Medico});  }}
                       style={{ padding: '0.75rem 1rem', color: '#005FA9', cursor: 'pointer', fontWeight: 600 }}
                       title="Filtrar por Médico"
                     >
@@ -363,7 +339,7 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
                     </td>
                     
                     <td 
-                      onClick={() => { setFilters({...filters, especialidad: c.Especialidad}); setTimeout(() => setApplyTrigger(p => p + 1), 50); }}
+                      onClick={() => { setFilters({...filters, especialidad: c.Especialidad});  }}
                       style={{ padding: '0.75rem 1rem', cursor: 'pointer', color: '#0D1B2A' }}
                       title="Filtrar por Especialidad"
                       onMouseOver={(e) => e.currentTarget.style.color = '#005FA9'}
@@ -397,4 +373,24 @@ export default function DashboardEficaciaNativo({ globalFilters, globalTrigger }
 
 function KPICard(props) {
   return <DashboardMetricCard {...props} />;
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || (typeof value === 'string' && !value.trim()) || typeof value === 'boolean') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function formatNumber(value) {
+  const number = numberOrNull(value);
+  return number === null ? 'No disponible' : number.toLocaleString('es-MX');
+}
+
+function formatSnapshotDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Fecha no disponible' : date.toLocaleString('es-MX');
+}
+
+function EmptyChart({ message }) {
+  return <div className="dashboard-chart-empty" style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--dash-muted)', textAlign: 'center' }}>{message}</div>;
 }

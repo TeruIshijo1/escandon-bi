@@ -9,7 +9,7 @@ export default function OcupacionCamas() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const [filtro, setFiltro] = useState('todas'); // todas | libres | ocupadas
+  const [filtro, setFiltro] = useState('todas');  
 
   const handleChipClick = (next) => {
     setFiltro((prev) => (prev === next ? 'todas' : next));
@@ -19,7 +19,7 @@ export default function OcupacionCamas() {
     fetchData();
     const interval = setInterval(() => {
       fetchData();
-    }, 30000); // 30 seconds
+    }, 30000);  
     return () => clearInterval(interval);
   }, []);
 
@@ -81,7 +81,6 @@ export default function OcupacionCamas() {
       groups[category].push(cama);
     });
 
-    // Remove empty groups
     Object.keys(groups).forEach(key => {
       if (groups[key].length === 0) delete groups[key];
     });
@@ -101,7 +100,6 @@ export default function OcupacionCamas() {
   const pctLibres = resumen.total > 0 ? Math.round((resumen.libres / resumen.total) * 100) : 0;
   const pctOcupadas = resumen.total > 0 ? Math.round((resumen.ocupadas / resumen.total) * 100) : 0;
 
-  // Render order for categories
   const categoryOrder = [
     'PPB (Planta Baja)', 
     'PPA (Planta Alta)', 

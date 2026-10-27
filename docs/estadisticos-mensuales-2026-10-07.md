@@ -1,10 +1,12 @@
 # Estadísticos mensuales: criterios y conciliación
 
+**Actualización vigente del 14 de octubre de 2026:** ver [correspondencia con los Excel base](estadisticos-conciliacion-excel-base-2026-10-14.md). La nueva revisión corrige consultas/estancias/terapia a recuentos de líneas SAP, agrupación literal de médicos y exclusiones del pivote de cirugías. Este documento conserva la evidencia histórica del 7 al 9 de octubre; sus criterios sustituidos no describen el generador actual.
+
 Revisión: 9 de octubre de 2026. Fuentes consultadas en modo lectura: Vertical, SAP Business One Service Layer y los libros de `Excel base`. No se modificaron datos en Vertical ni SAP.
 
 ## Uso
 
-En Estadísticas, **Generar estadístico** abre un formulario de fechas. Ambas fechas se incluyen completas. El periodo predeterminado es el mes anterior, según la fecha de Ciudad de México. El detalle está disponible desde el 1 de abril de 2026; los meses anteriores conservan los totales históricos originales, sin repartir personas proporcionalmente entre días.
+En Estadísticas, **Generar estadístico** abre un formulario con las fechas visibles del tablero. Ambas fechas se incluyen completas, según el calendario de Ciudad de México. **Ver estas fechas en el tablero** aplica el rango elegido a tarjetas y Top 10; si las fechas de descarga difieren, se indica. Tras la revisión del 14 de octubre, el detalle directo está disponible desde el 1 de enero de 2026. El acumulado del año incluye enero y termina hoy; para reproducir un cierre se elige su fecha final. Los años anteriores conservan los totales históricos originales, sin repartir personas proporcionalmente entre días.
 
 El Excel reúne resumen, apartados, documentos que sustentan los Top 10, comparación con referencias manuales y criterios. Los errores de consulta impiden la descarga; los datos no verificables se muestran como **No disponible**, nunca como cero. Un archivo descargado puede contener observaciones pendientes: deben revisarse antes de enviarlo.
 
@@ -101,7 +103,7 @@ La fuente del libro es `02_NACIEMIENTOS.xlsx`, fecha de nacimiento en D y creaci
 
 ## Verificación y límites
 
-- Lecturas reales de Vertical para nacimientos en abril-septiembre, y del conjunto SAP de facturas/notas de crédito para laboratorio en abril-septiembre; ver [auditoría clínica](auditoria-estadisticos-vertical-2026-10-07.md).
+- Lecturas reales de Vertical para nacimientos en abril-septiembre, y del conjunto SAP de facturas/notas de crédito para laboratorio en abril-septiembre; ver [auditoría clínica](../../historial/pases-anteriores/documentacion/61a3c63896a6e3fbd08373d26b1500a7905cd6d9421d02d0681d4cff2d631166/auditoria-estadisticos-vertical-2026-10-07.md).
 - Lectura completa y paginada de SAP, con órdenes, facturas, notas de crédito y facturas de origen cuando aplica. La paginación incompleta o repetida produce error.
 - Pruebas de servicios/rutas cubren fechas, devoluciones, cancelaciones, identidades de médicos, notas de crédito, permisos, datos ausentes, rankings y estructura del Excel.
 - Pruebas de navegador cubren selección de fechas, doble envío, descarga, errores, cambios rápidos de sección/detalle y vista móvil. Usan respuestas controladas para comprobar la interfaz; la evidencia de cifras procede de las lecturas reales separadas.

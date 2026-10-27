@@ -1,7 +1,6 @@
 'use strict';
 
-// Configuración y decisiones exclusivamente en BI. El directorio clínico sólo
-// confirma la identidad; cada mensualidad requiere una decisión explícita.
+// confirma la identidad; cada mensualidad requiere una decisión explícita
 const { createHash } = require('node:crypto');
 const { getDb } = require('../config/db');
 const { canReview, ensureTables } = require('./honorariosReview.service');
@@ -126,7 +125,6 @@ async function saveAssignment(pool, input, user) {
     const previous = config.id ? existing.find(item => item.id === config.id) : null;
     if (config.id && !previous) throw fail('No se encontró esta configuración para el médico.', 404);
     if ((previous?.revision || 0) !== config.expectedRevision) throw fail('Otra persona modificó esta configuración. Actualiza la lista.', 409);
-    if (previous && config.validFromMonth < previous.validFromMonth) throw fail('Para conservar el historial, la nueva vigencia debe comenzar en el mes original o después.');
     const split = previous && config.validFromMonth > previous.validFromMonth;
     if (split && previous.validToMonth && config.validFromMonth > nextMonth(previous.validToMonth)) throw fail('Crea una nueva configuración para una vigencia separada.');
     if (existing.some(item => item.id !== config.id && overlaps(config, item))) throw fail('Este médico ya tiene un pago fijo en esos meses. Revisa las vigencias antes de guardar.', 409);
@@ -161,8 +159,8 @@ async function deactivateAssignment(_pool, input, user) {
   const today = new Date();
   const cutoff = month(input.deactivatedFromMonth || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`);
   await ensureSchema();
-  // La lectura inicial sólo obtiene la clave del bloqueo; los datos se leen de
-  // nuevo bajo el bloqueo compartido con revisiones y cierres.
+   
+  // nuevo bajo el bloqueo compartido con revisiones y cierres
   const found = await getDb().pool.query('SELECT provider_id FROM bi_honorarios_monthly_fixed_assignments WHERE id=$1', [input.id]);
   if (!found.rows.length) throw fail('No se encontró esta configuración.', 404);
   const client = await getDb().pool.connect();

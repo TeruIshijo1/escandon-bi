@@ -1,7 +1,5 @@
-/**
- * AriaCopilotWidget.jsx — Copiloto de Inteligencia Analítica MAR-IA
- * Hospital Escandón BI Platform
- */
+
+
 import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '../../api/client';
 import useEscapeKey from '../../hooks/useEscapeKey';
@@ -22,24 +20,18 @@ function formatMarkdown(text) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // Headers
   formatted = formatted.replace(/^### (.*$)/gim, '<div style="font-weight:700; font-size:0.88rem; color:#004687; margin:0.3rem 0 0.15rem;">$1</div>');
   formatted = formatted.replace(/^## (.*$)/gim, '<div style="font-weight:800; font-size:0.92rem; color:#004687; margin:0.4rem 0 0.2rem;">$1</div>');
 
-  // Bold (**text** or __text__)
   formatted = formatted.replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="font-weight:700; color:#004687;">$1</strong>');
   formatted = formatted.replace(/__([\s\S]+?)__/g, '<strong style="font-weight:700; color:#004687;">$1</strong>');
 
-  // Italics (*text*)
   formatted = formatted.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
 
-  // Inline Code / Highlights (`text`)
   formatted = formatted.replace(/`([^`]+)`/g, '<code style="background:rgba(0,70,135,0.08); color:#005FA9; padding:2px 5px; border-radius:4px; font-family:var(--font-mono); font-size:0.78rem; font-weight:600;">$1</code>');
 
-  // Bullet Lists
   formatted = formatted.replace(/^\s*[-*]\s+(.*$)/gim, '<div style="display:flex; gap:6px; margin:2px 0 2px 6px;"><span style="color:#0088C9; font-weight:bold;">•</span><span>$1</span></div>');
 
-  // Line breaks
   formatted = formatted.replace(/\n/g, '<br/>');
 
   return formatted;
@@ -71,7 +63,6 @@ export default function AriaCopilotWidget() {
   useEscapeKey(closeChat, isOpen);
   useEffect(() => () => { requestRef.current += 1; controllerRef.current?.abort(); }, []);
 
-  // Load suggestions dynamically from API based on user's IA profile
   useEffect(() => {
     const controller = new AbortController();
     if (isOpen && !suggestionsLoaded) {
@@ -92,7 +83,7 @@ export default function AriaCopilotWidget() {
           setSuggestionsLoaded(true);
         } catch {
           if (controller.signal.aborted) return;
-          // Fallback: show generic suggestion
+           
           suggestionsRef.current = ['📊 Muéstrame un resumen general'];
           setMessages(prev => {
             const updated = [...prev];
@@ -130,8 +121,7 @@ export default function AriaCopilotWidget() {
     const requestId = ++requestRef.current;
     const controller = new AbortController();
     controllerRef.current = controller;
-    // Tables, indicators and answers containing report results stay on screen.
-    // Only the conversation about its configuration goes back to the server.
+
     const history = messages.filter(message => typeof message.historyText === 'string').slice(-8).map(message => ({ role: message.sender === 'user' ? 'user' : 'assistant', content: message.historyText.slice(0, 1500) }));
     const reportContext = context ? { entity: context.entity, selectedFields: context.selectedFields, filters: context.filters,
       ...(context.analysis ? { analysis: context.analysis } : {}) } : null;
@@ -156,8 +146,7 @@ export default function AriaCopilotWidget() {
         if (report?.plan && !plan) throw new Error('No pude conservar la configuración del reporte. Inicia una nueva conversación.');
         const choices = Array.isArray(report?.choices) ? report.choices.filter(choice => typeof choice?.id === 'string' && typeof choice.title === 'string').slice(0, 4) : [];
         const options = Array.isArray(report?.options) ? report.options.filter(option => typeof option?.label === 'string' && typeof option.message === 'string' && option.message.length <= 1500).slice(0, 4) : [];
-        // A denied or unavailable report must not retain a different old plan.
-        // Transport failures keep the existing plan in the catch branch below.
+
         setContext(plan);
         setPending(report?.pending || null);
         const text = typeof response.answer === 'string' ? response.answer : 'No pude preparar una respuesta. Intenta de nuevo.';
@@ -242,7 +231,7 @@ export default function AriaCopilotWidget() {
             zIndex: 9999,
           }}
         >
-          {/* Header */}
+          {/* Encabezado */}
           <div
             style={{
               background: 'linear-gradient(135deg, #004687 0%, #002B54 100%)',
@@ -330,7 +319,6 @@ export default function AriaCopilotWidget() {
                   {msg.report.limited && <p style={{ margin: '6px 0 0' }}>El reporte alcanzó el límite de consulta. Ajusta el período o los filtros para revisar el resto.</p>}
                 </div>}
 
-                {/* Tarjetas KPI renderizadas */}
                 {msg.kpis && msg.kpis.length > 0 && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginTop: '8px' }}>
                     {msg.kpis.map((kpi, kIdx) => (

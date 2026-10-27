@@ -10,12 +10,12 @@ import joblib
 def main():
     print("=== Iniciando Predicción de Riesgo de Desabasto ===")
 
-    # 1. Cargar variables de entorno del archivo .env de backend
+    # Cargar variables de entorno del archivo .env de backend
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dotenv_path = os.path.join(base_dir, '..', '.env')
     load_dotenv(dotenv_path)
 
-    # 2. Cargar modelo joblib entrenado
+    # Cargar modelo joblib entrenado
     model_path = os.path.join(base_dir, 'models', 'reorder_risk_7d.joblib')
     if not os.path.exists(model_path):
         print(f"❌ Error: No se encontró el modelo entrenado en {model_path}.")
@@ -28,7 +28,7 @@ def main():
     features_list = model_data['features']
     model_version = model_data.get('model_version', '1.0.0')
 
-    # 3. Conectarse a PostgreSQL
+    # Conectarse a PostgreSQL
     db_user = os.getenv("PGUSER", "postgres")
     db_host = os.getenv("PGHOST", "localhost")
     db_pass = os.getenv("PGPASSWORD")
@@ -44,7 +44,7 @@ def main():
         port=db_port
     )
 
-    # 4. Leer la foto actual (ml_dataset_reorden_sku)
+    # Leer la foto actual
     query = """
         SELECT 
             itemcode,
@@ -75,27 +75,27 @@ def main():
 
     print(f"[Predict] Leídos {len(df)} registros para predicción.")
 
-    # 5. Preprocesamiento (idéntico al de entrenamiento)
+    # Preprocesamiento
     risk_map = {'CRITICO': 3, 'ALTO': 2, 'MEDIO': 1, 'BAJO': 0}
     df['riesgo_base_enc'] = df['riesgo_base'].map(risk_map).fillna(0)
 
-    # Convertir variables requeridas y rellenar nulos
+    
     for col in features_list:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
-    # 6. Hacer inferencia
+    # Hacer inferencia
     X = df[features_list]
     print("[Predict] Ejecutando modelo predictivo...")
     
-    # Obtener probabilidades de clase 1 (Desabasto)
+    
     probabilities = model.predict_proba(X)[:, 1]
     df['prob_desabasto_7d'] = probabilities
 
-    # Override: si el stock ya es 0, no hay nada que predecir — ya esta en desabasto
+    
     mask_ya_desabasto = df['stock_actual'] <= 0
     df.loc[mask_ya_desabasto, 'prob_desabasto_7d'] = 1.0
 
-    # Asignar riesgo_ml basado en los umbrales del negocio
+    
     def get_risk_ml(row):
         if row['stock_actual'] <= 0:
             return 'YA EN DESABASTO'
@@ -112,8 +112,8 @@ def main():
     df['riesgo_ml'] = df.apply(get_risk_ml, axis=1)
     df['modelo_version'] = model_version
 
-    # 6b. Fecha estimada de agotamiento: hoy + días de stock restante
-    # (solo aplica si hay consumo; si el stock ya es 0 la fecha ya pasó)
+    # Fecha estimada de agotamiento: hoy + días de stock restante
+    
     def calc_fecha_agotamiento(row):
         if float(row.get('stock_actual') or 0) <= 0:
             return None
@@ -124,11 +124,11 @@ def main():
 
     df['fecha_estimada_agotamiento'] = df.apply(calc_fecha_agotamiento, axis=1)
 
-    # 7. Persistir predicciones en PostgreSQL con transacción y limpieza
+    # Persistir predicciones en PostgreSQL con transacción y limpieza
     print("[Predict] Guardando predicciones en PostgreSQL...")
     cursor = conn.cursor()
     try:
-        # Limpiar predicciones anteriores
+        
         cursor.execute("TRUNCATE TABLE ml_predictions_reorden_sku")
         
         insert_query = """
@@ -142,15 +142,15 @@ def main():
         
         records_to_insert = []
         for _, row in df.iterrows():
-            # fecha_ultimo_movimiento puede ser NaT/None
+            
             fecha_ult = row.get('fecha_ultimo_movimiento')
             if pd.isna(fecha_ult):
                 fecha_ult = None
-            # fecha_desabasto puede ser NaT/None (solo existe si el SKU ya se agotó)
+            
             fecha_desab = row.get('fecha_desabasto')
             if pd.isna(fecha_desab):
                 fecha_desab = None
-            # fecha_estimada_agotamiento puede ser None (sin consumo o ya agotado)
+            
             fecha_agot = row.get('fecha_estimada_agotamiento')
             if pd.isna(fecha_agot):
                 fecha_agot = None

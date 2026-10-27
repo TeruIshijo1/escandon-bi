@@ -1,15 +1,9 @@
-/**
- * db.js — Conexión a PostgreSQL (adaptador async compatible con la API de SQLite)
- * Hospital Escandón BI Platform v2.0
- *
- * Sustituye a better-sqlite3: expone prepare().get/all/run y exec() pero
- * devuelven Promesas. Los placeholders `?` se convierten a $1..$n automáticamente.
- */
+
+
 'use strict';
 
 const { Pool, types } = require('pg');
 
-// INT8 (bigint) → number para que COUNT(*) etc. no lleguen como strings
 types.setTypeParser(20, (v) => (v === null ? null : parseInt(v, 10)));
 
 const pool = new Pool({
@@ -18,6 +12,7 @@ const pool = new Pool({
   database: process.env.PGDATABASE || 'escandon_bi',
   port:     parseInt(process.env.PGPORT || '5432', 10),
   options:  "-c timezone=America/Mexico_City",
+  connectionTimeoutMillis: 10000,
   ...(process.env.PGPASSWORD ? { password: process.env.PGPASSWORD } : {}),
 });
 
@@ -40,15 +35,12 @@ async function connectDB() {
   }
 }
 
-/* Convierte ? → $1, $2, ... en orden de aparición */
 function toPg(sql) {
   let i = 0;
   return sql.replace(/\?/g, () => `$${++i}`);
 }
 
-/* PostgreSQL entrega columnas en minúsculas (identificadores no citados);
-   el código legacy accede con el case escrito en el SQL (ej. row.PasswordHash).
-   Este Proxy resuelve las claves sin distinguir mayúsculas/minúsculas. */
+/* PostgreSQL entrega columnas en minúsculas (identificadores no citados); */
 function rowProxy(row) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
   const lower = new Map(Object.keys(row).map((k) => [k.toLowerCase(), k]));
@@ -66,13 +58,12 @@ function getDb() {
   const db = {
     pool,
 
-    /** Consulta directa estilo node-pg ($1..$n), devuelve filas */
+    /* Consulta directa estilo node-pg ($1..$n), devuelve filas */
     async query(text, params) {
       const res = await pool.query(text, params);
       return res.rows.map(rowProxy);
     },
 
-    /** Prepara una consulta: { get, all, run } — todos async, placeholders ? */
     prepare(sql) {
       const pgSql = toPg(sql);
       return {
@@ -97,7 +88,7 @@ function getDb() {
       };
     },
 
-    /** Ejecuta múltiples sentencias separadas por ; (DDL/seeds) */
+    /* Ejecuta múltiples sentencias separadas por ; (DDL/seeds) */
     async exec(sql) {
       const statements = sql
         .split(';')

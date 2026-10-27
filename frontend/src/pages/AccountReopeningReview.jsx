@@ -60,8 +60,6 @@ async function boundedQuery(path, options, controller, timeoutMs) {
   }
 }
 
-// A slow write may still commit on the server. Stop waiting at the deadline,
-// retain its token for a status query, and never abort or replay the mutation.
 async function reopeningRequest(path, body) {
   let timeout;
   try {
@@ -107,17 +105,13 @@ function StatusBadge({ status }) {
   return <span className={`arr-status arr-status--${known}`}><span aria-hidden="true" />{STATUS_LABELS[known]}</span>;
 }
 
-// Topological layers preserve source → target direction. Cyclic or disconnected
-// documents are still displayed; the relation list retains every valid edge.
 function layoutDocuments(nodes, edges) {
   const nodeById = new Map(nodes.map(node => [String(node.id), node]));
   const incoming = new Map(nodes.map(node => [String(node.id), 0]));
   const outgoing = new Map(nodes.map(node => [String(node.id), []]));
   const validEdges = edges.filter(edge => nodeById.has(String(edge.source)) && nodeById.has(String(edge.target)));
   const stage = node => ({ SalesQuotations: 0, Quotations: 0, Orders: 1, DeliveryNotes: 2, DownPayments: 2, Invoices: 3, CreditNotes: 4, IncomingPayments: 4, JournalEntries: 5, InternalReconciliations: 6 }[node?.entity] ?? 3);
-  // SAP can include an invoice → journal link and its journal → invoice origin.
-  // Keep both for inspection, but only the forward link determines the columns.
-  // Otherwise a reciprocal accounting link collapses the commercial chain.
+
   const layeringEdges = validEdges.filter((edge, index) => {
     if (String(edge.source) === String(edge.target)) return false;
     const reverseIndex = validEdges.findIndex(candidate => String(candidate.source) === String(edge.target) && String(candidate.target) === String(edge.source));
@@ -375,8 +369,7 @@ export default function AccountReopeningReview() {
     const controller = new AbortController();
     detailController.current = controller;
     setSelectedAccount(account);
-    // Keep this account's previous observations visible during a new map request.
-    // The prior diagnostic is hidden until a fresh response has been verified.
+
     setDetail(previous => previous && String(previous.account) === String(account.account) ? previous : null);
     setDetailError('');
     setDetailFullMap(fullMap);
@@ -512,7 +505,7 @@ export default function AccountReopeningReview() {
     setPendingReopening(null);
     setReopeningError('');
     if (pendingStorageKey) {
-      try { sessionStorage.removeItem(pendingStorageKey); } catch { /* A retained token can only query the terminal receipt on reload. */ }
+      try { sessionStorage.removeItem(pendingStorageKey); } catch {   }
     }
   }
 
@@ -563,7 +556,7 @@ export default function AccountReopeningReview() {
         setReopeningError(response.data.status === 'not_started' ? 'La reapertura no llegó a iniciarse. Actualiza la consulta y prepara nuevamente la cuenta.' : 'La reapertura no se completó y los cambios fueron revertidos. Actualiza la consulta y revisa la cuenta antes de preparar otro intento.');
         setDetailError('Hace falta consultar nuevamente SAP y el estado de la cuenta antes de preparar otro intento.');
         if (pendingStorageKey) {
-          try { sessionStorage.removeItem(pendingStorageKey); } catch { /* Keep the terminal receipt available through the retained token. */ }
+          try { sessionStorage.removeItem(pendingStorageKey); } catch {   }
         }
       } else {
         setReopeningPhase('pending');

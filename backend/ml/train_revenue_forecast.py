@@ -48,19 +48,19 @@ def main():
         
     print(f"[Train] Dataset cargado: {len(df)} registros.")
     
-    # Ordenar cronológicamente por serie (area, servicio, periodo_mes)
+    
     df = df.sort_values(by=['area', 'servicio', 'periodo_mes']).reset_index(drop=True)
     
-    # Feature Engineering de Rezago (Lag-1 Histórico Real)
+    
     df['year'] = df['periodo_mes'].apply(lambda x: int(x.split('-')[0]))
     df['month'] = df['periodo_mes'].apply(lambda x: int(x.split('-')[1]))
     
-    # Construir variables históricas del mes anterior (Lag-1) por cada área y servicio
+    
     df['num_cuentas_mes_anterior'] = df.groupby(['area', 'servicio'])['num_cuentas'].shift(1)
     df['ticket_promedio_mes_anterior'] = df.groupby(['area', 'servicio'])['ticket_promedio'].shift(1)
     df['crecimiento_mensual_anterior'] = df.groupby(['area', 'servicio'])['crecimiento_mensual'].shift(1).fillna(0)
     
-    # Label encoding básico para area y servicio
+    
     df['area_encoded'] = df['area'].astype('category').cat.codes
     df['servicio_encoded'] = df['servicio'].astype('category').cat.codes
     
@@ -76,7 +76,7 @@ def main():
     
     target = 'ingresos_total'
     
-    # Eliminar NaNs generados por los shifts
+    
     df = df.dropna(subset=features + [target])
     
     if len(df) < 5:
@@ -85,13 +85,13 @@ def main():
     X = df[features]
     y = df[target]
     
-    # Split cronológico out-of-sample: el último mes registrado queda como test
+    
     last_month = df['periodo_mes'].max()
     test_mask = df['periodo_mes'] == last_month
     train_df = df[~test_mask]
     test_df = df[test_mask]
 
-    # Pool de candidatos a evaluar con regularización para evitar sobreajuste
+    
     print("[Train] Iniciando Optimizacion de Hiperparametros (AutoML)...")
     candidates_config = {
         'HistGradientBoostingRegressor': {
@@ -131,7 +131,7 @@ def main():
 
     best_name = 'GradientBoostingRegressor'
     best_candidate_model = candidates['GradientBoostingRegressor']
-    best_score = float('inf') # Menor MAE out-of-sample
+    best_score = float('inf') 
     eval_metrics = {}
 
     print(f"\n--- Evaluando {len(candidates)} Modelos Candidatos (Test: {last_month}) ---")
@@ -158,7 +158,7 @@ def main():
 
     best_val_metrics = eval_metrics.get(best_name, {'mae': 0, 'rmse': 0, 'r2': 0})
 
-    # Entrenar el modelo final seleccionado con TODO el historial disponible
+    
     final_model = candidates[best_name]
     final_model.fit(X, y)
     
@@ -177,7 +177,7 @@ def main():
     print(f"Train RMSE: ${full_rmse:,.2f}")
     print(f"Train R2:   {full_r2:.4f}")
 
-    # Guardado seguro con Backup
+    
     models_dir = os.path.join(os.path.dirname(__file__), 'models')
     reports_dir = os.path.join(os.path.dirname(__file__), 'reports')
     os.makedirs(models_dir, exist_ok=True)
@@ -195,7 +195,7 @@ def main():
 
     joblib.dump(final_model, model_path)
     
-    # Guardar categorías para el predictor
+    
     categories_path = os.path.join(models_dir, 'revenue_forecast_categories.joblib')
     categories = {
         'area': dict(enumerate(df['area'].astype('category').cat.categories)),
@@ -206,7 +206,7 @@ def main():
     print(f"[Success] Modelo activo guardado en {model_path}")
     print(f"[Success] Categorias guardadas en {categories_path}")
 
-    # Guardar reporte en JSON con clara diferenciación de métricas
+    
     metrics_report = {
         'model_name': best_name,
         'model_version': '1.1.0',
@@ -234,7 +234,7 @@ def main():
         json.dump(metrics_report, f, indent=2, ensure_ascii=False)
     print(f"[Success] Reporte de metricas guardado en {report_path}")
 
-    # Registrar corrida en PostgreSQL ml_model_runs con métricas de validación out-of-sample
+    
     try:
         with engine.connect() as conn:
             insert_run = text("""

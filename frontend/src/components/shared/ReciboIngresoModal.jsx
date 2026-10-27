@@ -49,7 +49,7 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
         maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden'
       }}>
-        {/* Header */}
+        {/* Encabezado */}
         <div style={{
           background: 'linear-gradient(135deg, #0F172A, #1E293B)',
           padding: '1.25rem 1.5rem', color: '#FFF',
@@ -75,14 +75,13 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
           </button>
         </div>
 
-        {/* Content */}
         <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
           {loading && <PremiumLoader text="Cargando recibo…" style={{ height: '200px' }} />}
           {error && <div style={{ padding: '1.5rem', background: '#FEE2E2', color: '#991B1B', borderRadius: '12px' }}>{userMessage(error)}</div>}
 
           {!loading && !error && data && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* Cliente Info */}
+              
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', background: '#F8FAFC', padding: '1.25rem', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Cliente / Paciente</div>
@@ -122,7 +121,6 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
                 </div>
               </div>
 
-              {/* Facturas Ligadas Table */}
               {data.PaymentInvoices && data.PaymentInvoices.length > 0 && (
                 <div>
                   <h4 style={{ margin: '0 0 0.75rem 0', color: '#334155', fontSize: '0.95rem', fontWeight: 700 }}>Facturas Pagadas (A/R Invoices)</h4>
@@ -186,7 +184,6 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
                 </div>
               )}
 
-              {/* Cuentas Pagadas Table */}
               {data.PaymentAccounts && data.PaymentAccounts.length > 0 && (
                 <div>
                   <h4 style={{ margin: '0 0 0.75rem 0', color: '#334155', fontSize: '0.95rem', fontWeight: 700 }}>Pagos a Cuenta (Payment Accounts)</h4>
@@ -219,7 +216,6 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
                 </div>
               )}
 
-              {/* Tarjetas Table */}
               {data.PaymentCreditCards && data.PaymentCreditCards.length > 0 && (
                 <div>
                   <h4 style={{ margin: '0 0 0.75rem 0', color: '#334155', fontSize: '0.95rem', fontWeight: 700 }}>Tarjetas de Crédito / Débito</h4>
@@ -252,7 +248,6 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
                 </div>
               )}
 
-              {/* Comentarios */}
               {data.Remarks && (
                 <div style={{ fontSize: '0.8rem', color: '#64748B', fontStyle: 'italic', background: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '8px' }}>
                   💬 {data.Remarks}
@@ -262,7 +257,7 @@ export default function ReciboIngresoModal({ docNum, onClose }) {
           )}
         </div>
 
-        {/* Footer */}
+        {/* Pie de página */}
         <div style={{ padding: '1rem 1.5rem', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', textAlign: 'right' }}>
           <button
             onClick={onClose}

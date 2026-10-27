@@ -1,13 +1,13 @@
 # Pagos fijos mensuales de jefes de área
 
-Actualización del 7 de octubre de 2026.
+Actualización del 14 de octubre de 2026.
 
 En **Honorarios médicos → Configuración → Jefes de área** se administra una tabla con el médico del directorio existente, su área, el importe mensual antes de impuestos y los meses de vigencia. No se crea un médico nuevo ni se vinculan pagos sólo por un nombre parecido.
 
 ## Configurar la tabla
 
 - **Agregar jefe de área:** selecciona al médico existente, indica área, importe y mes inicial, y confirma su identidad.
-- **Editar:** cambia el importe o el área desde el mes elegido. Las vigencias permiten conservar los tramos anteriores. Un cambio pendiente de pago puede requerir revisar nuevamente su aprobación.
+- **Editar:** cambia el importe, el área y el mes inicial. «Aplicar desde» indica el mes del servicio, aunque se liquide uno o dos meses después. Puedes mover el inicio a un mes anterior si no se traslapa con otra configuración del mismo médico; el importe y el área guardados aplican desde ese nuevo mes hacia adelante. Si mueves el inicio a un mes posterior, el tramo previo se conserva hasta el mes anterior. Las aprobaciones abiertas afectadas deben revisarse nuevamente; los pagos preparados o cerrados conservan sus valores.
 - **Quitar:** desactiva el pago desde el mes elegido. Conserva los meses anteriores, el historial y los pagos ya preparados.
 - **Cargar listado inicial:** presenta las seis propuestas de la imagen. Una coincidencia única del nombre se sugiere, pero cada médico debe confirmarse antes de guardar. Si hay varias coincidencias, se elige su identificador del directorio.
 

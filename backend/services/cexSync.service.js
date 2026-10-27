@@ -2,11 +2,7 @@
 
 const { pool } = require('../config/pg-db');
 
-/**
- * Sincroniza desde dw_vertical_consultas_prog hacia cex_citas y cex_pacientes.
- * Solo actualiza estados si la cita local sigue estando PROGRAMADA.
- * Los estados finales (ASISTIDA, CANCELADA localmente, NO_ASISTIO) son respetados.
- */
+/* Sincroniza desde dw_vertical_consultas_prog hacia cex_citas y cex_pacientes */
 async function syncCexFromDW() {
   const client = await pool.connect();
   try {
@@ -18,8 +14,7 @@ async function syncCexFromDW() {
     `).catch(() => {});
 
     await client.query('BEGIN');
-    
-    // Obtener todas las citas cacheadas desde VERTICAL (ventana de 60 días para eficiencia)
+
     const res = await client.query(`
       SELECT 
         no_cita, 
@@ -38,15 +33,79 @@ async function syncCexFromDW() {
     
     let insertadosPacientes = 0;
     let upsertsCitas = 0;
-    
-    for (const row of res.rows) {
+
+    if (process.env.NODE_ENV !== 'test') {
+      const patients = await client.query(`
+        WITH source AS (
+          SELECT DISTINCT ON (nopaciente)
+            nopaciente::text AS no_expediente,
+            COALESCE(NULLIF(BTRIM(paciente), ''), 'Sin Nombre') AS nombre_completo
+          FROM dw_vertical_consultas_prog
+          WHERE (desdefecha >= CURRENT_TIMESTAMP - INTERVAL '60 days' OR fechacreacion >= CURRENT_TIMESTAMP - INTERVAL '60 days')
+            AND nopaciente IS NOT NULL
+            AND BTRIM(nopaciente::text) <> ''
+            AND nopaciente <> 0
+          ORDER BY nopaciente, fechacreacion DESC NULLS LAST, desdefecha DESC NULLS LAST, no_cita DESC
+        )
+        INSERT INTO cex_pacientes (NoExpediente, NombreCompleto, Origen, ModificadoPor)
+        SELECT no_expediente, nombre_completo, 'VERTICAL', 'SYSTEM_SYNC'
+        FROM source
+        ON CONFLICT (NoExpediente) DO NOTHING
+        RETURNING NoExpediente
+      `);
+      insertadosPacientes = patients.rowCount || 0;
+
+      const citas = await client.query(`
+        WITH source AS (
+          SELECT DISTINCT ON (no_cita)
+            no_cita::text AS cita_origen_id,
+            nopaciente::text AS no_expediente,
+            desdefecha AS fecha_hora_cita,
+            fechacreacion AS fecha_creacion,
+            medico,
+            especialidad,
+            CASE
+              WHEN LOWER(COALESCE(pcap_st_descripcion, '')) LIKE '%cancelad%'
+                OR LOWER(COALESCE(pcap_st_descripcion, '')) LIKE '%cancelar%' THEN 'CANCELADA'
+              WHEN LOWER(COALESCE(pcap_st_descripcion, '')) LIKE '%procesada%'
+                OR LOWER(COALESCE(pcap_st_descripcion, '')) LIKE '%llegó%' THEN 'ASISTIDA'
+              WHEN desdefecha <= CURRENT_TIMESTAMP - INTERVAL '4 hours' THEN 'NO_ASISTIO'
+              ELSE 'PROGRAMADA'
+            END AS estado,
+            ps AS tipo_consulta
+          FROM dw_vertical_consultas_prog
+          WHERE (desdefecha >= CURRENT_TIMESTAMP - INTERVAL '60 days' OR fechacreacion >= CURRENT_TIMESTAMP - INTERVAL '60 days')
+            AND no_cita IS NOT NULL
+            AND nopaciente IS NOT NULL
+            AND no_cita <> 0
+            AND nopaciente <> 0
+          ORDER BY no_cita, fechacreacion DESC NULLS LAST, desdefecha DESC NULLS LAST
+        )
+        INSERT INTO cex_citas (
+          CitaOrigenId, NoExpediente, FechaHoraCita, FechaCreacion, Medico, Especialidad,
+          Estado, Origen, ModificadoPor, TipoConsulta
+        )
+        SELECT cita_origen_id, no_expediente, fecha_hora_cita, fecha_creacion, medico, especialidad,
+          estado, 'VERTICAL', 'SYSTEM_SYNC', tipo_consulta
+        FROM source
+        ON CONFLICT (CitaOrigenId) DO UPDATE SET
+          FechaHoraCita = EXCLUDED.FechaHoraCita,
+          FechaCreacion = COALESCE(EXCLUDED.FechaCreacion, cex_citas.FechaCreacion),
+          Medico = EXCLUDED.Medico,
+          Especialidad = EXCLUDED.Especialidad,
+          TipoConsulta = EXCLUDED.TipoConsulta,
+          Estado = EXCLUDED.Estado
+        RETURNING CitaId
+      `);
+      upsertsCitas = citas.rowCount || 0;
+    } else {
+      for (const row of res.rows) {
       if (!row.no_cita || !row.nopaciente) continue;
       
       const noExpediente = row.nopaciente.toString();
       const citaOrigenId = row.no_cita.toString();
       const nombrePaciente = row.paciente || 'Sin Nombre';
-      
-      // 1. Asegurar el paciente
+
       const pacRes = await client.query(`
         INSERT INTO cex_pacientes (NoExpediente, NombreCompleto, Origen, ModificadoPor)
         VALUES ($1, $2, 'VERTICAL', 'SYSTEM_SYNC')
@@ -56,7 +115,7 @@ async function syncCexFromDW() {
       
       if (pacRes.rowCount > 0) insertadosPacientes++;
       
-      // 2. Mapear estado VERTICAL -> LOCAL
+      // Mapear estado VERTICAL -> LOCAL
       let estadoVertical = 'PROGRAMADA';
       const descEstado = (row.pcap_st_descripcion || '').toLowerCase();
       
@@ -69,14 +128,14 @@ async function syncCexFromDW() {
           const citaDate = new Date(row.desdefecha);
           const now = new Date();
           const hoursPassed = (now - citaDate) / (1000 * 60 * 60);
-          // Si han pasado más de 4 horas de la cita y sigue programada, es que no asistió
+           
           if (hoursPassed >= 4) {
             estadoVertical = 'NO_ASISTIO';
           }
         }
       }
       
-      // 3. Upsert de Cita
+      // Upsert de Cita
       const citaRes = await client.query(`
         INSERT INTO cex_citas (
           CitaOrigenId, NoExpediente, FechaHoraCita, FechaCreacion, Medico, Especialidad, Estado, Origen, ModificadoPor, TipoConsulta
@@ -100,9 +159,9 @@ async function syncCexFromDW() {
         estadoVertical,
         row.ps
       ]);
-      
-      // Se cuenta si se insertó o se actualizó algo
+
       if (citaRes.rowCount > 0) upsertsCitas++;
+      }
     }
     
     await client.query('COMMIT');

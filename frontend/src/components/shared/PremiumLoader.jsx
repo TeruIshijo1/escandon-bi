@@ -1,9 +1,5 @@
 import React from 'react';
 
-/**
- * PremiumLoader.jsx
- * Loader animado premium con el logo llenándose de color.
- */
 export default function PremiumLoader({ text = "Cargando...", style = {} }) {
   return (
     <div style={{ 
@@ -16,7 +12,7 @@ export default function PremiumLoader({ text = "Cargando...", style = {} }) {
       ...style
     }}>
       <div style={{ position: 'relative', width: '80px', height: '80px', marginBottom: '1.5rem' }}>
-        {/* Base logo (transparent/gray) */}
+        
         <img 
           src="/logo-escandon.png" 
           alt="Cargando base"
@@ -28,7 +24,7 @@ export default function PremiumLoader({ text = "Cargando...", style = {} }) {
             filter: 'grayscale(100%)' 
           }}
         />
-        {/* Animated fill logo */}
+        
         <div style={{
           position: 'absolute',
           top: 0,

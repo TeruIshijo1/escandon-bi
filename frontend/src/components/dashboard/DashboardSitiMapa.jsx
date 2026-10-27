@@ -25,7 +25,6 @@ export default function DashboardSitiMapa() {
       .finally(() => setLoading(false));
   }, [year]);
 
-  // Generar lista de años del 2025 al 2010 + Histórico
   const years = [];
   for (let i = 2025; i >= 2010; i--) years.push(i.toString());
   years.push('Histórico');
@@ -142,7 +141,6 @@ export default function DashboardSitiMapa() {
     return [...rows, totalRow];
   };
 
-  // Extraer las tablas oficiales calculadas dinámicamente por la API SITI
   const poblacionServiciosList = data.poblacionServiciosOficial || [];
   const estadisticasEdadesSexoList = data.estadisticasEdadesSexoOficial || [];
 
@@ -313,7 +311,6 @@ export default function DashboardSitiMapa() {
         </div>
       </div>
 
-      {/* Tabla Oficial de Estadísticas de Edades y Sexo por Programa */}
       <div className="siti-card" style={{ background: '#ffffff', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', marginBottom: '2.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div>

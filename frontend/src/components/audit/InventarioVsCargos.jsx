@@ -1,8 +1,5 @@
-/**
- * InventarioVsCargos.jsx — Módulo de Auditoría Prioridad 1
- * Compara Órdenes surtidas por Almacén y Consumos en Cuenta del Paciente
- * Hospital Escandón BI Platform v4.0
- */
+
+
 import { useState, useEffect, useRef } from 'react';
 import ExportButton from '../shared/ExportButton';
 import PremiumLoader from '../shared/PremiumLoader';
@@ -37,7 +34,7 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
     String(opt).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const selectedValues = colFilters[columnKey]; // undefined means all selected
+  const selectedValues = colFilters[columnKey];  
   const isAllSelected = !selectedValues || selectedValues.length === uniqueOptions.length;
 
   const toggleSelection = (val) => {
@@ -123,7 +120,6 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
   );
 };
 
-
 export default function InventarioVsCargos({ defaultEstado = '' }) {
   const [data, setData] = useState(null);
   const [loading, setLoad] = useState(true);
@@ -138,8 +134,8 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
     setPage(1);
     fetchData();
     const interval = setInterval(() => {
-      fetchData(true); // silent refresh
-    }, 30000); // Auto-refresh cada 30 segundos
+      fetchData(true);  
+    }, 30000);  
     return () => clearInterval(interval);
   }, [filters]);
 
@@ -347,7 +343,6 @@ export default function InventarioVsCargos({ defaultEstado = '' }) {
         >
           Limpiar
         </button>
-
 
       </div>
 

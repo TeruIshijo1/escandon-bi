@@ -5,11 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 
 const ICONOS_RAPIDOS = ['📊','🏥','❤️','🔪','📅','🚪','📦','💼','⚙️','🎯','⭐','📋','👤','♀️','📉','👶','✅','⚠️','💰','🛏️','🔄'];
 
-/**
- * EditableKPIWrapper.jsx
- * Envuelve cualquier componente visual para hacerlo clickeable (abrir Power BI)
- * y editable (configurar URL, icono y nombre si eres admin).
- */
 export default function EditableKPIWrapper({ 
   elementoId, 
   isAdmin, 
@@ -113,10 +108,9 @@ export default function EditableKPIWrapper({
           if (btn) btn.style.opacity = '0';
         }}
       >
-        {/* Renderiza el componente visual envuelto */}
+        
         {children}
 
-        {/* Indicador PBI Flotante si tiene URL (opcional, visual) */}
         {!!kpi.pbiUrl && (
           <div style={{
             position: 'absolute', bottom: 8, right: 8,
@@ -129,7 +123,7 @@ export default function EditableKPIWrapper({
           </div>
         )}
 
-        {/* Botón ✏️ — solo Admin */}
+        {/* Botón ️ — solo Admin */}
         {isAdmin && (
           <button
             className="kpi-edit-btn-wrap"

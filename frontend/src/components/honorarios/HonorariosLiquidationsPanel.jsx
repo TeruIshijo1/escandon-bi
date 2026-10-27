@@ -42,7 +42,7 @@ export default function HonorariosLiquidationsPanel({ startDate, endDate, canMan
       if (!preparationStorageKey) return;
       if (value) sessionStorage.setItem(preparationStorageKey, JSON.stringify(value));
       else sessionStorage.removeItem(preparationStorageKey);
-    } catch { /* El bloqueo en pantalla se conserva si el navegador no permite guardar la sesión. */ }
+    } catch {   }
   };
   const request = async (endpoint, options = {}, label = 'Consultando el pago…') => {
     const controller = new AbortController();
@@ -111,7 +111,7 @@ export default function HonorariosLiquidationsPanel({ startDate, endDate, canMan
   };
   const exportPaymentPdf = async (current = selected) => {
     setPaymentIssues([]);
-    // Consultar de nuevo evita exportar el saldo de una pantalla abierta antes de otro pago.
+     
     const { report } = await request(`/honorarios/liquidations/${current.id}/payment-report`, {}, 'Comprobando el PDF para pago…');
     if (String(report?.liquidation?.id) !== String(current.id)) throw new Error('No se pudo confirmar el cierre seleccionado. Vuelve a consultarlo.');
     if (report.status === 'REVIEW_REQUIRED' || report.issues?.length) {

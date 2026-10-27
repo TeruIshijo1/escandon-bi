@@ -1,7 +1,5 @@
-/**
- * export.routes.js — Exportación de reportes PDF y Excel
- * Hospital Escandón BI Platform v1.0
- */
+
+
 'use strict';
 
 const express = require('express');
@@ -15,10 +13,6 @@ const { authenticate, authorize, authorizeCapability } = require('../middleware/
 const { getInventariosVsCargos, getDevolucionesFarmacia, getCargosFarmaciaSAP } = require('../services/etl.service');
 const auditMovementService = require('../services/auditMovement.service');
 
-/* ══════════════════════════════════════════════════════════════
-   ESTILO INSTITUCIONAL — Formato Excel Hospital Escandón
-   Se aplica a TODOS los reportes generados por la plataforma.
-══════════════════════════════════════════════════════════════ */
 const BRAND = {
   azulOscuro:   'FF004687',
   azulClaro:    'FF0088C9',
@@ -36,24 +30,11 @@ const BRAND = {
   verdeTxt:     'FF065F46',
 };
 
-/**
- * Aplica el formato institucional completo a un workbook de ExcelJS.
- * @param {ExcelJS.Workbook} workbook
- * @param {ExcelJS.Worksheet} sheet
- * @param {object} opts
- * @param {string} opts.titulo - Título del reporte
- * @param {object} opts.resumen - Objeto clave-valor con métricas de resumen (opcional)
- * @param {Array}  opts.columnas - Array de {header, key, width}
- * @param {Array}  opts.filas - Array de objetos con los datos
- * @param {object} opts.totales - Objeto con fila de totales (opcional)
- * @param {object} opts.meta - Info del usuario {nombre, role} (opcional)
- * @param {string} opts.periodo - Texto descriptivo del período (opcional)
- */
 function applyInstitutionalStyle(workbook, sheet, opts) {
   const { titulo, resumen, columnas, filas, totales, meta, periodo } = opts;
   const numCols = columnas.length;
 
-  // ── Fila 1: Barra de título ──
+  // Fila 1: Barra de título
   const titleRow = sheet.addRow([titulo || 'HOSPITAL ESCANDÓN']);
   sheet.mergeCells(titleRow.number, 1, titleRow.number, numCols);
   titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND.azulOscuro } };
@@ -61,7 +42,7 @@ function applyInstitutionalStyle(workbook, sheet, opts) {
   titleRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
   titleRow.height = 32;
 
-  // ── Fila 2: Subtítulo ──
+  // Fila 2: Subtítulo
   const subtitleText = 'Hospital Escandón — Plataforma BI';
   const subRow = sheet.addRow([subtitleText]);
   sheet.mergeCells(subRow.number, 1, subRow.number, numCols);
@@ -70,7 +51,6 @@ function applyInstitutionalStyle(workbook, sheet, opts) {
   subRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
   subRow.height = 22;
 
-  // ── Fila 3: Metadatos ──
   const infoFragments = [];
   if (periodo) infoFragments.push(`Período: ${periodo}`);
   if (meta?.nombre) infoFragments.push(`Generado por: ${meta.nombre}`);
@@ -82,7 +62,7 @@ function applyInstitutionalStyle(workbook, sheet, opts) {
   infoRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
   infoRow.height = 20;
 
-  // ── Fila 4: Resumen (si hay) ──
+  // Fila 4: Resumen (si hay)
   if (resumen && Object.keys(resumen).length > 0) {
     const resumenText = Object.entries(resumen).map(([k, v]) => `${k}: ${v}`).join('   |   ');
     const resRow = sheet.addRow([resumenText]);
@@ -93,11 +73,10 @@ function applyInstitutionalStyle(workbook, sheet, opts) {
     resRow.height = 22;
   }
 
-  // ── Fila separadora ──
   const sepRow = sheet.addRow([]);
   sepRow.height = 6;
 
-  // ── Fila de encabezados de columna ──
+  // Fila de encabezados de columna
   const headerValues = columnas.map(c => c.header);
   const headerRow = sheet.addRow(headerValues);
   const headerRowNum = headerRow.number;
@@ -114,13 +93,13 @@ function applyInstitutionalStyle(workbook, sheet, opts) {
     };
   });
 
-  // ── Configurar anchos de columna ──
+  // Configurar anchos de columna
   columnas.forEach((c, i) => {
     sheet.getColumn(i + 1).width = c.width || 18;
     sheet.getColumn(i + 1).key = c.key;
   });
 
-  // ── Datos con formato ──
+  // Datos con formato
   const thinBorder = {
     top:    { style: 'hair', color: { argb: 'FFD1D5DB' } },
     bottom: { style: 'hair', color: { argb: 'FFD1D5DB' } },
@@ -137,7 +116,6 @@ function applyInstitutionalStyle(workbook, sheet, opts) {
       cell.border = thinBorder;
       cell.alignment = { vertical: 'middle' };
 
-      // Fondo alternado
       if (idx % 2 === 0) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BRAND.grisFila } };
       }
@@ -183,7 +161,7 @@ function applyInstitutionalStyle(workbook, sheet, opts) {
     }
   });
 
-  // ── Fila de totales ──
+  // Fila de totales
   if (totales) {
     const totalRow = sheet.addRow(columnas.map(c => totales[c.key] ?? ''));
     totalRow.eachCell(cell => {
@@ -197,13 +175,13 @@ function applyInstitutionalStyle(workbook, sheet, opts) {
     totalRow.height = 26;
   }
 
-  // ── Autofilter en la fila de encabezados ──
+  // Autofilter en la fila de encabezados
   sheet.autoFilter = {
     from: { row: headerRowNum, column: 1 },
     to:   { row: headerRowNum, column: numCols },
   };
 
-  // ── Hoja de Información ──
+  // Hoja de Información
   const metaSheet = workbook.addWorksheet('Información');
   const metaData = [
     ['HOSPITAL ESCANDÓN'],
@@ -240,7 +218,7 @@ async function exportJsonToExcel(res, type, id) {
 
     let jsonData = null;
 
-    // 1. Obtener los datos JSON
+    // Obtener los datos JSON
     if (config.JsonFilePath) {
       const fullPath = path.join(__dirname, '..', config.JsonFilePath);
       if (fs.existsSync(fullPath)) {
@@ -261,14 +239,14 @@ async function exportJsonToExcel(res, type, id) {
     } else if (typeof jsonData === 'object' && jsonData !== null) {
       const key = Object.keys(jsonData).find(k => Array.isArray(jsonData[k]));
       if (key) rows = jsonData[key];
-      else rows = [jsonData]; // Fallback to single row
+      else rows = [jsonData];  
     }
 
     if (rows.length === 0) {
       return res.status(400).json({ error: "El archivo no contiene una lista de datos. Revisa su contenido e intenta de nuevo." });
     }
 
-    // 2. Generar Excel con estilo institucional
+    // Generar Excel con estilo institucional
     const workbook  = new ExcelJS.Workbook();
     workbook.creator = 'Hospital Escandón — Plataforma BI';
     workbook.created = new Date();
@@ -302,11 +280,6 @@ async function exportJsonToExcel(res, type, id) {
   }
 }
 
-/**
- * GET /api/export/json-to-excel/:type/:id
- * Exporta un JSON (de API o archivo local) a Excel
- * :type puede ser 'kpi' o 'bi'
- */
 router.get(
   '/json-to-excel/:type/:id',
   authenticate,
@@ -317,11 +290,6 @@ router.get(
   }
 );
 
-
-/**
- * GET /api/export/excel/:reportId
- * Descarga Data Explorer en formato XLSX
- */
 router.get(
   '/excel/:reportId',
   authenticate,
@@ -332,7 +300,6 @@ router.get(
       const { area, estado, fechaDesde, fechaHasta } = req.query;
       const hasFilters = Boolean(area || estado || fechaDesde || fechaHasta);
 
-      // Si NO hay filtros seleccionados en auditoría, generar CSV con TODOS los registros sin tope (23,000+)
       if (!hasFilters && (reportId === 'auditoria-inventarios' || reportId === 'directivo-main')) {
         const reporte = await resolveReportData(reportId, { limit: 100000 });
         const escapeCsv = (str) => `"${String(str ?? '').replace(/"/g, '""')}"`;
@@ -354,7 +321,6 @@ router.get(
         return res.send(csvContent);
       }
 
-      // Ignorar ConfigJSON para reportes que tienen lógica dedicada de exportación en resolveReportData
       const customReports = ['consulta-externa', 'auditoria-inventarios', 'directivo-main', 'devoluciones-farmacia', 'movimientos-paciente'];
       if (!customReports.includes(reportId)) {
         // Verificar si el reporte tiene un JSON asignado (override)
@@ -364,7 +330,6 @@ router.get(
           return await exportJsonToExcel(res, 'bi', reportId);
         }
 
-        // Verificar si el reporte corresponde a un KPI que tiene JSON asignado
         const kpiJson = await db.prepare('SELECT JsonApiUrl, JsonFilePath FROM KPIConfig WHERE ElementoId = ? OR CAST(KPIId AS TEXT) = ?').get(reportId, reportId);
         if (kpiJson && (kpiJson.JsonApiUrl || kpiJson.JsonFilePath)) {
           return await exportJsonToExcel(res, 'kpi', reportId);
@@ -402,7 +367,6 @@ router.get(
         periodo: periodoFragments.join('   |   ') || null,
       });
 
-      // ── Respuesta HTTP ──
       const filename = `escandon_${reportId}_${Date.now()}.xlsx`;
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -415,10 +379,6 @@ router.get(
   }
 );
 
-/**
- * GET /api/export/pdf/:reportId
- * Descarga Reporte Ejecutivo en formato PDF
- */
 router.get(
   '/pdf/:reportId',
   authenticate,
@@ -436,7 +396,6 @@ router.get(
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       doc.pipe(res);
 
-      // ── Portada ──
       doc.rect(0, 0, doc.page.width, 100).fill('#004687');
       doc.fillColor('white')
          .font('Helvetica-Bold').fontSize(20)
@@ -452,12 +411,12 @@ router.get(
       doc.fillColor('#4A5568').font('Helvetica').fontSize(10)
          .text(`Generado: ${new Date().toLocaleString('es-MX')}   |   Usuario: ${req.user.nombre} (${req.user.role})`);
 
-      // ── Línea decorativa ──
+      // Línea decorativa
       doc.moveDown(0.5);
       doc.moveTo(50, doc.y).lineTo(562, doc.y).strokeColor('#0088C9').lineWidth(2).stroke();
       doc.moveDown(1);
 
-      // ── Resumen KPIs ──
+      // Resumen KPIs
       if (reporte.resumen) {
         doc.fillColor('#004687').font('Helvetica-Bold').fontSize(13).text('Resumen Ejecutivo');
         doc.moveDown(0.5);
@@ -468,17 +427,16 @@ router.get(
         doc.moveDown(1);
       }
 
-      // ── Tabla de datos (primeros 50 registros) ──
+      // Tabla de datos (primeros 50 registros)
       if (reporte.filas.length > 0) {
         doc.fillColor('#004687').font('Helvetica-Bold').fontSize(13).text('Detalle de Registros');
         doc.moveDown(0.5);
 
-        const cols    = reporte.columnas.slice(0, 6); // Máx 6 columnas en PDF
+        const cols    = reporte.columnas.slice(0, 6);  
         const colW    = (562 - 50) / cols.length;
         const startX  = 50;
         let   y       = doc.y;
 
-        // Header de tabla
         doc.rect(startX, y, 512, 20).fill('#004687');
         cols.forEach((col, i) => {
           doc.fillColor('white').font('Helvetica-Bold').fontSize(8)
@@ -486,11 +444,10 @@ router.get(
         });
         y += 20;
 
-        // Filas
         reporte.filas.slice(0, 50).forEach((row, idx) => {
           // Calcular la altura máxima necesaria para esta fila
           let rowHeight = 18;
-          doc.font('Helvetica').fontSize(7.5); // Asegurar fuente para cálculo correcto
+          doc.font('Helvetica').fontSize(7.5);  
           cols.forEach((col, i) => {
             const val = String(row[col.key] ?? '');
             const h = doc.heightOfString(val, { width: colW - 8 });
@@ -516,7 +473,7 @@ router.get(
         }
       }
 
-      // ── Pie de página ──
+      // Pie de página
       doc.on('pageAdded', () => {
         doc.page.margins.bottom = 30;
         doc.fillColor('#8A97A8').font('Helvetica').fontSize(8)
@@ -530,7 +487,7 @@ router.get(
   }
 );
 
-/* ── Resolver datos según reportId ────────────────────────── */
+/* Resolver datos según reportId */
 async function resolveReportData(reportId, filters) {
   switch (reportId) {
     case 'auditoria-inventarios':
@@ -951,10 +908,6 @@ async function resolveReportData(reportId, filters) {
 }
 }
 
-/**
- * POST /api/export/convert-json
- * Extrae JSON de una URL (API) y lo convierte a Excel (.xlsx)
- */
 router.post(
   '/convert-json',
   authenticate,
@@ -972,7 +925,6 @@ router.post(
         return res.status(400).json({ error: msg });
       }
 
-      // Timeout de 15s y sin seguir redirecciones (evita SSRF por redirect)
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
       let response;
@@ -991,10 +943,10 @@ router.post(
       if (Array.isArray(data)) {
         rows = data;
       } else if (typeof data === 'object') {
-        // Buscar la primera propiedad que sea un arreglo
+         
         const key = Object.keys(data).find(k => Array.isArray(data[k]));
         if (key) rows = data[key];
-        else rows = [data]; // Si no hay arreglos, exportamos el objeto único
+        else rows = [data];  
       }
 
       if (rows.length === 0) {
@@ -1018,7 +970,7 @@ router.post(
         sheet.columns = [{ header: 'Valor', key: 'valor', width: 30 }];
         rows.forEach(val => sheet.addRow({ valor: String(val) }));
       } else {
-        // Aplanar objetos anidados
+         
         const flatRows = rows.map(row => {
           const flatRow = {};
           colArray.forEach(k => {

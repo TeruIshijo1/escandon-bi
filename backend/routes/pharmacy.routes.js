@@ -168,18 +168,13 @@ router.get('/lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA'])
   }
 });
 
-/**
- * GET /api/pharmacy/historial-lotes/:itemCode
- * Extrae el historial de movimientos de inventario desde Vertical cruzando PCPRBT y UDR_CUENTAS_SERVICIOS
- */
 router.get('/historial-lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     const itemCode = req.query.itemCode;
     if (!itemCode) return res.status(400).json({ ok: false, error: "Selecciona un producto para continuar." });
 
     const pool = await connectRemoteDB();
-    
-    // Consulta directa a la base de datos de Vertical KH_HE
+
     const sqlText = `
       SELECT TOP 200
         b.CreatedOn AS Fecha,
@@ -216,10 +211,6 @@ router.get('/historial-lotes', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
   }
 });
 
-/**
- * GET /api/pharmacy/ubicaciones/:itemCode
- * Devuelve en qué otros almacenes del hospital hay stock del artículo
- */
 router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   const itemCode = req.query.itemCode;
   if (!itemCode) return res.status(400).json({ ok: false, error: "Selecciona un producto para continuar." });
@@ -227,7 +218,7 @@ router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
   await sapInventoryService.ensureInventoryData();
 
   if (sapInventoryService.getInventoryCache().length > 0) {
-    // Buscar en el caché global en qué almacenes hay stock de este ItemCode
+     
     let locations = sapInventoryService.getInventoryCache()
       .filter(item => item.ItemCode === itemCode && item.QuantityOnStock > 0)
       .map(item => ({
@@ -239,18 +230,11 @@ router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
     return res.json({ ok: true, data: locations });
   }
 
-  // Si no hay caché, error
   res.status(503).json({ ok: false, error: "El inventario se está actualizando. Intenta de nuevo en unos segundos." });
 });
 
-// ==========================================
 // NUEVAS RUTAS DE INTELIGENCIA AVANZADA
-// ==========================================
 
-/**
- * GET /api/pharmacy/salidas-farmacia (alias: /api/pharmacy/controlled-ledger)
- * Registro de Salidas y Dispensaciones de Farmacia con Lote
- */
 const handleSalidasFarmacia = async (req, res) => {
   try {
     const filterClass = (req.query.classification || req.query.type || 'ALL').toUpperCase();
@@ -346,30 +330,26 @@ const handleSalidasFarmacia = async (req, res) => {
 router.get('/salidas-farmacia', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), handleSalidasFarmacia);
 router.get('/controlled-ledger', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), handleSalidasFarmacia);
 
-/**
- * Clasifica y valida si un insumo es un medicamento que requiere receta médica (Grupo IV, Antibióticos o Controlados)
- */
 function resolvePrescriptionDrugType(itemCode, itemName, clasiObj, sapItem) {
   const name = String(sapItem?.ItemName || clasiObj?.ItemName || itemName || '').toUpperCase().trim();
   const c1 = String(clasiObj?.MedicalClassification || sapItem?.MedicalClassification || '').toUpperCase().trim();
   const c2 = String(clasiObj?.SecondaryClassification || sapItem?.SecondaryClassification || '').toUpperCase().trim();
 
-  // 1. Controlados (Grupo I, II, III - Psicotrópicos y Estupefacientes)
+  // Controlados (Grupo I, II, III - Psicotrópicos y Estupefacientes)
   if (c1 === 'CON' || c2 === 'CON' || clasiObj?.isControlled) {
     return { isRx: true, rxCategory: 'CONTROLADO', label: '💊 CONTROLADO', color: '#DC2626', bg: '#FEE2E2', border: '#FECACA' };
   }
 
-  // 2. Antibióticos
+  // Antibióticos
   if (c1 === 'ANTI' || c2 === 'ANTI' || clasiObj?.isAntibiotic) {
     return { isRx: true, rxCategory: 'ANTIBIOTICO', label: '💉 ANTIBIÓTICO', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
   }
 
-  // 3. Grupo IV explícito
+  // Grupo IV explícito
   if (c1 === 'G4' || c2 === 'G4' || c1 === 'IV' || c2 === 'IV' || c1 === 'RECETA' || c2 === 'RECETA') {
     return { isRx: true, rxCategory: 'GRUPO_IV', label: '📋 GRUPO IV', color: '#0D9488', bg: '#F0FDFA', border: '#99F6E4' };
   }
 
-  // 4. Exclusiones explícitas de no-medicamentos (material de curación, equipo, insumos, suplementos, bebidas)
   const nonMedPatterns = [
     /\bMEDIAS\b/, /\bANTIEMB[OÓ]LIC/, /\bJERINGA\b/, /\bGUANTE\b/, /\bGASA\b/, /\bCATETER\b/, /\bCAT[EÉ]TER\b/,
     /\bVENOCLISIS\b/, /\bEQUIPO\b/, /\bAGUJA\b/, /\bSONDA\b/, /\bCINTA\b/, /\bAPOSITO\b/, /\bAP[OÓ]SITO\b/,
@@ -391,12 +371,12 @@ function resolvePrescriptionDrugType(itemCode, itemName, clasiObj, sapItem) {
     return { isRx: false };
   }
 
-  // 5. Clasificaciones hospitalarias médicas que corresponden a medicamentos de prescripción
+  // Clasificaciones hospitalarias médicas que corresponden a medicamentos de prescripción
   if (['REFRI', 'AR', 'LASA', 'ALTOD', 'REDFRIA'].includes(c1) || ['REFRI', 'AR', 'LASA', 'ALTOD', 'REDFRIA'].includes(c2)) {
     return { isRx: true, rxCategory: 'GRUPO_IV', label: '📋 GRUPO IV', color: '#0D9488', bg: '#F0FDFA', border: '#99F6E4' };
   }
 
-  // 6. Formas farmacéuticas o concentraciones de prescripción médica (Grupo IV)
+  // Formas farmacéuticas o concentraciones de prescripción médica (Grupo IV)
   const rxPharmaPatterns = [
     /\bMG\b/, /\bMCG\b/, /\bMG\/ML\b/, /\bMG\/[0-9]/, /\bSLIY\b/, /\bTABL\b/, /\bCAPS\b/, /\bSLOF\b/,
     /\bCREM\b/, /\bSUSP\b/, /\bINY\b/, /\bAMP\b/, /\bAMPOYETA\b/, /\bFCO\b/, /\bSOLUCI[OÓ]N INYECTABLE\b/,
@@ -411,10 +391,6 @@ function resolvePrescriptionDrugType(itemCode, itemName, clasiObj, sapItem) {
   return { isRx: false };
 }
 
-/**
- * GET /api/pharmacy/pending-prescriptions
- * Monitor de Recetas Pendientes (Cola de despacho exclusiva para medicamentos con receta: Grupo IV, Antibióticos y Controlados)
- */
 router.get('/pending-prescriptions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     await sapInventoryService.ensureInventoryData();
@@ -460,8 +436,7 @@ router.get('/pending-prescriptions', authenticate, authorize(['ADMIN', 'DIRECTOR
       if (!hiddenIds.has(String(row.Id))) {
         const sapItem = inventoryMap ? inventoryMap.get(row.Codigo) : null;
         const clasiObj = clasiMap ? clasiMap.get(row.Codigo) : null;
-        
-        // Filtrar SOLO medicamentos que requieren receta (Grupo IV, Antibióticos y Controlados)
+
         const rxCheck = resolvePrescriptionDrugType(row.Codigo, row.Medicamento, clasiObj, sapItem);
         if (!rxCheck.isRx) continue;
 
@@ -486,10 +461,6 @@ router.get('/pending-prescriptions', authenticate, authorize(['ADMIN', 'DIRECTOR
   }
 });
 
-/**
- * POST /api/pharmacy/pending-prescriptions/hide/:id
- * Oculta una receta pendiente localmente
- */
 router.post('/pending-prescriptions/hide/:id', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     await pgPool.query('INSERT INTO dw_hidden_prescriptions (pcprit_num) VALUES ($1) ON CONFLICT (pcprit_num) DO NOTHING', [req.params.id]);
@@ -500,10 +471,6 @@ router.post('/pending-prescriptions/hide/:id', authenticate, authorize(['ADMIN',
   }
 });
 
-/**
- * GET /api/pharmacy/patient-history/:search
- * Historial Farmacológico por Paciente
- */
 router.get('/patient-history/:search', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     if (!req.params.search || req.params.search.trim().length < 3) {
@@ -544,10 +511,6 @@ router.get('/patient-history/:search', authenticate, authorize(['ADMIN', 'DIRECT
   }
 });
 
-/**
- * GET /api/pharmacy/surgical-kits
- * Calculadora Estadística de Kits Quirúrgicos desde PostgreSQL DW
- */
 router.get('/surgical-kits', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     const pgRes = await pgPool.query(`
@@ -567,10 +530,6 @@ router.get('/surgical-kits', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
   }
 });
 
-/**
- * GET /api/pharmacy/surgical-events
- * Agenda y Registro de Eventos Quirúrgicos desde PostgreSQL DW
- */
 router.get('/surgical-events', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 30;
@@ -612,10 +571,6 @@ router.get('/surgical-events', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
   }
 });
 
-/**
- * GET /api/pharmacy/doctor-variations
- * Comparativo de consumo de insumos por cirujano agrupado por procedimiento desde PostgreSQL DW
- */
 router.get('/doctor-variations', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     const months = parseInt(req.query.months) || 6;
@@ -671,17 +626,13 @@ router.get('/doctor-variations', authenticate, authorize(['ADMIN', 'DIRECTOR', '
     res.status(500).json({ ok: false, error: "No se pudo comparar el consumo por médico. Intenta de nuevo." });
   }
 });
-/**
- * GET /api/pharmacy/quirofano-inventory
- * Stock en tiempo real del Almacén Quirófano (QX), Recuperación, Carros Rojos y Código Mater
- */
+
 router.get('/quirofano-inventory', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const sapInventoryService = require('../services/sapInventory.service');
     await sapInventoryService.ensureInventoryData();
     const cache = sapInventoryService.getInventoryCache();
-    
-    // Almacenes de Quirófano, Recuperación, Carros Rojos, Código Mater y CEYE
+
     const qxWhsCodes = ['QX', 'QXCR', 'QXRCR', 'QXCM', 'CEYE', 'TERACR', 'IMAGCR', 'PPBCR', 'PPACR', 'CARDIOCR', 'CUNACR', 'URG1CR', 'URG2CR', 'URG1CM'];
     
     const qxItems = cache.filter(item => qxWhsCodes.includes(item.WhsCode));
@@ -723,13 +674,9 @@ router.get('/quirofano-inventory', authenticate, authorize(['ADMIN', 'DIRECTOR',
   }
 });
 
-/**
- * GET /api/pharmacy/quirofano-movements
- * Historial de Movimientos: Salidas a Pacientes y Devoluciones/Retornos en Quirófano (QX/QXCR)
- */
 router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
-    const type = req.query.type || 'all'; // 'salidas', 'devoluciones', 'all'
+    const type = req.query.type || 'all';  
     const days = parseInt(req.query.days) || 30;
     const clampedDays = Math.min(Math.max(days, 1), 180);
 
@@ -737,7 +684,7 @@ router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR',
     const sapMap = sapInventoryService.getInventoryMap();
     let movements = [];
 
-    // 1. Obtener Salidas a Cirugías/Pacientes si aplica ('salidas' o 'all')
+    // Obtener Salidas a Cirugías/Pacientes si aplica ('salidas' o 'all')
     if (type === 'salidas' || type === 'all') {
       const salRes = await pool.request().query(`
         SELECT TOP 500
@@ -767,7 +714,7 @@ router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR',
       movements.push(...salRes.recordset);
     }
 
-    // 2. Obtener Devoluciones y Retornos si aplica ('devoluciones' o 'all')
+    // Obtener Devoluciones y Retornos si aplica ('devoluciones' o 'all')
     if (type === 'devoluciones' || type === 'all') {
       const devRes = await pool.request().query(`
         SELECT TOP 500
@@ -803,7 +750,6 @@ router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR',
     // Ordenar por Fecha descendente
     movements.sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
 
-    // Enriquecer con nombres de SAP si el nombre es genérico
     const enrichedMovements = movements.map(m => {
       const sapItem = sapMap.get(m.Codigo);
       const name = (sapItem && sapItem.ItemName && sapItem.ItemName !== 'Material/Medicamento') 
@@ -847,10 +793,6 @@ router.get('/quirofano-movements', authenticate, authorize(['ADMIN', 'DIRECTOR',
 
 const pool = pgPool;
 
-/**
- * GET /api/pharmacy/punto-reorden
- * Devuelve el catálogo de Insumos con Mínimos, Máximos, Stock Actual, Pedidos SAP en curso y Notas de Almacén.
- */
 router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
   try {
     const sapInventoryService = require('../services/sapInventory.service');
@@ -858,7 +800,6 @@ router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
     await sapInventoryService.ensureInventoryData();
     const inventoryMap = sapInventoryService.getInventoryMap();
 
-    // 1. Obtener Pedidos (PO) y Solicitudes (PR) abiertas en PostgreSQL (ultra-rápido)
     let openOrdersMap = new Map();
     const pgResPedidos = await pool.query(`
       SELECT dockey AS "DocKey", docentry AS "DocEntry", docnum AS "DocNum", tipodocumento AS "TipoDocumento", tiponombre AS "TipoNombre", fechadoc AS "FechaDoc", cardcode AS "CardCode", cardname AS "CardName", usersign AS "UserSign", usuarionombre AS "UsuarioNombre", docstatus AS "DocStatus", doctotal AS "DocTotal", estatustexto AS "EstatusTexto", itemsjson AS "ItemsJSON" 
@@ -866,8 +807,7 @@ router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
       WHERE docstatus = 'bost_Open'
     `);
     let pedidosDB = pgResPedidos.rows;
-    
-    // Si la tabla local no tiene datos aún, disparar sync asíncrono
+
     if (pedidosDB.length === 0) {
       const { syncPedidosSAP } = require('../services/almacenSync.service');
       syncPedidosSAP().catch(console.error);
@@ -894,7 +834,6 @@ router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
       });
     });
 
-    // 2. Obtener Universo de Artículos de Farmacia (Almacén FAR y códigos FAR%)
     const farInventoryItems = sapInventoryService.getInventoryCache()
       .filter(i => i.WhsCode === 'FAR' || (i.ItemCode && String(i.ItemCode).toUpperCase().startsWith('FAR')));
     
@@ -1025,11 +964,6 @@ router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
   }
 });
 
-
-/**
- * PUT /api/pharmacy/punto-reorden/:code
- * Actualiza Mínimo, Máximo, Notita o Solicitud de Compra Personalizada de un artículo en PostgreSQL.
- */
 router.put('/punto-reorden/:code', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
   try {
     const { code } = req.params;
@@ -1077,11 +1011,6 @@ router.put('/punto-reorden/:code', authenticate, authorize(['ADMIN', 'DIRECTOR',
   }
 });
 
-
-/**
- * GET /api/pharmacy/pedidos-sap
- * Devuelve todas las Ordenes de Compra y Solicitudes abiertas en SAP con desglose de usuarios y estatus en tiempo real.
- */
 router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
   try {
     const pgResPedidos = await pool.query(`
@@ -1091,7 +1020,6 @@ router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
     `);
     let pedidosDB = pgResPedidos.rows;
 
-    // Si PostgreSQL está vacío o se solicita refresco forzado
     if (pedidosDB.length === 0 || req.query.refresh === 'true') {
       const { syncPedidosSAP } = require('../services/almacenSync.service');
       await syncPedidosSAP();
@@ -1135,11 +1063,6 @@ router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
   }
 });
 
-
-/**
- * GET /api/pharmacy/ml-dataset
- * Retorna el dataset analítico completo ordenado por nivel de riesgo para Farmacia (FAR)
- */
 router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     await sapInventoryService.ensureInventoryData();
@@ -1216,11 +1139,6 @@ router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
   }
 });
 
-
-/**
- * POST /api/pharmacy/ml-dataset/sync
- * Fuerza la regeneración y cálculo del dataset analítico
- */
 router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { syncMLDataset } = require('../services/mlDataset.service');
@@ -1232,11 +1150,6 @@ router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
   }
 });
 
-
-/**
- * GET /api/pharmacy/ml-history
- * Retorna el historial completo del dataset analítico
- */
 router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     await sapInventoryService.ensureInventoryData();
@@ -1274,11 +1187,6 @@ router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
   }
 });
 
-
-/**
- * GET /api/pharmacy/ml-history/download
- * Descarga el historial completo en formato CSV preparado para pandas/python
- */
 router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const pgRes = await pool.query(`
@@ -1329,11 +1237,6 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
   }
 });
 
-
-/**
- * GET /api/pharmacy/ml-predictions
- * Retorna las predicciones de Machine Learning actuales
- */
 router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     await sapInventoryService.ensureInventoryData();
@@ -1365,11 +1268,6 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
   }
 });
 
-
-/**
- * GET /api/pharmacy/ml-predictions/status
- * Retorna el estado del último job ejecutado para predicciones de almacén
- */
 router.get('/ml-predictions/status', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { getLatestJobStatus } = require('../services/mlJobRunner.service');
@@ -1381,11 +1279,6 @@ router.get('/ml-predictions/status', authenticate, authorize(['ADMIN', 'DIRECTOR
   }
 });
 
-
-/**
- * POST /api/pharmacy/ml-predictions/run
- * Ejecuta el script de predicción de Machine Learning con trazabilidad en ml_job_runs y control de concurrencia
- */
 router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   const { startJob, runPythonScript } = require('../services/mlJobRunner.service');
   const triggeredBy = req.user?.username || req.user?.email || 'USER';
@@ -1430,11 +1323,6 @@ router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR',
   }
 });
 
-/**
- * GET /api/pharmacy/config-dinamica
- * Configuración Dinámica (Farmacia): lee el Excel de MÁXIMOS, MÍNIMOS Y PUNTOS DE REORDEN,
- * calcula los puntos MIN/REORDEN/MAX por producto y los vincula con códigos SAP.
- */
 router.get('/config-dinamica', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const reorderConfig = require('../services/reorderConfig.service');
@@ -1446,10 +1334,6 @@ router.get('/config-dinamica', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
   }
 });
 
-/**
- * GET /api/pharmacy/config-dinamica/search-sap?q=
- * Busca artículos SAP por código/descripción para vinculación manual del Excel.
- */
 router.get('/config-dinamica/search-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const reorderConfig = require('../services/reorderConfig.service');
@@ -1461,10 +1345,6 @@ router.get('/config-dinamica/search-sap', authenticate, authorize(['ADMIN', 'DIR
   }
 });
 
-/**
- * POST /api/pharmacy/config-dinamica/link
- * Vincula (o desvincula con itemcode null) un producto del Excel con un código SAP.
- */
 router.post('/config-dinamica/link', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { producto, itemcode } = req.body || {};
@@ -1479,11 +1359,6 @@ router.post('/config-dinamica/link', authenticate, authorize(['ADMIN', 'DIRECTOR
   }
 });
 
-/**
- * POST /api/pharmacy/config-dinamica/apply
- * Aplica los puntos MIN/MAX calculados a la matriz dw_sap_reorder_settings.
- * Body: { productos?: string[], soloVinculados?: boolean, syncMl?: boolean }
- */
 router.post('/config-dinamica/apply', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { productos, syncMl } = req.body || {};
@@ -1530,10 +1405,6 @@ router.post('/config-dinamica/apply', authenticate, authorize(['ADMIN', 'DIRECTO
   }
 });
 
-/**
- * POST /api/pharmacy/config-dinamica/upload
- * Carga una nueva versión del Excel (.xlsm/.xlsx) de Puntos de Reorden.
- */
 router.post('/config-dinamica/upload', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA']), async (req, res) => {
   try {
     const multer = require('multer');

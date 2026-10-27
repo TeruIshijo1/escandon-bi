@@ -36,13 +36,11 @@ export default function InventarioAlmacen() {
     fetchInventory();
   }, []);
 
-
   const fetchInventory = async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // Llamada al backend protegido, el cual gestionará de forma invisible la sesión de SAP
+
       const response = await fetch(`${API_BASE}/almacen/inventario`, {
         headers: authHeaders()
       });
@@ -62,13 +60,11 @@ export default function InventarioAlmacen() {
     }
   };
 
-
-
   const fetchHistory = async (item) => {
     try {
       setSelectedItemHistory(item);
       setLoadingHistory(true);
-      setHistorySearchTerm(''); // reset search
+      setHistorySearchTerm('');  
       const response = await fetch(`${API_BASE}/almacen/historial-movimientos?itemCode=${encodeURIComponent(item.ItemCode)}`, {
         headers: authHeaders()
       });
@@ -230,10 +226,8 @@ export default function InventarioAlmacen() {
         </div>
       )}
 
-      {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        
-        {/* Card 1 */}
+
         <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)', border: '1px solid #e2e8f0', borderTop: '4px solid #3b82f6' }}>
           <h3 style={{ margin: '0 0 0.5rem 0', color: '#64748b', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Catálogo Activo (Top 500)
@@ -243,7 +237,6 @@ export default function InventarioAlmacen() {
           </div>
         </div>
 
-        {/* Card 2 */}
         <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)', border: '1px solid #e2e8f0', borderTop: '4px solid #10b981' }}>
           <h3 style={{ margin: '0 0 0.5rem 0', color: '#64748b', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Valor Total de Inventario
@@ -253,7 +246,6 @@ export default function InventarioAlmacen() {
           </div>
         </div>
 
-        {/* Card 3 (Interactivo - Abre Punto de Reorden) */}
         <div 
           onClick={() => navigate('/almacen/reorden')}
           style={{ 
@@ -277,10 +269,8 @@ export default function InventarioAlmacen() {
 
       </div>
 
-      {/* Main Table Area */}
       <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        
-        {/* Toolbar */}
+
         <div style={{ padding: '1.25rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           
           <div style={{ display: 'flex', gap: '0.5rem', width: '100%', maxWidth: '600px', alignItems: 'center' }}>
@@ -342,7 +332,7 @@ export default function InventarioAlmacen() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Tabla */}
         <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
@@ -504,7 +494,6 @@ export default function InventarioAlmacen() {
         </div>
       )}
 
-      {/* Modal Reabastecimiento Inteligente */}
       {showReplenishmentModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '800px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>

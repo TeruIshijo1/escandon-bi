@@ -1,48 +1,54 @@
 'use strict';
 
 const sapService = require('./sap.service');
+const { ensureSapQuery, withSapQuery } = require('./sapQueryRegistration.service');
 const { pool } = require('../config/pg-db');
 
 // ==== MOTOR DE CACHÉ EN MEMORIA ====
 let globalInventoryCache = [];
 let globalInventoryMap = new Map();
-let globalBatchesCache = []; // Cache para lotes
-let globalMedicalClassificationMap = new Map(); // Mapa de clasificaciones médicas (CON, ANTI, REFRI, etc.)
+let globalBatchesCache = [];  
+let globalMedicalClassificationMap = new Map();  
 let globalItemGroups = {};
 let globalManufacturers = {};
 let syncPromise = null;
 let lastSyncTime = null;
-let usingDBFallback = false; // true cuando el caché viene del snapshot de PostgreSQL (SAP no disponible)
+let usingDBFallback = false;
+let hasInventorySnapshot = false;
 
-async function ensureSqlQuery(sqlCode, sqlText) {
-  try {
-    await sapService.post('/SQLQueries', {
-      SqlCode: sqlCode,
-      SqlName: sqlCode,
-      SqlText: sqlText
-    });
-  } catch (e) {
-    try {
-      // Si ya existe, actualizarla (Patch)
-      await sapService.patch(`/SQLQueries('${sqlCode}')`, {
-        SqlName: sqlCode,
-        SqlText: sqlText
-      });
-    } catch (err) {
-      console.error(`[SAP Cache SQL] No se pudo crear ni actualizar SQLQuery ${sqlCode}`);
-    }
-  }
+const SAP_READ_OPTIONS = { maxPages: 5000, timeoutMs: 30000, queueTimeoutMs: 60000, totalTimeoutMs: 300000, cacheTtlMs: 0 };
+
+function formatSapDate(value) {
+  if (!value) return null;
+  const text = String(value).trim();
+  const parsed = /^\d{8}$/.test(text)
+    ? new Date(`${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}T00:00:00Z`)
+    : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
-function formatSapDate(dateStr) {
-  if (!dateStr) return null;
-  return `${dateStr.substring(0,4)}-${dateStr.substring(4,6)}-${dateStr.substring(6,8)}T00:00:00Z`;
+async function readSapRows(endpoint) {
+  const rows = await sapService.fetchAllPages(endpoint, { Prefer: 'odata.maxpagesize=5000' }, SAP_READ_OPTIONS);
+  if (!Array.isArray(rows)) throw new Error(`Lectura SAP incompleta: ${endpoint}`);
+  return rows;
 }
 
-/**
- * Determina la clasificación comercial / tipo de medicamento o insumo (Patente, Genérico o General).
- * Analiza el fabricante registrado en SAP y los prefijos/sufijos estandarizados de SAP B1 (P / G / marcas comerciales).
- */
+function classificationFor(item) {
+  const c1 = item.U_CLASI_MED_1 ? String(item.U_CLASI_MED_1).trim().toUpperCase() : null;
+  const c2 = item.U_CLASI_MED_2 ? String(item.U_CLASI_MED_2).trim().toUpperCase() : null;
+  return {
+    ItemCode: item.ItemCode,
+    ItemName: item.ItemName,
+    MedicalClassification: c1,
+    SecondaryClassification: c2,
+    isControlled: c1 === 'CON' || c2 === 'CON',
+    isAntibiotic: c1 === 'ANTI' || c2 === 'ANTI',
+    isColdChain: c1 === 'REFRI' || c2 === 'REFRI',
+    isHighRisk: c1 === 'AR' || c2 === 'AR',
+    isLasa: c1 === 'LASA' || c2 === 'LASA'
+  };
+}
+
 function resolveDrugClassification(itemName, firmCode, manufacturersMap = {}) {
   const mfg = manufacturersMap[firmCode];
   if (mfg && mfg !== '- Ningún fabricante -' && mfg !== '- Ninguna Marca -') {
@@ -53,10 +59,8 @@ function resolveDrugClassification(itemName, firmCode, manufacturersMap = {}) {
 
   const clean = String(itemName).trim().toUpperCase();
 
-  // Patrones para Patente (P): ' P ', ' P.', ' P/', ' P$', 'PATENTE'
   const isPatente = /\sP\s|\sP$|\sP\/|\sP\.|\bPATENTE\b/i.test(clean);
 
-  // Patrones para Genérico (G): ' G ', ' G.', ' G/', ' G$', 'GENERICO', 'GEN'
   const isGenerico = /\sG\s|\sG$|\sG\/|\sG\.|\bGENERICO\b|\bGEN\b/i.test(clean);
 
   if (isPatente && !isGenerico) {
@@ -72,176 +76,102 @@ function resolveDrugClassification(itemName, firmCode, manufacturersMap = {}) {
   return 'General';
 }
 
-async function syncInventoryCache() {
+// Publica el inventario sólo después de leer todas las fuentes y confirmar PostgreSQL.
+function syncInventoryCache() {
   if (syncPromise) return syncPromise;
-  
   syncPromise = (async () => {
     try {
-      console.log(`[SAP Cache SQL] Iniciando sincronización ultra-rápida...`);
-    
-    await sapService._ensureSession();
-    
-    // 1. Preparar consultas SQL Nativas (para todos los almacenes con stock)
-    // En SAP B1: ListNum 1 = '2PUBLICO GENERAL' (PricePG), ListNum 2 = '1HOSPITALIZACION' (PriceHos)
-    // Costo: Último precio de compra en SAP (T0.LastPurPrc), con fallback a costo promedio (T1.AvgPrice)
-    const sqlInv = `SELECT T0.ItemCode, T0.ItemName, T0.ItmsGrpCod, T0.FirmCode, T0.U_CLASI_MED_1 AS MedicalClassification, T0.U_CLASI_MED_2 AS SecondaryClassification, T1.WhsCode, T1.OnHand AS QuantityOnStock, T0.LastPurPrc AS PurchaseCost, T1.AvgPrice AS AvgCost, T2.Price AS PricePG, T3.Price AS PriceHos FROM OITM T0 INNER JOIN OITW T1 ON T0.ItemCode = T1.ItemCode LEFT JOIN ITM1 T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 1 LEFT JOIN ITM1 T3 ON T0.ItemCode = T3.ItemCode AND T3.PriceList = 2 WHERE T0.InvntItem = 'Y' AND T1.OnHand > 0`;
-    const sqlBat = `SELECT T0.ItemCode, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber WHERE T1.Quantity > 0`;
-    const sqlClasi = `SELECT ItemCode, ItemName, U_CLASI_MED_1, U_CLASI_MED_2 FROM OITM WHERE U_CLASI_MED_1 IS NOT NULL OR U_CLASI_MED_2 IS NOT NULL`;
-    
-    await ensureSqlQuery('sq_inv_all', sqlInv);
-    await ensureSqlQuery('sq_bat_all', sqlBat);
-    await ensureSqlQuery('sq_clasi_all', sqlClasi);
-    
-    // 1.5 Obtener metadatos (Grupos y Fabricantes)
-    if (Object.keys(globalItemGroups).length === 0) {
-      const groupsRes = await sapService._request('/ItemGroups?$select=Number,GroupName', 'GET', null, { 'Cookie': sapService.sessionCookie });
-      if (groupsRes && groupsRes.data && groupsRes.data.value) {
-        groupsRes.data.value.forEach(g => globalItemGroups[g.Number] = g.GroupName);
-      }
-      const mfgRes = await sapService._request('/Manufacturers', 'GET', null, { 'Cookie': sapService.sessionCookie });
-      if (mfgRes && mfgRes.data && mfgRes.data.value) {
-        mfgRes.data.value.forEach(m => globalManufacturers[m.Code] = m.ManufacturerName);
-      }
-    }
+      console.log('[SAP Cache SQL] Iniciando sincronización de inventario...');
+      const sqlInv = `SELECT T0.ItemCode, T0.ItemName, T0.ItmsGrpCod, T0.FirmCode, T0.U_CLASI_MED_1 AS MedicalClassification, T0.U_CLASI_MED_2 AS SecondaryClassification, T1.WhsCode, T1.OnHand AS QuantityOnStock, T0.LastPurPrc AS PurchaseCost, T1.AvgPrice AS AvgCost, T2.Price AS PricePG, T3.Price AS PriceHos FROM OITM T0 INNER JOIN OITW T1 ON T0.ItemCode = T1.ItemCode LEFT JOIN ITM1 T2 ON T0.ItemCode = T2.ItemCode AND T2.PriceList = 1 LEFT JOIN ITM1 T3 ON T0.ItemCode = T3.ItemCode AND T3.PriceList = 2 WHERE T0.InvntItem = 'Y' AND T1.OnHand > 0`;
+      const sqlBat = `SELECT T0.ItemCode, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber WHERE T1.Quantity > 0`;
+      const sqlClasi = `SELECT ItemCode, ItemName, U_CLASI_MED_1, U_CLASI_MED_2 FROM OITM WHERE U_CLASI_MED_1 IS NOT NULL OR U_CLASI_MED_2 IS NOT NULL`;
+      await ensureSapQuery('sq_inv_all', sqlInv);
+      await ensureSapQuery('sq_bat_all', sqlBat);
+      await ensureSapQuery('sq_clasi_all', sqlClasi);
 
-    // 2. Obtener Inventario Principal
-    console.log(`[SAP Cache SQL] Obteniendo artículos de inventario...`);
-    const pageHeaders = { 'Prefer': 'odata.maxpagesize=5000' };
-    let invResponse = await sapService.get(`/SQLQueries('sq_inv_all')/List`, pageHeaders);
-    let invItems = invResponse.data.value || [];
-    let nextLinkInv = invResponse.data['odata.nextLink'];
-    while (nextLinkInv) {
-      let query = nextLinkInv.startsWith('/b1s/v1') ? nextLinkInv.replace('/b1s/v1', '') : nextLinkInv;
-      if (!query.startsWith('/')) query = '/' + query;
-      let res = await sapService._request(query, 'GET', null, { 'Cookie': sapService.sessionCookie, ...pageHeaders });
-      if (res && res.data && res.data.value) {
-        invItems = invItems.concat(res.data.value);
-        nextLinkInv = res.data['odata.nextLink'];
-      } else {
-        nextLinkInv = null;
+      let itemGroups = globalItemGroups;
+      let manufacturers = globalManufacturers;
+      if (Object.keys(itemGroups).length === 0) {
+        const groups = await readSapRows('/ItemGroups?$select=Number,GroupName');
+        const firms = await readSapRows('/Manufacturers');
+        itemGroups = Object.fromEntries(groups.map(g => [g.Number, g.GroupName]));
+        manufacturers = Object.fromEntries(firms.map(m => [m.Code, m.ManufacturerName]));
       }
-    }
-
-    // 3. Obtener Lotes
-    console.log(`[SAP Cache SQL] Obteniendo lotes...`);
-    let batResponse = await sapService.get(`/SQLQueries('sq_bat_all')/List`, pageHeaders);
-    let batItems = batResponse.data.value || [];
-    let nextLinkBat = batResponse.data['odata.nextLink'];
-    while (nextLinkBat) {
-      let query = nextLinkBat.startsWith('/b1s/v1') ? nextLinkBat.replace('/b1s/v1', '') : nextLinkBat;
-      if (!query.startsWith('/')) query = '/' + query;
-      let res = await sapService._request(query, 'GET', null, { 'Cookie': sapService.sessionCookie, ...pageHeaders });
-      if (res && res.data && res.data.value) {
-        batItems = batItems.concat(res.data.value);
-        nextLinkBat = res.data['odata.nextLink'];
-      } else {
-        nextLinkBat = null;
-      }
-    }
-    
-    // 3.5 Obtener Clasificaciones Médicas Generales
-    try {
-      let clasiResponse = await sapService.get(`/SQLQueries('sq_clasi_all')/List`, pageHeaders);
-      let clasiItems = clasiResponse.data?.value || [];
-      globalMedicalClassificationMap.clear();
-      clasiItems.forEach(c => {
-        const c1 = c.U_CLASI_MED_1 ? String(c.U_CLASI_MED_1).trim().toUpperCase() : null;
-        const c2 = c.U_CLASI_MED_2 ? String(c.U_CLASI_MED_2).trim().toUpperCase() : null;
-        globalMedicalClassificationMap.set(c.ItemCode, {
-          ItemCode: c.ItemCode,
-          ItemName: c.ItemName,
-          MedicalClassification: c1,
-          SecondaryClassification: c2,
-          isControlled: c1 === 'CON' || c2 === 'CON',
-          isAntibiotic: c1 === 'ANTI' || c2 === 'ANTI',
-          isColdChain: c1 === 'REFRI' || c2 === 'REFRI',
-          isHighRisk: c1 === 'AR' || c2 === 'AR',
-          isLasa: c1 === 'LASA' || c2 === 'LASA'
-        });
-      });
-    } catch (clasiErr) {
-      console.warn(`[SAP Cache SQL] Error al cargar clasificaciones médicas:`, clasiErr.message);
-    }
-    
-    // 4. Formatear y guardar en memoria
-    if (invItems.length > 0) {
-      globalInventoryCache = invItems.map(item => {
+      const invItems = await withSapQuery('sq_inv_all', sqlInv, () => readSapRows(`/SQLQueries('sq_inv_all')/List`));
+      const batItems = await withSapQuery('sq_bat_all', sqlBat, () => readSapRows(`/SQLQueries('sq_bat_all')/List`));
+      const classifications = await withSapQuery('sq_clasi_all', sqlClasi, () => readSapRows(`/SQLQueries('sq_clasi_all')/List`));
+      const medicalMap = new Map(classifications.map(c => [c.ItemCode, classificationFor(c)]));
+      const inventory = invItems.map(item => {
         const cost = Number((item.PurchaseCost > 0 ? item.PurchaseCost : item.AvgCost) || 0);
         const pricePG = Number(item.PricePG != null ? item.PricePG : (item.SalesPrice || 0));
         const priceHos = Number(item.PriceHos || 0);
-        const margin = pricePG > 0 ? ((pricePG - cost) / pricePG) * 100 : 0;
-        const medClass = globalMedicalClassificationMap.get(item.ItemCode);
         const quantity = Number(item.QuantityOnStock || 0);
-        
+        const medClass = medicalMap.get(item.ItemCode);
         return {
           ...item,
           QuantityOnStock: quantity,
           PurchaseCost: cost,
           PricePG: pricePG,
           PriceHos: priceHos,
-          SalesPrice: pricePG, // Compatibilidad hacia atrás
+          SalesPrice: pricePG,
           MedicalClassification: medClass?.MedicalClassification || item.MedicalClassification || null,
           SecondaryClassification: medClass?.SecondaryClassification || item.SecondaryClassification || null,
-          ItemGroupName: globalItemGroups[item.ItmsGrpCod] || (item.ItemCode?.startsWith('FAR') ? 'FARMACIA' : 'General'),
-          ManufacturerName: resolveDrugClassification(item.ItemName, item.FirmCode, globalManufacturers),
-          ProfitMargin: margin,
+          ItemGroupName: itemGroups[item.ItmsGrpCod] || (item.ItemCode?.startsWith('FAR') ? 'FARMACIA' : 'General'),
+          ManufacturerName: resolveDrugClassification(item.ItemName, item.FirmCode, manufacturers),
+          ProfitMargin: pricePG > 0 ? ((pricePG - cost) / pricePG) * 100 : 0,
           ExpectedUtility: (pricePG - cost) * quantity
         };
       });
-      globalInventoryMap = new Map(globalInventoryCache.map(i => [i.ItemCode, i]));
-      // Formatear fechas de los lotes para que el frontend no falle
-      globalBatchesCache = batItems.map(b => ({
+      const batches = batItems.map(b => ({
         ...b,
         Quantity: Number(b.Quantity || 0),
         AdmissionDate: formatSapDate(b.AdmissionDate),
         ExpirationDate: formatSapDate(b.ExpirationDate)
       }));
-      lastSyncTime = new Date();
+      const syncedAt = new Date();
+      await persistInventorySnapshot(inventory, { allowEmpty: true, syncedAt });
+      globalInventoryCache = inventory;
+      globalInventoryMap = new Map(inventory.map(i => [i.ItemCode, i]));
+      globalBatchesCache = batches;
+      globalMedicalClassificationMap = medicalMap;
+      globalItemGroups = itemGroups;
+      globalManufacturers = manufacturers;
+      lastSyncTime = syncedAt;
+      hasInventorySnapshot = true;
       usingDBFallback = false;
-      console.log(`[SAP Cache SQL] Sincronización exitosa: ${globalInventoryCache.length} artículos, ${globalBatchesCache.length} lotes y ${globalMedicalClassificationMap.size} clasificaciones médicas en memoria.`);
-      // Persistir snapshot en PostgreSQL para operar si SAP llega a caerse
-      await persistInventorySnapshot();
-    }
+      console.log(`[SAP Cache SQL] Sincronización exitosa: ${inventory.length} artículos, ${batches.length} lotes y ${medicalMap.size} clasificaciones médicas.`);
     } catch (error) {
-      console.error(`[SAP Cache SQL] Error al sincronizar inventario:`, error.message || error);
-    } finally {
-      syncPromise = null;
+      console.error('[SAP Cache SQL] Error al sincronizar inventario:', error.message || error);
+      throw error;
     }
-  })();
+  })().finally(() => { syncPromise = null; });
   return syncPromise;
 }
 
-/**
- * Persiste el caché de inventario actual en PostgreSQL (dw_sap_inventory_cache).
- * Permite que los módulos sigan operando (modo degradado) si SAP Service Layer no responde.
- */
-async function persistInventorySnapshot() {
-  if (!globalInventoryCache || globalInventoryCache.length === 0) return;
+// Sustituye el snapshot completo en una transacción.
+async function persistInventorySnapshot(rows = globalInventoryCache, { allowEmpty = false, syncedAt = new Date() } = {}) {
+  if (!Array.isArray(rows)) throw new TypeError('El snapshot de inventario debe ser una lista completa.');
+  if (rows.length === 0 && !allowEmpty) return;
   let client;
   try {
     client = await pool.connect();
     await client.query('BEGIN');
     await client.query('DELETE FROM dw_sap_inventory_cache');
     const batchSize = 500;
-    for (let i = 0; i < globalInventoryCache.length; i += batchSize) {
-      const batch = globalInventoryCache.slice(i, i + batchSize);
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
       const values = [];
       const params = [];
       batch.forEach((item, idx) => {
         const base = idx * 11;
         values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11})`);
         params.push(
-          String(item.ItemCode || ''),
-          item.ItemName || null,
-          String(item.WhsCode || ''),
-          Number(item.QuantityOnStock || 0),
-          Number(item.PurchaseCost || 0),
+          String(item.ItemCode || ''), item.ItemName || null, String(item.WhsCode || ''),
+          Number(item.QuantityOnStock || 0), Number(item.PurchaseCost || 0),
           Number(item.SalesPrice || item.PricePG || 0),
           Number(item.PricePG != null ? item.PricePG : (item.SalesPrice || 0)),
-          Number(item.PriceHos || 0),
-          item.MedicalClassification || null,
-          item.SecondaryClassification || null,
-          new Date()
+          Number(item.PriceHos || 0), item.MedicalClassification || null,
+          item.SecondaryClassification || null, syncedAt
         );
       });
       await client.query(`
@@ -250,26 +180,19 @@ async function persistInventorySnapshot() {
       `, params);
     }
     await client.query('COMMIT');
-    console.log(`[SAP Cache SQL] Snapshot de inventario persistido en PostgreSQL (${globalInventoryCache.length} registros).`);
   } catch (err) {
     if (client) await client.query('ROLLBACK').catch(() => {});
     console.warn('[SAP Cache SQL] No se pudo persistir el snapshot de inventario:', err.message);
+    throw err;
   } finally {
     client?.release();
   }
 }
 
-/**
- * Carga el último snapshot de inventario desde PostgreSQL a memoria.
- * Se usa como fallback cuando SAP Service Layer no está disponible.
- * Si nunca se ha persistido un snapshot, deriva un stock aproximado del
- * Kardex (última existencia registrada por artículo) en modo degradado.
- */
 async function loadInventoryFromDB() {
   try {
     let loaded = await loadSnapshotFromTable();
 
-    // Fallback nivel 2: derivar del Kardex (existencias de la última sincronización)
     if (!loaded) {
       loaded = await loadFromKardex();
     }
@@ -301,7 +224,7 @@ async function loadSnapshotFromTable() {
 }
 
 async function loadFromKardex() {
-  // Última existencia registrada por artículo en el Kardex (aprox. del stock total al último sync)
+   
   const res = await pool.query(`
       SELECT DISTINCT ON (k.codigo)
         k.codigo AS "ItemCode", k.descripcion AS "ItemName",
@@ -313,7 +236,6 @@ async function loadFromKardex() {
     `);
   if (res.rows.length === 0) return false;
 
-  // Sólo exponer los SKUs mapeados en la matriz de reorden (universo Farmacia/Almacén)
   const settingsRes = await pool.query('SELECT itemcode, itemdescription FROM dw_sap_reorder_settings');
   const mappedCodes = new Set(settingsRes.rows.map(r => r.itemcode));
 
@@ -338,6 +260,7 @@ async function loadFromKardex() {
 }
 
 function applyInventoryRows(rows, lastSync) {
+  hasInventorySnapshot = true;
   globalInventoryCache = rows.map(item => {
     const cost = Number(item.PurchaseCost || 0);
     const pricePG = Number(item.PricePG != null ? item.PricePG : (item.SalesPrice || 0));
@@ -358,7 +281,7 @@ function applyInventoryRows(rows, lastSync) {
   });
   globalInventoryMap = new Map(globalInventoryCache.map(i => [i.ItemCode, i]));
   lastSyncTime = lastSync;
-  // Cargar clasificaciones desde el mismo snapshot
+   
   globalMedicalClassificationMap.clear();
   globalInventoryCache.forEach(item => {
     if (item.MedicalClassification || item.SecondaryClassification) {
@@ -379,11 +302,8 @@ function applyInventoryRows(rows, lastSync) {
   });
 }
 
-/**
- * Garantiza que haya datos de inventario disponibles (SAP en vivo → fallback PostgreSQL).
- */
 async function ensureInventoryData() {
-  if (globalInventoryCache.length > 0) {
+  if (hasInventorySnapshot || globalInventoryCache.length > 0) {
     const itemWithPrice = globalInventoryCache.find(i => (i.SalesPrice > 0 || i.PricePG > 0));
     if (itemWithPrice && itemWithPrice.PriceHos === undefined) {
       await syncInventoryCache().catch(() => {});
@@ -393,20 +313,12 @@ async function ensureInventoryData() {
   try {
     await syncInventoryCache();
   } catch (e) {
-    // Ignorar: el fallback de BD se evalúa abajo
+     
   }
-  if (globalInventoryCache.length === 0) {
+  if (!hasInventorySnapshot && globalInventoryCache.length === 0) {
     await loadInventoryFromDB();
   }
-  return globalInventoryCache.length > 0;
-}
-
-// Iniciar sincronización en background cada 15 minutos
-// (no en modo test: evita timers y conexiones SAP durante los tests)
-if (process.env.NODE_ENV !== 'test') {
-  setInterval(syncInventoryCache, 15 * 60 * 1000);
-  // Disparar la primera vez con un pequeño delay para dar tiempo a que el servidor arranque
-  setTimeout(syncInventoryCache, 3000);
+  return hasInventorySnapshot || globalInventoryCache.length > 0;
 }
 
 module.exports = {
@@ -418,6 +330,7 @@ module.exports = {
   getBatchesCache: () => globalBatchesCache,
   getInventoryMap: () => globalInventoryMap,
   getMedicalClassificationMap: () => globalMedicalClassificationMap,
+  hasInventorySnapshot: () => hasInventorySnapshot,
   isUsingDBFallback: () => usingDBFallback,
   getLastSyncTime: () => lastSyncTime
 };

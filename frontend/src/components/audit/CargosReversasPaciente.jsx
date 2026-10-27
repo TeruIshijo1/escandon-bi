@@ -125,7 +125,6 @@ export default function CargosReversasPaciente() {
     fetchData();
   }, [fechaDesde, fechaHasta, tipoMovimiento, unidadServicio]);
 
-  // Mantener scroll sincronizado
   useEffect(() => {
     const tableContainer = tableScrollRef.current;
     if (!tableContainer) return;
@@ -148,7 +147,7 @@ export default function CargosReversasPaciente() {
   // Unidades de servicio disponibles en el dataset
   const unidadesDisponibles = useMemo(() => {
     const set = new Set(rows.map(r => r.unidadServicio).filter(Boolean));
-    // Garantizar que Carro Rojo aparezca destacado
+     
     return Array.from(set).sort();
   }, [rows]);
 
@@ -305,8 +304,7 @@ export default function CargosReversasPaciente() {
 
   return (
     <div style={{ padding: '0.5rem 0', width: '100%', maxWidth: '100%', boxSizing: 'border-box', color: '#1e293b' }}>
-      
-      {/* ── Header Principal ── */}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -354,14 +352,13 @@ export default function CargosReversasPaciente() {
         </div>
       </div>
 
-      {/* ── KPI Cards ── */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
         gap: '1rem',
         marginBottom: '1.5rem'
       }}>
-        {/* Total Movimientos */}
+        
         <div style={{ background: '#fff', padding: '1.1rem', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Total Movimientos</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#004687', marginTop: '0.3rem' }}>
@@ -372,7 +369,6 @@ export default function CargosReversasPaciente() {
           </div>
         </div>
 
-        {/* Total Cargos (Venta) */}
         <div style={{ background: '#fff', padding: '1.1rem', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#004687', textTransform: 'uppercase' }}>Total Cargado (Venta)</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#004687', marginTop: '0.3rem' }}>
@@ -383,7 +379,6 @@ export default function CargosReversasPaciente() {
           </div>
         </div>
 
-        {/* Total Reversas */}
         <div style={{ background: '#fff', padding: '1.1rem', borderRadius: '12px', border: '1px solid #FEE2E2', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#DC2626', textTransform: 'uppercase' }}>Total Reversado (Devoluciones)</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#DC2626', marginTop: '0.3rem' }}>
@@ -405,7 +400,6 @@ export default function CargosReversasPaciente() {
           </div>
         </div>
 
-        {/* Margen Neto */}
         <div style={{ background: '#fff', padding: '1.1rem', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803D', textTransform: 'uppercase' }}>Margen Operativo Neto</div>
           <div style={{ fontSize: '1.6rem', fontWeight: 800, color: filteredMetrics.margenNeto >= 0 ? '#15803D' : '#DC2626', marginTop: '0.3rem' }}>
@@ -417,7 +411,7 @@ export default function CargosReversasPaciente() {
         </div>
       </div>
 
-      {/* ── Barra de Filtros ── */}
+      {/* Barra de Filtros */}
       <div style={{
         background: '#fff',
         padding: '1.2rem',
@@ -565,7 +559,7 @@ export default function CargosReversasPaciente() {
         </div>
       </div>
 
-      {/* ── Mensaje de Error ── */}
+      {/* Mensaje de Error */}
       {error && (
         <div style={{
           background: '#FEE2E2', border: '1px solid #F87171', color: '#991B1B',
@@ -575,10 +569,8 @@ export default function CargosReversasPaciente() {
         </div>
       )}
 
-      {/* ── Contenedor de Tabla con Doble Scroll ── */}
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-        
-        {/* Scrollbar Superior Sincronizada */}
+
         <div
           ref={topScrollRef}
           onScroll={() => {
@@ -646,12 +638,11 @@ export default function CargosReversasPaciente() {
                         transition: 'background 0.1s ease'
                       }}
                     >
-                      {/* Cuenta */}
+                      
                       <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, color: '#004687' }}>
                         {r.cuenta}
                       </td>
 
-                      {/* Paciente */}
                       <td style={{ padding: '8px 10px', fontWeight: 600, color: '#1E293B' }}>
                         <div>{r.paciente}</div>
                         <div style={{ fontSize: '0.7rem', color: '#64748B' }}>
@@ -659,7 +650,6 @@ export default function CargosReversasPaciente() {
                         </div>
                       </td>
 
-                      {/* Tipo Movimiento */}
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                         <span style={{
                           display: 'inline-block',
@@ -675,7 +665,6 @@ export default function CargosReversasPaciente() {
                         </span>
                       </td>
 
-                      {/* Fecha */}
                       <td style={{ padding: '8px 10px', textAlign: 'center', fontSize: '0.75rem', color: '#475569', whiteSpace: 'nowrap' }}>
                         {r.fechaMovimiento ? new Date(r.fechaMovimiento).toLocaleString('es-MX', {
                           day: '2-digit', month: '2-digit', year: 'numeric',
@@ -688,7 +677,6 @@ export default function CargosReversasPaciente() {
                         {r.codigo}
                       </td>
 
-                      {/* Insumo */}
                       <td style={{ padding: '8px 10px', fontWeight: 600, color: '#1E293B' }}>
                         {r.insumo}
                       </td>
@@ -709,37 +697,30 @@ export default function CargosReversasPaciente() {
                         </span>
                       </td>
 
-                      {/* Cantidad */}
                       <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 800, color: r.isReversa ? '#DC2626' : '#004687' }}>
                         {r.isReversa ? `-${r.cantidad}` : r.cantidad}
                       </td>
 
-                      {/* Precio Venta Unitario */}
                       <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>
                         ${Number(r.precioVentaUnitario).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
-                      {/* Total Venta */}
                       <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: r.isReversa ? '#DC2626' : '#15803D' }}>
                         ${Number(r.precioVentaTotal).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
-                      {/* Costo Compra Unitario */}
                       <td style={{ padding: '8px 10px', textAlign: 'right', color: '#64748B' }}>
                         ${Number(r.costoCompraUnitario).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
-                      {/* Total Costo */}
                       <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#B45309' }}>
                         ${Number(r.costoCompraTotal).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
-                      {/* Margen */}
                       <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: r.margenMonto >= 0 ? '#15803D' : '#DC2626' }}>
                         ${Number(r.margenMonto).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
-                      {/* Lote */}
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                         {r.lote && r.lote !== 'N/A' ? (
                           <span style={{ background: '#FEF3C7', color: '#92400E', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600 }}>
@@ -750,7 +731,6 @@ export default function CargosReversasPaciente() {
                         )}
                       </td>
 
-                      {/* Responsable */}
                       <td style={{ padding: '8px 10px', color: '#334155' }}>
                         <div>{r.usuarioCargo}</div>
                         {r.deptoUsuarioCargo && (
@@ -770,7 +750,6 @@ export default function CargosReversasPaciente() {
           </div>
         )}
 
-        {/* ── Paginador ── */}
         {!loading && filtered.length > PER_PAGE && (
           <div style={{
             display: 'flex',

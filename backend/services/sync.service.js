@@ -2,12 +2,10 @@ const cron = require('node-cron');
 const sapService = require('./sap.service');
 const { pool } = require('../config/pg-db');
 
-/**
- * Función para sincronizar IncomingPayments (Ingresos)
- */
+/* Función para sincronizar IncomingPayments (Ingresos) */
 async function syncIncomingPayments() {
   try {
-    // Sincronizamos los últimos 15 días para capturar nuevos y modificaciones
+     
     const dateLimit = new Date();
     dateLimit.setDate(dateLimit.getDate() - 15);
     const sapDate = dateLimit.toISOString().split('T')[0];
@@ -16,7 +14,7 @@ async function syncIncomingPayments() {
     let count = 0;
 
     while (url) {
-      const res = await sapService.get(url, { 'B1S-PageSize': 500, 'Prefer': 'odata.maxpagesize=500' });
+      const res = await sapService.get(url, { 'B1S-PageSize': 500, 'Prefer': 'odata.maxpagesize=500' }, { timeoutMs: 30000, queueTimeoutMs: 60000, totalTimeoutMs: 120000 });
       const records = res.data?.value || [];
       
       for (const p of records) {
@@ -62,9 +60,7 @@ async function syncIncomingPayments() {
   }
 }
 
-/**
- * Función para sincronizar PurchaseInvoices (Egresos)
- */
+/* Función para sincronizar PurchaseInvoices (Egresos) */
 async function syncPurchaseInvoices() {
   try {
     const dateLimit = new Date();
@@ -75,11 +71,11 @@ async function syncPurchaseInvoices() {
     let count = 0;
 
     while (url) {
-      const res = await sapService.get(url, { 'B1S-PageSize': 500, 'Prefer': 'odata.maxpagesize=500' });
+      const res = await sapService.get(url, { 'B1S-PageSize': 500, 'Prefer': 'odata.maxpagesize=500' }, { timeoutMs: 30000, queueTimeoutMs: 60000, totalTimeoutMs: 120000 });
       const records = res.data?.value || [];
       
       for (const p of records) {
-        // En PurchaseInvoices, Cancelled viene como tYES o tNO.
+         
         const canceled = p.Cancelled === 'tYES' ? 'Y' : 'N';
 
         await pool.query(`
@@ -108,12 +104,12 @@ async function syncPurchaseInvoices() {
 }
 
 async function runFullSync() {
-  console.log('🔄 Iniciando ciclo de sincronización ETL hacia Postgres DW...');
+  await require('./almacenSync.service').waitForAlmacenSync?.(); console.log('🔄 Iniciando ciclo de sincronización ETL hacia Postgres DW...');
   await syncIncomingPayments();
   await syncPurchaseInvoices();
   
   try {
-    console.log('🔄 Iniciando sincronización de traslados desde SAP...');
+    await require('./almacenSync.service').waitForAlmacenSync?.(); console.log('🔄 Iniciando sincronización de traslados desde SAP...');
     const { syncTraslados } = require('./sapTrasladosSync.service');
     const count = await syncTraslados();
     console.log(`✅ Sincronizados ${count} traslados desde SAP.`);
@@ -124,11 +120,11 @@ async function runFullSync() {
   console.log('✅ Ciclo de sincronización ETL finalizado.');
 }
 
-// Iniciar los Cron Jobs
 function initCronJobs() {
-  // Ejecutar cada 15 minutos
-  cron.schedule('*/15 * * * *', () => {
-    runFullSync();
+   
+  cron.schedule('1-59/15 * * * *', () => {
+    require('./backgroundQueue.service').enqueue('etl', () => runFullSync())
+      .catch(error => console.warn('[ETL] Ciclo pendiente:', error.message));
   });
   console.log('⏰ Cron Jobs de ETL inicializados (Ejecución cada 15 min).');
 }

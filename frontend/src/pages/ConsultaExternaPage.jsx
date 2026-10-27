@@ -14,19 +14,17 @@ export default function ConsultaExternaPage() {
   
   const [fechaDesde, setFechaDesde] = useState(todayStr());
   const [fechaHasta, setFechaHasta] = useState(todayStr());
-  const [tipoFecha, setTipoFecha] = useState('cita'); // 'cita' | 'creacion'
+  const [tipoFecha, setTipoFecha] = useState('cita');  
   const [activeTab, setActiveTab] = useState('agenda');
   const [consultaDia, setConsultaDia] = useState([]);
   const [consultasProg, setConsultasProg] = useState([]);
-  
-  // Modals state
+
   const [openNotas, setOpenNotas] = useState(false);
   const [selectedCita, setSelectedCita] = useState(null);
   const [toast, setToast] = useState('');
 
   useEscapeKey(() => setOpenNotas(false), openNotas);
-  
-  // Form state
+
   const [notasData, setNotasData] = useState({
     Notas: '', Diagnostico: ''
   });
@@ -165,7 +163,7 @@ export default function ConsultaExternaPage() {
 
   const renderAgendaTab = () => (
     <>
-      {/* KPIs */}
+      
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
         <div 
           onClick={() => setFilterEstado(null)}
@@ -502,7 +500,7 @@ export default function ConsultaExternaPage() {
         @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      {/* Header */}
+      {/* Encabezado */}
       <div style={{
         background: 'linear-gradient(135deg, var(--color-azul-fuerte) 0%, #083b66 100%)',
         borderRadius: 20, padding: '1.75rem 2.25rem', marginBottom: '2rem',
@@ -515,7 +513,7 @@ export default function ConsultaExternaPage() {
         flexWrap: 'wrap',
         gap: '1rem'
       }}>
-        {/* ECG Pattern */}
+        {/* Fondo del encabezado */}
         <div style={{
           position: 'absolute',
           inset: 0,
@@ -623,7 +621,6 @@ export default function ConsultaExternaPage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '2px solid rgba(0,70,135,0.06)', paddingBottom: '0.5rem' }}>
         {[
           { id: 'agenda', label: 'Agenda Principal' },
@@ -683,7 +680,7 @@ export default function ConsultaExternaPage() {
         </div>
       )}
 
-      {/* Toast Notification */}
+      {/* Avisos */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: '2rem', right: '2rem',

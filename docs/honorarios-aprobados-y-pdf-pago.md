@@ -1,4 +1,4 @@
-> Actualización del 5 de octubre: el flujo vigente está en [Optimización de honorarios](revision-optimizacion-honorarios-2026-10-05.md) y en [el manual](instructivo_honorarios.html). Servicios, Pagos y PDF, Configuración; ficha fiscal interna y comprobante total por médico.
+> Actualización del 5 de octubre: el flujo vigente está en [el manual](instructivo_honorarios.html). La nota Optimización de honorarios se conserva en el expediente técnico del proyecto como [revision-optimizacion-honorarios-2026-10-05.md](../../historial/pases-anteriores/documentacion/5cc6f26ab9b5e4009c50b8ffdac57d557ab1cb7797f003db464bd8e79f710063/revision-optimizacion-honorarios-2026-10-05.md). Servicios, Pagos y PDF, Configuración; ficha fiscal interna y comprobante total por médico.
 
 # Honorarios: servicios aprobados y PDF para pago
 

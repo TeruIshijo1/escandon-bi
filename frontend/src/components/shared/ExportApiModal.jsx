@@ -61,7 +61,7 @@ export default function ExportApiModal({ isOpen, onClose }) {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in" style={{ zIndex: 9999 }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95" style={{ borderRadius: '16px', background: 'white' }}>
         
-        {/* Header */}
+        {/* Encabezado */}
         <div style={{ background: '#004687', padding: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h3 style={{ color: 'white', fontWeight: 600, fontSize: '1.125rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -76,7 +76,6 @@ export default function ExportApiModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Body */}
         <div style={{ padding: '1.5rem' }}>
           <p style={{ color: '#4A5568', fontSize: '0.875rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
             Pega el enlace de los datos para descargarlos en Excel. Si no lo tienes, pídelo al responsable de la información.

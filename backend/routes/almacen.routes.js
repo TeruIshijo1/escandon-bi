@@ -6,22 +6,18 @@ const path = require('path');
 const sapInventoryService = require('../services/sapInventory.service');
 const { authenticate, authorize } = require('../middleware/auth.middleware');
 const { pool } = require('../config/pg-db');
+const { ensureSapQuery } = require('../services/sapQueryRegistration.service');
+const SAP_QUERY_READ_OPTIONS = { maxPages: 5000, timeoutMs: 30000, totalTimeoutMs: 300000, cacheTtlMs: 0 };
 
-/**
- * GET /api/almacen/inventario
- * Devuelve el inventario exclusivo de Almacén General ('ALG', '01').
- * Excluye los artículos transferidos a sub-almacenes como Almacén de Insumos, CEYE, etc.
- */
+/* GET /api/almacen/inventario */
 router.get('/inventario', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { warehouse } = req.query;
 
-    // Si el caché está vacío (ej. servidor recién prendido), forzamos una carga
     if (sapInventoryService.getInventoryCache().length === 0) {
       await sapInventoryService.syncInventoryCache();
     }
-    
-    // Filtrar únicamente los artículos que físicamente pertenecen a Almacén General ('ALG' o '01')
+
     const generalItems = sapInventoryService.getInventoryCache().filter(item => {
       if (warehouse) return item.WhsCode === warehouse;
       return item.WhsCode === 'ALG' || item.WhsCode === '01';
@@ -34,17 +30,13 @@ router.get('/inventario', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
   }
 });
 
-/**
- * GET /api/almacen/ubicaciones
- * Devuelve todas las ubicaciones donde existe stock físico del artículo
- */
 router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
   const { itemCode } = req.query;
   if (!itemCode) {
     return res.status(400).json({ ok: false, error: 'Código de artículo requerido (itemCode)' });
   }
 
-  // 1. Validar si el caché ya está listo
+  // Validar si el caché ya está listo
   if (sapInventoryService.getInventoryCache().length > 0) {
     const allStock = sapInventoryService.getInventoryCache();
     const batches = sapInventoryService.getBatchesCache() || [];
@@ -64,7 +56,7 @@ router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
     const locations = allStock
       .filter(item => item.ItemCode === itemCode && Number(item.QuantityOnStock || item.OnHand || 0) > 0)
       .map(item => {
-        // Encontrar lotes y caducidades vinculados a este almacén para el artículo
+         
         const itemBatches = batches
           .filter(b => b.ItemCode === itemCode && b.WhsCode === item.WhsCode)
           .map(b => ({
@@ -85,14 +77,9 @@ router.get('/ubicaciones', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
     return res.json({ ok: true, data: locations });
   }
 
-  // Si no hay caché, error
   res.status(503).json({ ok: false, error: "El inventario se está actualizando. Intenta de nuevo en unos segundos." });
 });
 
-/**
- * GET /api/almacen/historial-movimientos
- * Devuelve el historial de movimientos de un articulo desde dw_sap_kardex
- */
 router.get('/historial-movimientos', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
   try {
     const { itemCode } = req.query;
@@ -109,7 +96,6 @@ router.get('/historial-movimientos', authenticate, authorize(['ADMIN', 'DIRECTOR
       LIMIT 100
     `, [itemCode]);
 
-    // Mapear los campos para que coincidan con lo que espera el frontend (que fue copiado de farmacia)
     const formattedData = pgRes.rows.map(row => ({
       Fecha: row.Fecha,
       Lote: row.DocumentoRef || 'S/D',
@@ -125,10 +111,6 @@ router.get('/historial-movimientos', authenticate, authorize(['ADMIN', 'DIRECTOR
   }
 });
 
-/**
- * GET /api/almacen/traslados
- * Lista las solicitudes de traslado desde PostgreSQL (caching de SAP)
- */
 router.get('/traslados', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { startDate, endDate, search } = req.query;
@@ -160,10 +142,6 @@ router.get('/traslados', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_ARE
   }
 });
 
-/**
- * GET /api/almacen/traslados/:id
- * Obtiene el detalle completo de una solicitud de traslado
- */
 router.get('/traslados/:id', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { id } = req.params;
@@ -193,8 +171,8 @@ async function checkAndSyncStaleData(cleanEnd) {
     try {
       console.log('[Almacén Reportes] Sincronizando datos recientes en background (sin bloquear la respuesta)...');
       const { runAlmacenSync } = require('../services/almacenSync.service');
-      // Fire-and-forget: la respuesta del reporte NO debe esperar al ETL completo
-      runAlmacenSync()
+       
+      require('../services/backgroundQueue.service').enqueue('almacen', () => runAlmacenSync())
         .catch(err => console.error('[Almacén Reportes] Error en sincronización bajo demanda:', err.message))
         .finally(() => { almacenSyncRunning = false; });
     } catch (err) {
@@ -204,9 +182,7 @@ async function checkAndSyncStaleData(cleanEnd) {
   }
 }
 
-/**
- * GET /api/almacen/reportes/kardex
- */
+/* GET /api/almacen/reportes/kardex */
 router.get('/reportes/kardex', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { startDate, endDate, itemCode } = req.query;
@@ -245,9 +221,7 @@ router.get('/reportes/kardex', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JE
   }
 });
 
-/**
- * GET /api/almacen/reportes/censo
- */
+/* GET /api/almacen/reportes/censo */
 router.get('/reportes/censo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -272,9 +246,7 @@ router.get('/reportes/censo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
   }
 });
 
-/**
- * GET /api/almacen/reportes/entradas
- */
+/* GET /api/almacen/reportes/entradas */
 router.get('/reportes/entradas', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { startDate, endDate, supplierName, invoiceNum, proveedor, factura } = req.query;
@@ -284,31 +256,16 @@ router.get('/reportes/entradas', authenticate, authorize(['ADMIN', 'DIRECTOR', '
     const cleanEnd = endDate ? endDate.replace(/-/g, '') : '';
     await checkAndSyncStaleData(cleanEnd);
 
-    const sapService = require('../services/sap.service');
     let data = [];
     let fetchedFromSAP = false;
 
     if (startDate && endDate) {
-      try {
-        const queryName = 'sq_reporte_entradas_resumen';
-        const sqlText = `SELECT T0.DocDate AS "Fecha", T0.DocNum AS "Numero de entrada", ISNULL(T0.NumAtCard, '') AS "Numero de factura", T0.CardName AS "Nombre proveedor", COUNT(DISTINCT T1.ItemCode) AS "Tipos de articulos", SUM(T1.Quantity) AS "Cantidad de articulos", T0.DocTotal AS "Importe de factura" FROM OPDN T0 INNER JOIN PDN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :sDate AND T0.DocDate <= :eDate GROUP BY T0.DocNum, T0.NumAtCard, T0.CardName, T0.DocDate, T0.DocTotal ORDER BY T0.DocDate DESC`;
-
-        try {
-          await sapService.post('/SQLQueries', { SqlCode: queryName, SqlName: queryName, SqlText: sqlText });
-        } catch (e) {
-          try {
-            await sapService.patch(`/SQLQueries('${queryName}')`, { SqlName: queryName, SqlText: sqlText });
-          } catch (err) {}
-        }
-
-        const sDate = startDate.replace(/-/g, '');
-        const eDate = endDate.replace(/-/g, '');
-
-        data = await sapService.fetchAllPages(`/SQLQueries('${queryName}')/List?sDate='${sDate}'&eDate='${eDate}'`, {}, 5000);
-        fetchedFromSAP = true;
-      } catch (sapErr) {
-        console.warn('[Reporte Entradas SAP Warning, falling back to PG]:', sapErr.message);
-      }
+      const queryName = 'sq_reporte_entradas_resumen';
+      const sqlText = `SELECT T0.DocDate AS "Fecha", T0.DocNum AS "Numero de entrada", ISNULL(T0.NumAtCard, '') AS "Numero de factura", T0.CardName AS "Nombre proveedor", COUNT(DISTINCT T1.ItemCode) AS "Tipos de articulos", SUM(T1.Quantity) AS "Cantidad de articulos", T0.DocTotal AS "Importe de factura" FROM OPDN T0 INNER JOIN PDN1 T1 ON T0.DocEntry = T1.DocEntry WHERE T0.DocDate >= :sDate AND T0.DocDate <= :eDate GROUP BY T0.DocNum, T0.NumAtCard, T0.CardName, T0.DocDate, T0.DocTotal ORDER BY T0.DocDate DESC`;
+      const sDate = startDate.replace(/-/g, '');
+      const eDate = endDate.replace(/-/g, '');
+      data = await executeSapQueryViaSL(queryName, sqlText, { sDate, eDate });
+      fetchedFromSAP = true;
     }
 
     if (!fetchedFromSAP) {
@@ -342,14 +299,12 @@ router.get('/reportes/entradas', authenticate, authorize(['ADMIN', 'DIRECTOR', '
 
     res.json({ ok: true, data });
   } catch (err) {
-    console.error('[Entradas Error]', err.message);
-    res.status(500).json({ ok: false, error: 'Error al generar Entradas' });
+    console.error('[Entradas Error]', { status: err.status, code: err.code });
+    res.status(req.query.startDate && req.query.endDate ? 502 : 500).json({ ok: false, error: 'No se pudo completar el reporte de entradas. Intenta de nuevo.' });
   }
 });
 
-/**
- * GET /api/almacen/reportes/consumo
- */
+/* GET /api/almacen/reportes/consumo */
 router.get('/reportes/consumo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { startDate, endDate, itemCode } = req.query;
@@ -389,34 +344,21 @@ router.get('/reportes/consumo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
 
 const executeSapQueryViaSL = async (queryName, sqlText, params) => {
   const sapService = require('../services/sap.service');
-  await sapService._ensureSession();
-  
-  try {
-    await sapService.post('/SQLQueries', { SqlCode: queryName, SqlName: queryName, SqlText: sqlText });
-  } catch (e) {
-    try {
-      await sapService.patch(`/SQLQueries('${queryName}')`, { SqlName: queryName, SqlText: sqlText });
-    } catch (err) {
-      const errMsg = err.error?.error?.message?.value || err.message || (typeof err === 'object' ? JSON.stringify(err) : err);
-      console.warn(`[SAP SL Query Register/Patch Warning]:`, errMsg);
-    }
-  }
+  await ensureSapQuery(queryName, sqlText);
 
   const qs = new URLSearchParams();
   for (let key in params) {
     if (params[key] !== undefined && params[key] !== null) {
-      qs.append(key, `'${params[key]}'`);
+      qs.append(key, `'${String(params[key]).replace(/'/g, "''")}'`);
     }
   }
 
-  const list = await sapService.fetchAllPages(`/SQLQueries('${queryName}')/List?${qs.toString()}`, {}, 5000);
-  return list || [];
+  const list = await sapService.fetchAllPages(`/SQLQueries('${queryName}')/List?${qs.toString()}`, {}, SAP_QUERY_READ_OPTIONS);
+  if (!Array.isArray(list)) throw new Error('SAP no confirmó una colección completa.');
+  return list;
 };
 
-/**
- * GET /api/almacen/reportes/custom-sap
- * Ejecuta reportes personalizados provistos por soporte de SAP directamente a través de SAP Service Layer
- */
+/* GET /api/almacen/reportes/custom-sap */
 router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO', 'CONSULTA_EXTERNA']), async (req, res) => {
   try {
     const { reportName, startDate, endDate, docNum } = req.query;
@@ -424,7 +366,6 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
     
     let data = [];
 
-    // Funciones auxiliares de formateo para igualar el output de SQL
     const formatStatus = (s) => s === 'bost_Open' ? 'Abierta' : s === 'bost_Close' ? 'Cerrada' : s;
     const formatStatusShort = (s) => s === 'bost_Open' ? 'Abierto' : s === 'bost_Close' ? 'Cerrado' : s;
     const formatType = (t) => t === 'IP' ? 'Hospitalizacion' : t === 'ER' ? 'Urgencias' : t;
@@ -553,7 +494,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
         groupsResp.forEach(g => { groupsMap[g.Number] = g.GroupName; });
         
         // Obtenemos los items con sus listas de precios
-        // Excluimos grupos que sabemos no tienen precios (ACTIVO FIJO=134, ALIAS=100)
+         
         const items = await sapService.fetchAllPages(`/Items?$select=ItemCode,ItemName,ItemsGroupCode,ItemPrices&$filter=ItemsGroupCode ne 134 and ItemsGroupCode ne 100`);
         console.log(`[precios-articulos] Total items fetched (excl. 100,134): ${items.length}`);
         
@@ -631,9 +572,7 @@ router.get('/reportes/custom-sap', authenticate, authorize(['ADMIN', 'DIRECTOR',
 
 });
 
-/**
- * GET /api/almacen/reportes/detalle/kardex/:codigo
- */
+/* GET /api/almacen/reportes/detalle/kardex/:codigo */
 router.get('/reportes/detalle/kardex/:codigo', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { codigo } = req.params;
@@ -654,9 +593,7 @@ router.get('/reportes/detalle/kardex/:codigo', authenticate, authorize(['ADMIN',
   }
 });
 
-/**
- * GET /api/almacen/reportes/detalle/censo/:cuenta
- */
+/* GET /api/almacen/reportes/detalle/censo/:cuenta */
 router.get('/reportes/detalle/censo/:cuenta', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { cuenta } = req.params;
@@ -691,9 +628,7 @@ router.get('/reportes/detalle/censo/:cuenta', authenticate, authorize(['ADMIN', 
   }
 });
 
-/**
- * GET /api/almacen/reportes/detalle/entradas/:numFactura
- */
+/* GET /api/almacen/reportes/detalle/entradas/:numFactura */
 router.get('/reportes/detalle/entradas/:numFactura', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     let { numFactura } = req.params;
@@ -768,16 +703,11 @@ router.get('/reportes/detalle/entradas/:numFactura', authenticate, authorize(['A
   }
 });
 
-/**
- * GET /api/almacen/punto-reorden
- * Devuelve el catálogo de Insumos con Mínimos, Máximos, Stock Actual, Pedidos SAP en curso y Notas de Almacén.
- */
 router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
   try {
     const sapInventoryService = require('../services/sapInventory.service');
     const inventoryMap = sapInventoryService.getInventoryMap();
 
-    // 1. Obtener Pedidos (PO) y Solicitudes (PR) abiertas en PostgreSQL (ultra-rápido)
     let openOrdersMap = new Map();
     const pgResPedidos = await pool.query(`
       SELECT dockey AS "DocKey", docentry AS "DocEntry", docnum AS "DocNum", tipodocumento AS "TipoDocumento", tiponombre AS "TipoNombre", fechadoc AS "FechaDoc", cardcode AS "CardCode", cardname AS "CardName", usersign AS "UserSign", usuarionombre AS "UsuarioNombre", docstatus AS "DocStatus", doctotal AS "DocTotal", estatustexto AS "EstatusTexto", itemsjson AS "ItemsJSON" 
@@ -785,8 +715,7 @@ router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
       WHERE docstatus = 'bost_Open'
     `);
     let pedidosDB = pgResPedidos.rows;
-    
-    // Si la tabla local no tiene datos aún, disparar sync asíncrono
+
     if (pedidosDB.length === 0) {
       const { syncPedidosSAP } = require('../services/almacenSync.service');
       syncPedidosSAP().catch(console.error);
@@ -813,7 +742,7 @@ router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
       });
     });
 
-    // 2. Cruzar con tabla de settings en PostgreSQL
+    // Cruzar con tabla de settings en PostgreSQL
     const pgResSettings = await pool.query(`
       SELECT itemcode AS "ItemCode", itemdescription AS "ItemDescription", minstock AS "MinStock", maxstock AS "MaxStock", note AS "Note", customsolicitud AS "CustomSolicitud", lastupdated AS "LastUpdated" 
       FROM dw_sap_reorder_settings 
@@ -881,10 +810,6 @@ router.get('/punto-reorden', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE
   }
 });
 
-/**
- * PUT /api/almacen/punto-reorden/:code
- * Actualiza Mínimo, Máximo, Notita o Solicitud de Compra Personalizada de un artículo en PostgreSQL.
- */
 router.put('/punto-reorden/:code', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
   try {
     const { code } = req.params;
@@ -932,10 +857,6 @@ router.put('/punto-reorden/:code', authenticate, authorize(['ADMIN', 'DIRECTOR',
   }
 });
 
-/**
- * GET /api/almacen/pedidos-sap
- * Devuelve todas las Ordenes de Compra y Solicitudes abiertas en SAP con desglose de usuarios y estatus en tiempo real.
- */
 router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL', 'USUARIO_OPERATIVO']), async (req, res) => {
   try {
     const pgResPedidos = await pool.query(`
@@ -945,7 +866,6 @@ router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
     `);
     let pedidosDB = pgResPedidos.rows;
 
-    // Si PostgreSQL está vacío o se solicita refresco forzado
     if (pedidosDB.length === 0 || req.query.refresh === 'true') {
       const { syncPedidosSAP } = require('../services/almacenSync.service');
       await syncPedidosSAP();
@@ -981,10 +901,6 @@ router.get('/pedidos-sap', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_A
   }
 });
 
-/**
- * GET /api/almacen/ml-dataset
- * Retorna el dataset analítico completo ordenado por nivel de riesgo
- */
 router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const pgRes = await pool.query(`
@@ -1022,10 +938,6 @@ router.get('/ml-dataset', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
   }
 });
 
-/**
- * POST /api/almacen/ml-dataset/sync
- * Fuerza la regeneración y cálculo del dataset analítico
- */
 router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { syncMLDataset } = require('../services/mlDataset.service');
@@ -1037,10 +949,6 @@ router.post('/ml-dataset/sync', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
   }
 });
 
-/**
- * GET /api/almacen/ml-history
- * Retorna el historial completo del dataset analítico
- */
 router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const pgRes = await pool.query(`
@@ -1074,10 +982,6 @@ router.get('/ml-history', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AR
   }
 });
 
-/**
- * GET /api/almacen/ml-history/download
- * Descarga el historial completo en formato CSV preparado para pandas/python
- */
 router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const pgRes = await pool.query(`
@@ -1105,7 +1009,7 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
         } else if (val instanceof Date) {
           val = val.toISOString();
         } else if (h === 'snapshot_date') {
-          // Format snapshot_date as YYYY-MM-DD
+           
           val = new Date(val).toISOString().split('T')[0];
         } else {
           val = String(val);
@@ -1128,10 +1032,6 @@ router.get('/ml-history/download', authenticate, authorize(['ADMIN', 'DIRECTOR',
   }
 });
 
-/**
- * GET /api/almacen/ml-model-metrics
- * Retorna las métricas del último entrenamiento del modelo (reorder_risk_metrics.json)
- */
 router.get('/ml-model-metrics', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), (req, res) => {
   try {
     const fs = require('fs');
@@ -1147,10 +1047,6 @@ router.get('/ml-model-metrics', authenticate, authorize(['ADMIN', 'DIRECTOR', 'J
   }
 });
 
-/**
- * GET /api/almacen/ml-predictions
- * Retorna las predicciones de Machine Learning actuales
- */
 router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const pgRes = await pool.query(`
@@ -1178,10 +1074,6 @@ router.get('/ml-predictions', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEF
   }
 });
 
-/**
- * GET /api/almacen/ml-predictions/status
- * Retorna el estado del último job ejecutado para predicciones de almacén
- */
 router.get('/ml-predictions/status', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   try {
     const { getLatestJobStatus } = require('../services/mlJobRunner.service');
@@ -1193,10 +1085,6 @@ router.get('/ml-predictions/status', authenticate, authorize(['ADMIN', 'DIRECTOR
   }
 });
 
-/**
- * POST /api/almacen/ml-predictions/run
- * Ejecuta el script de predicción de Machine Learning con trazabilidad en ml_job_runs y control de concurrencia
- */
 router.post('/ml-predictions/run', authenticate, authorize(['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'ALMACEN_GENERAL']), async (req, res) => {
   const { startJob, runPythonScript } = require('../services/mlJobRunner.service');
   const triggeredBy = req.user?.username || req.user?.email || 'USER';

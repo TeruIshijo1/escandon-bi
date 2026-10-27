@@ -3,14 +3,10 @@
 const { createHash } = require('node:crypto');
 const { isExcludedHonorariosService } = require('../utils/honorariosScope');
 
-// El servicio sólo lee Vertical. La presencia de una fuente o de una marca de
-// cabecera nunca autoriza el importe: catálogo y revisión pertenecen a BI.
 const CONTACT_CENTER_CODES = new Set(['SER1467', 'SER1470', 'SER1471']);
 const ANESTHESIA_CODES = new Set(['SER1259', 'SER1260', 'SER1261', 'SER1262']);
-const EXCLUDED_GROUP_SQL = "'ALMACEN GENERAL','FARMACIA','LABORATORIO','ESTUDIOS DE LABORATORIO','IMAGENOLOGIA','ALIAS','PAQUETE DE CIRUGIA','ARRENDAMIENTO','DONATIVOS','ESCUELA DE ENFERMERIA','INGRESOS ADMINISTRATIVOS','INSUMOS CONSULTA EXTERNA','SERVICIOS DE CEYE'";
+const EXCLUDED_GROUP_SQL = "'ALMACEN GENERAL','FARMACIA','LABORATORIO','ESTUDIOS DE LABORATORIO','ALIAS','PAQUETE DE CIRUGIA','ARRENDAMIENTO','DONATIVOS','ESCUELA DE ENFERMERIA','INGRESOS ADMINISTRATIVOS','INSUMOS CONSULTA EXTERNA','SERVICIOS DE CEYE'";
 
-// Se cuenta la relación con citas en todo el historial, no solamente en el
-// corte. Una línea reutilizada en otro mes conserva la cantidad compartida.
 const ORDER_CANDIDATES_SQL = `
   WITH Items AS (
     SELECT ItemCode,MIN(ItemDescription) ItemDescription,MIN(ItemGroupName) ItemGroupName,
@@ -28,6 +24,7 @@ const ORDER_CANDIDATES_SQL = `
       WHERE i.ItemType='S' OR i.ItemType IS NULL GROUP BY l.SONum
   )
   SELECT s.SONum,l.SOLNNum,l.LineNum,l.ItemCode,l.Quantity,l.UnitPrice,
+    CASE WHEN EXISTS (SELECT 1 FROM UT_Honorarios h WHERE h.ITEMCODE=l.ItemCode) THEN 1 ELSE 0 END SourceHonorariosReference,
     l.SOLN_ST,l.PCPRIT_ST,l.IsAssembly,l.IsComponent,l.SOLNRef,
     s.SO_ST,s.PCNum OrderPCNum,s.PTNum OrderPTNum,s.CreatedOn OrderCreatedOn,
     s.UDF_FromDate OrderServiceDate,s.UDF_ToDate OrderServiceEnd,s.UDF_Realizado,
@@ -61,7 +58,6 @@ const ORDER_CANDIDATES_SQL = `
     AND NULLIF(LTRIM(RTRIM(l.ItemCode)),'') IS NOT NULL
     AND (i.ItemGroupName IS NULL OR LTRIM(RTRIM(i.ItemGroupName)) COLLATE Latin1_General_CI_AI
       NOT IN (${EXCLUDED_GROUP_SQL}))
-    AND l.ItemCode NOT IN ('SER0647','SER0649')
   ORDER BY ServiceDate,l.SOLNNum,a.PCAPNum`;
 
 const CHARGE_CANDIDATES_SQL = `
@@ -76,6 +72,7 @@ const CHARGE_CANDIDATES_SQL = `
     SELECT PCFRNum,COUNT(*) ProcedureCount FROM PCFRCP GROUP BY PCFRNum
   )
   SELECT b.PCBLNum,b.PCNum,b.LineNum,b.[Partition],b.ChargeDate,b.PC_ST,b.LineType,
+    CASE WHEN EXISTS (SELECT 1 FROM UT_Honorarios h WHERE h.ITEMCODE=b.ItemCode) THEN 1 ELSE 0 END SourceHonorariosReference,
     b.ItemCode,COALESCE(b.ItemDescription,i.ItemDescription) ItemDescription,
     COALESCE(b.ItemGroupName,i.ItemGroupName) ItemGroupName,b.ItemType,
     b.Quantity,b.UnitPrice,b.SONum,b.SOLNNum,b.PCITNum,b.PCPRNum,b.PCPRITNum,b.PCFRNum,
@@ -113,11 +110,11 @@ const CHARGE_CANDIDATES_SQL = `
     AND (COALESCE(b.ItemGroupName,i.ItemGroupName) IS NULL
       OR LTRIM(RTRIM(COALESCE(b.ItemGroupName,i.ItemGroupName))) COLLATE Latin1_General_CI_AI
         NOT IN (${EXCLUDED_GROUP_SQL}))
-    AND b.ItemCode NOT IN ('SER0647','SER0649')
   ORDER BY b.ChargeDate,b.PCBLNum`;
 
 const APPOINTMENT_CANDIDATES_SQL = `
   SELECT a.PCAPNum,a.PCNum,a.SONum,a.FromDate ServiceDate,a.PCAP_ST,a.UDF_Ejecutada,
+    CASE WHEN EXISTS (SELECT 1 FROM UT_Honorarios h WHERE h.ITEMCODE=a.ItemCode) THEN 1 ELSE 0 END SourceHonorariosReference,
     a.ItemCode,a.PRNum,p.FullName AppointmentDoctorName,a.PTNum,pt.FullName Paciente,
     p.UDF_TIPO_MEDICO,p.UDF_ISR,p.UDF_IVA,ms.MSDescription_ES Especialidad,
     i.ItemDescription,i.ItemGroupName,s.SO_ST,s.BPCode,s.CreatedOn OrderCreatedOn
@@ -182,8 +179,7 @@ const numberOrNull = value => value === null || value === undefined || value ===
 const positiveId = value => numberOrNull(value) > 0 ? Number(value) : null;
 const flag = value => value === true || value === 1;
 const normalizeCode = value => String(value || '').trim().toUpperCase();
-// mssql useUTC:false entrega la fecha civil de Vertical en los componentes
-// locales. Convertirla a ISO UTC desplazaría los cargos nocturnos al día siguiente.
+
 const normalizeDate = value => {
   if (!(value instanceof Date)) return value == null ? null : String(value);
   const pad = number => String(number).padStart(2, '0');
@@ -215,6 +211,7 @@ function commonCandidate(raw,sourceType,id,occurrenceId) {
     TasaIVAPropuesta:[0,8,16].includes(registeredVat)?registeredVat/100:null,
     TasaISR:[0,0.1,0.0125].includes(registeredIsr)?registeredIsr:[10,1.25].includes(registeredIsr)?registeredIsr/100:null,
     EstadoVertical:null,ElegiblePago:0,RequiereRevision:true,PosibleDuplicado:false,
+    SourceHonorariosReference:flag(raw.SourceHonorariosReference),
     DuplicadoConSourceIds:[],PasaTipoServicio:true,FuenteHonorario:sourceType==='SOLN'?'Línea de orden de venta':'Cargo clínico',
     OrigenRenglon:sourceType==='SOLN'?'ORDEN_SERVICIO_BI':'CARGO_CLINICO_BI',
     PasaCatalogoHonorarios:false,PasaIncluidoHonorarios:false
@@ -233,8 +230,7 @@ function normalizeOrderCandidate(raw) {
   const appointmentPerformed=flag(raw.UDF_Ejecutada) && (contactCenter || raw.PCAP_ST==='SH');
   const orderPerformed=flag(raw.UDF_Realizado);
   const evidence=appointmentPerformed?'CITA_REALIZADA':orderPerformed?'ORDEN_MARCADA_REALIZADA':'SIN_CONFIRMACION';
-  // Las marcas del episodio se conservan como evidencia y una orden con varios
-  // conceptos exige confirmar su aplicación a la línea durante la revisión BI.
+
   const executionConfirmed=!canceled && (appointmentPerformed || orderPerformed)
     && Number(raw.ServiceLineCount)===1;
   Object.assign(row,{
@@ -269,8 +265,7 @@ function normalizeChargeCandidate(raw) {
   const clinicalRole=anesthesia?'AN':explicitRole;
   const row=commonCandidate(raw,'PCBL',id,clinicalRole || 'TRATANTE');
   const uniqueParticipant=Number(raw.ProviderCount)===1 && positiveId(raw.ProviderId)!==null;
-  // Para roles quirúrgicos no se reemplaza un participante ausente/ambiguo por
-  // PR_TX o PR_PC: ello reasignaba los cargos de anestesia al médico principal.
+
   const physicianId=clinicalRole?(uniqueParticipant?positiveId(raw.ProviderId):null)
     :positiveId(raw.PR_TX) || positiveId(raw.PR_PC);
   const returned=numberOrNull(raw.Returned)>0;
@@ -287,8 +282,7 @@ function normalizeChargeCandidate(raw) {
     NumeroMedicosRol:Number(raw.ProviderCount) || 0,MedicoCargoId:positiveId(raw.PR_TX),MedicoAtencionId:positiveId(raw.PR_PC),
     FechaReferenciaTipo:'FECHA_CARGO',FechaCargo:normalizeDate(raw.ChargeDate),FechaAtencionOriginal:normalizeDate(raw.AttentionDate),
     FechaProcedimiento:normalizeDate(raw.ProcedureDate),NumeroProcedimientos:Number(raw.ProcedureCount) || 0,
-    // Un cargo/documento de procedimiento aporta contexto; falta confirmar la
-    // prestación específica cuando no hay una marca directa de realización.
+
     EjecucionConfirmada:false,EvidenciaEjecucion:positiveId(raw.PCFRNum) && Number(raw.ProcedureCount)>0
       ?'PROCEDIMIENTO_REGISTRADO':'CARGO_REGISTRADO',AlcanceEvidencia:'REGISTRO_CLINICO',RequiereConfirmacionLinea:true,
     Cantidad:returned?null:row.CantidadOriginal,

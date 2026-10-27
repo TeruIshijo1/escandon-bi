@@ -10,7 +10,7 @@ export default function ControlledLedger() {
   const [error, setError] = useState(null);
   
   // Filtros
-  const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL', 'CON', 'ANTI', 'REFRI', 'AR'
+  const [activeFilter, setActiveFilter] = useState('ALL');  
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -40,7 +40,6 @@ export default function ControlledLedger() {
     }
   };
 
-  // 1. Filtrado base por término de búsqueda (Paciente, Médico, Medicamento, Código, Lote)
   const searchFilteredData = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
     if (!term) return data;
@@ -53,7 +52,6 @@ export default function ControlledLedger() {
     });
   }, [data, searchQuery]);
 
-  // 2. KPIs dinámicos calculados directamente con base en la información filtrada
   const kpis = useMemo(() => {
     const totalSalidas = searchFilteredData.length;
     const totalControlados = searchFilteredData.filter(d => d.EsControlado).length;
@@ -69,7 +67,7 @@ export default function ControlledLedger() {
     };
   }, [searchFilteredData]);
 
-  // 3. Filtrado final por categoría médica para la tabla
+  // Filtrado final por categoría médica para la tabla
   const filteredData = useMemo(() => {
     if (activeFilter === 'CON') return searchFilteredData.filter(d => d.EsControlado);
     if (activeFilter === 'ANTI') return searchFilteredData.filter(d => d.EsAntibiotico);
@@ -337,8 +335,7 @@ export default function ControlledLedger() {
           border-color: rgba(255, 255, 255, 0.15) !important;
         }
       `}</style>
-      
-      {/* Banner Superior */}
+
       <div style={{
         background: 'linear-gradient(135deg, #004687 0%, #0077B6 100%)',
         borderRadius: '16px',
@@ -403,10 +400,8 @@ export default function ControlledLedger() {
         </div>
       </div>
 
-      {/* Tarjetas KPI Interactivas (Filtros Principales con soporte Dark Mode) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        
-        {/* Card 1: Total Salidas */}
+
         <div 
           onClick={() => setActiveFilter('ALL')}
           className={`cl-card cl-card-all ${activeFilter === 'ALL' ? 'active' : ''}`}
@@ -425,7 +420,6 @@ export default function ControlledLedger() {
           </div>
         </div>
 
-        {/* Card 2: Controlados (CON) */}
         <div 
           onClick={() => setActiveFilter(activeFilter === 'CON' ? 'ALL' : 'CON')}
           className={`cl-card cl-card-con ${activeFilter === 'CON' ? 'active' : ''}`}
@@ -444,7 +438,6 @@ export default function ControlledLedger() {
           </div>
         </div>
 
-        {/* Card 3: Antibióticos (ANTI) */}
         <div 
           onClick={() => setActiveFilter(activeFilter === 'ANTI' ? 'ALL' : 'ANTI')}
           className={`cl-card cl-card-anti ${activeFilter === 'ANTI' ? 'active' : ''}`}
@@ -463,7 +456,6 @@ export default function ControlledLedger() {
           </div>
         </div>
 
-        {/* Card 4: Red Fría (REFRI) */}
         <div 
           onClick={() => setActiveFilter(activeFilter === 'REFRI' ? 'ALL' : 'REFRI')}
           className={`cl-card cl-card-refri ${activeFilter === 'REFRI' ? 'active' : ''}`}

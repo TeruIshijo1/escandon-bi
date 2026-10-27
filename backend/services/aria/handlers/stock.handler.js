@@ -22,9 +22,8 @@ async function queryStockInsumo(normalizedQuery) {
       };
     }
 
-    const keyword = searchTerms.join(' ').toUpperCase(); // Para SAP solemos usar mayúsculas
+    const keyword = searchTerms.join(' ').toUpperCase();  
 
-    // Construir la consulta a SAP Service Layer (ItemCode o ItemName)
     const filter = `contains(ItemCode, '${keyword}') or contains(ItemName, '${keyword}')`;
     const endpoint = `/Items?$select=ItemCode,ItemName,QuantityOnStock,ItemsGroupCode&$filter=${encodeURIComponent(filter)}&$top=5`;
     

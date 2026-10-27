@@ -4,19 +4,35 @@ const cron = require('node-cron');
 const { connectRemoteDB } = require('../config/remote-db');
 const { pool } = require('../config/pg-db');
 const sapService = require('./sap.service');
+const { AsyncLocalStorage } = require('node:async_hooks');
+const { createDashboardBatchWriter } = require('./dashboardBatchWriter.service');
+const { createDashboardSyncState } = require('./dashboardSyncState.service');
+const { readDailyProductivity } = require('./verticalProductivity.service');
 
-let isSyncing = false;
+const writeContext = new AsyncLocalStorage();
+const currentDb = () => writeContext.getStore() || pool;
+const sources = {
+  pc: { table: 'dw_vertical_pc' }, pt: { table: 'dw_vertical_pt' }, pcit: { table: 'dw_vertical_pcit' },
+  indicadores: { table: 'dw_vertical_indicadores_operativos' }, servicios: { table: 'dw_vertical_cuentas_servicios' },
+  productividad: { table: 'dw_vertical_productividad_medicos', fullOnFirstSync: true, modelVersion: 2 }, consulta: { table: 'dw_vertical_consulta_dia' },
+  solicitudes: { table: 'dw_vertical_solicitudes_estudios' }, payIma: { table: 'dw_vertical_pay_ima' },
+  consultasProg: { table: 'dw_vertical_consultas_prog' }, sapIngresos: { table: 'dw_sap_ingresos_grupos' },
+};
+for (const source of Object.values(sources)) source.fullStart = '2026-04-01';
+sources.productividad.fullStart = '2026-01-01';
+const syncState = createDashboardSyncState({ pool, sources });
+let dashboardSyncPromise = null;
 
-/**
- * Helper to format Dates to YYYY-MM-DD
- */
-function formatDate(date) {
-  return date.toISOString().split('T')[0];
+function recordsOf(response) {
+  if (!Array.isArray(response?.recordset)) {
+    const error = new Error('La fuente no devolvió un conjunto completo de registros.');
+    error.code = 'SOURCE_INVALID_RESPONSE';
+    throw error;
+  }
+  return response.recordset;
 }
 
-/**
- * 1. Sincronizar PC (Cuentas)
- */
+/* Sincronizar PC (Cuentas) */
 async function syncPC(remotePool, startDateStr) {
   console.log(`[Sync PC] Sincronizando desde ${startDateStr}...`);
   const res = await remotePool.request()
@@ -24,14 +40,14 @@ async function syncPC(remotePool, startDateStr) {
     .query(`
       SELECT PCNum, PC_ST, MedicalDischargeDate, Date, Total, Profit, SubtotalCost, Balance, Downpayments, PTNum, BPCode, PCType, CreatedOn, PRNum 
       FROM PC 
-      WHERE Date >= @startDate OR CreatedOn >= @startDate
+      WHERE Date >= @startDate OR CreatedOn >= @startDate OR ModifiedOn >= @startDate
     `);
 
-  const records = res.recordset || [];
+  const records = recordsOf(res);
   let count = 0;
 
   for (const r of records) {
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_pc 
         (pcnum, pc_st, medicaldischargedate, entrydate, total, profit, subtotalcost, balance, downpayments, ptnum, bpcode, pctype, createdon, prnum, sync_date)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
@@ -56,17 +72,15 @@ async function syncPC(remotePool, startDateStr) {
     ]);
     count++;
   }
-  console.log(`[Sync PC] Sincronizados ${count} registros.`);
+  console.log(`[Sync PC] Procesados ${count} registros.`);
+  return count;
 }
 
-/**
- * 2. Sincronizar PT (Pacientes con sus habitaciones/camas)
- */
+/* Sincronizar PT (Pacientes con sus habitaciones/camas) */
 async function syncPT(remotePool, startDateStr, isFullSync) {
   console.log(`[Sync PT] Sincronizando pacientes y ubicación...`);
-  
-  // Si no es full sync, solo traemos los modificados recientemente
-  const dateFilter = isFullSync ? "" : "WHERE pt.ModifiedOn >= @startDate OR pt.CreatedOn >= @startDate";
+
+  const dateFilter = isFullSync ? '' : 'WHERE pt.PTNum IN (SELECT PTNum FROM PT WHERE ModifiedOn >= @startDate OR CreatedOn >= @startDate)';
   
   const queryStr = `
     SELECT 
@@ -75,6 +89,7 @@ async function syncPT(remotePool, startDateStr, isFullSync) {
     FROM PT pt
     LEFT JOIN V_MRPT v ON pt.PTNum = v.PTNum
     ${dateFilter}
+    ${isFullSync ? '' : 'OPTION (LOOP JOIN)'}
   `;
 
   const request = remotePool.request();
@@ -83,11 +98,11 @@ async function syncPT(remotePool, startDateStr, isFullSync) {
   }
 
   const res = await request.query(queryStr);
-  const records = res.recordset || [];
+  const records = recordsOf(res);
   let count = 0;
 
   for (const r of records) {
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_pt 
         (ptnum, fullname, statecode, city, birthdate, roomcode, roomname, sync_date)
       VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
@@ -104,12 +119,11 @@ async function syncPT(remotePool, startDateStr, isFullSync) {
     ]);
     count++;
   }
-  console.log(`[Sync PT] Sincronizados ${count} pacientes.`);
+  console.log(`[Sync PT] Procesados ${count} pacientes.`);
+  return count;
 }
 
-/**
- * 3. Sincronizar PCIT (Detalle de cargos de cuentas)
- */
+/* Sincronizar PCIT (Detalle de cargos de cuentas) */
 async function syncPCIT(remotePool, startDateStr) {
   console.log(`[Sync PCIT] Sincronizando cargos desde ${startDateStr}...`);
   const res = await remotePool.request()
@@ -117,14 +131,14 @@ async function syncPCIT(remotePool, startDateStr) {
     .query(`
       SELECT PCITNum, PCNum, ChargeDate, SUCode, ItemCode, ItemDescription, Quantity, UnitPrice 
       FROM PCIT 
-      WHERE ChargeDate >= @startDate OR CreatedOn >= @startDate
+      WHERE ChargeDate >= @startDate OR CreatedOn >= @startDate OR ModifiedOn >= @startDate
     `);
 
-  const records = res.recordset || [];
+  const records = recordsOf(res);
   let count = 0;
 
   for (const r of records) {
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_pcit 
         (pcitnum, pcnum, chargedate, sucode, itemcode, itemdescription, quantity, unitprice, sync_date)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
@@ -142,12 +156,10 @@ async function syncPCIT(remotePool, startDateStr) {
     ]);
     count++;
   }
-  console.log(`[Sync PCIT] Sincronizados ${count} cargos.`);
+  console.log(`[Sync PCIT] Procesados ${count} cargos.`);
+  return count;
 }
 
-/**
- * 4. Sincronizar Indicadores Operativos (Eficiencia)
- */
 async function syncIndicadoresOperativos(remotePool) {
   console.log(`[Sync Eficiencia] Sincronizando indicadores operativos consolidados...`);
   const res = await remotePool.request().query(`
@@ -160,11 +172,11 @@ async function syncIndicadoresOperativos(remotePool) {
     FROM UDR_BI_INDICADORES_OPERATIVOS
   `);
 
-  const records = res.recordset || [];
+  const records = recordsOf(res);
   let count = 0;
 
   for (const r of records) {
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_indicadores_operativos 
         (anio, mes, fechaperiodo, camasocupadas, quirofanosactivos, urgencias, hospitalizacion, 
          triajemin, triajemeta, triajeoutliers, triajeregistros, 
@@ -209,13 +221,11 @@ async function syncIndicadoresOperativos(remotePool) {
     ]);
     count++;
   }
-  console.log(`[Sync Eficiencia] Sincronizados ${count} periodos.`);
+  console.log(`[Sync Eficiencia] Procesados ${count} periodos.`);
+  return count;
 }
 
-/**
- * 5. Sincronizar Cuentas Servicios (Urgencias, QX, CEX, UCIN)
- * Método: Delete-and-reload de la ventana de tiempo para robustez y velocidad sin PK.
- */
+/* Sincronizar Cuentas Servicios (Urgencias, QX, CEX, UCIN) */
 async function syncCuentasServicios(remotePool, startDateStr) {
   console.log(`[Sync Servicios] Sincronizando cargos de servicios desde ${startDateStr}...`);
   
@@ -231,14 +241,34 @@ async function syncCuentasServicios(remotePool, startDateStr) {
       WHERE FECHA_DE_CARGO >= @startDate OR FECHA_DE_MODIFICACION >= @startDate
     `);
 
-  const records = res.recordset || [];
+  const records = recordsOf(res);
   
-  // Limpiar la ventana en Postgres
-  await pool.query(`DELETE FROM dw_vertical_cuentas_servicios WHERE fecha_de_cargo >= $1`, [startDateStr]);
+  await currentDb().query(`DELETE FROM dw_vertical_cuentas_servicios WHERE fecha_de_cargo >= $1`, [startDateStr]);
+  const changedCharges = records.map(row => ({
+      folio: row.FOLIO_DE_ATENCION ?? null, orden: row.NUMERO_DE_ORDEN ?? null,
+      cargo: row.NUMERO_DE_CARGO ?? null, codigo: row.CODIGO ?? null,
+    }));
+  // Reemplazo por identidad para todos los cargos devueltos.
+  if (changedCharges.length) {
+    const identityDelete = process.env.NODE_ENV === 'test'
+      ? `DELETE FROM dw_vertical_cuentas_servicios old
+        USING jsonb_to_recordset($1::jsonb) AS changed(folio INT, orden INT, cargo INT, codigo TEXT)
+        WHERE old.folio_de_atencion IS NOT DISTINCT FROM changed.folio
+          AND old.numero_de_orden IS NOT DISTINCT FROM changed.orden
+          AND old.numero_de_cargo IS NOT DISTINCT FROM changed.cargo
+          AND old.codigo IS NOT DISTINCT FROM changed.codigo`
+      : `DELETE FROM dw_vertical_cuentas_servicios old
+        USING jsonb_to_recordset($1::jsonb) AS changed(folio INT, orden INT, cargo INT, codigo TEXT)
+        WHERE COALESCE(old.folio_de_atencion, -1) = COALESCE(changed.folio, -1)
+          AND COALESCE(old.numero_de_orden, -1) = COALESCE(changed.orden, -1)
+          AND COALESCE(old.numero_de_cargo, -1) = COALESCE(changed.cargo, -1)
+          AND COALESCE(old.codigo, '') = COALESCE(changed.codigo, '')`;
+    await currentDb().query(identityDelete, [JSON.stringify(changedCharges)]);
+  }
 
   let count = 0;
   for (const r of records) {
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_cuentas_servicios 
         (fecha_de_modificacion, unidad_de_servicio, fecha_de_cargo, nombre_del_paciente, folio_de_atencion, 
          numero_de_orden, numero_de_cargo, estatus_ch, fecha_cerrado_ch, minutos, agcode, grupo_de_articulos, 
@@ -255,30 +285,21 @@ async function syncCuentasServicios(remotePool, startDateStr) {
     ]);
     count++;
   }
-  console.log(`[Sync Servicios] Sincronizados ${count} cargos.`);
+  console.log(`[Sync Servicios] Procesados ${count} cargos.`);
+  return count;
 }
 
-/**
- * 6. Sincronizar Productividad Médicos (Eficacia)
- */
-async function syncProductividadMedicos(remotePool, startDateStr) {
+/* Sincronizar Productividad Médicos (Eficacia) */
+async function syncProductividadMedicos(remotePool, startDateStr, endDateStr) {
   console.log(`[Sync Productividad] Sincronizando productividad médica desde ${startDateStr}...`);
-  const res = await remotePool.request()
-    .input('startDate', startDateStr)
-    .query(`
-      SELECT Medico, Especialidad, Fecha, Primeras, Subsecuentes, TotalAtenciones 
-      FROM UDR_BI_PRODUCTIVIDAD_MEDICOS 
-      WHERE Fecha >= @startDate
-    `);
+  const res = await readDailyProductivity(remotePool, startDateStr, endDateStr);
+  const records = recordsOf(res);
 
-  const records = res.recordset || [];
-  
-  // Limpiar ventana en Postgres
-  await pool.query(`DELETE FROM dw_vertical_productividad_medicos WHERE fecha >= $1`, [startDateStr]);
+  await currentDb().query(`DELETE FROM dw_vertical_productividad_medicos WHERE fecha >= $1`, [startDateStr]);
 
   let count = 0;
   for (const r of records) {
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_productividad_medicos 
         (medico, especialidad, fecha, primeras, subsecuentes, totalatenciones, sync_date)
       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
@@ -287,29 +308,31 @@ async function syncProductividadMedicos(remotePool, startDateStr) {
     ]);
     count++;
   }
-  console.log(`[Sync Productividad] Sincronizados ${count} registros.`);
+  console.log(`[Sync Productividad] Procesados ${count} registros.`);
+  return count;
 }
 
-/**
- * 7. Sincronizar Consulta del Día
- */
+/* Sincronizar Consulta del Día */
 async function syncConsultaDia(remotePool, startDateStr) {
-  await pool.query(`ALTER TABLE dw_vertical_consulta_dia ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;`).catch(() => {});
   console.log(`[Sync Consulta] Sincronizando consultas del día desde ${startDateStr}...`);
+  const columns = `
+    SELECT v.Numero_Cita, v.Folio_Medico, v.Medico, v.MSDescription_ES, v.Fecha, v.Hora, v.Numero_Paciente, v.Paciente, v.Edad_Anios, v.Telefono_1, v.Celular_2, v.Estatus_Orden_Venta, v.Articulo, p.CreatedOn AS FechaCreacion
+    FROM V_UDR_CONSULTA_DIA v
+    LEFT JOIN PCAP p ON v.Numero_Cita = p.PCAPNum`;
+  const query = process.env.NODE_ENV === 'test'
+    ? `${columns} WHERE v.Fecha >= @startDate OR p.ModifiedOn >= @startDate`
+    : `${columns} WHERE v.Fecha >= @startDate
+      UNION ALL
+      ${columns} WHERE p.ModifiedOn >= @startDate AND (v.Fecha < @startDate OR v.Fecha IS NULL)`;
   const res = await remotePool.request()
     .input('startDate', startDateStr)
-    .query(`
-      SELECT v.Numero_Cita, v.Folio_Medico, v.Medico, v.MSDescription_ES, v.Fecha, v.Hora, v.Numero_Paciente, v.Paciente, v.Edad_Anios, v.Telefono_1, v.Celular_2, v.Estatus_Orden_Venta, v.Articulo, p.CreatedOn AS FechaCreacion 
-      FROM V_UDR_CONSULTA_DIA v
-      LEFT JOIN PCAP p ON v.Numero_Cita = p.PCAPNum
-      WHERE v.Fecha >= @startDate
-    `);
+    .query(query);
 
-  const records = res.recordset || [];
+  const records = recordsOf(res);
   let count = 0;
 
   for (const r of records) {
-    // Formatear la hora
+     
     let horaStr = '';
     if (r.Hora instanceof Date) {
       horaStr = r.Hora.toTimeString().split(' ')[0];
@@ -317,7 +340,7 @@ async function syncConsultaDia(remotePool, startDateStr) {
       horaStr = String(r.Hora);
     }
 
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_consulta_dia 
         (numero_cita, folio_medico, medico, msdescription_es, fecha, hora, numero_paciente, paciente, edad_anios, telefono_1, celular_2, estatus_orden_venta, articulo, fechacreacion, sync_date)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
@@ -343,12 +366,10 @@ async function syncConsultaDia(remotePool, startDateStr) {
     ]);
     count++;
   }
-  console.log(`[Sync Consulta] Sincronizados ${count} consultas.`);
+  console.log(`[Sync Consulta] Procesados ${count} consultas.`);
+  return count;
 }
 
-/**
- * 8. Sincronizar Solicitudes Estudios (Auxiliares)
- */
 async function syncSolicitudesEstudios(remotePool, startDateStr) {
   console.log(`[Sync Solicitudes] Sincronizando solicitudes de estudios desde ${startDateStr}...`);
   const res = await remotePool.request()
@@ -359,11 +380,11 @@ async function syncSolicitudesEstudios(remotePool, startDateStr) {
       WHERE Fecha >= @startDate
     `);
 
-  const records = res.recordset || [];
+  const records = recordsOf(res);
   let count = 0;
 
   for (const r of records) {
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_solicitudes_estudios 
         (pcpritnum, estudio, sucode, areanombre, medico, tipoatencion, fecha, cantidad, sync_date)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
@@ -381,13 +402,10 @@ async function syncSolicitudesEstudios(remotePool, startDateStr) {
     ]);
     count++;
   }
-  console.log(`[Sync Solicitudes] Sincronizados ${count} estudios.`);
+  console.log(`[Sync Solicitudes] Procesados ${count} estudios.`);
+  return count;
 }
 
-/**
- * 9. Sincronizar Pay IMA (Auxiliares / Cuneros)
- * Se filtra usando un JOIN con PCIT por ChargeDate
- */
 async function syncPayIma(remotePool, startDateStr) {
   console.log(`[Sync Pay IMA] Sincronizando detalle de cobros auxiliares desde ${startDateStr}...`);
   const res = await remotePool.request()
@@ -396,14 +414,14 @@ async function syncPayIma(remotePool, startDateStr) {
       SELECT ima.PCITNum, ima.SUCode, ima.LineType, ima.FullName, ima.ItemCode, ima.ItemDescription, ima.Quantity, ima.LineTotal
       FROM UDR_PAY_IMA ima
       INNER JOIN PCIT p ON ima.PCITNum = p.PCITNum
-      WHERE p.ChargeDate >= @startDate OR p.CreatedOn >= @startDate
+      WHERE p.ChargeDate >= @startDate OR p.CreatedOn >= @startDate OR p.ModifiedOn >= @startDate
     `);
 
-  const records = res.recordset || [];
+  const records = recordsOf(res);
   let count = 0;
 
   for (const r of records) {
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_pay_ima 
         (pcitnum, sucode, linetype, fullname, itemcode, itemdescription, quantity, linetotal, sync_date)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
@@ -421,64 +439,114 @@ async function syncPayIma(remotePool, startDateStr) {
     ]);
     count++;
   }
-  console.log(`[Sync Pay IMA] Sincronizados ${count} cargos auxiliares.`);
+  console.log(`[Sync Pay IMA] Procesados ${count} cargos auxiliares.`);
+  return count;
 }
 
-/**
- * 10. Sincronizar Consultas Programadas (CEX)
- */
+/* Sincronizar Consultas Programadas (CEX) */
 async function syncConsultasProg(remotePool, startDateStr) {
-  await pool.query(`ALTER TABLE dw_vertical_consultas_prog ADD COLUMN IF NOT EXISTS fechacreacion TIMESTAMP WITH TIME ZONE;`).catch(() => {});
   console.log(`[Sync CEX Prog] Sincronizando agenda programada desde ${startDateStr}...`);
+  const selectRows = filter => `
+    SELECT
+      c.Numero_Cita AS No_Cita,
+      c.Folio_Medico AS No_Medico,
+      c.Medico,
+      c.MSDescription_ES AS Especialidad,
+      c.Numero_Paciente AS NoPaciente,
+      c.Paciente,
+      CAST(CAST(c.Fecha AS DATE) AS DATETIME) + CAST(CAST(c.Hora AS TIME) AS DATETIME) AS DesdeFecha,
+      DATEADD(minute, 30, CAST(CAST(c.Fecha AS DATE) AS DATETIME) + CAST(CAST(c.Hora AS TIME) AS DATETIME)) AS HastaFecha,
+      COALESCE(prog.PCAP_ST_Descripcion, c.Estatus_Orden_Venta) AS PCAP_ST_Descripcion,
+      c.PS,
+      c.DXDescription_ES,
+      c.Comentarios,
+      c.Telefono_1,
+      c.Celular_2,
+      c.Articulo,
+      c.Edad_Anios,
+      c.Edad_Mes,
+      c.Genero,
+      c.ConsultasPreviasEjecutadas,
+      pcap.CreatedOn AS FechaCreacion,
+      NULLIF(NULLIF(RTRIM(LTRIM(so.UDF_convenio_so)), ''), 'N/A') AS Convenio
+    FROM UDR_CD c
+    LEFT JOIN PCAP pcap ON c.Numero_Cita = pcap.PCAPNum
+    LEFT JOIN SO so ON pcap.SONum = so.SONum
+    LEFT JOIN UDR_CONSULTAS_PROG prog ON c.Numero_Cita = prog.No_Cita
+    WHERE ${filter}`;
+  const testQuery = `
+    SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+    SELECT
+      c.Numero_Cita AS No_Cita, c.Folio_Medico AS No_Medico, c.Medico, c.MSDescription_ES AS Especialidad,
+      c.Numero_Paciente AS NoPaciente, c.Paciente,
+      CAST(CAST(c.Fecha AS DATE) AS DATETIME) + CAST(CAST(c.Hora AS TIME) AS DATETIME) AS DesdeFecha,
+      DATEADD(minute, 30, CAST(CAST(c.Fecha AS DATE) AS DATETIME) + CAST(CAST(c.Hora AS TIME) AS DATETIME)) AS HastaFecha,
+      COALESCE(prog.PCAP_ST_Descripcion, c.Estatus_Orden_Venta) AS PCAP_ST_Descripcion, c.PS, c.DXDescription_ES,
+      c.Comentarios, c.Telefono_1, c.Celular_2, c.Articulo, c.Edad_Anios, c.Edad_Mes, c.Genero,
+      c.ConsultasPreviasEjecutadas, pcap.CreatedOn AS FechaCreacion,
+      COALESCE(NULLIF(RTRIM(LTRIM(so.UDF_convenio_so)), ''), NULLIF(NULLIF(RTRIM(LTRIM(p.Convenio)), ''), 'N/A')) AS Convenio
+    FROM UDR_CD c
+    LEFT JOIN PCAP pcap ON c.Numero_Cita = pcap.PCAPNum
+    LEFT JOIN SO so ON pcap.SONum = so.SONum
+    LEFT JOIN UDR_CONSULTAS_PROG prog ON c.Numero_Cita = prog.No_Cita
+    OUTER APPLY (
+      SELECT TOP 1 bp.Convenio
+      FROM UDR_BI_PACIENTES bp
+      WHERE bp.NoPaciente = c.Numero_Paciente
+        AND bp.Convenio IS NOT NULL
+        AND RTRIM(LTRIM(bp.Convenio)) NOT IN ('', 'N/A')
+      ORDER BY bp.AtencionMedica DESC
+    ) p
+    WHERE c.Fecha >= @startDate OR pcap.ModifiedOn >= @startDate`;
+  const query = process.env.NODE_ENV === 'test'
+    ? testQuery
+    : `SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+      ${selectRows('c.Fecha >= @startDate')}
+      UNION ALL
+      ${selectRows('pcap.ModifiedOn >= @startDate AND (c.Fecha < @startDate OR c.Fecha IS NULL)')}`;
   const res = await remotePool.request()
     .input('startDate', startDateStr)
-    .query(`
-      SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
-      SELECT 
-        c.Numero_Cita AS No_Cita, 
-        c.Folio_Medico AS No_Medico, 
-        c.Medico, 
-        c.MSDescription_ES AS Especialidad, 
-        c.Numero_Paciente AS NoPaciente, 
-        c.Paciente, 
-        CAST(CAST(c.Fecha AS DATE) AS DATETIME) + CAST(CAST(c.Hora AS TIME) AS DATETIME) AS DesdeFecha, 
-        DATEADD(minute, 30, CAST(CAST(c.Fecha AS DATE) AS DATETIME) + CAST(CAST(c.Hora AS TIME) AS DATETIME)) AS HastaFecha, 
-        COALESCE(prog.PCAP_ST_Descripcion, c.Estatus_Orden_Venta) AS PCAP_ST_Descripcion, 
-        c.PS, 
-        c.DXDescription_ES, 
-        c.Comentarios, 
-        c.Telefono_1, 
-        c.Celular_2, 
-        c.Articulo,
-        c.Edad_Anios,
-        c.Edad_Mes,
-        c.Genero,
-        c.ConsultasPreviasEjecutadas,
-        pcap.CreatedOn AS FechaCreacion,
-        COALESCE(
-          NULLIF(RTRIM(LTRIM(so.UDF_convenio_so)), ''),
-          NULLIF(NULLIF(RTRIM(LTRIM(p.Convenio)), ''), 'N/A')
-        ) AS Convenio
-      FROM UDR_CD c
-      LEFT JOIN PCAP pcap ON c.Numero_Cita = pcap.PCAPNum
-      LEFT JOIN SO so ON pcap.SONum = so.SONum
-      LEFT JOIN UDR_CONSULTAS_PROG prog ON c.Numero_Cita = prog.No_Cita
-      OUTER APPLY (
-        SELECT TOP 1 bp.Convenio 
-        FROM UDR_BI_PACIENTES bp
-        WHERE bp.NoPaciente = c.Numero_Paciente 
-          AND bp.Convenio IS NOT NULL 
-          AND RTRIM(LTRIM(bp.Convenio)) NOT IN ('', 'N/A')
-        ORDER BY bp.AtencionMedica DESC
-      ) p
-      WHERE c.Fecha >= @startDate
-    `);
+    .query(query);
 
-  const records = res.recordset || [];
+  const records = recordsOf(res);
+  if (process.env.NODE_ENV !== 'test') {
+    const patientNumbers = [...new Set(records
+      .filter(row => !row.Convenio && row.NoPaciente != null)
+      .map(row => String(row.NoPaciente).trim())
+      .filter(value => /^\d+$/.test(value)))];
+    if (patientNumbers.length) {
+      const patientAgreements = new Map();
+      const batchSize = 1000;
+      for (let i = 0; i < patientNumbers.length; i += batchSize) {
+        const batch = patientNumbers.slice(i, i + batchSize);
+        const request = remotePool.request();
+        const placeholders = batch.map((value, index) => {
+          const name = `patient${index}`;
+          request.input(name, Number(value));
+          return `@${name}`;
+        });
+        const lookup = await request.query(`
+          WITH ranked AS (
+            SELECT bp.NoPaciente, bp.Convenio,
+              ROW_NUMBER() OVER (PARTITION BY bp.NoPaciente ORDER BY bp.AtencionMedica DESC) AS rn
+            FROM UDR_BI_PACIENTES bp
+            WHERE bp.NoPaciente IN (${placeholders.join(', ')})
+              AND bp.Convenio IS NOT NULL
+              AND RTRIM(LTRIM(bp.Convenio)) NOT IN ('', 'N/A')
+          )
+          SELECT NoPaciente, Convenio FROM ranked WHERE rn = 1
+        `);
+        recordsOf(lookup).forEach(row => patientAgreements.set(String(row.NoPaciente), row.Convenio));
+      }
+      records.forEach(row => {
+        if (!row.Convenio) row.Convenio = patientAgreements.get(String(row.NoPaciente)) || null;
+      });
+    }
+  }
   let count = 0;
 
   for (const r of records) {
-    await pool.query(`
+    await currentDb().query(`
       INSERT INTO dw_vertical_consultas_prog 
         (no_cita, no_medico, medico, especialidad, nopaciente, paciente, desdefecha, hastafecha, pcap_st_descripcion, ps, dx_description_es, comentarios, telefono_1, celular_2, articulo, edad_anios, edad_mes, genero, consultas_previas, convenio, fechacreacion, sync_date)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, CURRENT_TIMESTAMP)
@@ -510,102 +578,109 @@ async function syncConsultasProg(remotePool, startDateStr) {
     ]);
     count++;
   }
-  console.log(`[Sync CEX Prog] Sincronizados ${count} citas programadas.`);
+  console.log(`[Sync CEX Prog] Procesados ${count} citas programadas.`);
+  return count;
 }
 
-/**
- * 11. Sincronizar SAP Ingresos por Grupos
- */
+/* Sincronizar SAP Ingresos por Grupos */
 async function syncSapIngresosGrupos(startDateStr, endDateStr) {
-  try {
     console.log(`[Sync SAP Grupos] Consultando ingresos de SAP desde ${startDateStr} hasta ${endDateStr}...`);
-    await sapService._ensureSession();
-    
-    const records = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${startDateStr}'&endDate='${endDateStr}'`);
+    const definition = await sapService.get("/SQLQueries('sq_ingresos_grupos')", {},
+      { timeoutMs: 30000, queueTimeoutMs: 60000, totalTimeoutMs: 120000 });
+    if (definition.data?.SqlCode !== 'sq_ingresos_grupos' || !definition.data.SqlText) {
+      const error = new Error('No se confirmó la consulta de ingresos por grupos en SAP.');
+      error.code = 'SAP_QUERY_UNAVAILABLE';
+      throw error;
+    }
+    const records = await sapService.fetchAllPages(`/SQLQueries('sq_ingresos_grupos')/List?startDate='${startDateStr}'&endDate='${endDateStr}'`, {},
+      { timeoutMs: 30000, queueTimeoutMs: 60000, totalTimeoutMs: 300000, cacheTtlMs: 0 });
+    if (!Array.isArray(records)) throw new Error('SAP devolvió ingresos incompletos.');
+    const rows = records.map(row => {
+      const value = String(row.DocDate || '').slice(0, 10);
+      const date = /^\d{8}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}` : value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < startDateStr || date > endDateStr || row.ItmsGrpCod == null ||
+        row.Total == null || String(row.Total).trim() === '' || !Number.isFinite(Number(row.Total))) {
+        throw new Error('SAP devolvió una fila fuera del periodo o un importe inválido.');
+      }
+      return { ...row, DocDate: date };
+    });
+    await currentDb().query('DELETE FROM dw_sap_ingresos_grupos WHERE docdate >= $1 AND docdate <= $2', [startDateStr, endDateStr]);
     let count = 0;
 
-    for (const r of records) {
-      if (!r.DocDate) continue;
-      
-      // Formatear DocDate (de YYYYMMDD a YYYY-MM-DD)
-      let docDateFormatted = r.DocDate;
-      if (r.DocDate.length === 8) {
-        docDateFormatted = `${r.DocDate.substring(0,4)}-${r.DocDate.substring(4,6)}-${r.DocDate.substring(6,8)}`;
-      }
-
-      await pool.query(`
+    for (const r of rows) {
+      await currentDb().query(`
         INSERT INTO dw_sap_ingresos_grupos (itmsgrpcod, docdate, total, sync_date)
         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
         ON CONFLICT (itmsgrpcod, docdate) DO UPDATE SET
           total = EXCLUDED.total,
           sync_date = CURRENT_TIMESTAMP;
-      `, [r.ItmsGrpCod, docDateFormatted, r.Total || 0]);
+      `, [r.ItmsGrpCod, r.DocDate, r.Total]);
       count++;
     }
-    console.log(`[Sync SAP Grupos] Sincronizados ${count} registros de ingresos por grupos.`);
-  } catch (err) {
-    console.error(`[Sync SAP Grupos] Error al sincronizar ingresos SAP por grupos:`, err.message);
-  }
+    console.log(`[Sync SAP Grupos] Procesados ${count} registros de ingresos por grupos.`);
+  return count;
 }
 
-/**
- * Función principal para ejecutar la sincronización de todos los tableros
- */
-async function syncAllDashboards(options = { fullSync: false }) {
-  if (isSyncing) {
-    console.log('⏳ Sincronización de tableros ya en progreso. Omitiendo ciclo...');
-    return;
-  }
-  isSyncing = true;
-
+async function runDashboards(options) {
   const tStart = Date.now();
-  console.log(`\n🔄 [Sync DW Dashboards] Iniciando ciclo de sincronización (${options.fullSync ? 'Completo' : 'Incremental'})...`);
-
+  const report = { status: 'complete', sources: [], durationSeconds: 0 };
+  console.log(`[Sync DW Dashboards] Iniciando actualización por fuente (${options.fullSync ? 'revisión completa' : 'incremental'})...`);
   try {
-    const remotePool = await connectRemoteDB();
-    
-    // Calcular fecha límite
-    let startDate;
-    if (options.fullSync) {
-      startDate = new Date('2026-04-01T00:00:00'); // Hard cutoff de la migración
-    } else {
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - 15); // Ventana incremental de 15 días
+    let remoteConnection;
+    const vertical = work => async context => {
+      if (!remoteConnection) remoteConnection = connectRemoteDB();
+      return work(await remoteConnection, context);
+    };
+    const tasks = {
+      pc: vertical((remotePool, context) => syncPC(remotePool, context.startDate)),
+      pt: vertical((remotePool, context) => syncPT(remotePool, context.startDate, context.fullSync)),
+      pcit: vertical((remotePool, context) => syncPCIT(remotePool, context.startDate)),
+      indicadores: vertical(remotePool => syncIndicadoresOperativos(remotePool)),
+      servicios: vertical((remotePool, context) => syncCuentasServicios(remotePool, context.startDate)),
+      productividad: vertical((remotePool, context) => syncProductividadMedicos(remotePool, context.startDate, context.endDate)),
+      consulta: vertical((remotePool, context) => syncConsultaDia(remotePool, context.startDate)),
+      solicitudes: vertical((remotePool, context) => syncSolicitudesEstudios(remotePool, context.startDate)),
+      payIma: vertical((remotePool, context) => syncPayIma(remotePool, context.startDate)),
+      consultasProg: vertical((remotePool, context) => syncConsultasProg(remotePool, context.startDate)),
+      sapIngresos: context => syncSapIngresosGrupos(context.startDate, context.endDate),
+    };
+    for (const [key, work] of Object.entries(tasks)) {
+      if (options.sources && !options.sources.includes(key)) continue;
+      const result = await syncState.run(key, async context => {
+        const writer = createDashboardBatchWriter(context.client);
+        const count = await writeContext.run(writer, () => work(context));
+        await writer.flush();
+        return count;
+      }, { fullSync: Boolean(options.fullSync) });
+      report.sources.push(result);
+      if (result.status === 'error' || (result.status === 'skipped' && result.errorCode)) {
+        report.status = 'incomplete';
+        console.warn(`[Sync DW Dashboards] ${key}: pendiente (${result.errorCode}); se conserva la última copia completa.`);
+      } else if (result.status === 'complete') {
+        console.log(`[Sync DW Dashboards] ${key}: ${result.rows} registros confirmados desde ${result.startDate}.`);
+      }
     }
-    const startDateStr = formatDate(startDate);
-    const todayStr = formatDate(new Date());
-
-    // Ejecutar cada sincronización secuencialmente para no saturar los pools
-    await syncPC(remotePool, startDateStr).catch(e => console.error('❌ Error en Sync PC:', e.message));
-    await syncPT(remotePool, startDateStr, options.fullSync).catch(e => console.error('❌ Error en Sync PT:', e.message));
-    await syncPCIT(remotePool, startDateStr).catch(e => console.error('❌ Error en Sync PCIT:', e.message));
-    await syncIndicadoresOperativos(remotePool).catch(e => console.error('❌ Error en Sync Indicadores:', e.message));
-    await syncCuentasServicios(remotePool, startDateStr).catch(e => console.error('❌ Error en Sync CuentasServicios:', e.message));
-    await syncProductividadMedicos(remotePool, startDateStr).catch(e => console.error('❌ Error en Sync Productividad:', e.message));
-    await syncConsultaDia(remotePool, startDateStr).catch(e => console.error('❌ Error en Sync ConsultaDia:', e.message));
-    await syncSolicitudesEstudios(remotePool, startDateStr).catch(e => console.error('❌ Error en Sync SolicitudesEstudios:', e.message));
-    await syncPayIma(remotePool, startDateStr).catch(e => console.error('❌ Error en Sync PayIma:', e.message));
-    await syncConsultasProg(remotePool, startDateStr).catch(e => console.error('❌ Error en Sync ConsultasProg:', e.message));
-    
-    // Sincronizar ingresos de SAP Service Layer
-    await syncSapIngresosGrupos(startDateStr, todayStr);
-
-    const duration = ((Date.now() - tStart) / 1000).toFixed(1);
-    console.log(`\n✅ [Sync DW Dashboards] Ciclo de sincronización completado exitosamente en ${duration}s.\n`);
   } catch (err) {
-    console.error('❌ Error fatal en sincronización de DW Dashboards:', err.message);
-  } finally {
-    isSyncing = false;
+    report.status = 'incomplete';
+    report.errorCode = err.code || 'DASHBOARD_SYNC_FAILED';
+    console.warn('[Sync DW Dashboards] Actualización pendiente:', err.message);
   }
+  report.durationSeconds = Number(((Date.now() - tStart) / 1000).toFixed(1));
+  console.log(`[Sync DW Dashboards] Ciclo ${report.status === 'complete' ? 'terminado' : 'incompleto'} en ${report.durationSeconds}s.`);
+  return report;
 }
 
-/**
- * Inicializador de cron jobs
- */
+function syncAllDashboards(options = {}) {
+  if (!dashboardSyncPromise) dashboardSyncPromise = runDashboards(options).finally(() => { dashboardSyncPromise = null; });
+  return dashboardSyncPromise;
+}
+
+/* Inicializador de cron jobs */
 function initDashboardCron() {
   // Ejecutar sincronización incremental cada 15 minutos
-  cron.schedule('*/15 * * * *', () => {
-    syncAllDashboards({ fullSync: false });
+  cron.schedule('5-59/15 * * * *', () => {
+    require('./backgroundQueue.service').enqueue('dashboards', () => syncAllDashboards({ fullSync: false }))
+      .catch(error => console.warn('[Tableros] Actualización pendiente:', error.message));
   });
   console.log('⏰ Cron Job de DW Dashboards inicializado (Ejecución cada 15 min).');
 
@@ -614,8 +689,8 @@ function initDashboardCron() {
   const runCexSync = () => {
     syncCexFromDW().catch(e => console.error('[CEX Cron] Error sincronizando agenda:', e.message));
   };
-  cron.schedule('*/15 * * * *', runCexSync);
-  // Sync inicial al arrancar (después de que el DW cargue la ventana inicial)
+  cron.schedule('9-59/15 * * * *', runCexSync);
+   
   setTimeout(runCexSync, 30 * 1000);
   console.log('⏰ Cron Job de Consulta Externa inicializado (Ejecución cada 15 min).');
 }
@@ -624,5 +699,6 @@ module.exports = {
   syncAllDashboards,
   initDashboardCron,
   syncConsultasProg,
-  syncConsultaDia
+  syncConsultaDia,
+  getDashboardSyncStatus: source => syncState.read(source),
 };

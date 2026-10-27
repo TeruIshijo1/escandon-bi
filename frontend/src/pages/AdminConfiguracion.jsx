@@ -1,9 +1,5 @@
 import { userMessage } from '../utils/userMessages';
-/**
- * AdminConfiguracion.jsx — Configuración del sistema
- * Hospital Escandón BI Platform v4.0
- * Rediseño premium con identidad de marca y consistencia visual
- */
+
 import { useState, useEffect } from 'react';
 
 const API_BASE = '/api';
@@ -148,10 +144,9 @@ export default function AdminConfiguracion() {
     roles: [], area: '', multiPagina: false, active: true 
   });
 
-  // KPI CONFIG STATE
   const [kpiList,         setKPIList]        = useState([]);
   const [kpiFilter,       setKPIFilter]      = useState('all');
-  const [kpiEditing,      setKPIEditing]     = useState(null); // elementoId en edición
+  const [kpiEditing,      setKPIEditing]     = useState(null);  
   const [kpiEditForm,     setKPIEditForm]    = useState({ nombreCustom: '', icono: '', pbiUrl: '', jsonApiUrl: '', jsonFilePath: '', multiPagina: false });
   const [kpiSaving,       setKPISaving]      = useState(false);
 
@@ -279,7 +274,7 @@ export default function AdminConfiguracion() {
         }
       `}</style>
 
-      {/* Header */}
+      {/* Encabezado */}
       <div style={{
         background: 'linear-gradient(135deg, var(--color-azul-fuerte) 0%, #083b66 100%)',
         borderRadius: 20, padding: '1.75rem 2.25rem', marginBottom: '2rem',
@@ -303,7 +298,7 @@ export default function AdminConfiguracion() {
         </div>
       </div>
 
-      {/* ── SECCIÓN KPI CONFIG ── */}
+      {/* SECCIÓN KPI CONFIG */}
       <div style={{ background: '#FFFFFF', borderRadius: 16, padding: '1.75rem 1.5rem', marginBottom: '2rem', border: '1px solid rgba(0,70,135,0.05)', boxShadow: 'var(--shadow-xs)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.65rem', borderBottom: '1px solid rgba(0,70,135,0.06)' }}>
           <div>
@@ -384,10 +379,8 @@ export default function AdminConfiguracion() {
                       )}
                     </td>
 
-                    {/* Nombre original */}
                     <td style={{ padding: '0.75rem 0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', fontFamily: 'var(--font-body)' }}>{nombreDefault}</td>
 
-                    {/* Nombre personalizado */}
                     <td style={{ padding: '0.75rem 0.75rem' }}>
                       {isEditing ? (
                         <input
@@ -405,7 +398,6 @@ export default function AdminConfiguracion() {
                       )}
                     </td>
 
-                    {/* URL PBI / JSON */}
                     <td style={{ padding: '0.75rem 0.75rem', maxWidth: 300 }}>
                       {isEditing ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -500,7 +492,7 @@ export default function AdminConfiguracion() {
         </button>
       </div>
 
-      {/* Toast Notification */}
+      {/* Avisos */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: '2rem', right: '2rem',

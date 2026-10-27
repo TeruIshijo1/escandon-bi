@@ -3,21 +3,18 @@ import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
 
 export default function AlmacenQuirofano() {
-  const [subTab, setSubTab] = useState('inventory'); // 'inventory', 'salidas', 'devoluciones'
-  
-  // Stock State
+  const [subTab, setSubTab] = useState('inventory');  
+
   const [stockItems, setStockItems] = useState([]);
   const [stockStats, setStockStats] = useState({ totalItems: 0, totalStock: 0, totalValue: 0, qxcrCount: 0 });
   const [loadingStock, setLoadingStock] = useState(true);
-  
-  // Movements State
+
   const [movements, setMovements] = useState([]);
   const [movementStats, setMovementStats] = useState({ totalMovimientos: 0, totalSalidas: 0, totalDevoluciones: 0, piezasSalidas: 0, piezasDevueltas: 0 });
   const [loadingMovements, setLoadingMovements] = useState(false);
 
-  // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [warehouseFilter, setWarehouseFilter] = useState('ALL'); // 'ALL', 'QX', 'QXCR'
+  const [warehouseFilter, setWarehouseFilter] = useState('ALL');  
   const [daysFilter, setDaysFilter] = useState(30);
 
   useEffect(() => {
@@ -63,7 +60,6 @@ export default function AlmacenQuirofano() {
     }
   };
 
-  // Filtered Stock List
   const filteredStock = useMemo(() => {
     const q = (searchQuery || '').toLowerCase().trim();
     return stockItems.filter(item => {
@@ -85,7 +81,6 @@ export default function AlmacenQuirofano() {
     });
   }, [stockItems, searchQuery, warehouseFilter]);
 
-  // Filtered Movements List
   const filteredMovements = useMemo(() => {
     const q = (searchQuery || '').toLowerCase().trim();
     return movements.filter(m => {
@@ -274,8 +269,7 @@ export default function AlmacenQuirofano() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
-      {/* Banner de bienvenida e indicador del Almacén Quirófano */}
+
       <div style={{
         background: 'linear-gradient(135deg, #004687 0%, #0077B6 100%)',
         borderRadius: '16px',
@@ -296,7 +290,6 @@ export default function AlmacenQuirofano() {
           </p>
         </div>
 
-        {/* Action buttons */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
             onClick={exportToExcel}
@@ -589,7 +582,6 @@ export default function AlmacenQuirofano() {
         )}
       </div>
 
-      {/* VISTA 1: STOCK ACTUAL */}
       {subTab === 'inventory' && (
         <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)' }}>
           {loadingStock ? (

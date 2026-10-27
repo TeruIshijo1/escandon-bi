@@ -25,7 +25,7 @@ export default function TrasladosAlmacen() {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    // dateStr normally comes as YYYY-MM-DDTHH:MM:SSZ
+     
     const [year, month, day] = dateStr.split('T')[0].split('-');
     return new Date(year, month - 1, day).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' });
   };
@@ -104,8 +104,7 @@ export default function TrasladosAlmacen() {
 
   return (
     <div className="traslados-container" style={{ padding: '2rem' }}>
-      
-      {/* ─── VISTA PRINCIPAL (Oculta al imprimir) ─── */}
+
       <div className="no-print">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <div>
@@ -218,7 +217,7 @@ export default function TrasladosAlmacen() {
         </div>
       </div>
 
-      {/* ─── MODAL DE DETALLE / VISTA DE IMPRESIÓN ─── */}
+      {/* MODAL DE DETALLE / VISTA DE IMPRESIÓN */}
       {selectedTraslado && (
         <div className="receipt-modal-overlay">
           <div className="receipt-modal-content print-only-area">

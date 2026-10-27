@@ -1,5 +1,7 @@
 'use strict';
 
+const { isHonorariosScopeExcluded } = require('../utils/honorariosScope');
+
 const { getDb } = require('../config/db');
 const { canReview, ensureTables, readReviews } = require('./honorariosReview.service');
 const { getPeriodCandidates, validatePeriod } = require('./honorariosWorkflow.service');
@@ -43,9 +45,7 @@ async function closeLiquidation(pool, input, user) {
   try {
     return await prepareLiquidation(pool, input, user, outcome);
   } catch (error) {
-    // Antes de COMMIT no puede existir un pago preparado por esta solicitud.
-    // Si se perdió la confirmación de COMMIT o su lectura posterior, se consulta
-    // el resultado existente antes de volver a enviar una creación.
+
     if (!outcome.mayHaveCommitted) error.preparationStatus = 'NOT_CREATED';
     throw error;
   }
@@ -105,11 +105,11 @@ async function prepareLiquidation(pool, input, user, outcome) {
     const clinicalLines = lines.filter(line => line.sourceType !== 'BI_FIJO_MENSUAL');
     for (const code of [...new Set(clinicalLines.map(line => line.itemCode))].sort()) {
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`honorarios-catalog:${code}`]);
-      const config = await client.query('SELECT revision,status,source_active,scope_excluded FROM bi_honorarios_catalog WHERE item_code=$1 FOR UPDATE', [code]);
+      const config = await client.query('SELECT revision,status,source_active,scope_excluded,item_code,name,description,group_name,reference_prices,source_metadata FROM bi_honorarios_catalog WHERE item_code=$1 FOR UPDATE', [code]);
       for (const line of clinicalLines.filter(item => item.itemCode === code)) {
         const tariff = await client.query('SELECT revision,active FROM bi_honorarios_tariffs WHERE id=$1 FOR UPDATE', [line.tariff.id]);
         if (config.rows[0]?.revision !== line.catalog.revision || config.rows[0]?.status !== 'INCLUIDO'
-          || config.rows[0]?.source_active === false || config.rows[0]?.scope_excluded
+          || config.rows[0]?.source_active === false || isHonorariosScopeExcluded(config.rows[0])
           || tariff.rows[0]?.revision !== line.tariff.revision || !tariff.rows[0]?.active) {
           throw fail('Cambió la configuración o tarifa durante el cierre. Actualiza el reporte.', 409);
         }
@@ -188,7 +188,6 @@ async function recordApplication(id, input, user, adjustment = false) {
   finally { client.release(); }
 }
 
-// Un comprobante por médico, distribuido en centavos sobre sus saldos abiertos.
 async function recordProviderPayment(id, input, user) {
   if (!canReview(user)) throw fail('No tienes permiso para registrar pagos.', 403);
   const amount = Number(input?.amount);
@@ -229,8 +228,8 @@ async function recordProviderPayment(id, input, user) {
 }
 
 async function checkLiquidationChanges(pool, saved) {
-  // Compara sólo la prestación clínica; tarifas y perfiles fiscales actuales
-  // nunca reemplazan los importes conservados al cerrar.
+   
+  // nunca reemplazan los importes conservados al cerrar
   const clinicalLines = (saved.lines || saved.snapshot.lines).filter(line => line.sourceType !== 'BI_FIJO_MENSUAL');
   if (!clinicalLines.length) return [];
   const result = await getHonorariosCandidates(pool, dateOnly(saved.start_date), dateOnly(saved.end_date));

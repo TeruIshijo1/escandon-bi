@@ -1,9 +1,5 @@
 import { userMessage } from '../utils/userMessages';
-/**
- * AdminAuditoriaLog.jsx — Log de acciones del sistema
- * Hospital Escandón BI Platform v4.0
- * Rediseño premium con identidad de marca
- */
+
 import { useState, useEffect } from 'react';
 import { API_BASE } from '../api/config';
 
@@ -59,8 +55,7 @@ export default function AdminAuditoriaLog() {
     };
 
     fetchLogs();
-    
-    // Polling cada 30 segundos solo si no hay filtro de fechas (vista en vivo)
+
     let interval;
     if (!startDate && !endDate) {
       interval = setInterval(fetchLogs, 30000);
@@ -94,7 +89,7 @@ export default function AdminAuditoriaLog() {
         }
       `}</style>
 
-      {/* Header */}
+      {/* Encabezado */}
       <div style={{
         background: 'linear-gradient(135deg, var(--color-azul-fuerte) 0%, #083b66 100%)',
         borderRadius: 20, padding: '1.75rem 2.25rem', marginBottom: '2rem',
@@ -102,7 +97,7 @@ export default function AdminAuditoriaLog() {
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* ECG Pattern */}
+        {/* Fondo del encabezado */}
         <div style={{
           position: 'absolute',
           inset: 0,
@@ -230,7 +225,6 @@ export default function AdminAuditoriaLog() {
         </div>
       )}
 
-      {/* Table container */}
       <div style={{
         background:'#FFFFFF',
         borderRadius: '16px',

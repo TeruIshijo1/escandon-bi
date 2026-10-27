@@ -1,7 +1,5 @@
-/**
- * remote-db.js — Conexión a SQL Server Remoto (KH_HE)
- * Utiliza mssql para crear un pool de conexiones optimizado.
- */
+
+
 'use strict';
 
 const sql = require('mssql');
@@ -12,17 +10,17 @@ const dbConfig = {
   server: process.env.REMOTE_DB_SERVER,
   database: process.env.REMOTE_DB_NAME,
   port: parseInt(process.env.REMOTE_DB_PORT) || 1433,
-  connectionTimeout: 30000, // 30 seconds
-  requestTimeout: 90000,    // 90 seconds
+  connectionTimeout: 30000,  
+  requestTimeout: 90000,     
   pool: {
     max: 10,
     min: 0,
     idleTimeoutMillis: 30000
   },
   options: {
-    encrypt: false, // Desactivado para EC2 sin certificado SSL oficial configurado
-    trustServerCertificate: true, // Confiar en el certificado autofirmado si existiera
-    useUTC: false // Tratar las fechas de SQL Server en hora local del hospital
+    encrypt: false,  
+    trustServerCertificate: true,  
+    useUTC: false  
   }
 };
 
@@ -45,9 +43,6 @@ function connectRemoteDB() {
   return poolPromise;
 }
 
-/**
- * Retorna el pool activo o lanza un error si no se ha inicializado.
- */
 async function getRemoteDb() {
   if (!poolPromise) {
     throw new Error('Pool de base de datos remota no inicializado. Llame a connectRemoteDB() primero.');
@@ -65,4 +60,17 @@ function closeRemoteDB() {
   }
 }
 
-module.exports = { connectRemoteDB, getRemoteDb, closeRemoteDB, sql };
+async function resetRemoteDB() {
+  const pending = poolPromise;
+  poolPromise = null;
+  if (!pending) return;
+  try {
+    const pool = await pending;
+    await pool.close();
+    console.log('SQL Server Remoto reiniciado.');
+  } catch {
+    // La conexión anterior ya no es utilizable.
+  }
+}
+
+module.exports = { connectRemoteDB, getRemoteDb, closeRemoteDB, resetRemoteDB, sql };

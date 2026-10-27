@@ -1,16 +1,5 @@
 import REPORT_QUERY_PERMISSIONS from './reportQueryPermissions.json';
 
-/**
- * rbac.js — Mapa de permisos por rol
- * Hospital Escandón BI Platform v4.0
- *
- * ROLES:
- *   ADMIN           → Acceso total + auditoría + gestión de usuarios
- *   DIRECTOR        → Dashboard de Mando, KPIs globales, Macropanel financiero
- *   JEFE_AREA       → Solo tableros de su área asignada
- *   USUARIO_OPERATIVO → Solo visualización y descarga en su área
- */
-
 export const ROLES = {
   ADMIN:            'ADMIN',
   DIRECTOR:         'DIRECTOR',
@@ -36,10 +25,6 @@ export const AREAS = {
   ALMACEN_GENERAL:  'ALMACEN_GENERAL',
 };
 
-/**
- * ROUTE_PERMISSIONS
- * Mapea cada ruta a los roles que pueden accederla.
- */
 export const ROUTE_PERMISSIONS = {
   '/':                      [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL, ROLES.CONSULTA_EXTERNA],
   '/dashboard/directivo':   [ROLES.ADMIN, ROLES.DIRECTOR],
@@ -52,6 +37,7 @@ export const ROUTE_PERMISSIONS = {
   '/auditoria/cargos':      [ROLES.ADMIN, ROLES.DIRECTOR],
   '/auditoria/cargos-reversas': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
   '/auditoria/reapertura-cuentas': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
+  '/auditoria/ventas-hospitalarias': [ROLES.ADMIN, ROLES.DIRECTOR],
   '/farmacia/devoluciones': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
   '/farmacia/cargos-sap':   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
   '/farmacia/resumen-maestro': [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
@@ -76,12 +62,10 @@ export const ROUTE_PERMISSIONS = {
   '/admin/auditoria-log':   [ROLES.ADMIN],
   '/admin/configuracion':   [ROLES.ADMIN],
   '/admin/prueba-sap':      [ROLES.ADMIN],
+  '/sistemas/acuerdos':     [ROLES.ADMIN, ROLES.DIRECTOR],
+  '/sistemas/automatizaciones': [ROLES.ADMIN, ROLES.DIRECTOR],
 };
 
-/**
- * ROUTE_TO_PERMISSION
- * Mapea cada ruta de la plataforma al ID de permiso que asigna amendoza en AdminUsuarios.
- */
 export const ROUTE_TO_PERMISSION = {
   '/':                      'home',
   '/dashboard/directivo':   'dashboard-directivo',
@@ -96,6 +80,7 @@ export const ROUTE_TO_PERMISSION = {
   '/auditoria/cargos':      'auditoria-cargos',
   '/auditoria/cargos-reversas': 'auditoria-cargos-reversas',
   '/auditoria/reapertura-cuentas': 'auditoria-reapertura-cuentas',
+  '/auditoria/ventas-hospitalarias': 'auditoria-ventas-hospitalarias',
   '/calidad-datos':         'calidad-datos',
   '/farmacia/devoluciones': 'farmacia-devoluciones',
   '/farmacia/cargos-sap':   'farmacia-cargos-sap',
@@ -117,11 +102,10 @@ export const ROUTE_TO_PERMISSION = {
   '/admin/usuarios':        'admin-usuarios',
   '/admin/auditoria-log':   'admin-auditoria-log',
   '/admin/configuracion':   'admin-configuracion',
+  '/sistemas/acuerdos':     'sistemas-acuerdos',
+  '/sistemas/automatizaciones': 'sistemas-automatizaciones',
 };
 
-/**
- * Mapea área del usuario al ID de permiso de su tablero de área.
- */
 export const AREA_TO_PERMISSION = {
   'QUIROFANO':        'area-quirofano',
   'UCI':              'area-uci',
@@ -138,23 +122,13 @@ export const AREA_TO_PERMISSION = {
   'ALMACEN_GENERAL':  'area-almacen-general',
 };
 
-/**
- * Verifica si un usuario tiene permiso individual para acceder a una ruta.
- * REGLA MAESTRA: Solo amendoza tiene acceso total sin requerir permisos otorgados.
- * Todos los demás usuarios (incluyendo ADMINs) requieren que amendoza les otorgue permiso explícito.
- * @param {object} user - Objeto de usuario con { role, permisos, area, username }
- * @param {string} path - Ruta a verificar
- * @returns {boolean}
- */
 export function hasPermission(user, path) {
   if (!user) return false;
   
   const username = (user.username || user.Username || '').toLowerCase();
 
-  // REGLA MAESTRA: Solo el usuario amendoza tiene acceso total absoluto a todas las implementaciones sin requerir permisos explícitos
   if (username === 'amendoza') return true;
 
-  // El inicio siempre es accesible
   if (path === '/') return true;
 
   // Ruta exclusiva de pruebas de amendoza
@@ -163,10 +137,8 @@ export function hasPermission(user, path) {
   const permisos = user.permisos || [];
   const permId = ROUTE_TO_PERMISSION[path];
 
-  // Si la ruta no requiere permiso específico
   if (!permId) return true;
 
-  // Para /dashboard/area, verificar permisos de área:
   if (path === '/dashboard/area') {
     if (user.area) {
       const areaPermId = AREA_TO_PERMISSION[user.area];
@@ -178,13 +150,10 @@ export function hasPermission(user, path) {
     return permisos.includes(permId);
   }
 
-  // Absolutamente TODOS los demás usuarios (incluso con rol 'ADMIN') requieren que amendoza les otorgue el permiso explícito
   return permisos.includes(permId);
 }
 
-/**
- * CAPABILITIES — Acciones que puede realizar cada rol
- */
+/* CAPABILITIES — Acciones que puede realizar cada rol */
 export const CAPABILITIES = {
   [ROLES.ADMIN]: {
     verTodosTableros:    true,
@@ -266,9 +235,6 @@ export const CAPABILITIES = {
   },
 };
 
-/**
- * Verifica si un usuario puede acceder a una ruta por su rol/área.
- */
 export function canAccessRoute(role, path, userArea = null, routeArea = null) {
   const allowed = ROUTE_PERMISSIONS[path];
   if (!allowed) return false;
@@ -285,9 +251,7 @@ export function canAccessRoute(role, path, userArea = null, routeArea = null) {
   return true;
 }
 
-/**
- * Verifica si un usuario tiene una capacidad específica.
- */
+/* Verifica si un usuario tiene una capacidad específica */
 export function can(role, capability) {
   return CAPABILITIES[role]?.[capability] ?? false;
 }
@@ -308,13 +272,6 @@ export const AREAS_LABELS = {
   [AREAS.ALMACEN_GENERAL]:  'Almacén General',
 };
 
-/**
- * Menú de navegación filtrado por rol y username.
- * @param {string|object} roleOrUser
- * @param {string|null} areaArg
- * @param {string|null} usernameArg
- * @returns {Array}
- */
 export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
   let role = roleOrUser;
   let area = areaArg;
@@ -330,7 +287,6 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
   const areaLabel = area ? AREAS_LABELS[area] ?? area : '';
 
   const allItems = [
-    // Acceso universal
     {
       section: 'Principal',
       icon:    '🏠',
@@ -363,13 +319,6 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     },
     {
       section: 'Mi Área',
-      icon:    '📈',
-      label:   'Estadísticas',
-      path:    '/estadisticas',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
-    },
-    {
-      section: 'Mi Área',
       icon:    '🩺',
       label:   'Honorarios Médicos',
       path:    '/interconsultas-jornadas',
@@ -382,7 +331,6 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
       path:    '/mi-area/consultas-service-layer',
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO, ROLES.ALMACEN_GENERAL, ROLES.CONSULTA_EXTERNA],
     },
-    // Legado SITI
     {
       section: 'Históricos SITI',
       icon:    '⏳',
@@ -414,17 +362,17 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     },
     {
       section: 'Auditoría',
-      icon:    '📋',
-      label:   'Rastreo de Órdenes e Insumos',
-      path:    '/rastreo-ordenes',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
+      icon:    '🧾',
+      label:   'Facturas y reaperturas de cuentas',
+      path:    '/auditoria/reapertura-cuentas',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
     },
     {
       section: 'Auditoría',
-      icon:    '🧾',
-      label:   'Facturas y reapertura de cuentas',
-      path:    '/auditoria/reapertura-cuentas',
-      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.USUARIO_OPERATIVO],
+      icon:    '📊',
+      label:   'Ventas hospitalarias',
+      path:    '/auditoria/ventas-hospitalarias',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
     {
       section: 'Farmacia',
@@ -533,6 +481,36 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
       roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
     },
 
+    // Sistemas
+    {
+      section: 'Sistemas',
+      icon:    '⚙️',
+      label:   'Gestor de Acuerdos',
+      path:    '/sistemas/acuerdos',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
+    },
+    {
+      section: 'Sistemas',
+      icon:    '🤖',
+      label:   'Automatizaciones BI',
+      path:    '/sistemas/automatizaciones',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR],
+    },
+    {
+      section: 'Sistemas',
+      icon:    '📋',
+      label:   'Rastreo de órdenes e insumos',
+      path:    '/rastreo-ordenes',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA, ROLES.ALMACEN_GENERAL, ROLES.USUARIO_OPERATIVO],
+    },
+    {
+      section: 'Sistemas',
+      icon:    '📈',
+      label:   'Estadísticas',
+      path:    '/estadisticas',
+      roles:   [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.JEFE_AREA],
+    },
+
     // Administración
     {
       section: 'Administración',
@@ -565,23 +543,18 @@ export function getNavItems(roleOrUser, areaArg = null, usernameArg = null) {
     },
   ];
 
-  // REGLA MAESTRA: Solo el usuario amendoza ve todo en el menú automáticamente.
   if (uName === 'amendoza') {
     return allItems;
   }
 
-  // Filtrar items por rol y username. El filtrado granular por permisos individuales (user.permisos) lo realiza hasPermission(user, item.path).
   return allItems.filter(item => {
-    if (role !== ROLES.ADMIN && !item.roles.includes(role)) return false;
+
+    if (role !== ROLES.ADMIN && !item.roles.includes(role) && item.path !== '/auditoria/ventas-hospitalarias') return false;
     if (item.requiredUsername && item.requiredUsername !== uName) return false;
     return true;
   });
 }
 
-/**
- * getPermissionSections()
- * Genera dinámicamente la lista de secciones asignables como permisos individuales por amendoza en AdminUsuarios.
- */
 export function getPermissionSections(user) {
   const navItems = getNavItems({ username: 'amendoza', role: ROLES.ADMIN });
   const sections = [];
@@ -591,7 +564,6 @@ export function getPermissionSections(user) {
     const permId = ROUTE_TO_PERMISSION[item.path];
     if (!permId) continue;
 
-    // Expandir "Tablero de Área" en tableros individuales por cada área
     if (item.path === '/dashboard/area') {
       const areaEntries = Object.entries(AREA_TO_PERMISSION);
       for (const [areaKey, areaPermId] of areaEntries) {
@@ -619,7 +591,6 @@ export function getPermissionSections(user) {
     });
   }
 
-  // Consultar el mapa no concede permiso para modificar una cuenta en Vertical.
   sections.push({
     id: 'ejecutar-reapertura-cuentas',
     name: 'Reaperturar cuentas verificadas en Vertical',
@@ -627,7 +598,6 @@ export function getPermissionSections(user) {
     category: 'Auditoría',
   });
 
-  // ── Permisos Consultas SAP (sap-query-*) — Controlan módulos del constructor visual ──
   for (const sapPerm of SAP_QUERY_PERMISSIONS) {
     sections.push({
       id:       sapPerm.id,
@@ -637,7 +607,6 @@ export function getPermissionSections(user) {
     });
   }
 
-  // ── Permisos IA (ia-*) — Controlan qué módulos de MAR-IA puede usar el usuario ──
   const IA_PERMISSIONS = [
     { id: 'ia-productividad-medica', name: 'Productividad Médica',     icon: '👨‍⚕️' },
     { id: 'ia-ocupacion-camas',      name: 'Censo y Ocupación',        icon: '🛏️' },
@@ -660,7 +629,6 @@ export function getPermissionSections(user) {
     });
   }
 
-  // Para administradores (o amendoza), retornar todas las secciones disponibles en la plataforma
   if (!user || user?.username?.toLowerCase() === 'amendoza' || user?.role === ROLES.ADMIN || user?.role === 'ADMIN') {
     return sections;
   }
@@ -670,16 +638,10 @@ export function getPermissionSections(user) {
 
 export const SAP_QUERY_PERMISSIONS = REPORT_QUERY_PERMISSIONS;
 
-/**
- * Verifica si un usuario tiene permiso para acceder a un módulo específico de SAP Query Builder.
- * REGLA MAESTRA: Solo amendoza es Superadmin con acceso total automático.
- * Todos los demás usuarios requieren los permisos asignados por amendoza.
- */
 export function hasSapModulePermission(user, moduleId) {
   if (!user) return false;
   const username = (user.username || user.Username || '').toLowerCase();
-  
-  // REGLA MAESTRA: amendoza es Superadmin absoluto
+
   if (username === 'amendoza') return true;
 
   const permisos = user.permisos || [];
@@ -688,7 +650,6 @@ export function hasSapModulePermission(user, moduleId) {
     return permisos.includes(`sap-query-${moduleId}`);
   }
 
-  // Fallback si tiene permiso a la pantalla pero aún no se le configuran módulos específicos
   if (permisos.includes('mi-area-consultas-service-layer')) {
     return ['inventory', 'batches', 'item_prices', 'item_master_data', 'stock_transfers'].includes(moduleId);
   }

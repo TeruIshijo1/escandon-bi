@@ -1,16 +1,5 @@
 import { userMessage } from '../../utils/userMessages';
-/**
- * KPICard.jsx — Tarjeta de indicador clickeable con edición inline (solo Admin)
- * Hospital Escandón BI Platform v4.0
- *
- * Props:
- *   elementoId   {string}  — 'directivo.ocupacion'
- *   value        {string}  — Valor a mostrar (viene del backend/BD)
- *   subtitle     {string}  — Texto pequeño debajo del valor
- *   accentColor  {string}  — Color de la franja superior
- *   isAdmin      {boolean} — Muestra el lápiz ✏️ al hacer hover
- *   onKPIClick   {fn}      — Callback cuando el usuario hace click (para abrir PBI)
- */
+
 import { useState, useRef, useEffect } from 'react';
 import { useKPIConfig } from '../../hooks/useKPIConfig';
 import useEscapeKey from '../../hooks/useEscapeKey';
@@ -35,7 +24,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
 
   // Al abrir el modal, inicializar con los valores actuales
   const openEdit = (e) => {
-    e.stopPropagation(); // Evitar que el click llegue al card
+    e.stopPropagation();  
     setForm({
       nombreCustom: kpi.nombreCustom || '',
       icono:        kpi.icono        || '📊',
@@ -44,7 +33,6 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
     setEditing(true);
   };
 
-  // Cerrar al hacer click fuera
   useEffect(() => {
     if (!editing) return;
     const handler = (e) => {
@@ -119,7 +107,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
 
   return (
     <>
-      {/* ── Tarjeta principal ── */}
+      
       <div
         className={`dashboard-metric-card${value == null || value === '' ? ' dashboard-metric-card--link' : ''}`}
         onClick={handleCardClick}
@@ -146,7 +134,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
           e.currentTarget.style.transform   = hasPBI ? 'translateY(-3px)' : 'translateY(-1px)';
           e.currentTarget.style.boxShadow   = hasPBI ? `0 10px 30px ${accentColor}18, var(--shadow-md)` : 'var(--shadow-md)';
           e.currentTarget.style.borderColor = hasPBI ? accentColor + '40' : 'rgba(0,70,135,0.15)';
-          // Mostrar botón editar al hover (admin)
+           
           const btn = e.currentTarget.querySelector('.kpi-edit-btn');
           if (btn) btn.style.opacity = '1';
         }}
@@ -165,7 +153,6 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
           pointerEvents: 'none',
         }}>{kpi.icono}</div>
 
-        {/* Botón ✏️ — solo Admin, aparece en hover */}
         {isAdmin && (
           <button
             className="kpi-edit-btn"
@@ -195,7 +182,6 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
           >✏️</button>
         )}
 
-        {/* Etiqueta */}
         <div className="dashboard-metric-label" style={{
           fontFamily: 'var(--font-display)',
           fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em',
@@ -205,7 +191,6 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
           {kpi.nombre || elementoId}
         </div>
 
-        {/* Valor */}
         {value != null && value !== '' && (
           <div className="dashboard-metric-value" style={{
             fontFamily: 'var(--font-mono)', fontSize: '1.75rem', fontWeight: 600,
@@ -225,8 +210,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
 
         {/* Indicadores en la parte inferior */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
-          
-          {/* Indicador PBI (solo si tiene URL) */}
+
           {kpi.pbiUrl ? (
             <div className="dashboard-metric-report" style={{
               fontFamily: 'var(--font-body)',
@@ -243,7 +227,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
         </div>
       </div>
 
-      {/* ── Modal de edición inline ── */}
+      {/* Modal de edición inline */}
       {editing && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -266,7 +250,7 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
           >
             <style>{`@keyframes kpiSlideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
-            {/* Header */}
+            {/* Encabezado */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Editar indicador</div>
@@ -294,7 +278,6 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
               >✕</button>
             </div>
 
-            {/* Campo: Nombre personalizado */}
             <div style={{ marginBottom: '1.25rem' }}>
               <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem', letterSpacing: '0.05em' }}>
                 NOMBRE PERSONALIZADO
@@ -359,7 +342,6 @@ export default function KPICard({ elementoId, value, subtitle, accentColor = '#0
               </div>
             </div>
 
-            {/* Campo: URL Power BI */}
             <div style={{ marginBottom: '1.75rem' }}>
               <label style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem', letterSpacing: '0.05em' }}>
                 ENLACE DEL REPORTE

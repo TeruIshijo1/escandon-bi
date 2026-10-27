@@ -2,12 +2,11 @@ const cron = require('node-cron');
 const { connectRemoteDB } = require('../config/remote-db');
 const { pool } = require('../config/pg-db');
 const sapInventoryService = require('./sapInventory.service');
+const { syncQuirofanoRevenues } = require('./quirofanoRevenue.service');
 
-let isSyncing = false;
+let activeSync, queuedFull;
+let activeFull = false;
 
-/**
- * Inicializa las tablas del Data Warehouse en PostgreSQL para Quirófano
- */
 async function initQuirofanoDW() {
   try {
     await pool.query(`
@@ -59,24 +58,65 @@ async function initQuirofanoDW() {
     console.log('✅ PostgreSQL DW: Tablas de Quirófano inicializadas.');
   } catch (err) {
     console.error('❌ Error al inicializar tablas DW Quirófano:', err.message);
+    throw err;
   }
 }
 
-/**
- * Sincronización Incremental / Completa de Quirófano desde SQL Server hacia PostgreSQL DW
- */
-async function syncQuirofanoData(options = { fullSync: false }) {
-  if (isSyncing) {
-    console.log('⏳ Sincronización de Quirófano ya en progreso. Omitiendo ciclo...');
-    return;
+/* Actividad e ingresos conservan estados separados dentro de un mismo ciclo. */
+async function runQuirofanoData(options) {
+  const report = { status: 'complete', activity: null, revenues: null };
+  try {
+    report.activity = { status: 'complete', events: await syncQuirofanoActivity({ ...options, fullSync: Boolean(options.fullSync || options.activityFullSync) }) };
+  } catch (error) {
+    report.activity = { status: 'error', errorCode: error.code || 'QX_ACTIVITY_FAILED' };
+    report.status = 'incomplete';
   }
-  isSyncing = true;
+  try {
+    report.revenues = await syncQuirofanoRevenues({ fullSync: Boolean(options.fullSync) });
+    if (['error', 'incomplete'].includes(report.revenues.status) || report.revenues.errorCode) report.status = 'incomplete';
+  } catch (error) {
+    report.revenues = { status: 'error', errorCode: error.code || 'QX_REVENUE_FAILED' };
+    report.status = 'incomplete';
+  }
+  const reason = report.activity.status === 'error' ? 'activity_error' : report.revenues.pendingReason || (report.revenues.errorCode ? 'source_error' : null);
+  const progress = report.activity.status === 'complete' && ['history_pending', 'refresh_pending'].includes(reason);
+  console.log(progress ? '[Sync Quirófano DW] Avance guardado; actualización en curso' : '[Sync Quirófano DW] Ciclo', {
+    status: report.status, reason, activity: report.activity.status, events: report.activity.events ?? null,
+    revenues: report.revenues.status, completedWindows: report.revenues.completedWindows ?? 0,
+    pendingDays: report.revenues.pendingDays ?? null, failedDays: report.revenues.failedDays ?? null,
+    errorCode: report.revenues.errorCode || null
+  });
+  return report;
+}
 
+function syncQuirofanoData(options = {}) {
+  if (options.fullSync && queuedFull) return queuedFull;
+  if (activeSync) {
+    if (options.fullSync && !activeFull) {
+      const previous = activeSync;
+      const queued = previous.catch(() => {}).then(() => startQuirofanoSync({ ...options,fullSync: true }));
+      const full = queued.finally(() => { if (queuedFull === full) queuedFull = null; });
+      queuedFull = full;
+      return full;
+    }
+    return activeSync;
+  }
+  if (queuedFull) return queuedFull;
+  return startQuirofanoSync(options);
+}
+
+function startQuirofanoSync(options) {
+  activeFull = Boolean(options.fullSync);
+  activeSync = runQuirofanoData(options).finally(() => { activeSync = null; activeFull = false; });
+  return activeSync;
+}
+
+async function syncQuirofanoActivity(options) {
   try {
     const remotePool = await connectRemoteDB();
     const dateFilter = options.fullSync ? '' : 'WHERE q.FechaInicio >= DATEADD(day, -15, GETDATE())';
 
-    // 1. Obtener eventos de Quirófano desde SQL Server
+    // Obtener eventos de Quirófano desde SQL Server
     const eventsRes = await remotePool.request().query(`
       SELECT 
         q.PCFRNum,
@@ -92,14 +132,11 @@ async function syncQuirofanoData(options = { fullSync: false }) {
       ORDER BY q.FechaInicio DESC
     `);
 
-    const events = eventsRes.recordset || [];
+    if (!Array.isArray(eventsRes.recordset)) throw new Error('Vertical no confirmó los eventos de Quirófano.');
+    const events = eventsRes.recordset;
     if (events.length === 0) {
       console.log('ℹ️ Sync Quirófano DW: No hay eventos nuevos para sincronizar.');
-      
-      // Sincronizar de todos modos las analíticas SAP
-      await syncQuirofanoRevenues(options.fullSync);
-      isSyncing = false;
-      return;
+      return 0;
     }
 
     // Upsert eventos en PostgreSQL
@@ -125,7 +162,7 @@ async function syncQuirofanoData(options = { fullSync: false }) {
       ]);
     }
 
-    // 2. Obtener insumos consumidos para estos eventos
+    // Obtener insumos consumidos para estos eventos
     const pcfrNums = events.map(e => e.PCFRNum).filter(Boolean);
     if (pcfrNums.length > 0) {
       const itemsRes = await remotePool.request().query(`
@@ -147,7 +184,8 @@ async function syncQuirofanoData(options = { fullSync: false }) {
 
       const sapMap = sapInventoryService.getInventoryMap();
 
-      for (const item of (itemsRes.recordset || [])) {
+      if (!Array.isArray(itemsRes.recordset)) throw new Error('Vertical no confirmó los consumos de Quirófano.');
+      for (const item of itemsRes.recordset) {
         const sapItem = sapMap.get(item.Codigo);
         const description = (sapItem && sapItem.ItemName && sapItem.ItemName !== 'Material/Medicamento') 
           ? sapItem.ItemName 
@@ -164,25 +202,29 @@ async function syncQuirofanoData(options = { fullSync: false }) {
       }
     }
 
-    // 3. Recalcular la caché de Kits Quirúrgicos Agregados en PostgreSQL
+    // Recalcular la caché de Kits Quirúrgicos Agregados en PostgreSQL
     await refreshSurgicalKitsCache(remotePool);
 
-    // 4. Sincronizar ingresos de SAP B1
-    await syncQuirofanoRevenues(options.fullSync);
-
-    console.log(`✅ Sync Quirófano DW: Sincronizados ${events.length} eventos quirúrgicos.`);
+    return events.length;
   } catch (err) {
     console.error('❌ Error en sincronización de Quirófano DW:', err.message);
-  } finally {
-    isSyncing = false;
+    throw err;
   }
 }
 
-/**
- * Calcula y actualiza los Kits Quirúrgicos agregados en la caché de PostgreSQL
- */
 async function refreshSurgicalKitsCache(remotePool) {
   try {
+    const recentCache = await pool.query(`
+      SELECT 1
+      FROM dw_quirofano_kits_cache
+      WHERE sync_date >= CURRENT_TIMESTAMP - INTERVAL '60 minutes'
+      LIMIT 1
+    `);
+    if (recentCache.rowCount > 0) {
+      console.log('[Sync Quirófano] Se conserva la caché de kits actualizada durante los últimos 60 minutos.');
+      return;
+    }
+
     const dbRes = await remotePool.request().query(`
       SELECT 
         UPPER(RTRIM(LTRIM(ISNULL(NULLIF(c.UDF_Diagnostico_presuntivo, ''), 'CIRUGÍA GENERAL')))) AS CirugiaNorm,
@@ -200,7 +242,8 @@ async function refreshSurgicalKitsCache(remotePool) {
       HAVING AVG(b.Quantity) > 0
     `);
 
-    const rawData = dbRes.recordset || [];
+    if (!Array.isArray(dbRes.recordset)) throw new Error('Vertical no confirmó los kits de Quirófano.');
+    const rawData = dbRes.recordset;
     const kitsBySurgery = {};
     const sapMap = sapInventoryService.getInventoryMap();
 
@@ -244,146 +287,15 @@ async function refreshSurgicalKitsCache(remotePool) {
 
   } catch (err) {
     console.error('❌ Error al actualizar la caché de Kits Quirúrgicos DW:', err.message);
+    throw err;
   }
 }
 
-/**
- * Sincroniza analíticas de ingresos de Quirófano desde SAP B1 a PostgreSQL
- */
-async function syncQuirofanoRevenues(fullSync) {
-  try {
-    const sapService = require('./sap.service');
-    await sapService._ensureSession();
-
-    const ensureQuery = async (code, text) => {
-      try {
-        await sapService.post('/SQLQueries', { SqlCode: code, SqlName: code, SqlText: text });
-      } catch (e) {
-        try {
-          await sapService.patch(`/SQLQueries('${code}')`, { SqlName: code, SqlText: text });
-        } catch (err) {}
-      }
-    };
-
-    // Registrar las consultas agrupadas en SAP B1
-    await ensureQuery('sq_quirofano_top_medicos_group', `
-      SELECT 
-        T0.DocDate AS fecha,
-        T0.U_PRName AS nombre,
-        SUM(T1.LineTotal) AS ingresos
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      INNER JOIN OITM T2 ON T1.ItemCode = T2.ItemCode
-      WHERE T2.ItmsGrpCod = 111 
-        AND T0.DocDate >= :startDate 
-        AND T0.DocDate <= :endDate
-        AND T0.U_PRName IS NOT NULL AND T0.U_PRName <> ''
-      GROUP BY T0.DocDate, T0.U_PRName
-    `);
-
-    await ensureQuery('sq_quirofano_top_servicios_group', `
-      SELECT 
-        T0.DocDate AS fecha,
-        T1.Dscription AS nombre,
-        SUM(T1.LineTotal) AS ingresos
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      INNER JOIN OITM T2 ON T1.ItemCode = T2.ItemCode
-      WHERE T2.ItmsGrpCod = 111 
-        AND T0.DocDate >= :startDate 
-        AND T0.DocDate <= :endDate
-      GROUP BY T0.DocDate, T1.Dscription
-    `);
-
-    await ensureQuery('sq_quirofano_ingresos_totales_group', `
-      SELECT 
-        T0.DocDate AS fecha,
-        SUM(T1.LineTotal) AS ingresos
-      FROM OINV T0
-      INNER JOIN INV1 T1 ON T0.DocEntry = T1.DocEntry
-      INNER JOIN OITM T2 ON T1.ItemCode = T2.ItemCode
-      WHERE T2.ItmsGrpCod = 111 
-        AND T0.DocDate >= :startDate 
-        AND T0.DocDate <= :endDate
-      GROUP BY T0.DocDate
-    `);
-
-    // Rango de fechas
-    const now = new Date();
-    const endDate = now.toISOString().split('T')[0].replace(/-/g, '');
-    let startDate;
-    if (fullSync) {
-      const past = new Date();
-      past.setDate(past.getDate() - 365);
-      startDate = past.toISOString().split('T')[0].replace(/-/g, '');
-    } else {
-      const past = new Date();
-      past.setDate(past.getDate() - 15);
-      startDate = past.toISOString().split('T')[0].replace(/-/g, '');
-    }
-
-    console.log(`[Sync SAP Quirófano Revenue] Sincronizando ingresos desde ${startDate} hasta ${endDate}...`);
-
-    const [totalRes, medRes, srvRes] = await Promise.all([
-      sapService.get(`/SQLQueries('sq_quirofano_ingresos_totales_group')/List?startDate='${startDate}'&endDate='${endDate}'`),
-      sapService.get(`/SQLQueries('sq_quirofano_top_medicos_group')/List?startDate='${startDate}'&endDate='${endDate}'`),
-      sapService.get(`/SQLQueries('sq_quirofano_top_servicios_group')/List?startDate='${startDate}'&endDate='${endDate}'`)
-    ]);
-
-    const totals = totalRes.data?.value || [];
-    const medicos = medRes.data?.value || [];
-    const servicios = srvRes.data?.value || [];
-
-    const startIso = `${startDate.substring(0,4)}-${startDate.substring(4,6)}-${startDate.substring(6,8)}`;
-    const endIso = `${endDate.substring(0,4)}-${endDate.substring(4,6)}-${endDate.substring(6,8)}`;
-    
-    await pool.query(`DELETE FROM dw_sap_quirofano_analiticas WHERE startdate >= $1 AND startdate <= $2`, [startIso, endIso]);
-
-    // Insertar Totales
-    for (const r of totals) {
-      const fecha = r.fecha ? String(r.fecha).slice(0, 10) : null;
-      if (!fecha) continue;
-      await pool.query(`
-        INSERT INTO dw_sap_quirofano_analiticas (tipo, nombre, ingresos, startdate, enddate, sync_date)
-        VALUES ('TOTAL', 'TOTAL', $1, $2, $2, CURRENT_TIMESTAMP)
-        ON CONFLICT (tipo, nombre, startdate, enddate) DO UPDATE SET ingresos = EXCLUDED.ingresos, sync_date = CURRENT_TIMESTAMP
-      `, [Number(r.ingresos || 0), fecha]);
-    }
-
-    // Insertar Médicos
-    for (const r of medicos) {
-      const fecha = r.fecha ? String(r.fecha).slice(0, 10) : null;
-      if (!fecha) continue;
-      await pool.query(`
-        INSERT INTO dw_sap_quirofano_analiticas (tipo, nombre, ingresos, startdate, enddate, sync_date)
-        VALUES ('MEDICO', $1, $2, $3, $3, CURRENT_TIMESTAMP)
-        ON CONFLICT (tipo, nombre, startdate, enddate) DO UPDATE SET ingresos = EXCLUDED.ingresos, sync_date = CURRENT_TIMESTAMP
-      `, [String(r.nombre || '').trim(), Number(r.ingresos || 0), fecha]);
-    }
-
-    // Insertar Servicios
-    for (const r of servicios) {
-      const fecha = r.fecha ? String(r.fecha).slice(0, 10) : null;
-      if (!fecha) continue;
-      await pool.query(`
-        INSERT INTO dw_sap_quirofano_analiticas (tipo, nombre, ingresos, startdate, enddate, sync_date)
-        VALUES ('SERVICIO', $1, $2, $3, $3, CURRENT_TIMESTAMP)
-        ON CONFLICT (tipo, nombre, startdate, enddate) DO UPDATE SET ingresos = EXCLUDED.ingresos, sync_date = CURRENT_TIMESTAMP
-      `, [String(r.nombre || '').trim(), Number(r.ingresos || 0), fecha]);
-    }
-
-    console.log(`✅ [Sync SAP Quirófano Revenue] Sincronizados ${totals.length} totales, ${medicos.length} medicos y ${servicios.length} servicios.`);
-  } catch (err) {
-    console.error('❌ Error al sincronizar ingresos de Quirófano SAP:', err.message);
-  }
-}
-
-/**
- * Inicializa el Cron Job de Quirófano (cada 15 min)
- */
+/* Inicializa el Cron Job de Quirófano (cada 15 min) */
 function initQuirofanoCron() {
-  cron.schedule('*/15 * * * *', () => {
-    syncQuirofanoData({ fullSync: false });
+  cron.schedule('3-59/15 * * * *', () => {
+    require('./backgroundQueue.service').enqueue('quirofano', () => syncQuirofanoData({ fullSync: false }))
+      .catch(error => console.warn('[Quirófano] Actualización pendiente:', error.message));
   });
   console.log('⏰ Cron Job de Quirófano DW inicializado (Ejecución cada 15 min).');
 }

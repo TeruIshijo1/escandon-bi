@@ -1,9 +1,5 @@
 import { userMessage } from '../utils/userMessages';
-/**
- * AdminUsuarios.jsx — Gestión de Usuarios (solo ADMIN)
- * Hospital Escandón BI Platform v4.0
- * Rediseño premium con identidad de marca
- */
+
 import { useState, useEffect, useMemo } from 'react';
 import { getPermissionSections } from '../utils/rbac';
 import useEscapeKey from '../hooks/useEscapeKey';
@@ -11,16 +7,10 @@ import { useAuth } from '../context/AuthContext';
 
 const API_BASE = '/api';
 
-/**
- * PLATFORM_SECTIONS se genera dinámicamente desde rbac.js.
- * Así, al agregar una nueva sección en rbac.js (getNavItems + ROUTE_TO_PERMISSION),
- * automáticamente aparecerá en el modal de permisos sin necesidad de tocar este archivo.
- */
-
 const ROL_COLORS = {
   ADMIN:            { bg:'rgba(0,70,135,0.08)',   text:'var(--color-azul-fuerte)'   },
   DIRECTOR:         { bg:'rgba(232,133,61,0.08)',  text:'var(--color-accent-warm)'   },
-  // Use green for jefe de area in v4.0
+   
   JEFE_AREA:        { bg:'rgba(0,151,74,0.08)',   text:'var(--color-verde-e)'   },
   USUARIO_OPERATIVO:{ bg:'rgba(90,107,124,0.08)', text:'#5A6B7C'  },
 };
@@ -36,7 +26,7 @@ const AREAS_LIST = ['QUIROFANO', 'UCI', 'URGENCIAS', 'CUNEROS', 'IMAGENOLOGIA', 
 
 export default function AdminUsuarios() {
   const { user } = useAuth();
-  // Genera dinámicamente la lista de secciones desde rbac.js (filtrada por lo que tiene el propio admin)
+   
   const PLATFORM_SECTIONS = useMemo(() => getPermissionSections(user), [user]);
   // Extraer las categorías únicas, en orden de aparición
   const categories = useMemo(() => {
@@ -70,8 +60,6 @@ export default function AdminUsuarios() {
     fetchUsers();
     fetchRoles();
   }, []);
-
-
 
   const fetchUsers = async () => {
     try {
@@ -251,7 +239,7 @@ export default function AdminUsuarios() {
         }
       `}</style>
 
-      {/* Header */}
+      {/* Encabezado */}
       <div style={{
         background: 'linear-gradient(135deg, var(--color-azul-fuerte) 0%, #083b66 100%)',
         borderRadius: 20, padding: '1.75rem 2.25rem', marginBottom: '2rem',
@@ -264,7 +252,7 @@ export default function AdminUsuarios() {
         flexWrap: 'wrap',
         gap: '1rem'
       }}>
-        {/* ECG Pattern */}
+        {/* Fondo del encabezado */}
         <div style={{
           position: 'absolute',
           inset: 0,
@@ -636,7 +624,7 @@ export default function AdminUsuarios() {
         </div>
       )}
 
-      {/* Toast Notification */}
+      {/* Avisos */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: '2rem', right: '2rem',

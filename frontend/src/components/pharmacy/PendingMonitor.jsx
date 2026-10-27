@@ -26,9 +26,6 @@ function formatTimeAgo(totalMins) {
   return parts.join(' ');
 }
 
-/**
- * Clasificador garantizado de medicamentos que requieren receta médica (Grupo IV, Antibióticos y Controlados)
- */
 function classifyRxItem(row) {
   if (row.RxCategory && row.RxBadge) {
     return {
@@ -70,7 +67,6 @@ function classifyRxItem(row) {
     return { isRx: false };
   }
 
-  // 1. Controlados (Grupo I, II, III)
   const controlledKeywords = [
     'DIAZEPAM', 'BUPRENORFINA', 'FENTANILO', 'FENTANYL', 'MORFINA', 'CLONAZEPAM', 'ALPRAZOLAM',
     'MIDAZOLAM', 'LORAZEPAM', 'TRAMADOL', 'METADONA', 'METILFENIDATO', 'KETAMINA', 'EFEDRINA',
@@ -84,7 +80,7 @@ function classifyRxItem(row) {
     };
   }
 
-  // 2. Antibióticos
+  // Antibióticos
   const antibioticKeywords = [
     'MEROPENEM', 'AMIKACINA', 'CEFTRIAXONA', 'CIPROFLOXACINO', 'LEVOFLOXACINO', 'VANCOMICINA',
     'CLARITROMICINA', 'AMPICILINA', 'METRONIDAZOL', 'CEFALOTINA', 'CEFOTAXIMA', 'CEFTAZIDIMA',
@@ -99,7 +95,7 @@ function classifyRxItem(row) {
     };
   }
 
-  // 3. Grupo IV (Resto de medicamentos que requieren prescripción)
+  // Grupo IV (Resto de medicamentos que requieren prescripción)
   return {
     category: 'GRUPO_IV',
     badge: { label: '📋 GRUPO IV', color: '#0D9488', bg: '#F0FDFA', border: '#99F6E4' },
@@ -143,7 +139,7 @@ export default function PendingMonitor() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Auto refresh every 30s
+    const interval = setInterval(fetchData, 30000);  
     return () => clearInterval(interval);
   }, []);
 
@@ -201,7 +197,7 @@ export default function PendingMonitor() {
 
   return (
     <div style={{ background: '#fff', borderRadius: '16px', padding: '2rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
-      {/* Header */}
+      {/* Encabezado */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.6rem', fontWeight: 'bold', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -220,7 +216,6 @@ export default function PendingMonitor() {
         )}
       </div>
 
-      {/* Control Bar: Categories & Search */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem', background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
@@ -413,8 +408,7 @@ export default function PendingMonitor() {
       {selectedPrescription && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'white', padding: '2rem', borderRadius: '16px', width: '90%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
-            
-            {/* Header Modal */}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Solicitud de Farmacia</span>
@@ -427,8 +421,7 @@ export default function PendingMonitor() {
               </div>
               <button onClick={() => setSelectedPrescription(null)} style={{ background: '#f1f5f9', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#64748b', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
             </div>
-            
-            {/* Referencias Documentales Grid */}
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1.25rem', background: '#f8fafc', padding: '0.85rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <div>
                 <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>No. Requisición</span>

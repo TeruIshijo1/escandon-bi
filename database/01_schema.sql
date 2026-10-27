@@ -1,18 +1,18 @@
--- ═══════════════════════════════════════════════════════════════════
--- 01_schema.sql — Esquema de la Plataforma BI (PostgreSQL)
--- Hospital Escandón v1.0
--- Ejecutado por backend/config/init-db.js (o por la migración SQLite→PG)
--- ═══════════════════════════════════════════════════════════════════
 
--- ───────────────────────────────────────────────────────────────────
--- MÓDULO 1: RBAC — Roles y Usuarios
--- ───────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+-- RBAC — Roles y Usuarios
+
 
 CREATE TABLE IF NOT EXISTS Roles (
     RolId           SERIAL        PRIMARY KEY,
     NombreRol       TEXT          NOT NULL UNIQUE,
     Descripcion     TEXT,
-    Nivel           INTEGER       NOT NULL  -- 1=Admin, 2=Director, 3=JefeArea, 4=Operativo
+    Nivel           INTEGER       NOT NULL  
         CHECK (Nivel BETWEEN 1 AND 4),
     Activo          INTEGER       NOT NULL DEFAULT 1,
     FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS Usuarios (
     Email           TEXT          NOT NULL UNIQUE,
     PasswordHash    TEXT          NOT NULL,
     RolId           INTEGER       NOT NULL REFERENCES Roles(RolId),
-    AreaAsignada    TEXT          NULL,  -- NULL para ADMIN y DIRECTOR
+    AreaAsignada    TEXT          NULL,  
     Activo          INTEGER       NOT NULL DEFAULT 1,
     RefreshToken    TEXT          NULL,
     UltimoAcceso    TIMESTAMP     NULL,
@@ -40,21 +40,21 @@ CREATE INDEX IF NOT EXISTS IX_Usuarios_RolId      ON Usuarios(RolId);
 CREATE INDEX IF NOT EXISTS IX_Usuarios_Username   ON Usuarios(Username);
 CREATE INDEX IF NOT EXISTS IX_Usuarios_Area       ON Usuarios(AreaAsignada);
 
--- ───────────────────────────────────────────────────────────────────
--- MÓDULO 2: AUDITORÍA — AuditLog de acciones del sistema
--- ───────────────────────────────────────────────────────────────────
+
+-- AUDITORÍA — AuditLog de acciones del sistema
+
 
 CREATE TABLE IF NOT EXISTS AuditLog (
     LogId           SERIAL        PRIMARY KEY,
     UsuarioId       INTEGER       NULL REFERENCES Usuarios(UsuarioId),
     Username        TEXT          NOT NULL,
     Rol             TEXT,
-    Metodo          TEXT          NOT NULL,  -- GET, POST, etc.
+    Metodo          TEXT          NOT NULL,  
     Ruta            TEXT          NOT NULL,
     EstadoHTTP      INTEGER       NOT NULL,
     DuracionMs      INTEGER,
     IP              TEXT,
-    CuerpoRequest   TEXT          NULL,      -- JSON sanitizado
+    CuerpoRequest   TEXT          NULL,      
     FechaHora       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -62,9 +62,9 @@ CREATE INDEX IF NOT EXISTS IX_AuditLog_UsuarioId ON AuditLog(UsuarioId);
 CREATE INDEX IF NOT EXISTS IX_AuditLog_FechaHora ON AuditLog(FechaHora);
 CREATE INDEX IF NOT EXISTS IX_AuditLog_Ruta      ON AuditLog(Ruta);
 
--- ───────────────────────────────────────────────────────────────────
--- MÓDULO 3: CATÁLOGOS CLÍNICOS
--- ───────────────────────────────────────────────────────────────────
+
+-- CATÁLOGOS CLÍNICOS
+
 
 CREATE TABLE IF NOT EXISTS Pacientes (
     PacienteId      SERIAL        PRIMARY KEY,
@@ -117,9 +117,9 @@ CREATE INDEX IF NOT EXISTS IX_Egresos_PacienteId  ON Egresos(PacienteId);
 CREATE INDEX IF NOT EXISTS IX_Egresos_FechaEgreso ON Egresos(FechaEgreso);
 CREATE INDEX IF NOT EXISTS IX_Egresos_TipoEgreso  ON Egresos(TipoEgreso);
 
--- ───────────────────────────────────────────────────────────────────
--- MÓDULO 4: INFRAESTRUCTURA — Camas
--- ───────────────────────────────────────────────────────────────────
+
+-- INFRAESTRUCTURA — Camas
+
 
 CREATE TABLE IF NOT EXISTS Camas (
     CamaId          SERIAL        PRIMARY KEY,
@@ -136,16 +136,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS IX_Camas_NumeroArea ON Camas(NumeroCama, Area)
 CREATE       INDEX IF NOT EXISTS IX_Camas_Area       ON Camas(Area);
 CREATE       INDEX IF NOT EXISTS IX_Camas_Estado     ON Camas(Estado);
 
--- ───────────────────────────────────────────────────────────────────
--- MÓDULO 5: AUDITORÍA — Inventarios vs. Cargos (PRIORIDAD 1)
--- ───────────────────────────────────────────────────────────────────
+
+-- AUDITORÍA — Inventarios vs. Cargos
+
 
 CREATE TABLE IF NOT EXISTS Insumos (
     InsumoId        SERIAL        PRIMARY KEY,
     Descripcion     TEXT          NOT NULL,
     CodigoBarras    TEXT          NULL UNIQUE,
     ClaveCBCBSS     TEXT          NULL,
-    Categoria       TEXT,  -- MEDICAMENTO, MATERIAL, EQUIPO
+    Categoria       TEXT,  
     PrecioUnitario  DOUBLE PRECISION NOT NULL DEFAULT 0,
     UnidadMedida    TEXT          NOT NULL DEFAULT 'PZA',
     Activo          INTEGER       NOT NULL DEFAULT 1
@@ -186,7 +186,7 @@ CREATE INDEX IF NOT EXISTS IX_CargosEnfermeria_OrdenId    ON CargosEnfermeria(Or
 CREATE INDEX IF NOT EXISTS IX_CargosEnfermeria_PacienteId ON CargosEnfermeria(PacienteId);
 CREATE INDEX IF NOT EXISTS IX_CargosEnfermeria_Fecha      ON CargosEnfermeria(FechaCargo);
 
--- Tabla de resultados de auditoría conciliada
+
 CREATE TABLE IF NOT EXISTS AuditoriaInventarioCargos (
     AuditoriaId     SERIAL        PRIMARY KEY,
     OrdenId         TEXT          NOT NULL,
@@ -203,9 +203,9 @@ CREATE INDEX IF NOT EXISTS IX_AuditoriaIC_OrdenId   ON AuditoriaInventarioCargos
 CREATE INDEX IF NOT EXISTS IX_AuditoriaIC_Estado    ON AuditoriaInventarioCargos(EstadoConciliacion);
 CREATE INDEX IF NOT EXISTS IX_AuditoriaIC_Fecha     ON AuditoriaInventarioCargos(FechaAuditoria);
 
--- ───────────────────────────────────────────────────────────────────
--- MÓDULO 6: QUIRÓFANO
--- ───────────────────────────────────────────────────────────────────
+
+-- QUIRÓFANO
+
 
 CREATE TABLE IF NOT EXISTS ProgramacionQuirofano (
     CirugiaId       SERIAL        PRIMARY KEY,
@@ -226,9 +226,9 @@ CREATE TABLE IF NOT EXISTS ProgramacionQuirofano (
 CREATE INDEX IF NOT EXISTS IX_ProgramacionQX_Fecha     ON ProgramacionQuirofano(FechaCirugia);
 CREATE INDEX IF NOT EXISTS IX_ProgramacionQX_PacienteId ON ProgramacionQuirofano(PacienteId);
 
--- ───────────────────────────────────────────────────────────────────
--- MÓDULO 7: CONFIGURACIÓN DE REPORTES BI
--- ───────────────────────────────────────────────────────────────────
+
+-- CONFIGURACIÓN DE REPORTES BI
+
 
 CREATE TABLE IF NOT EXISTS ConfiguracionBI (
     ConfigId        SERIAL        PRIMARY KEY,
@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS ConfiguracionBI (
     LookerDashboard TEXT          NULL,
     LookerDashboard2 TEXT         NULL,
     LookerDashboard3 TEXT         NULL,
-    RolesPermitidos TEXT          NOT NULL,  -- JSON array de roles
+    RolesPermitidos TEXT          NOT NULL,  
     AreaRequerida   TEXT          NULL,
     Activo          INTEGER       NOT NULL DEFAULT 1,
     FechaCreacion   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -251,9 +251,9 @@ CREATE TABLE IF NOT EXISTS ConfiguracionBI (
     JsonFilePath    TEXT          NULL
 );
 
--- ───────────────────────────────────────────────────────────────────
--- MÓDULO 8: CONSULTAS PERSONALIZADAS SAP (SERVICE LAYER QUERY BUILDER)
--- ───────────────────────────────────────────────────────────────────
+
+-- CONSULTAS PERSONALIZADAS SAP
+
 
 CREATE TABLE IF NOT EXISTS UserSapQueries (
     QueryId           SERIAL        PRIMARY KEY,
@@ -262,8 +262,8 @@ CREATE TABLE IF NOT EXISTS UserSapQueries (
     Titulo            TEXT          NOT NULL,
     Descripcion       TEXT          NULL,
     Entidad           TEXT          NOT NULL,
-    CamposSeleccionados TEXT        NOT NULL,  -- JSON array de campos
-    FiltrosAplicados  TEXT          NOT NULL,  -- JSON object de filtros
+    CamposSeleccionados TEXT        NOT NULL,  
+    FiltrosAplicados  TEXT          NOT NULL,  
     EsPublico         INTEGER       NOT NULL DEFAULT 0,
     FechaCreacion     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FechaModificacion TIMESTAMP     NULL

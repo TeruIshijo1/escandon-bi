@@ -1,10 +1,5 @@
-/**
- * admin.routes.js — Gestión de Usuarios (solo ADMIN)
- * Hospital Escandón BI Platform v1.0
- *
- * Solo el rol ADMIN puede crear, editar, desactivar usuarios
- * y asignar roles/permisos.
- */
+
+
 'use strict';
 
 const express  = require('express');
@@ -30,19 +25,15 @@ const storage = multer.diskStorage({
     cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage: storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max
+const upload = multer({ storage: storage, limits: { fileSize: 5 * 1024 * 1024 } });  
 
-/* ── Todas las rutas requieren ADMIN ──────────────────────── */
+/* Todas las rutas requieren ADMIN */
 router.use(authenticate, authorize(['ADMIN']));
 
-/**
- * POST /api/admin/upload-json
- * Sube un archivo JSON para la configuración de BI/KPI y devuelve la ruta
- */
 router.post('/upload-json', upload.single('jsonFile'), (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
-    // Guardar ruta relativa al backend
+     
     const filePath = `/uploads/json/${req.file.filename}`;
     res.json({ ok: true, filePath });
   } catch (err) {
@@ -50,10 +41,6 @@ router.post('/upload-json', upload.single('jsonFile'), (req, res, next) => {
   }
 });
 
-/**
- * GET /api/admin/usuarios
- * Lista todos los usuarios con su rol
- */
 router.get('/usuarios', async (req, res, next) => {
   try {
     const db = getDb();
@@ -85,10 +72,6 @@ router.get('/usuarios', async (req, res, next) => {
   }
 });
 
-/**
- * GET /api/admin/usuarios/:id
- * Detalle de un usuario
- */
 router.get('/usuarios/:id', async (req, res, next) => {
   try {
     const db = getDb();
@@ -117,10 +100,7 @@ router.get('/usuarios/:id', async (req, res, next) => {
   }
 });
 
-/**
- * PUT /api/admin/usuarios/:id/permisos
- * Actualiza los reportes/tableros específicos a los que tiene acceso el usuario
- */
+/* PUT /api/admin/usuarios/:id/permisos */
 router.put('/usuarios/:id/permisos', async (req, res, next) => {
   try {
     const { permisos } = req.body;
@@ -135,11 +115,6 @@ router.put('/usuarios/:id/permisos', async (req, res, next) => {
   }
 });
 
-/**
- * POST /api/admin/usuarios
- * Crear nuevo usuario
- * Body: { username, nombre, email, password, rolId, area? }
- */
 router.post('/usuarios', async (req, res, next) => {
   try {
     const { username, nombre, email, password, rolId, area } = req.body;
@@ -156,11 +131,9 @@ router.post('/usuarios', async (req, res, next) => {
 
     const db = getDb();
 
-    // Verificar que el rol existe
     const rol = await db.prepare('SELECT RolId, NombreRol FROM Roles WHERE RolId = ?').get(rolId);
     if (!rol) return res.status(400).json({ error: 'Rol no válido' });
 
-    // Verificar duplicados
     const existe = await db.prepare('SELECT UsuarioId FROM Usuarios WHERE Username = ? OR Email = ?')
       .get(username.toLowerCase(), email.toLowerCase());
     if (existe) return res.status(409).json({ error: "Ese usuario o correo ya está registrado. Usa uno diferente." });
@@ -198,11 +171,6 @@ router.post('/usuarios', async (req, res, next) => {
   }
 });
 
-/**
- * PUT /api/admin/usuarios/:id
- * Actualizar usuario (nombre, email, rol, área, activo)
- * Body: { nombre?, email?, rolId?, area?, activo? }
- */
 router.put('/usuarios/:id', async (req, res, next) => {
   try {
     const db = getDb();
@@ -250,11 +218,6 @@ router.put('/usuarios/:id', async (req, res, next) => {
   }
 });
 
-/**
- * PUT /api/admin/usuarios/:id/password
- * Resetear contraseña de un usuario
- * Body: { password }
- */
 router.put('/usuarios/:id/password', async (req, res, next) => {
   try {
     const { password } = req.body;
@@ -276,10 +239,6 @@ router.put('/usuarios/:id/password', async (req, res, next) => {
   }
 });
 
-/**
- * DELETE /api/admin/usuarios/:id
- * Desactivar usuario (soft delete)
- */
 router.delete('/usuarios/:id', async (req, res, next) => {
   try {
     const db = getDb();
@@ -301,10 +260,6 @@ router.delete('/usuarios/:id', async (req, res, next) => {
   }
 });
 
-/**
- * GET /api/admin/roles
- * Lista todos los roles disponibles
- */
 router.get('/roles', async (req, res, next) => {
   try {
     const db = getDb();
@@ -315,10 +270,6 @@ router.get('/roles', async (req, res, next) => {
   }
 });
 
-/**
- * GET /api/admin/audit-logs
- * Retorna logs de auditoría, filtrados por fecha
- */
 router.get('/audit-logs', async (req, res, next) => {
   try {
     const db = getDb();
@@ -360,10 +311,6 @@ router.get('/audit-logs', async (req, res, next) => {
   }
 });
 
-/**
- * GET /api/admin/audit-logs/excel
- * Exporta el log de auditoría completo a formato Excel
- */
 router.get('/audit-logs/excel', async (req, res, next) => {
   try {
     const db = require('../config/db').getDb();
@@ -419,16 +366,11 @@ router.get('/audit-logs/excel', async (req, res, next) => {
   }
 });
 
-/**
- * GET /api/admin/config-bi
- * Lista todos los reportes configurados
- */
 router.get('/config-bi', async (req, res, next) => {
   try {
     const db = getDb();
     const config = await db.prepare('SELECT ConfigId AS id, ReporteId AS reportId, Titulo AS name, PowerBIWorkspace AS workspaceId, PowerBIReportId AS pbiReportId, LookerDashboard AS lookerUrl, LookerDashboard2 AS lookerUrl2, LookerDashboard3 AS lookerUrl3, PbixPath AS pbixPath, ExcelPath AS excelPath, ThumbnailPath AS thumbnailPath, RolesPermitidos AS roles, AreaRequerida AS area, MultiPagina AS multiPagina, Activo AS active, JsonApiUrl AS jsonApiUrl, JsonFilePath AS jsonFilePath FROM ConfiguracionBI').all();
-    
-    // Parsear roles JSON
+
     const data = config.map(c => ({
       ...c,
       roles: JSON.parse(c.roles || '[]')
@@ -440,10 +382,6 @@ router.get('/config-bi', async (req, res, next) => {
   }
 });
 
-/**
- * POST /api/admin/config-bi
- * Crear nueva configuración de reporte
- */
 router.post('/config-bi', async (req, res, next) => {
   try {
     const { reportId, name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, roles, area, multiPagina, jsonApiUrl, jsonFilePath } = req.body;
@@ -460,10 +398,6 @@ router.post('/config-bi', async (req, res, next) => {
   }
 });
 
-/**
- * PUT /api/admin/config-bi/:id
- * Actualizar configuración de reporte
- */
 router.put('/config-bi/:id', async (req, res, next) => {
   try {
     const { name, workspaceId, pbiReportId, lookerUrl, lookerUrl2, lookerUrl3, pbixPath, excelPath, thumbnailPath, roles, area, multiPagina, active, jsonApiUrl, jsonFilePath } = req.body;
@@ -481,10 +415,6 @@ router.put('/config-bi/:id', async (req, res, next) => {
   }
 });
 
-/**
- * DELETE /api/admin/config-bi/:id
- * Eliminar configuración de reporte
- */
 router.delete('/config-bi/:id', async (req, res, next) => {
   try {
     const db = getDb();
@@ -495,13 +425,9 @@ router.delete('/config-bi/:id', async (req, res, next) => {
   }
 });
 
-
-/**
- * DATA HUB: GESTIÓN DE CONECTORES Y MAPEOS
- */
+/* DATA HUB: GESTIÓN DE CONECTORES Y MAPEOS */
 const dataHubService = require('../services/datahub.service');
 
-// Listar conectores
 router.get('/connectors', async (req, res, next) => {
   try {
     const db = getDb();
@@ -510,7 +436,6 @@ router.get('/connectors', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Crear conector
 router.post('/connectors', async (req, res, next) => {
   try {
     const { nombre, tipo, configuracion } = req.body;
@@ -532,7 +457,6 @@ router.get('/connectors/:id/entities', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Listar todas las entidades registradas
 router.get('/entities', async (req, res, next) => {
   try {
     const db = getDb();
@@ -555,7 +479,6 @@ router.get('/metric-mappings', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Crear/Actualizar mapeo
 router.post('/metric-mappings', async (req, res, next) => {
   try {
     const { seccionUI, entityId, campoValor, campoDelta, campoFiltro, metodoCalculo } = req.body;
@@ -575,16 +498,6 @@ router.post('/metric-mappings', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/**
- * ─────────────────────────────────────────────────────────────────
- * KPI CONFIG — Gestión de indicadores y enlaces Power BI
- * ─────────────────────────────────────────────────────────────────
- */
-
-/**
- * GET /api/admin/kpi-config
- * Lista los 37 KPIs con su configuración actual
- */
 router.get('/kpi-config', async (req, res, next) => {
   try {
     const db   = getDb();
@@ -613,11 +526,6 @@ router.get('/kpi-config', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/**
- * PUT /api/admin/kpi-config/:elementoId
- * Actualiza nombre, ícono y URL PBI de un KPI específico
- * Body: { nombreCustom?, icono?, pbiUrl? }
- */
 router.put('/kpi-config/:elementoId', async (req, res, next) => {
   try {
     const { nombreCustom, icono, pbiUrl, pbiUrl2, pbiUrl3, multiPagina, jsonApiUrl, jsonFilePath } = req.body;
@@ -648,10 +556,6 @@ router.put('/kpi-config/:elementoId', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/**
- * POST /api/admin/sync-dw-full
- * Fuerza la re-sincronización histórica completa de todos los tableros (Quirófano, Dashboards y Traslados SAP)
- */
 router.post('/sync-dw-full', async (req, res, next) => {
   try {
     const { syncAllDashboards } = require('../services/dashboardSync.service');
@@ -660,15 +564,22 @@ router.post('/sync-dw-full', async (req, res, next) => {
 
     console.log('[API Admin] Iniciando re-sincronización completa de DW...');
     
-    // Ejecutar secuencialmente para controlar carga
-    await syncQuirofanoData({ fullSync: true });
-    await syncAllDashboards({ fullSync: true });
-    const countT = await syncTraslados();
-
-    res.json({
+    // La cola evita que la actualización manual compita con los ciclos automáticos.
+    const { runExclusive } = require('../services/backgroundQueue.service');
+    const { quirofano, tableros, countT } = await runExclusive(async () => {
+      const quirofano = await syncQuirofanoData({ fullSync: true });
+      const tableros = await syncAllDashboards({ fullSync: true });
+      const countT = await syncTraslados();
+      return { quirofano, tableros, countT };
+    });
+    const incomplete = quirofano?.status !== 'complete' || tableros?.status !== 'complete';
+    res.status(incomplete ? 202 : 200).json({
       ok: true,
-      message: "Información actualizada.",
+      status: incomplete ? 'incomplete' : 'complete',
+      message: incomplete ? 'La actualización conserva fuentes pendientes; revisa su última copia completa.' : 'Información actualizada.',
       detalle: {
+        quirofano,
+        tableros,
         trasladosSincronizados: countT || 0
       }
     });

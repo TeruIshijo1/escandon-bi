@@ -10,9 +10,7 @@ const PDF_MARGIN = 13;
 const PDF_CONTENT_BOTTOM_GAP = 12;
 const HONORARIOS_DECLARATION = 'Manifiesto mi conformidad con esta liquidación de honorarios por los servicios profesionales que le presté, sin sujeción a un horario, a FUNDACIÓN MARÍA ANA MIER DE ESCANDÓN, I.A.P. en el libre ejercicio de mi profesión de médico; en el mes arriba mencionado y para que estos me sean pagados, contra la firma de este documento,entrego Comprobante Fiscal Digital Por Internet, expedido por el suscrito, por lo que no me adeuda cantidad alguna por concepto de honorarios y reitero además que la relación que me une con dicha Fundación es de naturaleza civil por virtud del contrato de prestación de servicios profesionales que tenemos celebrado, reiterando que la única relación existente es la antes mencionada y por ende, no existe ninguna otra, ni de naturaleza laboral, ni de ninguna otra. Así mismo, con el pago que se me haga de estos honorarios se encuentra pagada cualquier cantidad adeudada por la Fundación, por lo que no me reservo derecho ni acción algunos que ejercitar en contra de esa Fundación, ni en el presente ni en el futuro, por ninguna vía; otorgándoles por este medio el finiquito más amplio que en derecho proceda.';
 
-/**
- * Formatea un número como moneda mexicana MXN ($ 1,234.56)
- */
+/* Formatea un número como moneda mexicana MXN ($ 1,234.56) */
 function formatCurrency(val) {
   if (val === null || val === undefined || !Number.isFinite(Number(val))) return 'PENDIENTE';
   const num = Number(val) || 0;
@@ -43,9 +41,7 @@ function prepareDoctorReview(doctorData, approvedOnly = false) {
     tasaISR: rates.length === 1 ? rates[0] : null, tasasISR: rates };
 }
 
-/**
- * Obtiene el texto de periodo en formato legible
- */
+/* Obtiene el texto de periodo en formato legible */
 function getPeriodLabel(startDate, endDate) {
   if (!startDate || !endDate) return 'PERIODO DE SERVICIOS';
   
@@ -60,7 +56,6 @@ function getPeriodLabel(startDate, endDate) {
   const sMIdx = parseInt(sMonth, 10) - 1;
   const eMIdx = parseInt(eMonth, 10) - 1;
 
-  // Si es un mes completo exacto (ej. 2026-08-01 a 2026-08-31)
   if (sYear === eYear && sMIdx === eMIdx && parseInt(sDay, 10) === 1) {
     const lastDayOfMonth = new Date(parseInt(sYear, 10), sMIdx + 1, 0).getDate();
     if (parseInt(eDay, 10) === lastDayOfMonth) {
@@ -71,9 +66,6 @@ function getPeriodLabel(startDate, endDate) {
   return `SERVICIOS DEL ${sDay}/${sMonth}/${sYear} AL ${eDay}/${eMonth}/${eYear}`;
 }
 
-/**
- * Agrupa y suma las filas de un médico por Grupo de Servicio y Descripción de Concepto
- */
 function aggregateDoctorServices(filas) {
   const groups = {};
 
@@ -185,20 +177,16 @@ function addPdfFooters(doc) {
   }
 }
 
-/**
- * Renderiza los servicios configurados y su revisión para un médico.
- */
 function renderDoctorReceipt(doc, doctorData, periodInfo) {
-  // El detalle y el resumen comparten el mismo catálogo autorizado y médico.
+   
   const reviewRows = doctorData.filasRevision || doctorData.filas || [];
   doctorData = { ...doctorData, filas: reviewRows, ...summarizeHonorarios(reviewRows) };
-  const pageWidth = doc.internal.pageSize.getWidth(); // 215.9 mm
-  const pageHeight = doc.internal.pageSize.getHeight(); // 279.4 mm
+  const pageWidth = doc.internal.pageSize.getWidth();  
+  const pageHeight = doc.internal.pageSize.getHeight();  
   const margin = PDF_MARGIN;
   const contentWidth = pageWidth - margin * 2;
   let currentY = drawDoctorPageHeader(doc, doctorData, periodInfo);
 
-  // 4. Renglones Agrupados
   const aggregated = aggregateDoctorServices(doctorData.filas || []);
   const groupNames = Object.keys(aggregated);
 
@@ -256,7 +244,7 @@ function renderDoctorReceipt(doc, doctorData, periodInfo) {
   doc.line(margin, currentY, pageWidth - margin, currentY);
   currentY += 2.5;
 
-  // 5. Cuadro Financiero / Resumen Fiscal (Alineado a la derecha)
+  // Cuadro Financiero / Resumen Fiscal (Alineado a la derecha)
   const summaryWidth = 108;
   const summaryX = pageWidth - margin - summaryWidth;
 
@@ -305,7 +293,6 @@ function renderDoctorReceipt(doc, doctorData, periodInfo) {
     currentY += 5.2;
   });
 
-  // El importe final incluye únicamente decisiones aprobadas de estas atenciones.
   doc.setFillColor(0, 70, 135);
   doc.rect(summaryX, currentY, summaryWidth, 7, 'F');
   doc.setFont('helvetica', 'bold');
@@ -319,7 +306,6 @@ function renderDoctorReceipt(doc, doctorData, periodInfo) {
   return currentY;
 }
 
-// El detalle conserva las decisiones de revisión de los mismos servicios autorizados.
 function renderReviewAppendix(doc, doctorData, periodInfo, detailed, startAtY) {
   const clinical = detailed ? doctorData.filasRevision || doctorData.filas || [] : [];
   if (!clinical.length) return startAtY;
@@ -431,9 +417,6 @@ function renderFinalSignature(doc, doctorData, periodInfo, startAtY) {
   doc.text('MÉDICO / PRESTADOR', center, currentY + 10.5, { align: 'center' });
 }
 
-/**
- * Genera y descarga la revisión de servicios autorizados de un médico
- */
 export function generateDoctorHonorariosPdf(doctorData, startDate, endDate, includeZeroAmounts = true, _generatedBy = '', approvedOnly = false) {
   doctorData = prepareDoctorReview(doctorData, approvedOnly);
   if (!doctorData.filasRevision.length) return false;
@@ -455,9 +438,6 @@ export function generateDoctorHonorariosPdf(doctorData, startDate, endDate, incl
   return true;
 }
 
-/**
- * Genera y descarga la revisión de todos los médicos con servicios autorizados
- */
 export function generateAllDoctorsHonorariosPdf(doctorsList, startDate, endDate, includeZeroAmounts = true, _generatedBy = '', approvedOnly = false) {
   const eligibleDoctors = (doctorsList || []).map(doctor => prepareDoctorReview(doctor, approvedOnly)).filter(doctor => doctor.filasRevision.length);
   if (!eligibleDoctors.length) return false;

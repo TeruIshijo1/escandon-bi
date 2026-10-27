@@ -1,17 +1,5 @@
-/**
- * api/client.js — Cliente HTTP centralizado de la plataforma
- * Hospital Escandón BI Platform
- *
- * Unifica:
- *  - Inyección del token JWT (sessionStorage) en el header Authorization
- *  - Manejo de errores consistente (ApiError con status)
- *  - Parseo de JSON seguro
- *  - Soporte para respuestas binarias (blob) en exportaciones
- *
- * Uso:
- *   const data = await apiFetch('/dashboard/stats');
- *   const blob = await apiFetch('/export/pdf/x', { raw: 'blob' });
- */
+
+
 import { API_BASE } from './config';
 import { userMessage } from '../utils/userMessages';
 
@@ -35,14 +23,6 @@ export function setToken(token) {
   else sessionStorage.removeItem(TOKEN_KEY);
 }
 
-/**
- * Fetch centralizado.
- * @param {string} path  Ruta API (ej. '/dashboard/stats' o '/api/dashboard/stats')
- * @param {Object} options { method, body, params, headers, raw, signal }
- *   - params: objeto → query string
- *   - raw: 'blob' | 'text' para no intentar parsear JSON
- * @returns {Promise<any>} JSON parseado, blob o texto
- */
 export async function apiFetch(path, {
   method = 'GET',
   body,
@@ -51,7 +31,8 @@ export async function apiFetch(path, {
   raw,
   signal,
 } = {}) {
-  let url = path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? path : '/' + path}`;
+  const cleanPath = path.replace(/^\/api(?=\/|$)/, '');
+  let url = path.startsWith('http') ? path : `${API_BASE}${cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath}`;
 
   if (params) {
     const qs = new URLSearchParams(
@@ -74,12 +55,11 @@ export async function apiFetch(path, {
       body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch (error) {
-    // Cancellation belongs to the caller's request lifecycle, not a connection failure.
+     
     if (signal?.aborted || error?.name === 'AbortError') throw error;
     throw new ApiError(0, userMessage(error));
   }
 
-  // Respuestas binarias (PDF/Excel)
   if (raw === 'blob') {
     if (!res.ok) throw new ApiError(res.status, 'No se pudo descargar el archivo. Intenta de nuevo.');
     return res.blob();
@@ -94,7 +74,7 @@ export async function apiFetch(path, {
   try {
     data = await res.json();
   } catch {
-    // Sin cuerpo JSON: usar texto si existe
+     
     data = await res.text().catch(() => null);
   }
 

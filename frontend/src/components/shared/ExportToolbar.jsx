@@ -7,7 +7,6 @@ export default function ExportToolbar({ targetId, excelData, fileNamePrefix = 'D
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
 
-  // Generar Excel Institucional
   const handleExportExcel = () => {
     setIsExportingExcel(true);
     try {
@@ -62,7 +61,6 @@ export default function ExportToolbar({ targetId, excelData, fileNamePrefix = 'D
     }
   };
 
-  // Generar PDF
   const handleExportPdf = async () => {
     const target = document.getElementById(targetId);
     if (!target) {
@@ -84,13 +82,12 @@ export default function ExportToolbar({ targetId, excelData, fileNamePrefix = 'D
       const pdf = new jsPDF({
         orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
         unit: 'px',
-        format: [canvas.width, canvas.height + 40] // +40px para el header
+        format: [canvas.width, canvas.height + 40]  
       });
 
       const pdfW = pdf.internal.pageSize.getWidth();
-      
-      // Header institucional
-      pdf.setFillColor(0, 70, 135); // Azul Institucional
+
+      pdf.setFillColor(0, 70, 135);  
       pdf.rect(0, 0, pdfW, 40, 'F');
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(18);
@@ -124,7 +121,7 @@ export default function ExportToolbar({ targetId, excelData, fileNamePrefix = 'D
           justifyContent: 'center',
           gap: '0.45rem',
           padding: '0.6rem 1.1rem',
-          background: '#09152b', // Dark institutional color
+          background: '#09152b',  
           border: '1.5px solid rgba(255,255,255,0.1)',
           borderRadius: 10,
           color: '#FFFFFF',

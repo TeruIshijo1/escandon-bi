@@ -1,6 +1,6 @@
 'use strict';
 
-const ACTIVE_START = '2026-04-01';
+const ACTIVE_START = '2026-01-01';
 const DAY = 86400000;
 
 function invalid(message) {
@@ -38,7 +38,7 @@ function dateRange(startDate, endDate, { activeOnly = true, maxDays = 366 } = {}
   dateOnly(endDate);
   if (startDate > endDate) throw invalid('La fecha inicial debe ser anterior o igual a la fecha final.');
   if (activeOnly && startDate < ACTIVE_START) {
-    throw invalid('El detalle para generar el estadístico está disponible desde el 1 de abril de 2026. Los meses anteriores se conservan en el histórico.');
+    throw invalid('El detalle para generar el estadístico está disponible desde el 1 de enero de 2026. Los años anteriores se conservan en el histórico.');
   }
   const days = (Date.parse(endDate) - Date.parse(startDate)) / DAY + 1;
   if (days > maxDays) throw invalid(`Selecciona un periodo de hasta ${maxDays} días.`);
@@ -63,10 +63,17 @@ function periodRange(period, now) {
   else if (period === 'año') startDate = `${year}-01-01`;
   else if (!period || period === 'mes') startDate = `${year}-${month}-01`;
   else throw invalid('Selecciona un periodo válido.');
-  // No prorratear personas ni eventos de las cifras mensuales del histórico.
+   
   return dateRange(startDate < ACTIVE_START ? ACTIVE_START : startDate, endDate);
 }
 
-function roundMoney(value) { return Math.round((Number(value) + Number.EPSILON) * 100) / 100; }
+function roundMoney(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return number;
+
+  const [coefficient, exponent = '0'] = Math.abs(number).toString().split('e');
+  const shifted = Number(`${coefficient}e${Number(exponent) + 2}`);
+  return Math.sign(number) * Math.round(shifted) / 100 || 0;
+}
 
 module.exports = { ACTIVE_START, dateOnly, dateRange, monthRange, periodRange, hospitalToday, addDays, invalid, roundMoney };

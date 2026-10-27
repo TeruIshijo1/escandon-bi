@@ -1,9 +1,5 @@
 import { userMessage } from '../utils/userMessages';
-/**
- * LoginPage.jsx — Página de autenticación
- * Hospital Escandón BI Platform v4.0
- * Rediseño premium con identidad de marca y micro-interacciones
- */
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +15,6 @@ export default function LoginPage() {
   const [showPass,   setShowPass]   = useState(false);
   const [localError, setLocalError] = useState('');
 
-  // Si ya está autenticado, redirigir
   useEffect(() => {
     if (!loading && user) navigate(from, { replace: true });
   }, [user, loading]);
@@ -54,7 +49,7 @@ export default function LoginPage() {
       position:      'relative',
       overflow:      'hidden',
     }}>
-      {/* Background Medical Cross Pattern Grid */}
+      
       <div style={{
         position: 'absolute',
         inset: 0,
@@ -64,7 +59,6 @@ export default function LoginPage() {
         pointerEvents: 'none',
       }}/>
 
-      {/* Decorative Orbs */}
       {[
         { w:500, h:500, top:'-150px', left:'-100px', bg:'radial-gradient(circle, rgba(0,184,163,0.1) 0%, rgba(0,0,0,0) 70%)' },
         { w:400, h:400, bottom:'-100px', right:'-50px', bg:'radial-gradient(circle, rgba(0,70,135,0.2) 0%, rgba(0,0,0,0) 70%)' },
@@ -83,7 +77,6 @@ export default function LoginPage() {
         }}/>
       ))}
 
-      {/* Login Card Wrapper with rotating border effect simulated via premium styling */}
       <div className="login-card-wrapper" style={{
         position: 'relative',
         padding: '3px',
@@ -101,7 +94,7 @@ export default function LoginPage() {
           borderRadius: '21px',
           padding: '2.75rem 2.25rem 2.25rem',
         }}>
-          {/* Internal animations and styles */}
+          
           <style>{`
             @keyframes cardEntrance {
               from { opacity: 0; transform: scale(0.96) translateY(15px); }
@@ -212,7 +205,6 @@ export default function LoginPage() {
             }
           `}</style>
 
-          {/* Logo & Subtitle */}
           <div style={{ textAlign:'center', marginBottom:'2rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div className="brand-logo-badge" style={{ marginBottom: '1rem', cursor: 'default' }}>
               <img
@@ -236,7 +228,7 @@ export default function LoginPage() {
 
           {/* Formulario */}
           <form onSubmit={handleSubmit} noValidate>
-            {/* Usuario */}
+            
             <div className="login-field-group">
               <label className="login-label">Usuario</label>
               <div className="login-input-container">
@@ -302,7 +294,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Error */}
             {localError && (
               <div style={{
                 background:  'rgba(239,68,68,0.06)',
@@ -347,7 +338,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Footer */}
+          {/* Pie de página */}
           <div style={{ textAlign:'center', marginTop:'1.75rem', borderTop:'1px solid #EDF2F7', paddingTop:'1.25rem' }}>
             <p style={{
               fontFamily: 'var(--font-mono)',

@@ -1,14 +1,14 @@
 'use strict';
 
-// Read-only Service Layer reports. Importing this module never registers SQLQueries.
 const sap = require('./sap.service');
 const sapConfig = require('../config/sap.config');
+const { roundMoney } = require('./statisticsCommon');
 
 const SELECT = 'DocEntry,DocNum,DocType,DocDate,TaxDate,DocCurrency,DocTotal,VatSum,DiscountPercent,TotalDiscount,Cancelled,CancelStatus,DocumentStatus,CardCode,U_PCType,U_PCNum,U_PRNum,U_PRName,DocumentLines';
-const CATEGORY_GROUPS = Object.freeze({ imagen: [117, 130], laboratorio: [101, 121] });
-// Catalog verified through Items on 2026-10-07: specialty consultation fees in
-// group 107. Excludes the generic outpatient fee SER0577 and general medicine
-// SER0598, as well as supplies, drugs, tests and pre-consultations in that group.
+const CATEGORY_GROUPS = Object.freeze({ imagen: [117], laboratorio: [101, 105, 124],
+  ultrasonidoEstructural: [130], paquetesLaboratorio: [121] });
+const LABORATORY_AREAS = Object.freeze({ 101: 'Laboratorio', 105: 'Banco de sangre', 121: 'Paquetes de laboratorio', 124: 'Patología' });
+
 const SPECIALTY_CONSULTATION_CODES = Object.freeze([
   'SER0578', 'SER0579', 'SER0580', 'SER0581', 'SER0582', 'SER0583', 'SER0584', 'SER0585',
   'SER0586', 'SER0587', 'SER0588', 'SER0589', 'SER0590', 'SER0591', 'SER0592', 'SER0593',
@@ -17,10 +17,8 @@ const SPECIALTY_CONSULTATION_CODES = Object.freeze([
   'SER0611', 'SER0612', 'SER0613', 'SER0614', 'SER0615', 'SER0616', 'SER0617', 'SER0618',
   'SER0619', 'SER0620', 'SER0621', 'SER0622', 'SER0623'
 ]);
-// Complete monthly reads were verified with 200 documents per page. Large
-// hospital accounts make later pages much larger than an initial sample.
-// Prefer controls page size; $top would truncate the report.
-const PAGE_SIZE = 200;
+
+const PAGE_SIZE = process.env.NODE_ENV === 'test' ? 200 : 500;
 const MAX_PAGES = 500;
 const MAX_ROWS = 200000;
 const REQUEST_TIMEOUT = 90000;
@@ -35,8 +33,6 @@ function cancelledRead() {
   return error;
 }
 
-// One shared read slot across exports and history consumers. SAP can otherwise
-// queue several large document pages until the smaller catalog read times out.
 function acquireRead(signal) {
   if (signal?.aborted) return Promise.reject(cancelledRead());
   return new Promise((resolve, reject) => {
@@ -71,13 +67,15 @@ async function readSap(endpoint, headers, options = {}) {
   const release = await acquireRead(options.signal);
   try {
     if (options.signal?.aborted) throw cancelledRead();
-    return await sap.get(endpoint, headers, { timeoutMs: REQUEST_TIMEOUT,
+    return await sap.get(endpoint, headers, { timeoutMs: REQUEST_TIMEOUT, queueTimeoutMs: 60000, totalTimeoutMs: 240000,
       ...(options.signal ? { signal: options.signal } : {}) });
   } finally { release(); }
 }
 
-const money = value => Math.round((value + Number.EPSILON) * 100) / 100;
+const money = roundMoney;
 const text = value => String(value ?? '').trim();
+
+const doctorText = value => text(value) ? String(value) : 'Sin identificar';
 const id = value => Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : null;
 function number(value, label) {
   if (value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) {
@@ -155,8 +153,7 @@ async function getItems(options) {
   }
   const entry = pendingItems;
   entry.consumers++;
-  // Each report cancels its own wait. The shared read is cancelled only after
-  // every consumer leaves, so closing one export cannot break another export.
+
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (callback, value) => {
@@ -174,25 +171,25 @@ async function getItems(options) {
 }
 
 function documentEndpoint(entity, range) {
-  // The supplied monthly workbook calls TaxDate "FechaDocumento" for sales orders.
+   
   const dateField = entity === 'Orders' ? 'TaxDate' : 'DocDate';
-  const filter = `${dateField} ge '${range.startDate}' and ${dateField} lt '${range.endExclusive}' and Cancelled eq 'tNO'`;
+  const filter = `${dateField} ge '${range.startDate}' and ${dateField} lt '${range.endExclusive}'${entity === 'Orders' ? " and Cancelled eq 'tNO'" : ''}`;
   return `/${entity}?$select=${SELECT}&$filter=${encodeURIComponent(filter)}&$orderby=DocEntry asc`;
 }
 
 function distribute(total, weights) {
-  const sum = weights.reduce((a, b) => a + b, 0);
-  if (!weights.length) return [];
-  if (sum === 0) {
+  return proportionalAmounts(total, weights);
+}
+
+function proportionalAmounts(total, weights) {
+  const subtotal = weights.reduce((sum, amount) => sum + amount, 0);
+  if (subtotal === 0) {
     if (total !== 0) throw new Error('No se pudo distribuir un importe entre los servicios del documento.');
     return weights.map(() => 0);
   }
-  let allocated = 0;
-  return weights.map((weight, i) => {
-    const amount = i === weights.length - 1 ? money(total - allocated) : money(total * weight / sum);
-    allocated = money(allocated + amount);
-    return amount;
-  });
+  if (total === subtotal) return [...weights];
+
+  return weights.map(amount => total * amount / subtotal);
 }
 
 function category(group, code) {
@@ -201,17 +198,25 @@ function category(group, code) {
   return Object.keys(CATEGORY_GROUPS).find(key => CATEGORY_GROUPS[key].includes(group)) || null;
 }
 
-function flattenDocuments(documents, entity, items, origins = new Map()) {
+function flattenDocuments(documents, entity, items, origins = new Map(), creditOrigins = new Map()) {
   const itemMap = new Map(items.map(item => [text(item.ItemCode), item]));
   const rows = [];
   const headers = [];
   const issues = { missingAccountType: 0, missingDoctor: 0, missingItems: 0, unallocatedDocuments: 0, unlinkedCredits: 0, multiAccountDocuments: 0 };
-  const sign = entity === 'CreditNotes' ? -1 : 1;
-  const kind = entity === 'Orders' ? 'Orden de venta' : entity === 'Invoices' ? 'Factura' : 'Nota de crédito';
   for (const doc of documents) {
-    if (['csYes', 'csCancellation'].includes(doc.CancelStatus)) continue;
-    if (['tYES', 'Y', true].includes(doc.Cancelled)) continue;
-    if (!['tNO', 'N', false].includes(doc.Cancelled)) throw new Error('No se pudo comprobar si un documento está cancelado.');
+    const isReversal = doc.CancelStatus === 'csCancellation';
+    const isCancelled = doc.CancelStatus === 'csYes' || ['tYES', 'Y', true].includes(doc.Cancelled);
+    if (entity === 'Orders' && (isCancelled || isReversal)) continue;
+    if ((doc.CancelStatus != null && !['csNo', 'csYes', 'csCancellation'].includes(doc.CancelStatus)) ||
+      (!isReversal && !['tNO', 'N', false, 'tYES', 'Y', true].includes(doc.Cancelled))) {
+      throw new Error('No se pudo comprobar si un documento está cancelado.');
+    }
+    // Emisión y contraasiento conservan sus propias fechas de contabilización.
+    // Omitir ambos borra el mes original y pierde la reversión si ocurre en otro mes.
+    const sign = (entity === 'CreditNotes' ? -1 : 1) * (isReversal ? -1 : 1);
+    const kind = entity === 'Orders' ? 'Orden de venta' : entity === 'Invoices'
+      ? isReversal ? 'Cancelación de factura' : isCancelled ? 'Factura cancelada' : 'Factura'
+      : isReversal ? 'Cancelación de nota de crédito' : isCancelled ? 'Nota de crédito cancelada' : 'Nota de crédito';
     if (!Array.isArray(doc.DocumentLines)) throw new Error('Un documento no incluyó el detalle de sus servicios.');
     const day = text(entity === 'Orders' ? doc.TaxDate : doc.DocDate).slice(0, 10);
     if (!validDate(day)) throw new Error('Un documento no incluyó una fecha válida.');
@@ -220,7 +225,7 @@ function flattenDocuments(documents, entity, items, origins = new Map()) {
     const lineTotals = doc.DocumentLines.map(line => number(line.LineTotal, 'el importe de un servicio'));
     const subtotal = lineTotals.reduce((sum, amount) => sum + amount, 0);
     const discount = number(doc.TotalDiscount, 'el descuento del documento');
-    const discounts = distribute(discount, lineTotals);
+    const discounts = proportionalAmounts(discount, lineTotals);
     const taxes = doc.DocumentLines.map(line => number(line.TaxTotal, 'el impuesto de un servicio'));
     const allocatedTaxes = distribute(vat, taxes.some(amount => amount !== 0) ? taxes : lineTotals);
     const difference = money(docTotal - vat - subtotal + discount);
@@ -236,7 +241,7 @@ function flattenDocuments(documents, entity, items, origins = new Map()) {
       AtencionesMultiples: multiAccount,
       TipoAtencion: multiAccount ? null : text(doc.U_PCType) || null,
       NumeroMedico: multiAccount ? null : id(doc.U_PRNum),
-      Medico: multiAccount ? 'Sin identificar' : text(doc.U_PRName) || 'Sin identificar',
+      Medico: multiAccount ? 'Sin identificar' : doctorText(doc.U_PRName),
       Moneda: 'MXN', MonedaDocumento: text(doc.DocCurrency),
       TotalOrdenVenta: entity === 'Orders' ? money(docTotal) : null,
       IngresoNeto: money(sign * (docTotal - vat)), IVA: money(sign * vat),
@@ -247,16 +252,17 @@ function flattenDocuments(documents, entity, items, origins = new Map()) {
     for (const [i, line] of doc.DocumentLines.entries()) {
       if (!Number.isInteger(line.LineNum) || lineNumbers.has(line.LineNum)) throw new Error('El documento devolvió líneas repetidas o sin identificar.');
       lineNumbers.add(line.LineNum);
-      const original = entity === 'CreditNotes' && Number(line.BaseType) === 13 ? origins.get(id(line.BaseEntry)) : null;
+      const original = entity === 'CreditNotes' ? Number(line.BaseType) === 13 ? origins.get(id(line.BaseEntry))
+        : Number(line.BaseType) === 14 ? creditOrigins.get(id(line.BaseEntry)) : null : null;
       const originalLine = original?.DocumentLines?.find(value => Number(value.LineNum) === Number(line.BaseLine));
       if (entity === 'CreditNotes' && !originalLine && (!id(doc.U_PCNum) || !doc.U_PCType)) issues.unlinkedCredits++;
       const account = id(line.U_PCNum) || id(doc.U_PCNum) || id(originalLine?.U_PCNum) || id(original?.U_PCNum);
-      // A consolidated header cannot classify another account. Vertical enriches that row by its unique account.
+       
       const canUseHeader = !multiAccount && (!id(line.U_PCNum) || !id(doc.U_PCNum) || id(line.U_PCNum) === id(doc.U_PCNum));
       const canUseOriginal = original && (!account || !id(original.U_PCNum) || account === id(original.U_PCNum));
       const accountType = (canUseHeader && text(doc.U_PCType)) || (canUseOriginal && text(original.U_PCType)) || null;
       const doctorNumber = (canUseHeader && id(doc.U_PRNum)) || (canUseOriginal && id(original.U_PRNum)) || null;
-      const doctorName = (canUseHeader && text(doc.U_PRName)) || (canUseOriginal && text(original.U_PRName)) || 'Sin identificar';
+      const doctorName = (canUseHeader && text(doc.U_PRName) && doctorText(doc.U_PRName)) || (canUseOriginal && text(original.U_PRName) && doctorText(original.U_PRName)) || 'Sin identificar';
       const code = text(line.ItemCode);
       const item = itemMap.get(code);
       const group = item ? number(item.ItemsGroupCode, 'el grupo del servicio') : null;
@@ -264,15 +270,17 @@ function flattenDocuments(documents, entity, items, origins = new Map()) {
       if (account && (!doctorNumber || doctorName === 'Sin identificar')) issues.missingDoctor++;
       const serviceWithoutItem = !code && doc.DocType === 'dDocument_Service';
       if (!item && !serviceWithoutItem) issues.missingItems++;
-      const net = money(sign * (lineTotals[i] - discounts[i]));
+      const net = sign * (lineTotals[i] - discounts[i]);
       if (rows.length >= MAX_ROWS) throw new Error('El periodo supera el límite de servicios. Selecciona un periodo menor.');
       rows.push({ Fecha: day, FolioAtencion: account, TipoAtencion: accountType, Medico: doctorName,
         NumeroMedico: doctorNumber, Codigo: code, Servicio: text(line.ItemDescription) || text(item?.ItemName),
-        Grupo: group, Categoria: category(group, code), Documento: doc.DocNum, DocumentoId: doc.DocEntry,
+        Grupo: group, Categoria: category(group, code), ...(LABORATORY_AREAS[group] ? { AreaLaboratorio: LABORATORY_AREAS[group] } : {}),
+        Documento: doc.DocNum, DocumentoId: doc.DocEntry,
         TipoDocumento: kind, EstadoDocumento: doc.DocumentStatus, CodigoCliente: text(doc.CardCode),
         Linea: line.LineNum, Cantidad: sign * number(line.Quantity, 'la cantidad de un servicio'),
+        ImporteLinea: money(sign * lineTotals[i]),
         IngresoNeto: net, IngresoOrden: entity === 'Orders' ? net : null,
-        IVA: money(sign * allocatedTaxes[i]), ImporteTotal: money(net + sign * allocatedTaxes[i]),
+        IVA: sign * allocatedTaxes[i], ImporteTotal: net + sign * allocatedTaxes[i],
         Moneda: 'MXN', BaseAtribucion: canUseHeader ? 'Cabecera SAP' : canUseOriginal ? 'Factura de origen SAP' : 'Pendiente de clasificar',
         ServicioSinArticulo: serviceWithoutItem
       });
@@ -292,9 +300,7 @@ async function getFinancialStatistics(input = {}) {
   const range = period(input);
   const options = { signal: input.signal };
   const includeOrders = input.includeOrders !== false;
-  // Complete the shared catalog before requesting document pages. Sequential
-  // stages also stop immediately on failure instead of leaving sibling queries
-  // running after Promise.all has already rejected the report.
+
   const items = includeOrders || input.includeBilling ? await getItems(options) : [];
   const orders = includeOrders ? await readPages(documentEndpoint('Orders', range), 'Orders', options) : [];
   const result = flattenDocuments(orders, 'Orders', items);
@@ -321,8 +327,17 @@ async function getBillingStatistics(input = {}, existingItems) {
   const invoices = await readPages(documentEndpoint('Invoices', range), 'Invoices', options);
   const billed = flattenDocuments(invoices, 'Invoices', items);
   const credits = await readPages(documentEndpoint('CreditNotes', range), 'CreditNotes', options);
+  const creditOrigins = new Map(credits.map(doc => [id(doc.DocEntry), doc]));
+  const neededCredits = new Set(credits.flatMap(doc => doc.DocumentLines || []).filter(line => Number(line.BaseType) === 14)
+    .map(line => id(line.BaseEntry)).filter(value => value && !creditOrigins.has(value)));
+  if (neededCredits.size > 2000) throw new Error('Demasiadas notas de crédito de origen para conciliar; selecciona un periodo menor.');
+  for (const entry of neededCredits) {
+    const response = await readSap(`/CreditNotes(${entry})?$select=${SELECT}`, {}, options);
+    if (id(response?.data?.DocEntry) !== entry || !Array.isArray(response.data.DocumentLines)) throw new Error('No se pudo verificar una nota de crédito de origen de las cancelaciones.');
+    creditOrigins.set(entry, response.data);
+  }
   const origins = new Map(invoices.map(doc => [id(doc.DocEntry), doc]));
-  const needed = new Set(credits.flatMap(doc => doc.DocumentLines || []).filter(line => Number(line.BaseType) === 13)
+  const needed = new Set([...creditOrigins.values()].flatMap(doc => doc.DocumentLines || []).filter(line => Number(line.BaseType) === 13)
     .map(line => id(line.BaseEntry)).filter(value => value && !origins.has(value)));
   if (needed.size > 2000) throw new Error('Demasiadas facturas de origen para conciliar; selecciona un periodo menor.');
   for (const entry of needed) {
@@ -330,10 +345,10 @@ async function getBillingStatistics(input = {}, existingItems) {
     if (id(response?.data?.DocEntry) !== entry || !Array.isArray(response.data.DocumentLines)) throw new Error('No se pudo verificar una factura de origen de las notas de crédito.');
     origins.set(entry, response.data);
   }
-  const returned = flattenDocuments(credits, 'CreditNotes', items, origins);
+  const returned = flattenDocuments(credits, 'CreditNotes', items, origins, creditOrigins);
   return { rows: [...billed.rows, ...returned.rows], documents: [...billed.documents, ...returned.documents],
-    warnings: [...billed.warnings, ...returned.warnings], basis: 'Facturas menos notas de crédito vigentes por fecha de contabilización; importes netos sin IVA.' };
+    warnings: [...billed.warnings, ...returned.warnings], basis: 'Movimientos facturados por fecha de contabilización: facturas y cancelaciones de notas de crédito suman; notas de crédito y cancelaciones de facturas restan. Cada movimiento conserva su propio mes; importes netos sin IVA.' };
 }
 
-module.exports = { getFinancialStatistics, getBillingStatistics, CATEGORY_GROUPS, SPECIALTY_CONSULTATION_CODES,
-  _testing: { readPages, nextEndpoint, flattenDocuments, distribute, resetCache: () => { itemCache = null; pendingItems = null; } } };
+module.exports = { getFinancialStatistics, getBillingStatistics, CATEGORY_GROUPS, LABORATORY_AREAS, SPECIALTY_CONSULTATION_CODES,
+  _testing: { readPages, nextEndpoint, flattenDocuments, distribute, proportionalAmounts, resetCache: () => { itemCache = null; pendingItems = null; } } };

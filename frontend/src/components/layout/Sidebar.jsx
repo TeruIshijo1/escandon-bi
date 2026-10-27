@@ -1,8 +1,5 @@
-/**
- * Sidebar.jsx — Navegación lateral con control RBAC
- * Hospital Escandón BI Platform v4.0
- * Rediseño premium con identidad de marca y micro-interacciones
- */
+
+
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth }                  from '../../context/AuthContext';
@@ -35,7 +32,7 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {/* Logo Section */}
+      
       <div className="sidebar-logo">
         <div 
           className="brand-logo-badge"
@@ -74,7 +71,6 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer de usuario */}
       <div className="sidebar-footer">
         <div className="user-badge">
           <div className="user-avatar">{initials}</div>

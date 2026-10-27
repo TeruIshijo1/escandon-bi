@@ -7,7 +7,6 @@ export default function DashboardUciNativo({ data }) {
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modal details states
   const [selectedPatientDetail, setSelectedPatientDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailItems, setDetailItems] = useState([]);
@@ -45,7 +44,6 @@ export default function DashboardUciNativo({ data }) {
     return `${diff} ${diff === 1 ? 'día' : 'días'}`;
   };
 
-  // Fetch detailed account charges on click
   useEffect(() => {
     if (!selectedPatientDetail) {
       setDetailItems([]);
@@ -75,7 +73,6 @@ export default function DashboardUciNativo({ data }) {
     fetchDetail();
   }, [selectedPatientDetail]);
 
-  // Filter patients list
   const filteredPatients = listaPacientes.filter(p => {
     if (selectedStatus) {
       if (selectedStatus === 'ACTIVO' && p.status !== 'OP') return false;
@@ -92,7 +89,6 @@ export default function DashboardUciNativo({ data }) {
     return true;
   });
 
-  // Filter detail items in modal
   const filteredDetailItems = detailItems.filter(item => {
     if (detailSelectedGroup && item.grupo !== detailSelectedGroup) return false;
     if (detailSearchQuery) {
@@ -105,7 +101,6 @@ export default function DashboardUciNativo({ data }) {
     return true;
   });
 
-  // Calculate some counts for censo status
   const totalBeds = censoCamas.length;
   const occupiedBedsCount = censoCamas.filter(b => b.Estado === 'OCUPADA').length;
   const freeBedsCount = totalBeds - occupiedBedsCount;
@@ -166,7 +161,7 @@ export default function DashboardUciNativo({ data }) {
         }
       `}</style>
 
-      {/* ── SECCIÓN 1: METRICAS CLAVE ── */}
+      {/* SECCIÓN 1: METRICAS CLAVE */}
       <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         
         {/* KPI: Facturación Total */}
@@ -195,7 +190,6 @@ export default function DashboardUciNativo({ data }) {
           </div>
         </div>
 
-        {/* KPI: Estancia Promedio */}
         <div className="uci-card-glow area-metric-card dashboard-metric-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-10px', bottom: '-15px', opacity: 0.05, fontSize: '6rem' }}>⏱️</div>
           <div className="area-metric-label dashboard-metric-label" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Estancia Promedio UCI</div>
@@ -207,7 +201,6 @@ export default function DashboardUciNativo({ data }) {
           </div>
         </div>
 
-        {/* KPI: Mortalidad */}
         <div className="uci-card-glow area-metric-card dashboard-metric-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #E2E8F0', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', right: '-10px', bottom: '-15px', opacity: 0.05, fontSize: '6rem' }}>🩺</div>
           <div className="area-metric-label dashboard-metric-label" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B' }}>Tasa de Mortalidad UCI</div>
@@ -221,7 +214,7 @@ export default function DashboardUciNativo({ data }) {
 
       </div>
 
-      {/* ── SECCIÓN 2: CENSO DE CAMAS EN VIVO ── */}
+      {/* SECCIÓN 2: CENSO DE CAMAS EN VIVO */}
       <div className="area-panel" style={{ background: '#FFFFFF', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '2rem' }}>
         <div className="area-panel-toolbar" style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
@@ -240,7 +233,6 @@ export default function DashboardUciNativo({ data }) {
           </div>
         </div>
 
-        {/* Camas Grid */}
         <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
           {censoCamas.map((bed, idx) => {
             const isOcupada = bed.Estado === 'OCUPADA';
@@ -269,7 +261,7 @@ export default function DashboardUciNativo({ data }) {
                   position: 'relative'
                 }}
               >
-                {/* Header Camas */}
+                
                 <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center' }}>
                   <div className="area-text-muted" style={{
                     fontFamily: 'var(--font-display)', 
@@ -322,8 +314,7 @@ export default function DashboardUciNativo({ data }) {
                     <div className="area-text-muted" style={{ fontSize: '0.78rem', color: '#64748B' }}>
                       ⏳ <span style={{ fontWeight: 600 }}>Estancia:</span> {getDaysBetween(bed.FechaIngreso)}
                     </div>
-                    
-                    {/* Accumulated charges for this active patient */}
+
                     <div style={{ 
                       marginTop: '0.3rem', 
                       background: 'rgba(5, 150, 105, 0.04)', 
@@ -373,7 +364,7 @@ export default function DashboardUciNativo({ data }) {
         </div>
       </div>
 
-      {/* ── SECCIÓN 3: GRAFICAS ANALÍTICAS ── */}
+      {/* SECCIÓN 3: GRAFICAS ANALÍTICAS */}
       <div className="area-chart-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '2rem' }}>
         
         {/* Gráfica 1: Distribución Financiera */}
@@ -459,7 +450,7 @@ export default function DashboardUciNativo({ data }) {
 
       </div>
 
-      {/* ── SECCIÓN 4: DETALLE HISTÓRICO DE PACIENTES ── */}
+      {/* SECCIÓN 4: DETALLE HISTÓRICO DE PACIENTES */}
       <div className="area-panel" style={{ background: 'white', padding: '1.75rem', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
         <div className="area-panel-toolbar" style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
@@ -619,7 +610,7 @@ export default function DashboardUciNativo({ data }) {
         </div>
       </div>
 
-      {/* ── MODAL: ESTADO DE CUENTA DETALLADO ── */}
+      {/* MODAL: ESTADO DE CUENTA DETALLADO */}
       {selectedPatientDetail && (
         <div style={{
           position: 'fixed',
@@ -648,7 +639,7 @@ export default function DashboardUciNativo({ data }) {
             overflow: 'hidden',
             animation: 'modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
-            {/* Modal Header */}
+            
             <div style={{
               padding: '1.5rem 1.75rem',
               borderBottom: '1px solid #F1F5F9',
@@ -671,8 +662,7 @@ export default function DashboardUciNativo({ data }) {
                   )}
                 </div>
               </div>
-              
-              {/* Right side: Amount highlighted */}
+
               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                 <span className="area-text-muted" style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94A3B8' }}>Total Cargado</span>
                 <div className="area-text-positive" style={{ fontSize: '1.6rem', fontWeight: 850, color: '#059669', fontFamily: 'var(--font-mono)' }}>
@@ -681,7 +671,6 @@ export default function DashboardUciNativo({ data }) {
               </div>
             </div>
 
-            {/* Modal Filters Toolbar */}
             <div style={{
               padding: '0.75rem 1.75rem',
               borderBottom: '1px solid #F1F5F9',
@@ -730,7 +719,6 @@ export default function DashboardUciNativo({ data }) {
               </span>
             </div>
 
-            {/* Modal Body / Table */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.75rem' }}>
               {detailLoading ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5rem 0', gap: '1rem' }}>
@@ -778,7 +766,6 @@ export default function DashboardUciNativo({ data }) {
               )}
             </div>
 
-            {/* Modal Footer */}
             <div style={{
               padding: '1.25rem 1.75rem',
               borderTop: '1px solid #F1F5F9',

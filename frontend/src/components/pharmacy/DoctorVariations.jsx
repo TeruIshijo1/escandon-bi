@@ -10,11 +10,10 @@ export default function DoctorVariations() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Selected state
   const [months, setMonths] = useState(6);
   const [selectedProcedure, setSelectedProcedure] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState('cards'); // 'cards', 'differencesTable', 'specificSurgery'
+  const [viewMode, setViewMode] = useState('cards');  
   const [selectedSurgeryFolio, setSelectedSurgeryFolio] = useState('');
 
   useEffect(() => {
@@ -51,7 +50,6 @@ export default function DoctorVariations() {
     return Object.keys(variationsData).sort();
   }, [variationsData]);
 
-  // Doctors for current procedure
   const currentDoctorsData = useMemo(() => {
     if (!selectedProcedure || !variationsData[selectedProcedure]) return {};
     return variationsData[selectedProcedure];
@@ -61,14 +59,12 @@ export default function DoctorVariations() {
     return Object.keys(currentDoctorsData);
   }, [currentDoctorsData]);
 
-  // Real events for current selected procedure
   const filteredEventsForProcedure = useMemo(() => {
     if (!selectedProcedure) return [];
     const procUpper = selectedProcedure.toUpperCase().trim();
     return events.filter(e => (e.Procedimiento || '').toUpperCase().trim().includes(procUpper));
   }, [selectedProcedure, events]);
 
-  // Auto select first surgery folio if none selected
   useEffect(() => {
     if (filteredEventsForProcedure.length > 0) {
       if (!selectedSurgeryFolio || !filteredEventsForProcedure.some(e => String(e.PCFRNum) === String(selectedSurgeryFolio))) {
@@ -81,13 +77,11 @@ export default function DoctorVariations() {
     return events.find(e => String(e.PCFRNum) === String(selectedSurgeryFolio)) || null;
   }, [selectedSurgeryFolio, events]);
 
-  // Hospital Average Kit matching selected procedure
   const hospitalKit = useMemo(() => {
     if (!selectedProcedure) return null;
     return kits.find(k => k.Cirugia.toUpperCase().trim() === selectedProcedure.toUpperCase().trim()) || null;
   }, [selectedProcedure, kits]);
 
-  // Build Comparative Differences Matrix Table
   const differencesMatrix = useMemo(() => {
     if (!selectedProcedure || doctorsList.length === 0) return [];
 
@@ -108,7 +102,6 @@ export default function DoctorVariations() {
       });
     });
 
-    // Populate kit averages
     if (hospitalKit) {
       hospitalKit.Items.forEach(kItem => {
         if (itemsMap.has(kItem.Codigo)) {
@@ -119,7 +112,6 @@ export default function DoctorVariations() {
 
     const rows = Array.from(itemsMap.values());
 
-    // Calculate max variation for each item
     rows.forEach(r => {
       const values = doctorsList.map(d => r.DoctorConsumptions[d] || 0);
       const min = Math.min(...values);
@@ -193,7 +185,7 @@ export default function DoctorVariations() {
   return (
     <div style={{ background: 'var(--card-bg, #ffffff)', borderRadius: '16px', padding: '2rem', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)', border: '1px solid var(--border-color, #e2e8f0)' }}>
       
-      {/* Header */}
+      {/* Encabezado */}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid var(--border-color, #e2e8f0)', paddingBottom: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.65rem', fontWeight: '800', color: 'var(--text-main, #0f172a)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -275,7 +267,6 @@ export default function DoctorVariations() {
         )}
       </div>
 
-      {/* Selector Control */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem', background: 'var(--sub-bg, #f8fafc)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color, #e2e8f0)' }}>
         <div>
           <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-muted, #64748b)', marginBottom: '0.35rem' }}>🔪 Procedimiento Quirúrgico:</label>
@@ -327,7 +318,6 @@ export default function DoctorVariations() {
       ) : (
         <div>
 
-          {/* VISTA 1: CARDS POR MÉDICO */}
           {viewMode === 'cards' && (
             <div>
               <div style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)', border: '1px solid rgba(99, 102, 241, 0.2)', padding: '1.25rem', borderRadius: '12px', marginBottom: '2rem' }}>
@@ -541,7 +531,7 @@ export default function DoctorVariations() {
                              (e.Procedimiento || '').toLowerCase().includes(q) ||
                              String(e.PCFRNum || '').includes(q);
                     })
-                    .slice(0, 30) // Render first 30 matches
+                    .slice(0, 30)  
                     .map(ev => {
                       const isSelected = String(ev.PCFRNum) === String(selectedSurgeryFolio);
                       const totalPiezas = (ev.ActualItems || []).reduce((acc, i) => acc + i.Cantidad, 0);
@@ -607,8 +597,7 @@ export default function DoctorVariations() {
               {/* Desglose de la Cirugía Seleccionada */}
               {currentSelectedSurgery ? (
                 <div style={{ background: 'var(--card-sub-bg, #f8fafc)', border: '2px solid #2563eb', borderRadius: '14px', padding: '1.5rem', boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}>
-                  
-                  {/* Header Cirugía Seleccionada */}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color, #cbd5e1)', paddingBottom: '0.75rem' }}>
                     <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span>📦</span> Insumos Consumidos en Folio #{currentSelectedSurgery.PCFRNum}
@@ -640,7 +629,6 @@ export default function DoctorVariations() {
                     </div>
                   </div>
 
-                  {/* Tabla con números exactos de insumos usados en esta cirugía */}
                   <div className="custom-table-scroll" style={{ maxHeight: '50vh', overflowY: 'auto', overflowX: 'auto', border: '1px solid var(--border-color, #e2e8f0)', borderRadius: '10px', background: 'var(--card-bg, #ffffff)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                       <thead>

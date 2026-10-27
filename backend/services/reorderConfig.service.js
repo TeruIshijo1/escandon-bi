@@ -1,18 +1,5 @@
 'use strict';
 
-/**
- * reorderConfig.service.js
- * Motor de "Configuración Dinámica (Farmacia)".
- * Lee el Excel de MÁXIMOS, MÍNIMOS Y PUNTOS DE REORDEN (2026) y expone la
- * calculadora de puntos de reorden basada en el consumo real histórico:
- *   CONSUMO MENSUAL = Total general / 11 meses
- *   CONSUMO DIARIO  = CONSUMO MENSUAL / 30
- *   PUNTO MIN     = ODD(CONSUMO DIARIO x 7)
- *   PUNTO REORDEN = ODD(CONSUMO DIARIO x 10.5)
- *   PUNTO MAX     = ODD(CONSUMO DIARIO x 14)
- * (misma lógica ODD() del Excel original)
- */
-
 const fs = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
@@ -20,10 +7,8 @@ const { pool } = require('../config/pg-db');
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'excel');
-const MONTH_COUNT = 11; // meses de consumo considerados en el Excel
+const MONTH_COUNT = 11;  
 const DAY_MONTH = 30;
-
-// ==== Utilidades ====
 
 function normalizeText(s) {
   return String(s || '')
@@ -43,9 +28,6 @@ function tokenize(s) {
   return normalizeText(s).split(' ').filter(t => t.length > 0);
 }
 
-/**
- * Réplica de la función ODD() de Excel (redondeo hacia arriba al impar más cercano).
- */
 function excelOdd(x) {
   const n = Math.ceil(Math.abs(Number(x) || 0));
   const odd = n % 2 === 0 ? n + 1 : n;
@@ -60,12 +42,6 @@ function computePoints(consDiario) {
   };
 }
 
-/**
- * Similitud 0..1 entre un producto del Excel y un nombre de artículo SAP.
- * Combina solapamiento de tokens (Jaccard ponderado) con coincidencia de dosis.
- * Devuelve también el conteo de tokens alfabéticos compartidos para filtrar
- * falsos positivos que sólo coinciden en la dosis (ej. "60ML").
- */
 function similarity(excelName, sapName) {
   const a = tokenize(excelName);
   const b = tokenize(sapName);
@@ -77,7 +53,7 @@ function similarity(excelName, sapName) {
   let alphaOverlap = 0;
   a.forEach(tok => {
     const isNumeric = /\d/.test(tok);
-    const w = isNumeric ? 2.5 : 1; // las dosis/potencias pesan más
+    const w = isNumeric ? 2.5 : 1;  
     totalWeight += w;
     if (setB.has(tok)) {
       overlapWeight += w;
@@ -87,7 +63,6 @@ function similarity(excelName, sapName) {
 
   const weightedJaccard = overlapWeight / Math.max(1, totalWeight);
 
-  // Bonificación por prefijo (nombres truncados a 30 chars en el Excel)
   const na = normalizeText(excelName);
   const nb = normalizeText(sapName);
   const prefixBonus = nb.startsWith(na) || na.startsWith(nb) ? 0.15 : 0;
@@ -99,11 +74,11 @@ function similarity(excelName, sapName) {
 
 function getExcelCandidates() {
   const candidates = [];
-  // 1. Variable de entorno
+  // Variable de entorno
   if (process.env.REORDER_EXCEL_PATH) {
     candidates.push(process.env.REORDER_EXCEL_PATH);
   }
-  // 2. Última versión cargada vía upload (prioridad operativa)
+  // Última versión cargada vía upload (prioridad operativa)
   try {
     const files = fs.readdirSync(UPLOAD_DIR)
       .filter(f => /\.(xlsm|xlsx)$/i.test(f) && /^reorder_config_/i.test(f))
@@ -114,14 +89,14 @@ function getExcelCandidates() {
       }))
       .sort((a, b) => b.mtime - a.mtime);
     if (files.length > 0) candidates.push(files[0].path);
-  } catch (e) { /* carpeta aún no existe */ }
-  // 3. Archivo original en la raíz del proyecto
+  } catch (e) {   }
+  // Archivo original en la raíz del proyecto
   try {
     const rootFiles = fs.readdirSync(PROJECT_ROOT)
       .filter(f => /\.xlsm$/i.test(f) && /REORDEN/i.test(f))
       .map(f => path.join(PROJECT_ROOT, f));
     candidates.push(...rootFiles);
-  } catch (e) { /* noop */ }
+  } catch (e) {   }
   return candidates;
 }
 
@@ -129,7 +104,7 @@ function resolveExcelPath() {
   for (const p of getExcelCandidates()) {
     try {
       if (p && fs.existsSync(p)) return p;
-    } catch (e) { /* noop */ }
+    } catch (e) {   }
   }
   return null;
 }
@@ -148,9 +123,6 @@ function cellValue(cell) {
   return v;
 }
 
-/**
- * Parsea el Excel de puntos de reorden y devuelve las filas calculadas.
- */
 async function parseReorderExcel(filePath) {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(filePath);
@@ -158,7 +130,6 @@ async function parseReorderExcel(filePath) {
   const ws = wb.getWorksheet('Puntos de Reorden (TRABAJ)') || wb.worksheets[0];
   if (!ws) throw new Error('El Excel no contiene hojas de cálculo');
 
-  // Detectar fila de encabezados (busca "PRODUCTO" en col B y "CONSUMO DIARIO")
   let headerRow = null;
   let monthCols = [];
   for (let r = 1; r <= Math.min(15, ws.rowCount); r++) {
@@ -166,7 +137,7 @@ async function parseReorderExcel(filePath) {
     const bVal = String(cellValue(row.getCell(2)) || '').trim().toUpperCase();
     if (bVal === 'PRODUCTO') {
       headerRow = r;
-      // Los meses están en las columnas C.. hasta "Total general"
+       
       for (let c = 3; c <= 20; c++) {
         const h = String(cellValue(row.getCell(c)) || '').trim().toUpperCase();
         if (h.includes('TOTAL GENERAL')) break;
@@ -229,7 +200,7 @@ async function parseReorderExcel(filePath) {
 // ==== Universo SAP para matching ====
 
 async function getSapCatalog() {
-  const catalog = new Map(); // itemcode -> { itemcode, description }
+  const catalog = new Map();  
 
   try {
     const res = await pool.query(`
@@ -237,7 +208,7 @@ async function getSapCatalog() {
       WHERE itemdescription IS NOT NULL AND itemdescription <> ''
     `);
     res.rows.forEach(r => catalog.set(r.itemcode, { itemcode: r.itemcode, description: r.itemdescription }));
-  } catch (e) { /* noop */ }
+  } catch (e) {   }
 
   try {
     const res = await pool.query(`
@@ -247,7 +218,7 @@ async function getSapCatalog() {
     res.rows.forEach(r => {
       if (!catalog.has(r.ItemCode)) catalog.set(r.ItemCode, { itemcode: r.ItemCode, description: r.ItemName });
     });
-  } catch (e) { /* tabla puede no existir aún */ }
+  } catch (e) {   }
 
   try {
     const res = await pool.query(`
@@ -258,16 +229,14 @@ async function getSapCatalog() {
     res.rows.forEach(r => {
       if (!catalog.has(r.codigo)) catalog.set(r.codigo, { itemcode: r.codigo, description: r.descripcion });
     });
-  } catch (e) { /* noop */ }
+  } catch (e) {   }
 
   return Array.from(catalog.values());
 }
 
-// ==== Matching ====
-
 async function buildMatches(rows) {
   const catalog = await getSapCatalog();
-  // Cada artículo se compara contra su nombre completo Y su versión sin marcas en paréntesis
+   
   // (el Excel mezcla nombres genéricos y marcas comerciales)
   const normalizedCatalog = catalog.map((c, idx) => {
     const normFull = normalizeText(c.description);
@@ -275,11 +244,10 @@ async function buildMatches(rows) {
     return { ...c, idx, normFull, normStripped };
   });
 
-  // Índice invertido token -> índices de catálogo (acelera el matching ~1000x)
   const tokenIndex = new Map();
   const indexTokens = (tokens, idx) => {
     tokens.forEach(t => {
-      if (t.length < 3 && !/\d/.test(t)) return; // tokens muy cortos sin dígito no indexan
+      if (t.length < 3 && !/\d/.test(t)) return;  
       if (!tokenIndex.has(t)) tokenIndex.set(t, new Set());
       tokenIndex.get(t).add(idx);
     });
@@ -294,7 +262,7 @@ async function buildMatches(rows) {
   try {
     const res = await pool.query('SELECT producto, itemcode FROM dw_reorder_excel_map');
     manualMap = new Map(res.rows.map(r => [r.producto, r.itemcode]));
-  } catch (e) { /* tabla puede no existir aún */ }
+  } catch (e) {   }
 
   return rows.map(row => {
     let itemcode = null;
@@ -306,7 +274,7 @@ async function buildMatches(rows) {
       matchType = 'MANUAL';
       matchScore = 1;
     } else {
-      // Candidatos que comparten al menos un token con el producto del Excel
+       
       const candidateSet = new Set();
       tokenize(row.producto).forEach(t => {
         const hits = tokenIndex.get(t);
@@ -319,7 +287,7 @@ async function buildMatches(rows) {
         const full = similarity(row.producto, cand.normFull);
         const stripped = similarity(row.producto, cand.normStripped);
         const bestVar = stripped.score > full.score ? stripped : full;
-        // Exigir al menos 1 token alfabético compartido (evita matches sólo por dosis "60ML")
+         
         const viable = (bestVar.score >= 0.85 && bestVar.alphaOverlap >= 1) ||
                        (bestVar.score >= 0.6 && bestVar.alphaOverlap >= 2);
         if (!viable) continue;
@@ -350,11 +318,6 @@ async function saveManualLinks(links) {
   invalidateCache();
 }
 
-/**
- * Aplica los puntos calculados a la matriz dw_sap_reorder_settings.
- * @param {Array} matchedRows filas con itemcode resuelto
- * @param {Object} opts { onlyLinked: boolean } aplica sólo filas con itemcode
- */
 async function applyToSettings(matchedRows, opts = {}) {
   let applied = 0;
   const errors = [];
@@ -387,16 +350,14 @@ async function applyToSettings(matchedRows, opts = {}) {
 // ==== Cache en memoria ====
 let configCache = null;
 let configCacheTime = null;
-const CONFIG_CACHE_TTL = 10 * 60 * 1000; // 10 minutos
+const CONFIG_CACHE_TTL = 10 * 60 * 1000;  
 
 function invalidateCache() {
   configCache = null;
   configCacheTime = null;
 }
 
-/**
- * Orquestador: obtiene la configuración dinámica completa para el frontend.
- */
+/* Orquestador: obtiene la configuración dinámica completa para el frontend */
 async function getDynamicConfig(force = false) {
   if (!force && configCache && configCacheTime && (Date.now() - configCacheTime) < CONFIG_CACHE_TTL) {
     return configCache;
@@ -460,9 +421,6 @@ async function getDynamicConfig(force = false) {
   return result;
 }
 
-/**
- * Busca artículos SAP por código o descripción (para vinculación manual).
- */
 async function searchSapCatalog(query, limit = 20) {
   const q = String(query || '').trim();
   if (q.length < 2) return [];

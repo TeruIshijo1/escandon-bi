@@ -88,7 +88,6 @@ export default function DashboardSiti() {
         <p style={{ color: '#6B7280', fontFamily: 'var(--font-body)' }}>Archivo histórico de desempeño extraído de las bases de datos originales.</p>
       </header>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid #E5E7EB', paddingBottom: '1rem' }}>
         <button
           onClick={() => setActiveTab('general')}

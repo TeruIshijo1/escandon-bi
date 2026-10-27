@@ -1,17 +1,13 @@
 'use strict';
 
-/**
- * Normaliza un texto: minúsculas, sin acentos, sin puntuación
- * @param {string} text
- * @returns {string}
- */
+/* Normaliza un texto: minúsculas, sin acentos, sin puntuación */
 function normalizeText(text) {
   return (text || '')
     .toLowerCase()
-    .normalize('NFD')                        // Descomponer acentos
-    .replace(/[\u0300-\u036f]/g, '')         // Eliminar marcas diacríticas
-    .replace(/[¿?¡!,.:;'"(){}[\]]/g, '')    // Eliminar puntuación
-    .replace(/\s+/g, ' ')                    // Normalizar espacios
+    .normalize('NFD')                         
+    .replace(/[\u0300-\u036f]/g, '')          
+    .replace(/[¿?¡!,.:;'"(){}[\]]/g, '')     
+    .replace(/\s+/g, ' ')                     
     .trim();
 }
 
@@ -33,12 +29,6 @@ function isGreeting(normalizedQuery) {
   return GREETING_PATTERNS.some(p => p.test(normalizedQuery));
 }
 
-/**
- * Distancia de Levenshtein (edit distance) para tolerancia a errores de tipeo.
- * @param {string} a
- * @param {string} b
- * @returns {number}
- */
 function levenshtein(a, b) {
   if (a === b) return 0;
   const m = a.length;

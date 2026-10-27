@@ -1,8 +1,5 @@
-/**
- * auditMovement.service.js
- * Servicio de Auditoría: Movimientos de Pacientes (Cargos y Reversas con Costos y Unidades de Servicio)
- * Hospital Escandón BI Platform v4.0
- */
+
+
 'use strict';
 
 const { getRemoteDb, sql } = require('../config/remote-db');
@@ -34,13 +31,10 @@ function parseDateStr(dateStr, isEndOfDay) {
   return new Date(`${dateStr}T${isEndOfDay ? '23:59:59' : '00:00:00'}`);
 }
 
-/**
- * Obtiene los movimientos de cuenta de pacientes (cargos y reversas) cruzados con costos de SAP.
- */
 async function getMovimientosPaciente({
   fechaDesde,
   fechaHasta,
-  tipoMovimiento, // 'TODOS' | 'CARGO' | 'REVERSA'
+  tipoMovimiento,  
   unidadServicio,
   busqueda,
   limit = 5000
@@ -216,7 +210,6 @@ async function getMovimientosPaciente({
       uServicio = 'Farmacia Central (FAR)';
     }
 
-    // Normalizar caducidad si falta en Vertical pero existe lote en SAP
     let lote = row.Lote;
     let caducidad = row.Caducidad;
     if ((!lote || !caducidad) && sapBatches.length > 0) {

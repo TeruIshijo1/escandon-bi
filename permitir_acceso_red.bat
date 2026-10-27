@@ -17,9 +17,13 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo Permitiendo el acceso a BI desde los equipos de la red local...
+echo Permitiendo el acceso a BI desde los equipos de la red...
 netsh advfirewall firewall delete rule name="Hospital Escandon BI - Acceso local TCP 5173" >nul 2>&1
-netsh advfirewall firewall add rule name="Hospital Escandon BI - Acceso local TCP 5173" dir=in action=allow protocol=TCP localport=5173 remoteip=localsubnet profile=any
+netsh advfirewall firewall add rule name="Hospital Escandon BI - Acceso local TCP 5173" dir=in action=allow protocol=TCP localport=5173 profile=any
+if exist "%~dp0.runtime\node.exe" (
+    netsh advfirewall firewall delete rule name="Hospital Escandon BI - Node Runtime" >nul 2>&1
+    netsh advfirewall firewall add rule name="Hospital Escandon BI - Node Runtime" dir=in action=allow program="%~dp0.runtime\node.exe" enable=yes profile=any >nul 2>&1
+)
 if errorlevel 1 (
     echo.
     echo No se pudo agregar la regla. Pide ayuda al responsable de la red.

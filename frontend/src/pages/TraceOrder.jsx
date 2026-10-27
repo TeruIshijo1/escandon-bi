@@ -1,34 +1,113 @@
 import { userMessage } from '../utils/userMessages';
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useRef, useState } from 'react';
+import { apiFetch } from '../api/client';
+import './TraceOrder.css';
+
+const MODES = {
+  account: { title: 'Cuenta', label: 'Número de cuenta', placeholder: 'Escribe el número de cuenta', hint: 'Busca la cuenta hospitalaria exacta para consultar sus órdenes.' },
+  patient: { title: 'Paciente', label: 'Nombre del paciente', placeholder: 'Escribe nombre o apellidos', hint: 'Puedes escribir parte del nombre. Confirma la cuenta y la fecha entre las coincidencias.' },
+  order: { title: 'Orden', label: 'Número de orden', placeholder: 'Escribe el número de orden', hint: 'Si ya conoces la orden de venta, puedes localizarla directamente.' },
+};
+const dateLabel = value => {
+  const date = new Date(String(value || '').slice(0, 10) + 'T12:00:00');
+  return Number.isNaN(date.getTime()) ? 'Sin fecha' : date.toLocaleDateString('es-MX');
+};
+const statusLabel = value => ['bost_Open', 'O'].includes(value) ? 'Abierta' : ['bost_Close', 'C'].includes(value) ? 'Cerrada' : value || 'Sin estado';
+const amountLabel = (value, currency) => `${Number(value || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ''}`;
 
 const TraceOrder = () => {
-  const [docNum, setDocNum] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState('account');
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState('');
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [accounts, setAccounts] = useState(null);
+  const [orders, setOrders] = useState(null);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [notice, setNotice] = useState('');
+  const request = useRef(null);
+  const resultsRef = useRef(null);
+  const ordersRef = useRef(null);
+  useEffect(() => () => request.current?.abort(), []);
 
-  const handleSearch = async () => {
-    if (!docNum) return;
-    setLoading(true);
-    setError(null);
-    setData(null);
+  const clear = () => {
+    request.current?.abort();
+    request.current = null;
+    setLoading(''); setError(null); setData(null);
+    setAccounts(null); setOrders(null); setSelectedAccount(null); setNotice('');
+  };
 
+  const run = async (stage, action) => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    setLoading(stage); setError(null); setNotice('');
     try {
-      const response = await axios.get(`/api/sap/trace-order/${docNum}`, {
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem('escandon_token')}`
-        }
-      });
-      setData(response.data.data);
+      await action(controller.signal);
     } catch (err) {
-      setError(userMessage(err.response?.data?.message || err.response?.data?.error || err.message || 'Error al buscar la orden'));
+      if (!controller.signal.aborted) setError(userMessage(err));
     } finally {
-      setLoading(false);
+      if (request.current === controller) { request.current = null; setLoading(''); }
     }
   };
 
-  /* ── Estilos reutilizables ─────────────────────────────── */
+  const search = (event, more = false) => {
+    event?.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    if (mode === 'patient' ? q.length < 2 : !/^\d+$/.test(q) || Number(q) <= 0) {
+      setError(mode === 'patient' ? 'Escribe al menos dos caracteres del nombre del paciente.' : 'Escribe un número válido, sin letras ni símbolos.');
+      return;
+    }
+    if (!more) { setAccounts(null); setOrders(null); setData(null); setSelectedAccount(null); }
+    const isOrder = mode === 'order';
+    const previous = isOrder ? orders : accounts;
+    run('search', async signal => {
+      const response = await apiFetch(`/sap/${isOrder ? 'trace-orders' : 'trace-accounts'}/search`, {
+        params: { mode, q, offset: more ? previous?.nextOffset : 0 }, signal,
+      });
+      if (signal.aborted) return;
+      const result = response.data;
+      const updated = { ...result, rows: more ? [...(previous?.rows || []), ...result.rows] : result.rows,
+        warnings: [...new Set([...(more ? previous?.warnings || [] : []), ...(result.warnings || [])])] };
+      (isOrder ? setOrders : setAccounts)(updated);
+    });
+  };
+
+  const loadOrders = (account, more = false) => {
+    if (!more) { setSelectedAccount(account); setOrders(null); setData(null); }
+    run('orders', async signal => {
+      const response = await apiFetch('/sap/trace-orders/search', {
+        params: { mode: 'account', q: account.account, offset: more ? orders?.nextOffset : 0 }, signal,
+      });
+      if (signal.aborted) return;
+      setOrders({ ...response.data, rows: more ? [...orders.rows, ...response.data.rows] : response.data.rows,
+        warnings: [...new Set([...(more ? orders?.warnings || [] : []), ...(response.data.warnings || [])])] });
+      if (!more) requestAnimationFrame(() => {
+        ordersRef.current?.focus({ preventScroll: true });
+        ordersRef.current?.scrollIntoView({ behavior: 'auto', block: 'start' });
+      });
+    });
+  };
+
+  const traceOrder = order => {
+    setData(null);
+    run('trace', async signal => {
+      const response = await apiFetch(`/sap/trace-order/${encodeURIComponent(order.docNum)}`, {
+        params: { entity: 'Orders', docEntry: order.docEntry }, signal,
+      });
+      if (signal.aborted) return;
+      setData(response.data);
+      requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    });
+  };
+
+  const patientNameFor = (sapName, linkedAccounts = []) => sapName || (
+    linkedAccounts.length === 1 && selectedAccount && String(linkedAccounts[0]) === String(selectedAccount.account)
+      ? selectedAccount.patientName : null
+  );
+
+  /* Estilos compartidos */
   const card = {
     background: 'var(--surface-raised)',
     border: '1px solid rgba(0,70,135,0.07)',
@@ -77,7 +156,7 @@ const TraceOrder = () => {
     padding: '0.5rem 0',
   };
 
-  /* ── Tabla de Stock ────────────────────────────────────── */
+  /* Existencias por almacén */
   const renderStockTable = (stock) => {
     if (!stock || stock.length === 0) return <p style={emptyMsg}>No hay existencias en ningún almacén.</p>;
     return (
@@ -102,7 +181,7 @@ const TraceOrder = () => {
     );
   };
 
-  /* ── Tabla de Kardex ───────────────────────────────────── */
+  /* Movimientos del artículo */
   const renderKardexTable = (kardex) => {
     if (!kardex || kardex.length === 0) return <p style={emptyMsg}>No hay movimientos recientes.</p>;
     return (
@@ -137,7 +216,7 @@ const TraceOrder = () => {
     );
   };
 
-  /* ── Tabla de Traslados ────────────────────────────────── */
+  /* Traslados del artículo */
   const renderTransfersTable = (transfers) => {
     if (!transfers || transfers.length === 0) return <p style={emptyMsg}>No hay traslados recientes.</p>;
     return (
@@ -154,7 +233,7 @@ const TraceOrder = () => {
           <tbody>
             {transfers.map((t, i) => (
               <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'var(--surface-2)' }}>
-                <td style={tdStyle}>{new Date(t.DocDate).toLocaleDateString()}</td>
+                <td style={tdStyle}>{dateLabel(t.DocDate)}</td>
                 <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)' }}>{t.DocNum}</td>
                 <td style={tdStyle}>{t.From}</td>
                 <td style={tdStyle}>{t.To}</td>
@@ -168,83 +247,98 @@ const TraceOrder = () => {
     );
   };
 
-  /* ── Render Principal ──────────────────────────────────── */
+  /* Vista principal */
   return (
     <div style={{ padding: '0.5rem 0' }}>
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 0.35rem' }}>
         Rastreo de Órdenes e Insumos
       </h1>
-      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 1.5rem', lineHeight: 1.5 }}>
-        Ingrese el número de orden de venta para verificar su estatus, el nivel de inventario de los artículos en los almacenes, y los traslados o salidas recientes para detectar incidencias.
-      </p>
+      <p className="trace-intro">Encuentra la cuenta del paciente y consulta sus órdenes, insumos y movimientos.</p>
 
-      {/* Buscador */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '2rem', alignItems: 'center' }}>
-        <input
-          placeholder="DocNum de Orden"
-          value={docNum}
-          onChange={(e) => setDocNum(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          style={{
-            width: 260,
-            padding: '0.65rem 1rem',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--navbar-border)',
-            background: 'var(--surface-raised)',
-            color: 'var(--text-primary)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.9rem',
-            outline: 'none',
-          }}
-        />
-        <button
-          onClick={handleSearch}
-          disabled={loading || !docNum}
-          style={{
-            padding: '0.65rem 1.5rem',
-            background: 'var(--color-azul-claro)',
-            color: 'var(--color-bg-white)',
-            border: 'none',
-            borderRadius: 'var(--radius-sm)',
-            fontFamily: 'var(--font-display)',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            cursor: loading || !docNum ? 'not-allowed' : 'pointer',
-            opacity: loading || !docNum ? 0.5 : 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-          }}
-        >
-          🔍 RASTREAR
-        </button>
-      </div>
-
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-          <div className="premium-spinner" style={{ width: 36, height: 36, border: '3px solid var(--navbar-border)', borderTopColor: 'var(--color-azul-claro)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
-          Buscando orden...
+      <section className="trace-search" aria-labelledby="trace-search-title">
+        <div className="trace-search-heading">
+          <span className="trace-search-icon" aria-hidden="true">⌕</span>
+          <div><h2 id="trace-search-title">¿Qué dato tienes a la mano?</h2><p>Busca por cuenta, nombre del paciente o número de orden.</p></div>
         </div>
-      )}
+        <div className="trace-modes" role="group" aria-label="Buscar por">
+          {Object.entries(MODES).map(([key, value]) => <button key={key} type="button" aria-pressed={mode === key}
+            onClick={() => { if (key !== mode) { clear(); setMode(key); setQuery(''); } }}>{value.title}</button>)}
+        </div>
+        <form onSubmit={search}>
+          <label htmlFor="trace-query">{MODES[mode].label}</label>
+          <div className="trace-form-row">
+            <input id="trace-query" type="search" inputMode={mode === 'patient' ? 'text' : 'numeric'} autoComplete="off" maxLength={100}
+              placeholder={MODES[mode].placeholder} value={query} aria-describedby="trace-search-hint"
+              onChange={event => { clear(); setQuery(event.target.value); }} />
+            <button className="trace-primary" type="submit" disabled={!!loading || !query.trim()}>Buscar</button>
+          </div>
+          <p id="trace-search-hint">{MODES[mode].hint}</p>
+        </form>
+      </section>
 
-      {error && <p style={{ color: 'var(--color-danger)', fontWeight: 600, marginBottom: '1rem' }}>{userMessage(error)}</p>}
+      {loading && <div className="trace-progress" role="status">
+        <span>{loading === 'trace' ? 'Consultando insumos y movimientos de la orden…' : loading === 'orders' ? 'Buscando órdenes de la cuenta…' : 'Buscando coincidencias…'}</span>
+        <button type="button" className="trace-secondary" onClick={() => {
+          request.current?.abort(); request.current = null; setLoading(''); setNotice('Consulta cancelada. Puedes buscar de nuevo.');
+        }}>Cancelar consulta</button>
+      </div>}
+      {notice && <p role="status" className="trace-notice">{notice}</p>}
+      {error && <p role="alert" className="trace-error">{userMessage(error)}</p>}
+
+      {accounts && <section className="trace-results" aria-label="Cuentas encontradas">
+        <h2>Cuentas encontradas <span>{accounts.rows.length}{accounts.hasMore ? '+' : ''}</span></h2>
+        {accounts.warnings?.map(warning => <p key={warning} className="trace-notice" role="status">{warning}</p>)}
+        {!accounts.rows.length && <div className="trace-empty"><strong>No se encontraron cuentas.</strong><p>{mode === 'patient' ? 'Prueba con un apellido o con menos palabras del nombre.' : 'Revisa el número o busca por nombre del paciente en la opción Paciente.'}</p></div>}
+        <div className="trace-account-grid">{accounts.rows.map(account => <article key={account.account}
+          className={`trace-account${selectedAccount?.account === account.account ? ' is-selected' : ''}`}>
+          <div className="trace-account-top"><strong>Cuenta {account.account}</strong><span>{selectedAccount?.account === account.account ? 'Seleccionada' : 'Cuenta hospitalaria'}</span></div>
+          <h3>{account.patientName || 'Paciente sin nombre disponible'}</h3>
+          <p>Fecha de cuenta: {dateLabel(account.date)}</p>
+          {account.patientNumber && <p>Expediente: {account.patientNumber}</p>}
+          <button type="button" className="trace-secondary" aria-label={`Ver órdenes de la cuenta ${account.account}`}
+            disabled={!!loading} onClick={() => loadOrders(account)}>Ver órdenes <span aria-hidden="true">→</span></button>
+        </article>)}</div>
+        {accounts.hasMore && <button type="button" className="trace-secondary trace-more" disabled={!!loading} onClick={event => search(event, true)}>Ver más cuentas</button>}
+      </section>}
+
+      {orders && <section ref={ordersRef} tabIndex={-1} className="trace-results trace-orders-results" aria-label="Órdenes encontradas">
+        <h2>{selectedAccount ? `Órdenes de la cuenta ${selectedAccount.account}` : 'Órdenes encontradas'} <span>{orders.rows.length}{orders.hasMore ? '+' : ''}</span></h2>
+        {orders.warnings?.map(warning => <p key={warning} className="trace-notice" role="status">{warning}</p>)}
+        {selectedAccount && <p className="trace-context">{selectedAccount.patientName} · Fecha de cuenta: {dateLabel(selectedAccount.date)}</p>}
+        {!orders.rows.length && <div className="trace-empty"><strong>{selectedAccount ? 'No se encontraron órdenes de venta vinculadas a esta cuenta.' : 'No se encontró esa orden de venta.'}</strong><p>{selectedAccount ? 'Puedes revisar otra cuenta del paciente o buscar un número de orden conocido.' : 'Revisa el número o localiza primero la cuenta del paciente.'}</p></div>}
+        <div className="trace-order-list">{orders.rows.map(order => <article className="trace-order" key={order.docEntry}>
+          <div><strong>Orden {order.docNum}</strong><p>{dateLabel(order.date)} <span className="trace-status">{statusLabel(order.status)}</span></p></div>
+          <div className="trace-order-patient"><strong>{patientNameFor(order.patientName, order.accounts) || (order.accounts?.length > 1 ? 'Orden con varias cuentas' : 'Paciente sin nombre disponible')}</strong>
+            <p>{order.accounts?.length ? `Cuenta${order.accounts.length > 1 ? 's' : ''}: ${order.accounts.join(', ')}` : order.account ? `Cuenta: ${order.account}` : 'Sin cuenta vinculada'}</p>
+            <p>Pagador: {order.customerName || 'Sin dato'}</p></div>
+          <div className="trace-order-action"><strong>{amountLabel(order.total, order.currency)}</strong><button type="button" className="trace-primary"
+            aria-label={`Rastrear orden ${order.docNum}`} disabled={!!loading} onClick={() => traceOrder(order)}>Ver insumos y movimientos</button></div>
+        </article>)}</div>
+        {orders.hasMore && <button type="button" className="trace-secondary trace-more" disabled={!!loading}
+          onClick={event => selectedAccount ? loadOrders(selectedAccount, true) : search(event, true)}>Ver más órdenes</button>}
+      </section>}
 
       {data && (
         <>
           {/* Detalles de la Orden */}
-          <div style={{ ...card, marginBottom: '1.5rem', borderLeft: '4px solid #004687' }}>
+          <div ref={resultsRef} style={{ ...card, marginBottom: '1.5rem', borderLeft: '4px solid var(--color-azul-claro)', scrollMarginTop: '6rem' }}>
             <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#004687', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <span>📋</span> DETALLES DE LA ORDEN #{data.OrderInfo.DocNum}
             </div>
             <div style={{ height: 1, background: 'var(--navbar-border)', margin: '0.5rem 0 1rem' }} />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2.5rem', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Cliente</div>
+                <div className="trace-detail-label">Paciente / cuenta</div>
+                <div style={{ fontWeight: 700 }}>{patientNameFor(data.OrderInfo.PatientName, data.OrderInfo.Accounts) || 'Paciente sin nombre disponible'}</div>
+                <div>{data.OrderInfo.Accounts?.length ? `Cuenta${data.OrderInfo.Accounts.length > 1 ? 's' : ''}: ${data.OrderInfo.Accounts.join(', ')}` : data.OrderInfo.Account ? `Cuenta: ${data.OrderInfo.Account}` : 'Sin cuenta vinculada'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Pagador</div>
                 <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{data.OrderInfo.CardName} ({data.OrderInfo.CardCode})</div>
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Fecha</div>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{new Date(data.OrderInfo.DocDate).toLocaleDateString('es-MX')}</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{dateLabel(data.OrderInfo.DocDate)}</div>
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Estado SAP</div>
@@ -258,21 +352,24 @@ const TraceOrder = () => {
                   background: data.OrderInfo.DocumentStatus === 'bost_Open' ? 'rgba(var(--color-accent-warm-rgb), 0.15)' : 'rgba(var(--color-verde-e-rgb), 0.15)',
                   color: data.OrderInfo.DocumentStatus === 'bost_Open' ? 'var(--color-accent-warm)' : 'var(--color-verde-e)',
                 }}>
-                  {data.OrderInfo.DocumentStatus === 'bost_Open' ? 'Abierta' : 'Cerrada'}
+                  {statusLabel(data.OrderInfo.DocumentStatus)}
                 </span>
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Total</div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>${parseFloat(data.OrderInfo.DocTotal).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{amountLabel(data.OrderInfo.DocTotal, data.OrderInfo.Currency)}</div>
               </div>
             </div>
           </div>
 
+          {data.OrderInfo.Accounts?.length > 1 && <p className="trace-notice">Esta orden incluye varias cuentas. El total y los insumos corresponden a la orden completa.</p>}
+          <p className="trace-context">Las existencias son actuales. Los movimientos recientes corresponden al artículo y pueden incluir otras cuentas.</p>
           {/* Artículos */}
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 1rem' }}>
             Artículos de la Orden
           </h2>
 
+          {!data.Items.length && <p className="trace-empty">La orden no contiene artículos para rastrear.</p>}
           {data.Items.map((item, index) => (
             <div key={index} style={{ ...card, marginBottom: '1.25rem', borderLeft: '4px solid var(--color-azul-claro)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -300,11 +397,11 @@ const TraceOrder = () => {
               </div>
 
               <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 280 }}>
+                <div style={{ flex: '1 1 280px', minWidth: 0 }}>
                   <div style={sectionTitle}>📦 Inventario Actual</div>
                   {renderStockTable(item.StockByWarehouse)}
                 </div>
-                <div style={{ flex: 1, minWidth: 280 }}>
+                <div style={{ flex: '1 1 280px', minWidth: 0 }}>
                   <div style={sectionTitle}>🔄 Traslados Recientes</div>
                   {renderTransfersTable(item.RecentTransfers)}
                 </div>

@@ -24,13 +24,10 @@
   box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
 }
 
-/* 
-  REGLAS DE IMPRESIÓN INTELIGENTE 
-  Al mandar a imprimir, ocultamos todo menos el recibo.
-*/
+/* REGLAS DE IMPRESIÓN INTELIGENTE */
 @media print {
   @page {
-    margin: 0; /* Esto quita la URL y la fecha por defecto del navegador */
+    margin: 0; 
   }
 
   html, body {
@@ -40,17 +37,17 @@
     padding: 0 !important;
   }
 
-  /* Ocultar elementos genéricos de la app (menús laterales, barra superior, etc.) */
+  
   body * {
     visibility: hidden;
   }
 
-  /* Ocultar la sección explícita "no-print" */
+  
   .no-print {
     display: none !important;
   }
 
-  /* Mostrar solo el área del modal y sus hijos */
+  
   .print-only-area, .print-only-area * {
     visibility: visible;
   }
@@ -78,10 +75,10 @@
     max-height: none !important;
     height: auto !important;
     overflow: visible !important;
-    padding: 1cm !important; /* Padding aquí para no crear otra hoja entera */
+    padding: 1cm !important; 
   }
 
-  /* Mostrar sección de firmas y logo solo al imprimir */
+  
   .print-signatures,
   .print-only-logo {
     display: block !important;
@@ -94,9 +91,7 @@
   display: none;
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   DARK MODE — Detalle de Solicitud / Receipt Modal
-   ───────────────────────────────────────────────────────────────── */
+
 [data-theme="dark"] .receipt-modal-overlay {
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(6px);
@@ -111,7 +106,7 @@
   color: #F1F5F9;
 }
 
-/* Header row: "Detalle de Solicitud" */
+
 [data-theme="dark"] .receipt-modal-content > .no-print {
   border-bottom-color: rgba(255, 255, 255, 0.08) !important;
 }
@@ -119,7 +114,7 @@
   color: #F1F5F9 !important;
 }
 
-/* Receipt body — typography */
+
 [data-theme="dark"] .receipt-body h2 {
   color: #F1F5F9 !important;
 }
@@ -131,7 +126,7 @@
   color: #CBD5E1;
 }
 
-/* Info grid (Almacén Origen / Destino / Comentarios) */
+
 [data-theme="dark"] .receipt-body > div > div[style*="background: #f8fafc"],
 [data-theme="dark"] .receipt-body > div > div[style*="background:#f8fafc"] {
   background: rgba(255, 255, 255, 0.04) !important;
@@ -139,7 +134,7 @@
   color: #CBD5E1 !important;
 }
 
-/* "Contenido" table header row */
+
 [data-theme="dark"] .receipt-body table thead tr {
   background: rgba(255, 255, 255, 0.06) !important;
 }
@@ -149,7 +144,7 @@
   color: #94A3B8 !important;
 }
 
-/* Table body cells */
+
 [data-theme="dark"] .receipt-body table td {
   border-color: rgba(255, 255, 255, 0.06) !important;
   color: #CBD5E1 !important;
@@ -161,12 +156,12 @@
   background: rgba(0, 136, 201, 0.08);
 }
 
-/* Signature dividers */
+
 [data-theme="dark"] .print-signatures div[style*="border-bottom"] {
   border-bottom-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-/* ── Print: always force light backgrounds regardless of theme ── */
+
 @media print {
   .receipt-modal-content {
     background: white !important;

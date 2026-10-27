@@ -18,8 +18,8 @@ const TOPICS = {
   goods_receipts_inv: ['entradas directas', 'ajustes positivos de inventario'],
   purchase_requests: ['requisiciones', 'solicitudes de compra'],
   sales_invoices: ['facturacion hospitalaria', 'facturas de pacientes', 'facturas de ventas'],
-  sales_invoice_summary: ['resumen de facturas de clientes', 'facturas de clientes por documento'],
-  credit_memos: ['notas de credito de clientes', 'cancelaciones de facturas de clientes'],
+  sales_invoice_summary: ['resumen de facturas de clientes', 'facturas de clientes por documento', 'facturas de clientes', 'facturas clientes'],
+  credit_memos: ['notas de credito de clientes', 'cancelaciones de facturas de clientes', 'notas de credito'],
   purchase_credit_memos: ['notas de credito de proveedores'],
   business_partners: ['directorio de socios', 'socios de negocio', 'socios comerciales', 'socios de negocios'],
   customers: ['directorio de clientes', 'lista de clientes', 'directorio de aseguradoras', 'clientes y aseguradoras', 'directorio de pagadores'],
@@ -110,8 +110,6 @@ function naturalText(message) {
     .replace(/\s+/g, ' ').trim();
 }
 
-// Aliases and sources come from authorized server definitions. They describe
-// capabilities the assistant can use without adding cards to the manual list.
 function topicPhrases(entity) {
   return [...new Set([entity.title, ...(TOPICS[entity.id] || []),
     ...(Array.isArray(entity.aliases) ? entity.aliases.filter(alias => typeof alias === 'string' && alias.trim()) : [])])].filter(Boolean);

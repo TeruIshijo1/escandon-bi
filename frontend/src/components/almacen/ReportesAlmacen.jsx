@@ -14,12 +14,10 @@ export default function ReportesAlmacen() {
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(today);
   const [itemCode, setItemCode] = useState('');
-  
-  // Entradas de Factura filters
+
   const [supplierSearch, setSupplierSearch] = useState('');
   const [invoiceSearch, setInvoiceSearch] = useState('');
 
-  // Custom SAP reports state
   const [customReport, setCustomReport] = useState('cuentas-hospitalarias');
   const [docNum, setDocNum] = useState('');
   
@@ -31,7 +29,6 @@ export default function ReportesAlmacen() {
   const isInterconsultas = location.pathname.includes('/interconsultas-jornadas');
   const isDedicatedView = isPreciosArticulos || isInterconsultas;
 
-  // Set initial state based on URL
   useEffect(() => {
     if (location.pathname.includes('/almacen/precios-articulos')) {
       setActiveTab('custom-sap');
@@ -42,7 +39,6 @@ export default function ReportesAlmacen() {
     }
   }, [location.pathname]);
 
-  // Modal State
   const [selectedRow, setSelectedRow] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -149,7 +145,6 @@ export default function ReportesAlmacen() {
 
     const lowerKey = String(key).toLowerCase();
 
-    // 1. Formato Moneda ($)
     if (
       lowerKey.includes('importe') || 
       lowerKey.includes('valor acumulado') || 
@@ -163,7 +158,7 @@ export default function ReportesAlmacen() {
       }
     }
 
-    // 2. Formato Fecha y Hora
+    // Formato Fecha y Hora
     if (lowerKey.includes('fecha') || lowerKey.includes('caducidad')) {
       const str = String(val).trim();
       if (!str) return '';
@@ -194,7 +189,6 @@ export default function ReportesAlmacen() {
         }
       }
 
-      // Formato YYYY-MM-DD
       if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
         const [year, month, day] = str.split('-');
         return `${day}/${month}/${year}`;
@@ -237,7 +231,6 @@ export default function ReportesAlmacen() {
 
     const ws = XLSX.utils.json_to_sheet(formattedData);
 
-    // Encabezado que refleja el filtro aplicado, para que el Excel respete exactamente lo filtrado
     const reportTitle = isInterconsultas
       ? 'Interconsultas y Jornadas Especiales (SER*)'
       : isPreciosArticulos
@@ -324,7 +317,6 @@ export default function ReportesAlmacen() {
         </button>
       </header>
 
-      {/* Tabs */}
       {!isDedicatedView && (
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', background: '#f1f5f9', padding: '0.5rem', borderRadius: '12px' }}>
           {TABS.map(tab => (
@@ -594,7 +586,7 @@ export default function ReportesAlmacen() {
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
             overflow: 'hidden'
           }}>
-            {/* Header Modal */}
+            
             <div style={{ padding: '1.5rem 2rem', background: 'linear-gradient(135deg, #0f172a 0%, #004687 100%)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: '700', color: 'white' }}>
@@ -615,7 +607,6 @@ export default function ReportesAlmacen() {
               </button>
             </div>
 
-            {/* Body Modal */}
             <div style={{ padding: '2rem', overflowY: 'auto', flex: 1 }}>
               {modalLoading ? (
                 <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
@@ -624,7 +615,7 @@ export default function ReportesAlmacen() {
                 </div>
               ) : (
                 <>
-                  {/* 1. Modal Kardex / Consumo: Timeline de Trazabilidad */}
+                  {/* Modal Kardex / Consumo: Timeline de Trazabilidad */}
                   {(activeTab === 'kardex' || activeTab === 'consumo') && (
                     <div>
                       <div style={{ background: '#f0f9ff', padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -679,7 +670,6 @@ export default function ReportesAlmacen() {
                     </div>
                   )}
 
-                  {/* 2. Modal Censo: Cargos al Paciente */}
                   {activeTab === 'censo' && (
                     <div>
                       <div style={{ background: '#e0f2fe', padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -743,7 +733,7 @@ export default function ReportesAlmacen() {
                     </div>
                   )}
 
-                  {/* 3. Modal Entradas: Partidas de Factura */}
+                  {/* Modal Entradas: Partidas de Factura */}
                   {activeTab === 'entradas' && (
                     <div>
                       <div style={{ background: '#f0fdf4', padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -803,7 +793,7 @@ export default function ReportesAlmacen() {
                     </div>
                   )}
 
-                  {/* 4. Modal para Reportes de Soporte SAP (Custom) */}
+                  {/* Modal para Reportes de Soporte SAP (Custom) */}
                   {modalData?.isCustom && (
                     <div>
                       <h4 style={{ margin: '0 0 1rem 0', color: '#0f172a', fontSize: '1.1rem' }}>
@@ -828,7 +818,6 @@ export default function ReportesAlmacen() {
               )}
             </div>
 
-            {/* Footer Modal */}
             <div style={{ padding: '1rem 2rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', textAlign: 'right' }}>
               <button 
                 onClick={() => setModalOpen(false)}

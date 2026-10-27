@@ -1,7 +1,5 @@
 'use strict';
 
-// Diagnostics must never serialize provider errors, URLs, environment values,
-// response bodies or conversation text. Every value below is allowlisted.
 const NETWORK_CODES = new Set(['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT',
   'ENETUNREACH', 'EHOSTUNREACH', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT',
   'UND_ERR_BODY_TIMEOUT', 'UND_ERR_SOCKET', 'CERT_HAS_EXPIRED', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
@@ -17,7 +15,7 @@ function safeModel(model) {
 
 function providerDetails(config) {
   let endpoint;
-  try { endpoint = new URL(config.base); } catch { /* Do not expose malformed URLs. */ }
+  try { endpoint = new URL(config.base); } catch {   }
   const host = endpoint?.hostname;
   const provider = host === 'generativelanguage.googleapis.com' ? 'gemini'
     : host === 'api.deepseek.com' ? 'deepseek' : host === 'api.openai.com' ? 'openai'

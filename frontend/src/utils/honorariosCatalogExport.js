@@ -1,20 +1,23 @@
-import { classifyProfessionalCandidate, isExcludedHonorariosService } from './honorariosScope';
+import { classifyProfessionalCandidate, isHonorariosScopeExcluded } from './honorariosScope.js';
 
 export const CATALOG_STATUS_LABELS = { PENDIENTE: 'Por configurar', INCLUIDO: 'Incluido para pago', EXCLUIDO: 'Excluido' };
 export const CATALOG_ROLE_LABELS = { TRATANTE: 'Tratante / consulta', AN: 'Anestesiólogo', SURGEON: 'Cirujano', AY: 'Ayudante' };
-export const isCatalogApproved = item => item?.approvalStatus === 'APROBADO' || (!item?.approvalStatus
-  && item?.status === 'INCLUIDO' && item.active !== false && !item.scopeExcluded
-  && Number(item.approvedTariffCount ?? item.tariffCount) > 0);
+export const isCatalogApproved = item => !isHonorariosScopeExcluded(item)
+  && (item?.approvalStatus === 'APROBADO' || (!item?.approvalStatus
+    && item?.status === 'INCLUIDO' && item.active !== false
+    && Number(item.approvedTariffCount ?? item.tariffCount) > 0));
 export const catalogStateLabel = item => isCatalogApproved(item) ? 'Configurados' : item.status === 'EXCLUIDO'
   ? 'Excluido' : item.active === false ? 'Inactivo' : item.status === 'INCLUIDO' ? 'Falta tarifa' : 'Por configurar';
 export const withCatalogScope = item => {
   const scope = classifyProfessionalCandidate(item);
-  return { ...scope, ...item, professionalCandidate: item.professionalCandidate ?? scope.professionalCandidate };
+  const scopeExcluded = isHonorariosScopeExcluded(item);
+  return { ...scope, ...item, scopeExcluded, professionalCandidate: item.scopeExcluded && !scopeExcluded
+    ? scope.professionalCandidate : item.professionalCandidate ?? scope.professionalCandidate };
 };
 const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 export function catalogItemsForView(items, { view = 'TODOS', reviewOtherConcepts = false } = {}) {
-  const working = items.filter(item => !item.scopeExcluded && !isExcludedHonorariosService(item)
+  const working = items.filter(item => !isHonorariosScopeExcluded(item)
     && (reviewOtherConcepts || item.professionalCandidate !== false || item.status === 'INCLUIDO'));
   if (view === 'APROBADOS') return working.filter(isCatalogApproved);
   if (view === 'RECOMENDADOS') return working.filter(item => !isCatalogApproved(item) && item.status !== 'EXCLUIDO'

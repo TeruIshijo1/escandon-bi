@@ -15,7 +15,7 @@ test('rechaza inyección, fechas imposibles, rangos invertidos y excesivos', () 
 });
 
 test('el histórico agregado no se ofrece como detalle completo', () => {
-  expect(() => dateRange('2026-03-01', '2026-04-30')).toThrow(/detalle/);
+  expect(() => dateRange('2025-11-01', '2025-12-31')).toThrow(/detalle/);
 });
 
 test('periodos usan calendario hospitalario y no el mes móvil ni la fecha UTC del servidor', () => {

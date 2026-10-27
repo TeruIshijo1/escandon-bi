@@ -30,17 +30,7 @@ export default function DashboardQuirofanoNativo({ data }) {
     topServiciosIngresos,
     excelCategories
   } = useMemo(() => {
-    if (!data || !data.lista || data.lista.length === 0) return { 
-      filteredData: [], kpis: {}, monthlyData: [], roomUsage: [], statusUsage: [], topProcedures: [], availableYears: [], availableMedicos: [], availableRooms: [], availableProcedures: [], kpisFinancieros: {}, topMedicosIngresos: [], topServiciosIngresos: [],
-      excelCategories: {
-        maternidad: { title: 'Maternidad', count: 0, items: { 'Partos': 0, 'Cesárea': 0, 'Histerectomía': 0, 'Miomectomía': 0, 'Salpingo': 0, 'AMEU': 0, 'LUI': 0, 'Otros': 0 } },
-        endoscopias: { title: 'Endoscopías', count: 0, items: { 'Colonoscopías': 0, 'Endoscopías': 0, 'Broncoscopías': 0 } },
-        gastro: { title: 'Gastroenterología', count: 0, items: { 'CPRE': 0 } },
-        quirofano: { title: 'Quirófano', count: 0, items: { 'Cirugías': 0 } }
-      }
-    };
-
-    const rawData = data.lista;
+    const rawData = Array.isArray(data?.lista) ? data.lista : [];
     // Extraer catálogos completos
     const yearsSet = new Set();
     const medicosSetAll = new Set();
@@ -74,19 +64,13 @@ export default function DashboardQuirofanoNativo({ data }) {
       return true;
     });
 
-    // Gráficas interactivas: cuando seleccionas una, se filtra el resto (excepto ella misma para que muestre todos los totales del nivel anterior)
-    // Para simplificar, todas las gráficas ahora usarán fullyFiltered y actuarán solo si el usuario no ha seleccionado nada en el dropdown. 
-    // Como ahora los dropdowns controlan el estado principal, podemos reusar los mismos estados `selectedRoom` y `selectedProcedure`.
-    
-    // 2. KPIs based on fully filtered data
     let totalDurationMinutes = 0;
     const medicosSet = new Set();
-    
-    // Monthly aggregation
+
     const monthlyMap = {};
 
     fullyFiltered.forEach(d => {
-      // Parse dates
+       
       const start = new Date(d.FechaInicio);
       const end = new Date(d.FechaFin);
       let duration = 0;
@@ -97,7 +81,6 @@ export default function DashboardQuirofanoNativo({ data }) {
       
       if (d.Medicos) medicosSet.add(d.Medicos);
 
-      // Monthly
       if (!isNaN(start)) {
         const m = start.getMonth();
         if (!monthlyMap[m]) monthlyMap[m] = { cirugias: 0, duration: 0 };
@@ -115,7 +98,6 @@ export default function DashboardQuirofanoNativo({ data }) {
       medicosActivos: medicosSet.size
     };
 
-    // Prepare Monthly Array
     const monthlyData = Object.keys(monthlyMap).map(k => Number(k)).sort((a,b) => a - b).map(m => {
       const ms = monthlyMap[m];
       return {
@@ -125,8 +107,6 @@ export default function DashboardQuirofanoNativo({ data }) {
       };
     });
 
-    // 3. Room Usage
-    // Si selectedRoom tiene valor, la dona solo muestra esa room. Si queremos que muestre todas para poder cambiar, filtramos sin `selectedRoom`
     const dataForRooms = rawData.filter(d => {
       const date = new Date(d.FechaInicio);
       if (selectedYear !== 'Todas' && date.getFullYear() !== Number(selectedYear)) return false;
@@ -146,8 +126,6 @@ export default function DashboardQuirofanoNativo({ data }) {
     const roomUsage = Object.entries(roomsCount).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
     const statusUsage = Object.entries(statusCount).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
 
-    // 4. Top Procedures
-    // Igual para top procedures, filtramos sin `selectedProcedure` para que la lista siga visible
     const dataForProcs = rawData.filter(d => {
       const date = new Date(d.FechaInicio);
       if (selectedYear !== 'Todas' && date.getFullYear() !== Number(selectedYear)) return false;
@@ -204,16 +182,25 @@ export default function DashboardQuirofanoNativo({ data }) {
       availableMedicos, 
       availableRooms, 
       availableProcedures,
-      kpisFinancieros: data.kpisFinancieros || {},
-      topMedicosIngresos: data.topMedicosIngresos || [],
-      topServiciosIngresos: data.topServiciosIngresos || [],
+      kpisFinancieros: data?.kpisFinancieros || {},
+      topMedicosIngresos: data?.topMedicosIngresos || [],
+      topServiciosIngresos: data?.topServiciosIngresos || [],
       excelCategories
     };
   }, [data, selectedRoom, selectedProcedure, selectedYear, selectedMonth, selectedMedico, selectedStatus]);
 
-  const formatCurrency = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
+  const formatCurrency = (val) => val == null || val === '' || !Number.isFinite(Number(val)) ? 'No disponible' : new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(val));
 
   if (!data) return <PremiumLoader text="Cargando información de quirófano..." />;
+  const source = data.sourceStatus;
+  const revenueValue = kpisFinancieros.ingresosSAP;
+  const validRevenue = revenueValue !== null && revenueValue !== undefined && String(revenueValue).trim() !== '' && Number.isFinite(Number(revenueValue));
+  const revenueAvailable = validRevenue && (source ? source.available === true : Number(revenueValue) !== 0);
+  const revenuePartial = revenueAvailable && source?.partial === true;
+  const hasCoverageCount = Number.isInteger(source?.completeDays) && Number.isInteger(source?.totalDays) && source.totalDays > 0;
+  const updatedAt = source?.updatedAt ? new Date(source.updatedAt) : null;
+  const updatedLabel = updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt.toLocaleString('es-MX') : null;
+
 
   const clearFilters = () => {
     setSelectedRoom('Todos');
@@ -306,8 +293,7 @@ export default function DashboardQuirofanoNativo({ data }) {
 
   return (
     <div className="area-native-dashboard dashboard-view" style={{ marginTop: '1rem', fontFamily: 'var(--font-body)' }} id="dashboard-quirofano-nativo">
-      
-      {/* Header Native Dashboard */}
+
       <div className="area-native-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 className="area-text-primary" style={{ margin: 0, fontFamily: 'var(--font-display)', color: '#004687', fontSize: '1.75rem', fontWeight: 800 }}>Actividad de Quirófano</h2>
@@ -315,14 +301,21 @@ export default function DashboardQuirofanoNativo({ data }) {
         </div>
       </div>
 
-      {/* Tarjeta de Ingreso Real Contabilizado (SAP) */}
+      {(!revenueAvailable || revenuePartial || source?.status === 'stale') && <div role="status" className="area-panel dashboard-panel" style={{ marginBottom: '1.5rem', color: 'var(--dash-text)' }}>
+        <p style={{ margin: 0 }}>{!revenueAvailable ? 'Los ingresos de Quirófano están pendientes de confirmar. Se mostrarán cuando exista una copia completa del periodo.' : revenuePartial ? 'El periodo está incompleto. Los ingresos mostrados son cifras de referencia de los días disponibles; no representan el total del periodo.' : 'Se muestran los ingresos de la última copia disponible. La actualización completa del periodo no pudo confirmarse.'}</p>
+        {revenuePartial && hasCoverageCount && <p style={{ margin: '0.5rem 0 0' }}>Días con copia confirmada: {source.completeDays} de {source.totalDays}.</p>}
+        {updatedLabel && <p style={{ margin: '0.5rem 0 0' }}>Última copia guardada: {updatedLabel}</p>}
+      </div>}
+      {revenueAvailable && !revenuePartial && source?.status === 'complete' && updatedLabel && <p className="area-text-muted">Ingresos actualizados: {updatedLabel}</p>}
+
+      {/* Ingresos disponibles del periodo consultado. */}
       <div className="area-metric-grid dashboard-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
         <div className="area-metric-card area-metric-card--highlight dashboard-metric-card" style={{ background: 'linear-gradient(135deg, #10B981, #059669)', padding: '1.25rem', borderRadius: 12, color: 'white', boxShadow: '0 4px 6px rgba(16, 185, 129, 0.2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div className="area-metric-label dashboard-metric-label" style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9 }}>Ingresos de Quirófano</div>
-              <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 800, marginTop: '0.5rem' }}>{formatCurrency(kpisFinancieros.ingresosSAP || 0)}</div>
-              <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem' }}>Ingresos registrados por servicios de quirófano</div>
+              <div className="area-metric-value dashboard-metric-value" style={{ fontSize: '2.2rem', fontFamily: 'var(--font-mono)', fontWeight: 800, marginTop: '0.5rem' }}>{revenueAvailable ? formatCurrency(revenueValue) : 'No disponible'}</div>
+              <div className="area-metric-note dashboard-metric-note" style={{ fontSize: '0.8rem', opacity: 0.8, marginTop: '0.5rem' }}>{revenuePartial ? 'Importe parcial de referencia del periodo incompleto' : 'Ingresos registrados por servicios de quirófano'}</div>
             </div>
             <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.2)', borderRadius: 10 }}>
               <span style={{ fontSize: '1.5rem' }}>💰</span>
@@ -331,7 +324,6 @@ export default function DashboardQuirofanoNativo({ data }) {
         </div>
       </div>
 
-      {/* Top KPIs Row */}
       <div className="area-metric-grid dashboard-metric-grid" data-html2canvas-ignore="false" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
         {/* Total Cirugías */}
         <div className="area-metric-card dashboard-metric-card" style={{ background: 'white', padding: '1.25rem', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', position: 'relative' }}>
@@ -370,7 +362,7 @@ export default function DashboardQuirofanoNativo({ data }) {
             {kpis.medicosActivos}
           </div>
           <div className="dashboard-chart-host" style={{ height: 60, marginTop: '1rem', marginLeft: '-1.25rem', marginRight: '-1.25rem', marginBottom: '-1.25rem' }}>
-            {/* Using same data just for decorative sparkline effect, ideally would use unique doctor count per month */}
+            
             <DashboardChart width="100%" height="100%">
               <LineChart data={monthlyData}>
                 <Line type="step" dataKey="Total_Cirugias" stroke="#10B981" strokeWidth={2} dot={false} isAnimationActive={false} />
@@ -385,7 +377,7 @@ export default function DashboardQuirofanoNativo({ data }) {
         <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
           <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Médicos con mayores ingresos</h3>
           <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
-            <DashboardChart>
+            {revenueAvailable ? (<DashboardChart>
               <BarChart layout="vertical" data={topMedicosIngresos} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
@@ -396,14 +388,14 @@ export default function DashboardQuirofanoNativo({ data }) {
                 />
                 <Bar dataKey="ingresos" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
-            </DashboardChart>
+            </DashboardChart>) : <div className="dashboard-chart-empty" style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--dash-muted)' }}>Ingresos pendientes de confirmar.</div>}
           </div></div>
         </div>
 
         <div className="area-panel dashboard-panel" data-html2canvas-ignore="false" style={{ flex: '1 1 400px', background: 'white', padding: '1.5rem', borderRadius: 12, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid rgba(0,136,201,0.1)' }}>
           <h3 className="area-text-primary" style={{ margin: '0 0 1rem 0', color: '#0D1B2A', fontSize: '1.1rem' }}>Servicios con mayor facturación</h3>
           <div className="area-chart-scroll"><div className="dashboard-chart-host" style={{ width: '100%', height: 350 }}>
-            <DashboardChart>
+            {revenueAvailable ? (<DashboardChart>
               <BarChart layout="vertical" data={topServiciosIngresos} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                 <XAxis type="number" tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} />
@@ -414,12 +406,11 @@ export default function DashboardQuirofanoNativo({ data }) {
                 />
                 <Bar dataKey="ingresos" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
-            </DashboardChart>
+            </DashboardChart>) : <div className="dashboard-chart-empty" style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--dash-muted)' }}>Ingresos pendientes de confirmar.</div>}
           </div></div>
         </div>
       </div>
 
-      {/* Main Charts Row */}
       <div className="area-chart-grid area-chart-grid--overview" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1.25rem', alignItems: 'stretch' }}>
         
         {/* Evolución Mensual */}
@@ -485,7 +476,6 @@ export default function DashboardQuirofanoNativo({ data }) {
           </div>
         </div>
 
-        {/* Top Procedimientos */}
         <div className="area-panel" data-html2canvas-ignore="false" style={{ background: 'white', borderRadius: 12, boxShadow: 'var(--shadow-xs)', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ padding: '1rem', borderBottom: '1px solid #F1F5F9' }}>
             <h3 className="area-text-muted" style={{ margin: 0, fontSize: '0.95rem', color: '#475569', fontWeight: 600, textAlign: 'center' }}>Top Procedimientos</h3>
@@ -548,7 +538,7 @@ export default function DashboardQuirofanoNativo({ data }) {
                 <td style={{ padding: '0.75rem', border: '1px solid #BBD4F0' }}>Cirugías Generales</td>
                 <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 600, border: '1px solid #BBD4F0' }}>{excelCategories.quirofano.items['Cirugías']}</td>
               </tr>
-              {/* MATERNIDAD */}
+              
               <tr style={{ background: '#FCE7EB' }}>
                 <td rowSpan={7} style={{ padding: '0.75rem', fontWeight: 700, border: '1px solid #F6BCC7' }}>MATERNIDAD</td>
                 <td style={{ padding: '0.75rem', border: '1px solid #F6BCC7' }}>Partos</td>
@@ -578,8 +568,7 @@ export default function DashboardQuirofanoNativo({ data }) {
                 <td style={{ padding: '0.75rem', border: '1px solid #F6BCC7' }}>LUI / Legrado</td>
                 <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F6BCC7' }}>{excelCategories.maternidad.items['LUI']}</td>
               </tr>
-              
-              {/* ENDOSCOPIAS */}
+
               <tr style={{ background: '#FDF2E2' }}>
                 <td rowSpan={3} style={{ padding: '0.75rem', fontWeight: 700, border: '1px solid #F5D5A5' }}>ENDOSCOPÍAS</td>
                 <td style={{ padding: '0.75rem', border: '1px solid #F5D5A5' }}>Colonoscopías</td>
@@ -594,14 +583,12 @@ export default function DashboardQuirofanoNativo({ data }) {
                 <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #F5D5A5' }}>{excelCategories.endoscopias.items['Broncoscopías']}</td>
               </tr>
 
-              {/* GASTROENTEROLOGIA */}
               <tr style={{ background: '#EAF6E8' }}>
                 <td rowSpan={1} style={{ padding: '0.75rem', fontWeight: 700, border: '1px solid #C4E6BE' }}>GASTROENTEROLOGÍA</td>
                 <td style={{ padding: '0.75rem', border: '1px solid #C4E6BE' }}>CPRE</td>
                 <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #C4E6BE' }}>{excelCategories.gastro.items['CPRE']}</td>
               </tr>
 
-              {/* TOTAL */}
               <tr style={{ background: '#E0E7FF', fontWeight: 700 }}>
                 <td colSpan={2} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #A5B4FC' }}>TOTAL PROCEDIMIENTOS (Aprox)</td>
                 <td className="area-text-info" style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #A5B4FC', fontSize: '1rem', color: '#1E40AF' }}>

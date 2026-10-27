@@ -21,7 +21,7 @@ export default function QuirofanoPage({ defaultTab }) {
 
   return (
     <div style={{ padding: '2rem', maxWidth: 'var(--content-max, 1400px)', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
-      {/* Component Content directly without duplicate inner tab bar */}
+      
       {activeTab === 'agenda' && <SurgicalAgenda />}
       {activeTab === 'kits' && <SurgicalKits />}
       {activeTab === 'variations' && <DoctorVariations />}

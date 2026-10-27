@@ -1,7 +1,5 @@
-/**
- * sap.routes.js
- * Rutas de monitoreo y diagnóstico para la integración SAP
- */
+
+
 'use strict';
 
 const express = require('express');
@@ -10,9 +8,33 @@ const { authenticate, authorize } = require('../middleware/auth.middleware');
 const sapService = require('../services/sap.service');
 const sapAccountReview = require('../services/sapAccountReview.service');
 const accountReopening = require('../services/accountReopening.service');
+const orderTraceSearch = require('../services/orderTraceSearch.service');
 
-// This audit contains patient/account data. A role or an unrelated permission
-// must never unlock it through the general authorize middleware's fallback.
+function authorizeOrderTrace(req, res, next) {
+  if (String(req.user?.username || '').toLowerCase() === 'amendoza' ||
+    req.user?.permisos?.includes('rastreo-ordenes')) return next();
+  return res.status(403).json({ success: false, error: 'No tienes permiso para consultar el rastreo de órdenes.' });
+}
+
+function traceSearchHandler(method, source) {
+  return async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const controller = new AbortController();
+    const cancel = () => { if (!res.writableEnded) controller.abort(); };
+    res.once('close', cancel);
+    try {
+      const data = await orderTraceSearch[method]({ mode: req.query.mode, q: req.query.q, offset: req.query.offset }, { signal: controller.signal });
+      if (!res.destroyed) res.json({ success: true, data });
+    } catch (error) {
+      if (controller.signal.aborted || res.destroyed) return;
+      const status = error.status === 400 ? 400 : 502;
+      res.status(status).json({ success: false, error: status === 400 ? error.message : error.publicMessage || `No se pudo completar la consulta de ${source}. Intenta de nuevo.` });
+    } finally { res.removeListener('close', cancel); controller.abort(); }
+  };
+}
+router.get('/trace-accounts/search', authenticate, authorizeOrderTrace, traceSearchHandler('searchAccounts', 'las cuentas del hospital'));
+router.get('/trace-orders/search', authenticate, authorizeOrderTrace, traceSearchHandler('searchOrders', 'las órdenes de venta'));
+
 function authorizeAccountReview(req, res, next) {
   const user = req.user;
   if (user && (String(user.username || '').toLowerCase() === 'amendoza' ||
@@ -27,9 +49,6 @@ function authorizeAccountReopening(req, res, next) {
   return res.status(403).json({ success: false, error: 'No tienes permiso para reaperturar cuentas.', code: 'ACCOUNT_REOPENING_FORBIDDEN' });
 }
 
-// SAP supplies the fresh eligibility check; the only account changes occur in Vertical.
-// A dropped connection cancels pending preparation. Once execution starts, its
-// durable receipt must be completed so the user can safely consult its result.
 for (const action of ['prepare', 'execute', 'status']) {
   router.post(`/account-review/:account/reopening/${action}`, authenticate, authorizeAccountReview, authorizeAccountReopening, async (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -71,6 +90,7 @@ router.get('/account-review/search', authenticate, authorizeAccountReview, async
     res.json({ success: true, data });
   } catch (error) {
     if (controller.signal.aborted || res.destroyed) return;
+    console.error('[AccountReview Search] Error en búsqueda SAP:', error.message, error.code || '', error.status || '');
     const status = error.status === 400 ? 400 : 502;
     res.status(status).json({ success: false, error: status === 400 ? error.message : 'No se pudo completar la búsqueda en SAP. Intenta de nuevo.' });
   } finally {
@@ -89,6 +109,7 @@ router.get('/account-review/:account', authenticate, authorizeAccountReview, asy
     res.json({ success: true, data });
   } catch (error) {
     if (controller.signal.aborted || res.destroyed) return;
+    console.error(`[AccountReview] Error verificando cuenta ${req.params.account} en SAP:`, error.message, error.code || '', error.status || '');
     const status = error.status === 400 ? 400 : 502;
     res.status(status).json({ success: false, error: status === 400 ? error.message : 'No se pudo verificar el estado de la cuenta en SAP. Intenta de nuevo.' });
   } finally {
@@ -97,16 +118,9 @@ router.get('/account-review/:account', authenticate, authorizeAccountReview, asy
   }
 });
 
-/**
- * GET /api/sap/ping
- * Realiza una consulta básica a SAP (ej: buscar el nombre de la compañía) 
- * para verificar que el autopiloto de sesión funciona correctamente.
- * Solo administradores pueden correr esta prueba.
- */
 router.get('/ping', authenticate, authorize(['ADMIN']), async (req, res) => {
   try {
-    // Consultamos la tabla CompanyService_GetCompanyTime como una prueba inofensiva y rápida
-    // O si preferimos algo más estándar: buscar Top 1 item
+
     const response = await sapService.get('/Items?$top=1&$select=ItemCode,ItemName');
     
     res.status(200).json({
@@ -124,10 +138,6 @@ router.get('/ping', authenticate, authorize(['ADMIN']), async (req, res) => {
   }
 });
 
-/**
- * GET /api/sap/warehouses
- * Obtiene el catálogo de almacenes activos de SAP
- */
 router.get('/warehouses', authenticate, async (req, res) => {
   try {
     const response = await sapService.get("/Warehouses?$select=WarehouseCode,WarehouseName");
@@ -144,25 +154,41 @@ router.get('/warehouses', authenticate, async (req, res) => {
   }
 });
 
-/**
- * GET /api/sap/trace-order/:docNum
- * Busca una orden y rastrea el stock, kardex y traslados de sus insumos.
- */
-router.get('/trace-order/:docNum', authenticate, async (req, res) => {
+router.get('/trace-order/:docNum', authenticate, authorizeOrderTrace, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
   const { docNum } = req.params;
+  const { entity, docEntry } = req.query;
+  if (!orderTraceSearch.positiveId(docNum) || (docEntry !== undefined && !orderTraceSearch.positiveId(docEntry)) ||
+    (entity !== undefined && !['Orders', 'PurchaseOrders'].includes(entity)) || (docEntry !== undefined && !entity)) {
+    return res.status(400).json({ success: false, error: 'Selecciona una orden válida para rastrear.' });
+  }
+  const controller = new AbortController();
+  const cancel = () => { if (!res.writableEnded) controller.abort(); };
+  res.once('close', cancel);
+  const budgetTimer = setTimeout(() => controller.abort(), 120000);
+  const sapGet = endpoint => sapService.get(endpoint, {}, { signal: controller.signal, timeoutMs: 30000 });
   try {
     const { pool } = require('../config/pg-db.js');
     
-    // 1. Buscar la Orden de Venta
+    // Buscar la Orden de Venta
     let order = null;
-    const orderRes = await sapService.get(`/Orders?$filter=DocNum eq ${docNum}`);
-    if (orderRes.data.value && orderRes.data.value.length > 0) {
+    let orderEntity = entity || 'Orders';
+    const orderRes = await sapGet(docEntry ? `/${orderEntity}(${Number(docEntry)})` : `/${orderEntity}?$filter=DocNum eq ${Number(docNum)}`);
+    if (docEntry) {
+      if (Number(orderRes.data?.DocEntry) === Number(docEntry) && Number(orderRes.data?.DocNum) === Number(docNum)) order = orderRes.data;
+    } else if (orderRes.data.value && orderRes.data.value.length > 1) {
+      return res.status(409).json({ success: false, error: 'Hay más de una orden con ese número. Selecciona la orden desde los resultados de búsqueda.' });
+    } else if (orderRes.data.value && orderRes.data.value.length > 0) {
       order = orderRes.data.value[0];
-    } else {
+    } else if (!entity) {
       // Intentar en órdenes de compra por si acaso
-      const poRes = await sapService.get(`/PurchaseOrders?$filter=DocNum eq ${docNum}`);
-      if (poRes.data.value && poRes.data.value.length > 0) {
+      const poRes = await sapGet(`/PurchaseOrders?$filter=DocNum eq ${Number(docNum)}`);
+      if (poRes.data.value && poRes.data.value.length > 1) {
+        return res.status(409).json({ success: false, error: 'Hay más de una orden con ese número. Selecciona una orden específica.' });
+      }
+      if (poRes.data.value && poRes.data.value.length === 1) {
         order = poRes.data.value[0];
+        orderEntity = 'PurchaseOrders';
       }
     }
 
@@ -171,9 +197,11 @@ router.get('/trace-order/:docNum', authenticate, async (req, res) => {
     }
 
     const lines = order.DocumentLines || [];
+    const accounts = [...new Set([order.U_PCNum, ...lines.map(line => line.U_PCNum)].map(orderTraceSearch.positiveId).filter(Boolean))].map(String);
     const itemsData = [];
 
     for (let line of lines) {
+      controller.signal.throwIfAborted();
       if (!line.ItemCode) continue;
       
       const itemCode = line.ItemCode;
@@ -188,8 +216,9 @@ router.get('/trace-order/:docNum', authenticate, async (req, res) => {
       };
 
       try {
-        // A. Obtener stock real de SAP
-        const itemRes = await sapService.get(`/Items('${itemCode}')?$select=ItemWarehouseInfoCollection`);
+        // Obtener stock real de SAP
+        const itemRes = await sapGet(`/Items('${encodeURIComponent(String(itemCode).replace(/'/g, "''"))}')?$select=ItemWarehouseInfoCollection`);
+        controller.signal.throwIfAborted();
         if (itemRes.data && itemRes.data.ItemWarehouseInfoCollection) {
           resultItem.StockByWarehouse = itemRes.data.ItemWarehouseInfoCollection
             .filter(w => w.InStock > 0 || w.Committed > 0)
@@ -200,7 +229,7 @@ router.get('/trace-order/:docNum', authenticate, async (req, res) => {
             }));
         }
 
-        // B. Obtener Kardex reciente de PG
+        // Obtener Kardex reciente de PG
         const kardexRes = await pool.query(
           `SELECT fecha, almacenorigen, almacendestino, movimiento, documentoref, usuario 
            FROM dw_sap_kardex 
@@ -208,9 +237,10 @@ router.get('/trace-order/:docNum', authenticate, async (req, res) => {
            ORDER BY fecha DESC LIMIT 10`,
           [itemCode]
         );
+        controller.signal.throwIfAborted();
         resultItem.RecentKardex = kardexRes.rows;
 
-        // C. Obtener Traslados recientes de PG
+        // Obtener Traslados recientes de PG
         const transRes = await pool.query(
           `SELECT docnum, docdate, fromwarehouse, towarehouse, comments, stocktransferlines 
            FROM dw_sap_traslados 
@@ -218,6 +248,7 @@ router.get('/trace-order/:docNum', authenticate, async (req, res) => {
            ORDER BY docdate DESC LIMIT 5`,
           [`%${itemCode}%`]
         );
+        controller.signal.throwIfAborted();
         
         // Formatear líneas de traslados para mostrar cantidad exacta
         resultItem.RecentTransfers = transRes.rows.map(t => {
@@ -238,6 +269,7 @@ router.get('/trace-order/:docNum', authenticate, async (req, res) => {
         });
 
       } catch (err) {
+        if (controller.signal.aborted) throw err;
         console.error(`Error al rastrear el item ${itemCode}:`, err.message);
       }
 
@@ -248,6 +280,13 @@ router.get('/trace-order/:docNum', authenticate, async (req, res) => {
       success: true,
       data: {
         OrderInfo: {
+          DocEntry: order.DocEntry,
+          Entity: orderEntity,
+          Account: accounts.length === 1 ? accounts[0] : null,
+          Accounts: accounts,
+          PatientName: accounts.length <= 1 ? order.U_PTName || null : null,
+          PatientNumber: accounts.length <= 1 ? order.U_PTNum || null : null,
+          Currency: order.DocCurrency,
           DocNum: order.DocNum,
           DocDate: order.DocDate,
           CardCode: order.CardCode,
@@ -261,11 +300,16 @@ router.get('/trace-order/:docNum', authenticate, async (req, res) => {
     });
 
   } catch (error) {
+    if (res.destroyed) return;
     console.error('Error en /api/sap/trace-order:', error);
-    res.status(500).json({
+    res.status(controller.signal.aborted ? 504 : 502).json({
       success: false,
-      error: error.error || error.message || String(error)
+      error: controller.signal.aborted ? 'La consulta tardó demasiado. Intenta de nuevo.' : 'No se pudo consultar la orden. Intenta de nuevo.'
     });
+  } finally {
+    clearTimeout(budgetTimer);
+    res.removeListener('close', cancel);
+    controller.abort();
   }
 });
 

@@ -1,12 +1,12 @@
 import { userMessage } from '../../utils/userMessages';
-/* @refresh reset */
+ 
 import React, { useState, useEffect, useMemo } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
 import useEscapeKey from '../../hooks/useEscapeKey';
 
 export default function PuntoReordenFarmacia() {
-  const [activeTab, setActiveTab] = useState('reorden'); // 'reorden' | 'pedidos' | 'ml_dataset'
+  const [activeTab, setActiveTab] = useState('reorden');  
   const [items, setItems] = useState([]);
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,18 +17,18 @@ export default function PuntoReordenFarmacia() {
   const [mlDataset, setMlDataset] = useState([]);
   const [mlHistory, setMlHistory] = useState([]);
   const [mlPredictions, setMlPredictions] = useState([]);
-  const [mlViewMode, setMlViewMode] = useState('today'); // 'today' | 'history' | 'predictions'
+  const [mlViewMode, setMlViewMode] = useState('today');  
   const [runningMLPredictions, setRunningMLPredictions] = useState(false);
   const [loadingML, setLoadingML] = useState(false);
   const [syncingML, setSyncingML] = useState(false);
-  const [mlRiskFilter, setMlRiskFilter] = useState('ALL'); // ALL | CRITICO | ALTO | MEDIO | BAJO
-  const [mlStockFilter, setMlStockFilter] = useState('ALL'); // ALL | FAR | QX | QXCR | SIN_STOCK
+  const [mlRiskFilter, setMlRiskFilter] = useState('ALL');  
+  const [mlStockFilter, setMlStockFilter] = useState('ALL');  
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState(''); // ALL | CRITICO | REORDEN | OPTIMO | CON_PEDIDO | CON_NOTA
+  const [endDate, setEndDate] = useState('');  
 
   // Modal para editar Min/Max, Notita y Solicitud Compra
   const [editingItem, setEditingItem] = useState(null);
@@ -42,7 +42,6 @@ export default function PuntoReordenFarmacia() {
   const [inlineEditCode, setInlineEditCode] = useState(null);
   const [inlineSolicitudVal, setInlineSolicitudVal] = useState('');
 
-  // Modal para ver detalle de Pedidos SAP de un SKU
   const [selectedItemOrders, setSelectedItemOrders] = useState(null);
 
   useEscapeKey(() => setEditingItem(null), !!editingItem);
@@ -52,12 +51,12 @@ export default function PuntoReordenFarmacia() {
   const [configData, setConfigData] = useState(null);
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [configSearch, setConfigSearch] = useState('');
-  const [configMatchFilter, setConfigMatchFilter] = useState('ALL'); // ALL | AUTO_ALTA | AUTO_MEDIA | UNMATCHED | OUT_OF_SYNC
+  const [configMatchFilter, setConfigMatchFilter] = useState('ALL');  
   const [applyingAll, setApplyingAll] = useState(false);
   const [applyingRow, setApplyingRow] = useState(null);
   const [uploadingExcel, setUploadingExcel] = useState(false);
-  const [linkModal, setLinkModal] = useState(null); // { producto, search, results, searching }
-  const [configToast, setConfigToast] = useState(null); // { type: 'ok'|'error', message }
+  const [linkModal, setLinkModal] = useState(null);  
+  const [configToast, setConfigToast] = useState(null);  
 
   const showConfigToast = (type, message) => {
     setConfigToast({ type, message });
@@ -585,7 +584,6 @@ export default function PuntoReordenFarmacia() {
     });
   }, [items, searchTerm, statusFilter]);
 
-  // KPIs
   const stats = useMemo(() => {
     let reordenCount = 0;
     let criticoCount = 0;
@@ -688,7 +686,6 @@ export default function PuntoReordenFarmacia() {
     });
   }, [configData, configSearch, configMatchFilter]);
 
-  
   const exportPedidosToExcel = () => {
     const term = searchTerm.toLowerCase().trim();
     const csvRows = ['Folio,Tipo,Fecha,Proveedor,Usuario,Estatus,Total'];
@@ -1034,7 +1031,6 @@ export default function PuntoReordenFarmacia() {
         </div>
       )}
 
-      {/* KPI Cards Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
         
         <div className="reorder-kpi-card" style={{ borderTop: '4px solid #ef4444' }}>
@@ -1220,7 +1216,6 @@ export default function PuntoReordenFarmacia() {
                           {item.CalculoPromedio}
                         </td>
 
-                        {/* Solicitud Compra (Verde destacado como en Excel, editable por el usuario) */}
                         <td 
                           style={{ 
                             padding: '0.5rem 0.75rem', 
@@ -1303,7 +1298,6 @@ export default function PuntoReordenFarmacia() {
                           )}
                         </td>
 
-                        {/* Pedidos SAP en Curso (Crucial para evitar duplicados en el turno tarde) */}
                         <td style={{ padding: '0.75rem 1rem' }}>
                           {hasPedidos ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -1382,7 +1376,6 @@ export default function PuntoReordenFarmacia() {
         </div>
       )}
 
-      {/* Pestaña 2: Módulo de Pedidos y Solicitudes SAP en Curso */}
       {activeTab === 'pedidos' && (
         <div style={{ background: 'var(--color-bg-white, white)', borderRadius: '14px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid var(--border-color, #e2e8f0)', padding: '1.5rem' }}>
           
@@ -1689,7 +1682,7 @@ onClick={() => fetchPedidosData(true)}
               Cargando datos...
             </div>
           ) : mlViewMode === 'today' ? (
-            /* RENDER SNAPSHOT TAB */
+             
             filteredMLDataset.length === 0 ? (
               <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)', background: 'var(--color-bg-base, #f8fafc)', borderRadius: '10px' }}>
                 No se encontraron registros en el inventario de hoy.
@@ -1777,7 +1770,7 @@ onClick={() => fetchPedidosData(true)}
               </div>
             )
           ) : mlViewMode === 'history' ? (
-            /* RENDER HISTORY TAB */
+             
             filteredMLHistory.length === 0 ? (
               <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)', background: 'var(--color-bg-base, #f8fafc)', borderRadius: '10px' }}>
                 No hay registros en el historial de consumo para el filtro seleccionado.
@@ -1884,7 +1877,7 @@ onClick={() => fetchPedidosData(true)}
               </div>
             )
           ) : (
-            /* RENDER PREDICTIONS TAB */
+             
             filteredMLPredictions.length === 0 ? (
               <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary, #64748b)', background: 'var(--color-bg-base, #f8fafc)', borderRadius: '10px' }}>
                 No hay pronósticos disponibles. Haz clic en "Calcular Alertas de Desabasto (IA)" para generarlos.
@@ -1931,8 +1924,6 @@ onClick={() => fetchPedidosData(true)}
                       const outOfStockDateStr = row.fecha_desabasto ? new Date(row.fecha_desabasto).toLocaleString('es-MX') : null;
                       const estAgotDateStr = row.fecha_estimada_agotamiento ? new Date(row.fecha_estimada_agotamiento).toLocaleDateString('es-MX') : null;
 
-                      // Para items YA EN DESABASTO, mostrar la fecha en la que se acabó (nunca un pronóstico);
-                      // para los demás, la fecha estimada en que se agotará el stock
                       const isYaDesabasto = row.riesgo_ml === 'YA EN DESABASTO';
                       const desabastoDate = outOfStockDateStr || lastMovDateStr;
                       const daysRemainingNum = Number(row.dias_stock_restante);
@@ -2004,10 +1995,9 @@ onClick={() => fetchPedidosData(true)}
         </div>
       )}
 
-      {/* TAB 4: Configuración Dinámica de Reorden (UI Premium) */}
       {activeTab === 'dynamic_config' && (
         <div style={{ animation: 'fadeIn 0.4s ease-out' }}>
-          {/* Header de la Pestaña */}
+          
           <div style={{ background: 'linear-gradient(to right, #0f172a, #1e293b)', padding: '2rem', borderRadius: '16px', color: 'white', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
             <div>
               <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.8rem', fontWeight: '800', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2097,7 +2087,6 @@ onClick={() => fetchPedidosData(true)}
         </div>
       )}
 
-      {/* Modal Editar Notita / Min / Max */}
       {editingItem && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'white', padding: '2rem', borderRadius: '16px', width: '90%', maxWidth: '520px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>

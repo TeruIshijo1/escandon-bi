@@ -12,7 +12,7 @@ const LLM_BASE    = process.env.LLM_BASE_URL ||
   (process.env.GEMINI_API_KEY ? 'https://generativelanguage.googleapis.com/v1beta/openai' : 
   (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' : (process.env.AZURE_OPENAI_ENDPOINT || 'https://api.openai.com/v1')));
 
-/* ── Mapeo de intenciones → permisos por rol ─────────────── */
+/* Mapeo de intenciones → permisos por rol */
 const INTENT_PERMISSIONS = {
   ocupacion_camas:  ['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO'],
   censo_pacientes:  ['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO'],
@@ -27,7 +27,7 @@ const INTENT_PERMISSIONS = {
   general:          ['ADMIN', 'DIRECTOR', 'JEFE_AREA', 'USUARIO_OPERATIVO'],
 };
 
-/* ── Catálogo de intenciones → queries SQL ────────────────── */
+/* Catálogo de intenciones → queries SQL */
 const INTENT_QUERIES = {
   saludo: {
     description: 'Saludo o presentación (hola, buenos días, qué tal)',
@@ -184,11 +184,9 @@ const INTENT_QUERIES = {
   },
 };
 
-/* ══════════════════════════════════════════════════════════════
-   Función principal: processRAGQuery
-══════════════════════════════════════════════════════════════ */
+/* Función principal: processRAGQuery */
 async function processRAGQuery({ question, userRole, userArea, userName, file, screenImage, currentContext }) {
-  // Procesar primero con el motor de intenciones analíticas de ARIA (que incluye Quirófano, Almacén, Farmacia, Censo, etc.)
+   
   const ariaUser = { role: userRole, area: userArea, nombre: userName };
   const ariaResponse = await ariaService.processAriaQuery(question, ariaUser);
 
@@ -223,7 +221,7 @@ async function processRAGQuery({ question, userRole, userArea, userName, file, s
     };
   }
 
-  // 1. Clasificar intención si no hubo match en ARIA
+  // Clasificar intención si no hubo match en ARIA
   const intent = await classifyIntent(question);
   const allowed = INTENT_PERMISSIONS[intent] || INTENT_PERMISSIONS.general;
   const hasPermission = allowed.includes(userRole);
@@ -272,7 +270,7 @@ async function processRAGQuery({ question, userRole, userArea, userName, file, s
   };
 }
 
-/* ── Paso 1: Clasificar intención ────────────────────────── */
+/* Paso 1: Clasificar intención */
 async function classifyIntent(question) {
   const intentList = Object.entries(INTENT_QUERIES)
     .map(([key, v]) => `- ${key}: ${v.description}`)
@@ -296,7 +294,7 @@ ${intentList}`,
   return INTENT_QUERIES[intent] ? intent : 'general';
 }
 
-/* ── Paso 2: Ejecutar query SQL con filtro RBAC ──────────── */
+/* Paso 2: Ejecutar query SQL con filtro RBAC */
 async function fetchDataForIntent(intent, { userRole, userArea }) {
   const queryConfig = INTENT_QUERIES[intent];
   if (!queryConfig || !queryConfig.sql) {
@@ -330,7 +328,7 @@ async function fetchDataForIntent(intent, { userRole, userArea }) {
   }
 }
 
-/* ── Paso 3: Generar respuesta con LLM ───────────────────── */
+/* Paso 3: Generar respuesta con LLM */
 async function generateAnswer({ question, data, intent, userRole, userName, systemPrompt, excelData, screenImage }) {
   const userMessageContent = buildUserMessage(question, data, intent, userName, excelData);
 
@@ -355,7 +353,6 @@ async function generateAnswer({ question, data, intent, userRole, userName, syst
   return callLLM(messages);
 }
 
-/* ── Cliente OpenAI / Azure OpenAI (MODO DEMO) ──────────────────────── */
 async function callLLM(messages, options = {}) {
   const isClassification = messages[0]?.content?.includes("Clasifica la pregunta");
   

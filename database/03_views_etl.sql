@@ -1,9 +1,9 @@
--- ═══════════════════════════════════════════════════════════════════
--- 03_views_etl.sql — Vistas para el módulo ETL de Auditoría (PostgreSQL)
--- Hospital Escandón BI v1.0
--- ═══════════════════════════════════════════════════════════════════
 
--- VISTA 1: Conciliación completa Inventarios vs. Cargos
+
+
+
+
+-- Conciliación completa Inventarios vs. Cargos
 CREATE OR REPLACE VIEW VW_ConciliacionInventarioCargos AS
 SELECT
     ao.OrdenId,
@@ -40,7 +40,7 @@ LEFT JOIN CargosEnfermeria ce ON ce.OrdenAlmacenId = ao.OrdenId
 LEFT JOIN Usuarios         u  ON u.UsuarioId       = ce.EnfermerId
 WHERE ao.Estado = 'SURTIDA';
 
--- VISTA 2: KPIs de Ocupación en tiempo real
+-- KPIs de Ocupación en tiempo real
 CREATE OR REPLACE VIEW VW_OcupacionCamasActual AS
 SELECT
     c.Area,
@@ -56,7 +56,7 @@ FROM Camas c
 WHERE c.Activo = 1
 GROUP BY c.Area;
 
--- VISTA 3: Productividad por Área (Rotación + Estancia)
+-- Productividad por Área
 CREATE OR REPLACE VIEW VW_ProductividadPorArea AS
 SELECT
     e.AreaEgreso                                            AS Area,
@@ -72,7 +72,7 @@ JOIN Admisiones a ON a.AdmisionId = e.AdmisionId
 WHERE e.FechaEgreso >= CURRENT_TIMESTAMP - INTERVAL '1 month'
 GROUP BY e.AreaEgreso;
 
--- VISTA 4: Resumen de Discrepancias para Dashboard de Auditoría
+-- Resumen de Discrepancias para Dashboard de Auditoría
 CREATE OR REPLACE VIEW VW_ResumenDiscrepancias AS
 SELECT
     AreaHospitalaria,

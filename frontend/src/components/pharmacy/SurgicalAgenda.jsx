@@ -9,12 +9,11 @@ export default function SurgicalAgenda() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filters & Modal State
   const [days, setDays] = useState(30);
   const [searchTerm, setSearchTerm] = useState('');
   const [quirofanoFilter, setQuirofanoFilter] = useState('ALL');
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [modalTab, setModalTab] = useState('ACTUAL'); // 'ACTUAL' or 'SUGGESTED'
+  const [modalTab, setModalTab] = useState('ACTUAL');  
   const [copied, setCopied] = useState(false);
 
   useEscapeKey(() => setSelectedEvent(null), !!selectedEvent);
@@ -41,7 +40,6 @@ export default function SurgicalAgenda() {
       });
   }, [days]);
 
-  // Create a normalized Map of Kits by Procedure Name
   const kitsMap = useMemo(() => {
     const map = new Map();
     kits.forEach(k => {
@@ -50,7 +48,6 @@ export default function SurgicalAgenda() {
     return map;
   }, [kits]);
 
-  // Helper to match an event procedure with best fitting kit
   const getMatchedKit = (procName) => {
     if (!procName) return null;
     const normProc = procName.toUpperCase().trim();
@@ -64,7 +61,6 @@ export default function SurgicalAgenda() {
     return null;
   };
 
-  // Filtered Events
   const filteredEvents = useMemo(() => {
     return events.filter(ev => {
       const matchSearch = !searchTerm.trim() || 
@@ -188,7 +184,7 @@ export default function SurgicalAgenda() {
 
   return (
     <div style={{ background: 'var(--card-bg, #ffffff)', borderRadius: '16px', padding: '2rem', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)', border: '1px solid var(--border-color, #e2e8f0)' }}>
-      {/* Header */}
+      {/* Encabezado */}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid var(--border-color, #e2e8f0)', paddingBottom: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.65rem', fontWeight: '800', color: 'var(--text-main, #0f172a)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -229,7 +225,6 @@ export default function SurgicalAgenda() {
         )}
       </div>
 
-      {/* Control Bar */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem', background: 'var(--sub-bg, #f8fafc)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color, #e2e8f0)' }}>
         <div style={{ gridColumn: 'span 2' }}>
           <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-muted, #64748b)', marginBottom: '0.35rem' }}>🔍 Buscar por Paciente, Médico o Procedimiento:</label>
@@ -270,7 +265,6 @@ export default function SurgicalAgenda() {
         </div>
       </div>
 
-      {/* Grid of Events */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-muted, #64748b)' }}>
           <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⚙️</div>
@@ -369,7 +363,6 @@ export default function SurgicalAgenda() {
         </div>
       )}
 
-      {/* Detail & Kit Projection Modal */}
       {selectedEvent && (() => {
         const matchedKit = getMatchedKit(selectedEvent.Procedimiento);
         const hasActual = selectedEvent.ActualItemsCount > 0;
@@ -378,7 +371,7 @@ export default function SurgicalAgenda() {
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
             <div style={{ background: 'var(--card-bg, #ffffff)', padding: '2rem', borderRadius: '16px', width: '95%', maxWidth: '850px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', border: '1px solid var(--border-color, #cbd5e1)' }}>
               
-              {/* Header */}
+              {/* Encabezado */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', borderBottom: '2px solid var(--border-color, #e2e8f0)', paddingBottom: '0.75rem' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -403,7 +396,6 @@ export default function SurgicalAgenda() {
                 <button onClick={() => setSelectedEvent(null)} style={{ background: 'none', border: 'none', fontSize: '1.75rem', cursor: 'pointer', color: 'var(--text-muted, #94a3b8)', lineHeight: 1 }}>×</button>
               </div>
 
-              {/* Modal Tabs Switcher */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', background: 'var(--sub-bg, #f8fafc)', padding: '0.5rem', borderRadius: '10px', border: '1px solid var(--border-color, #e2e8f0)', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button 
@@ -448,7 +440,6 @@ export default function SurgicalAgenda() {
                 </button>
               </div>
 
-              {/* Items Container */}
               <div style={{ overflowY: 'auto', flex: 1, paddingRight: '0.5rem' }}>
                 {modalTab === 'ACTUAL' ? (
                   hasActual ? (
@@ -514,7 +505,6 @@ export default function SurgicalAgenda() {
                 )}
               </div>
 
-              {/* Modal Footer */}
               <div style={{ marginTop: '1.25rem', textAlign: 'right', paddingTop: '1rem', borderTop: '1px solid var(--border-color, #e2e8f0)' }}>
                 <button onClick={() => setSelectedEvent(null)} style={{ padding: '0.65rem 1.5rem', background: '#94a3b8', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
                   Cerrar

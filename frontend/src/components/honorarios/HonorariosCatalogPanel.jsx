@@ -30,7 +30,7 @@ const historyDescription = entry => {
   return `${STATUS_LABELS[current.status] || current.status || ''} · ${current.modality === 'contact_center' ? 'Contact Center' : 'Presencial'} · Por ${current.paymentUnit || 'servicio'}`;
 };
 
-export default function HonorariosCatalogPanel({ canManage = false, onChanged, onReviewServices }) {
+export default function HonorariosCatalogPanel({ canManage = false, active = true, onChanged, onReviewServices }) {
   const [items, setItems] = useState([]);
   const [sync, setSync] = useState(null);
   const [providers, setProviders] = useState([]);
@@ -56,6 +56,8 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
   const [tariff, setTariff] = useState(blankTariff);
   const [tariffEditorOpen, setTariffEditorOpen] = useState(false);
   const catalogRequest = useRef(0);
+  const catalogLoading = useRef(false);
+  const backgroundRefreshBlocked = useRef(false);
   const detailRequest = useRef(0);
   const detailCache = useRef(new Map());
   const selectedCodeRef = useRef(selectedCode);
@@ -67,6 +69,9 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
     && Array.isArray(item.referencePrices) && item.referencePrices.length > 0), [workingItems]);
   const scopedItems = catalogView === 'APROBADOS' ? approvedItems : catalogView === 'RECOMENDADOS' ? recommendedItems : workingItems;
   const selected = workingItems.find(item => item.itemCode === selectedCode) || null;
+  backgroundRefreshBlocked.current = !active || saving || syncing || exporting || tariffEditorOpen
+    || Boolean(selected && config && (config.status !== selected.status
+      || config.modality !== (selected.modality || 'presencial')));
   const changeCatalogView = view => {
     if (view === catalogView) return;
     setCatalogView(view);
@@ -76,13 +81,16 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
     setMessage('');
   };
 
-  const loadCatalog = useCallback(async () => {
+  const loadCatalog = useCallback(async ({ background = false } = {}) => {
+    if (background && (catalogLoading.current || backgroundRefreshBlocked.current
+      || document.visibilityState !== 'visible')) return;
     const request = ++catalogRequest.current;
-    setLoading(true);
+    catalogLoading.current = true;
+    if (!background) setLoading(true);
     setError('');
     try {
       const result = await apiFetch('/honorarios/catalog');
-      if (request === catalogRequest.current) {
+      if (request === catalogRequest.current && (!background || !backgroundRefreshBlocked.current)) {
         setItems((result.items || []).map(withProfessionalScope));
         setSync(result.sync || null);
       }
@@ -91,7 +99,10 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
       if (request === catalogRequest.current) setError(userMessage(failure.message));
       throw failure;
     } finally {
-      if (request === catalogRequest.current) setLoading(false);
+      if (request === catalogRequest.current) {
+        catalogLoading.current = false;
+        if (!background) setLoading(false);
+      }
     }
   }, []);
 
@@ -103,6 +114,20 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
     }).catch(failure => { if (alive) setProviderError(userMessage(failure.message)); });
     return () => { alive = false; catalogRequest.current += 1; detailRequest.current += 1; };
   }, [loadCatalog]);
+
+  useEffect(() => {
+    if (!active) return;
+    const refresh = () => { loadCatalog({ background: true }).catch(() => {}); };
+    refresh();
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [active, loadCatalog]);
 
   useEffect(() => {
     setConfig(selected ? { status: selected.status, modality: selected.modality || 'presencial',
@@ -287,6 +312,7 @@ export default function HonorariosCatalogPanel({ canManage = false, onChanged, o
             }).catch(() => {})}>Actualizar</button>
           </div>
           <span className="hon-catalog-muted">{sync?.lastSuccess ? `Última actualización: ${timestampLabel(sync.lastSuccess)}` : 'Aún no se ha actualizado el catálogo'}</span>
+          <span className="hon-catalog-muted">Los servicios y precios de referencia de Vertical se consultan automáticamente cada {sync?.intervalMinutes || 30} minutos. Los servicios nuevos quedan por configurar.</span>
         </div>
       </div>
       {sync?.lastError && <div className="hon-catalog-alert" role="alert">No se pudo actualizar el catálogo. Puedes consultar los servicios guardados e intentar de nuevo más tarde.</div>}

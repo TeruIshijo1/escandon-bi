@@ -16,7 +16,7 @@ export default function InventarioFarmacia() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [itemTypeFilter, setItemTypeFilter] = useState('FAR'); // 'FAR' (Por defecto: Solo Medicamentos FAR) | 'ALL' (Todos los artículos)
+  const [itemTypeFilter, setItemTypeFilter] = useState('FAR');  
 
   const [selectedItemBatches, setSelectedItemBatches] = useState(null);
   const [batches, setBatches] = useState([]);
@@ -45,7 +45,6 @@ export default function InventarioFarmacia() {
     fetchInventory();
   }, [selectedWarehouse]);
 
-
   const fetchInventory = async (isRefresh = false) => {
     try {
       setLoading(true);
@@ -55,7 +54,6 @@ export default function InventarioFarmacia() {
         ? `${API_BASE}/pharmacy/inventario?warehouse=${selectedWarehouse}&refresh=true`
         : `${API_BASE}/pharmacy/inventario?warehouse=${selectedWarehouse}`;
 
-      // Llamada al backend protegido, el cual gestionará de forma invisible la sesión de SAP
       const response = await fetch(url, {
         headers: authHeaders()
       });
@@ -101,7 +99,7 @@ export default function InventarioFarmacia() {
     try {
       setSelectedItemHistory(item);
       setLoadingHistory(true);
-      setHistorySearchTerm(''); // reset search
+      setHistorySearchTerm('');  
       const response = await fetch(`${API_BASE}/pharmacy/historial-lotes?itemCode=${encodeURIComponent(item.ItemCode)}`, {
         headers: authHeaders()
       });
@@ -140,7 +138,6 @@ export default function InventarioFarmacia() {
     }
   };
 
-  // Filtrado local
   const filteredItems = useMemo(() => {
     let result = items;
     
@@ -165,7 +162,6 @@ export default function InventarioFarmacia() {
     });
   }, [items, searchTerm, itemTypeFilter]);
 
-  // Items base según el filtro de tipo de artículo para los KPIs
   const baseItems = useMemo(() => {
     if (itemTypeFilter === 'FAR') {
       return items.filter(item => String(item.ItemCode || '').toUpperCase().startsWith('FAR'));
@@ -173,7 +169,6 @@ export default function InventarioFarmacia() {
     return items;
   }, [items, itemTypeFilter]);
 
-  // Helper de clasificación médica SAP
   const getMedClassificationBadge = (item) => {
     const c1 = (item.MedicalClassification || '').toUpperCase().trim();
     const c2 = (item.SecondaryClassification || '').toUpperCase().trim();
@@ -226,7 +221,6 @@ export default function InventarioFarmacia() {
     ALL: 'Todos los almacenes SAP'
   };
 
-  // Helper de formateo numérico: stock sin decimales, precios/costos con 4 decimales de SAP
   const formatStock = (val) => Number(val || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const formatCurrency = (val) => `$${(Number(val) || 0).toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
   const formatUtility = (val) => `$${(Number(val) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -439,7 +433,6 @@ export default function InventarioFarmacia() {
         </div>
       )}
 
-      {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         
         {/* Catálogo Activo */}
@@ -480,10 +473,8 @@ export default function InventarioFarmacia() {
 
       </div>
 
-      {/* Main Table Card */}
       <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-        
-        {/* Search & Actions Header */}
+
         <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', background: '#f8fafc' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, minWidth: '300px' }}>
             <span style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '1.1rem' }}>
@@ -664,7 +655,7 @@ export default function InventarioFarmacia() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Tabla */}
         <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 350px)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f1f5f9' }}>
@@ -805,8 +796,7 @@ export default function InventarioFarmacia() {
           </table>
         </div>
       </div>
-      
-      {/* Modal Lotes */}
+
       {selectedItemBatches && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '700px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
@@ -943,7 +933,6 @@ export default function InventarioFarmacia() {
         </div>
       )}
 
-      {/* Modal Reabastecimiento Inteligente */}
       {showReplenishmentModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '800px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>

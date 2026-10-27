@@ -188,14 +188,12 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
 
   return (
     <div className="dashboard-view" id="dashboard-finanzas-container" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      
-      {/* Hidden export buttons triggered by DashboardDirectivo header */}
+
       <div style={{ display: 'none' }}>
         <ExportButton id="export-pdf-btn" type="pdf" targetId="dashboard-finanzas-container" compact={true} />
         <button id="export-excel-btn" onClick={handleExportExcel}></button>
       </div>
 
-      {/* TABS */}
       <div style={{ display: 'flex', gap: '1rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
         <button
           onClick={() => setActiveTab('HISTORIAL')}
@@ -224,7 +222,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
 
       {activeTab === 'HISTORIAL' ? (
         <>
-      {/* KPIs Section */}
+      
       <div className="dashboard-metric-grid" style={{
         display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem'
       }}>
@@ -360,7 +358,7 @@ export default function DashboardFinanzasNativo({ globalFilters, globalTrigger }
                 .map((t, idx) => {
                   const tipo = t.tipo || t.Tipo || (t.Code?.startsWith('FAC') ? 'EGRESO' : 'INGRESO');
                   const isIngreso = tipo === 'INGRESO';
-                  const isNumericPCNum = !!t.PCNum; // Allowing any PCNum, including CTE00029
+                  const isNumericPCNum = !!t.PCNum;  
                   const montoVal = t.MontoPago ?? t.Monto ?? t.MontoTotal ?? 0;
                   return (
                     <tr 

@@ -6,8 +6,8 @@ import PremiumLoader from '../shared/PremiumLoader';
 import ExportToolbar from '../shared/ExportToolbar';
 
 const COLORS = ['#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe', '#f5f3ff'];
-const PIE_COLORS = ['#ec4899', '#3b82f6', '#10b981', '#f59e0b']; // Pink for F, Blue for M
-const RETENCION_COLORS = ['#f59e0b', '#10b981']; // Orange for new, green for recurring
+const PIE_COLORS = ['#ec4899', '#3b82f6', '#10b981', '#f59e0b'];  
+const RETENCION_COLORS = ['#f59e0b', '#10b981'];  
 
 export default function DashboardSitiPacientes() {
   const [data, setData] = useState(null);

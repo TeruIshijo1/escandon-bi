@@ -1,8 +1,5 @@
 import { userMessage } from '../../utils/userMessages';
-/**
- * ExportButton.jsx — Botones de exportación PDF y Excel
- * Hospital Escandón BI Platform v4.0
- */
+
 import { useState } from 'react';
 import { API_BASE } from '../../api/config';
 import { authHeaders } from '../../api/auth';
@@ -49,22 +46,21 @@ export default function ExportButton({
   queryParams = null,
   directUrl = null,
   compact = false,
-  variant = 'glass', // 'glass' | 'solid'
+  variant = 'glass',  
   onClickOverride,
   targetId = 'dashboard-container',
   useServerPdf = false,
 }) {
   const [loading, setLoading] = useState(false);
   const cfg = CONFIG[type] || CONFIG.pdf;
-  
-  // Define styles based on variant
+
   const bgIdle = variant === 'solid' ? cfg.bg : 'rgba(255,255,255,0.15)';
   const bgHover = variant === 'solid' ? cfg.bg : 'rgba(255,255,255,0.28)';
   const borderStyle = variant === 'solid' ? 'none' : '1.5px solid rgba(255,255,255,0.22)';
   const shadowStyle = variant === 'solid' ? `0 4px 12px ${cfg.shadow}` : 'var(--shadow-xs)';
 
   const buildQueryString = () => {
-    // ... [existing logic inside buildQueryString] ...
+     
     const cleanParams = queryParams
       ? Object.fromEntries(Object.entries(queryParams).filter(([, v]) => v !== undefined && v !== null && v !== ''))
       : {};
@@ -75,7 +71,7 @@ export default function ExportButton({
 
   const handleExport = async () => {
     if (loading) return;
-    // ... [existing handleExport logic] ...
+     
     if (onClickOverride) {
       onClickOverride();
       return;

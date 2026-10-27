@@ -4,6 +4,72 @@ const { pool } = require('../config/pg-db');
 const { connectRemoteDB } = require('../config/remote-db');
 const sql = require('mssql');
 const etlService = require('./etl.service');
+const sapService = require('./sap.service');
+const { withSapQuery } = require('./sapQueryRegistration.service');
+const { hospitalToday, addDays } = require('./statisticsCommon');
+
+const SAP_READ_OPTIONS = { maxPages: 5000, timeoutMs: 30000, queueTimeoutMs: 60000, totalTimeoutMs: 300000, cacheTtlMs: 0 };
+const activeSyncs = new Map();
+
+function singleFlight(name, work) {
+  if (activeSyncs.has(name)) return activeSyncs.get(name);
+  const promise = Promise.resolve().then(work).finally(() => { activeSyncs.delete(name); });
+  activeSyncs.set(name, promise);
+  return promise;
+}
+
+async function withTransaction(work) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function executeBatchInsert(client, table, columns, rows, batchSize = 250) {
+  if (!rows || !rows.length) return;
+  const colCount = columns.length;
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const chunk = rows.slice(i, i + batchSize);
+    if (chunk.length === 1) {
+      const placeholders = columns.map((_, idx) => `$${idx + 1}`).join(', ');
+      await client.query(`
+        INSERT INTO ${table} (
+          ${columns.join(', ')}, lastsync
+        ) VALUES (
+          ${placeholders}, CURRENT_TIMESTAMP
+        )
+      `, chunk[0]);
+    } else {
+      const tuples = [];
+      const params = [];
+      for (let r = 0; r < chunk.length; r++) {
+        const row = chunk[r];
+        const offset = r * colCount;
+        const rowPlaceholders = [];
+        for (let c = 1; c <= colCount; c++) {
+          rowPlaceholders.push(`$${offset + c}`);
+        }
+        tuples.push(`(${rowPlaceholders.join(', ')}, CURRENT_TIMESTAMP)`);
+        for (let c = 0; c < colCount; c++) {
+          params.push(row[c]);
+        }
+      }
+      await client.query(`
+        INSERT INTO ${table} (
+          ${columns.join(', ')}, lastsync
+        ) VALUES ${tuples.join(', ')}
+      `, params);
+    }
+  }
+}
 
 function parseSapDate(dateStr) {
   if (!dateStr) return null;
@@ -20,28 +86,18 @@ function parseSapDate(dateStr) {
 }
 
 const executeSAPQuery = async (queryName, sqlText, params) => {
-  const sapService = require('../services/sap.service');
-  await sapService._ensureSession();
-  try {
-    await sapService.post('/SQLQueries', { SqlCode: queryName, SqlName: queryName, SqlText: sqlText });
-  } catch (e) {
-    try {
-      await sapService.patch(`/SQLQueries('${queryName}')`, { SqlName: queryName, SqlText: sqlText });
-    } catch(err) {
-      console.error('[SAP SQL Error]', err.response?.data?.error?.message?.value || err.message);
-    }
-  }
   const qs = new URLSearchParams();
-  for(let key in params) {
-    qs.append(key, `'${params[key]}'`);
+  for (const [key, value] of Object.entries(params || {})) {
+    qs.append(key, `'${String(value).replace(/'/g, "''")}'`);
   }
-  const list = await sapService.fetchAllPages(`/SQLQueries('${queryName}')/List?${qs.toString()}`, {}, 5000);
-  return list || [];
+  return withSapQuery(queryName, sqlText, async () => {
+    const list = await sapService.fetchAllPages(`/SQLQueries('${queryName}')/List?${qs.toString()}`, {}, SAP_READ_OPTIONS);
+    if (!Array.isArray(list)) throw new Error(`Lectura SAP incompleta: ${queryName}`);
+    return list;
+  });
 };
 
-/**
- * Sincroniza el Censo de Pacientes de Vertical a PostgreSQL
- */
+/* Sincroniza el Censo de Pacientes de Vertical a PostgreSQL */
 async function syncCenso() {
   try {
     console.log('[Sync] Extrayendo Censo de Pacientes de Vertical...');
@@ -98,15 +154,17 @@ async function syncCenso() {
   }
 }
 
-/**
- * Sincroniza los consumos (cargos) cruzados de Vertical + SAP a PostgreSQL
- */
-async function syncConsumo() {
+function syncConsumo() {
+  return singleFlight('consumo', syncConsumoOnce);
+}
+
+async function syncConsumoOnce() {
   try {
     console.log('[Sync] Extrayendo Consumos de Vertical y cruzando con SAP (Últimos 45 días)...');
     
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 45);
+    startDate.setUTCHours(0, 0, 0, 0);
     const endDate = new Date();
     
     const data = await etlService.getCargosFarmaciaSAP({ 
@@ -115,35 +173,33 @@ async function syncConsumo() {
       limit: 100000
     });
 
+    if (!Array.isArray(data)) throw new Error('La lectura de consumos no está completa.');
     console.log(`[Sync] Cruzados ${data.length} registros de consumo. Guardando en PostgreSQL...`);
 
-    // Limpiamos los últimos 45 días para evitar duplicados y volvemos a insertar
-    await pool.query(`DELETE FROM dw_cirrus_consumo WHERE fechacargo >= $1`, [startDate]);
+    const consumoColumns = [
+      'cuentahospitalaria', 'fechacargo', 'codigo', 'insumo', 'cantidad', 'preciounitario',
+      'montocobrado', 'lote', 'caducidad', 'paciente', 'habitacion', 'medico', 'usuariocargo'
+    ];
+    const consumoRows = data.map(d => [
+      String(d.Cuenta || ''),
+      parseSapDate(d.FechaCargo || d.Fecha),
+      String(d.Codigo || ''),
+      String(d.Insumo || ''),
+      Number(d.CantidadCargada ?? d.Cantidad ?? 0),
+      Number(d.PrecioUnitario || 0),
+      Number(d.MontoCobrado || 0),
+      String(d.Lote || ''),
+      d.Caducidad ? String(d.Caducidad) : '',
+      String(d.NombrePaciente || d.Paciente || ''),
+      String(d.AreaHospitalaria || d.Habitacion || ''),
+      String(d.MedicoTratante || d.Medico || ''),
+      String(d.UsuarioCargo || d.Usuario || '')
+    ]);
 
-    for (const d of data) {
-      await pool.query(`
-        INSERT INTO dw_cirrus_consumo (
-          cuentahospitalaria, fechacargo, codigo, insumo, cantidad, preciounitario, montocobrado, lote, caducidad, 
-          paciente, habitacion, medico, usuariocargo, lastsync
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP
-        )
-      `, [
-        String(d.Cuenta || ''),
-        parseSapDate(d.FechaCargo || d.Fecha),
-        String(d.Codigo || ''),
-        String(d.Insumo || ''),
-        Number(d.CantidadCargada ?? d.Cantidad ?? 0),
-        Number(d.PrecioUnitario || 0),
-        Number(d.MontoCobrado || 0),
-        String(d.Lote || ''),
-        d.Caducidad ? String(d.Caducidad) : '',
-        String(d.NombrePaciente || d.Paciente || ''),
-        String(d.AreaHospitalaria || d.Habitacion || ''),
-        String(d.MedicoTratante || d.Medico || ''),
-        String(d.UsuarioCargo || d.Usuario || '')
-      ]);
-    }
+    await withTransaction(async client => {
+      await client.query(`DELETE FROM dw_cirrus_consumo WHERE fechacargo >= $1`, [startDate]);
+      await executeBatchInsert(client, 'dw_cirrus_consumo', consumoColumns, consumoRows, 250);
+    });
 
     console.log('[Sync] Consumos sincronizados exitosamente.');
     return data.length;
@@ -153,17 +209,44 @@ async function syncConsumo() {
   }
 }
 
-/**
- * Sincroniza Entradas (OPDN / PDN1) de los últimos 60 días a PostgreSQL
- */
-async function syncEntradas() {
+function syncEntradas() {
+  return singleFlight('entradas', syncEntradasOnce);
+}
+
+function validateEntradas(rows) {
+  const numericFields = ['CantidadArticulos', 'PrecioUnitario', 'ImporteFactura'];
+  const optionalFields = ['NumeroFactura', 'NombreProveedor', 'Codigo', 'Descripcion', 'AlmacenReceptor'];
+  const fields = ['Fecha', 'NumeroEntrada', ...numericFields, ...optionalFields];
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    const invalid = field => { throw Object.assign(new Error(`SAP devolvió una partida de Entradas inválida (fila ${index + 1}, campo ${field}).`), { code: 'SAP_ENTRADAS_INVALID' }); };
+    if (!row || typeof row !== 'object' || Array.isArray(row)) invalid('partida');
+    for (const field of fields) if (!Object.hasOwn(row, field)) invalid(field);
+    const date = parseSapDate(row.Fecha);
+    if (!(row.Fecha instanceof Date) && typeof row.Fecha !== 'string') invalid('Fecha');
+    if (!date || !Number.isFinite(date.getTime())) invalid('Fecha');
+    if (typeof row.Fecha === 'string') {
+      const text = row.Fecha.trim();
+      const day = /^\d{8}$/.test(text) ? `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}` : text.slice(0, 10);
+      const calendarDate = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T00:00:00Z`) : null;
+      if (!calendarDate || !Number.isFinite(calendarDate.getTime()) || calendarDate.toISOString().slice(0, 10) !== day) invalid('Fecha');
+    }
+    if (!['string', 'number'].includes(typeof row.NumeroEntrada) || !String(row.NumeroEntrada).trim() || (typeof row.NumeroEntrada === 'number' && !Number.isFinite(row.NumeroEntrada))) invalid('NumeroEntrada');
+    for (const field of numericFields) {
+      const value = row[field];
+      if (!['string', 'number'].includes(typeof value) || (typeof value === 'string' && !value.trim()) || !Number.isFinite(Number(value))) invalid(field);
+    }
+    for (const field of optionalFields) if (row[field] !== null && typeof row[field] !== 'string') invalid(field);
+  }
+}
+
+async function syncEntradasOnce() {
   try {
     console.log('[Sync] Extrayendo Entradas de Factura con partidas individuales (SAP)...');
     
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 60);
-    const sDate = startDate.toISOString().split('T')[0].replace(/-/g, '');
-    const eDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const endDate = hospitalToday();
+    const sDate = addDays(endDate, -60).replace(/-/g, '');
+    const eDate = endDate.replace(/-/g, '');
 
     const sqlText = `
       SELECT 
@@ -184,30 +267,30 @@ async function syncEntradas() {
     `;
 
     const data = await executeSAPQuery('sq_sync_entradas_lineas', sqlText, { sDate, eDate });
+    validateEntradas(data);
     console.log(`[Sync] Obtenidas ${data.length} partidas de Entradas. Guardando en PostgreSQL...`);
 
-    await pool.query(`DELETE FROM dw_sap_entradas`);
+    const entradasColumns = [
+      'fecha', 'numeroentrada', 'numerofactura', 'nombreproveedor', 'codigo', 'descripcion',
+      'cantidadarticulos', 'preciounitario', 'importefactura', 'almacenreceptor'
+    ];
+    const entradasRows = data.map(d => [
+      parseSapDate(d.Fecha),
+      String(d.NumeroEntrada),
+      String(d.NumeroFactura || ''),
+      String(d.NombreProveedor || ''),
+      String(d.Codigo || ''),
+      String(d.Descripcion || ''),
+      Number(d.CantidadArticulos || 0),
+      Number(d.PrecioUnitario || 0),
+      Number(d.ImporteFactura || 0),
+      String(d.AlmacenReceptor || 'ALG')
+    ]);
 
-    for (const d of data) {
-      await pool.query(`
-        INSERT INTO dw_sap_entradas (
-          fecha, numeroentrada, numerofactura, nombreproveedor, codigo, descripcion, cantidadarticulos, preciounitario, importefactura, almacenreceptor, lastsync
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP
-        )
-      `, [
-        parseSapDate(d.Fecha),
-        String(d.NumeroEntrada || ''),
-        String(d.NumeroFactura || ''),
-        String(d.NombreProveedor || ''),
-        String(d.Codigo || ''),
-        String(d.Descripcion || ''),
-        Number(d.CantidadArticulos || 0),
-        Number(d.PrecioUnitario || 0),
-        Number(d.ImporteFactura || 0),
-        String(d.AlmacenReceptor || 'ALG')
-      ]);
-    }
+    await withTransaction(async client => {
+      await client.query(`DELETE FROM dw_sap_entradas`);
+      await executeBatchInsert(client, 'dw_sap_entradas', entradasColumns, entradasRows, 250);
+    });
     return data.length;
   } catch (err) {
     console.error('[Sync] Error sincronizando Entradas:', err);
@@ -215,133 +298,170 @@ async function syncEntradas() {
   }
 }
 
-/**
- * Genera el Kardex de inventario en PostgreSQL
- */
-async function syncKardex() {
+// Reemplaza el Kardex sólo con las fuentes locales completas y un inventario disponible.
+function syncKardex() {
+  return singleFlight('kardex', syncKardexOnce);
+}
+
+async function syncKardexOnce() {
   try {
-    console.log('[Sync] Generando Kardex unificado con trazabilidad completa de almacenes en PostgreSQL...');
-    
-    // Obtener mapa de existencias actuales desde SAP
+    const inventoryService = require('./sapInventory.service');
+    if (!await inventoryService.ensureInventoryData()) {
+      throw new Error('No hay una copia válida del inventario para generar el Kardex.');
+    }
     const stockMap = new Map();
-    try {
-      const sapInventoryService = require('./sapInventory.service');
-      await sapInventoryService.syncInventoryCache();
-      const invCache = sapInventoryService.getInventoryCache() || [];
-      invCache.forEach(item => {
-        stockMap.set(item.ItemCode, (stockMap.get(item.ItemCode) || 0) + Number(item.QuantityOnStock || 0));
-      });
-    } catch(e) {
-      console.log('[Sync Kardex] No se pudo actualizar el caché de inventario SAP.');
-    }
-
-    await pool.query(`DELETE FROM dw_sap_kardex`);
-
-    // 1. Insertar Entradas (Recepción en Almacén General)
-    const entradasRes = await pool.query(`SELECT * FROM dw_sap_entradas`);
-    for (const e of entradasRes.rows) {
-      await pool.query(`
-        INSERT INTO dw_sap_kardex (
-          codigo, descripcion, almacenorigen, almacendestino, documentoref, existencias, fecha, servicio, usuario, movimiento, valoracumulado, lastsync
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP
-        )
-      `, [
-        'ENTRADA',
-        `Entrada Factura ${e.numerofactura || ''} - ${e.nombreproveedor || ''}`,
-        `Proveedor: ${e.nombreproveedor || 'Externo'}`,
-        'Almacén General (01)',
-        `Factura ${e.numerofactura || e.numeroentrada || 'S/N'}`,
-        0,
-        e.fecha,
-        'Almacén General',
-        e.nombreproveedor || 'Sistema SAP',
-        Number(e.cantidadarticulos || 0),
-        Number(e.importefactura || 0)
-      ]);
-    }
-
-    // 2. Insertar Traslados entre Almacenes (dw_sap_traslados)
-    try {
-      const trasladosRes = await pool.query(`SELECT * FROM dw_sap_traslados`);
-      for (const t of trasladosRes.rows) {
-        const lines = t.stocktransferlines ? JSON.parse(t.stocktransferlines) : [];
+    inventoryService.getInventoryCache().forEach(item => {
+      stockMap.set(item.ItemCode, (stockMap.get(item.ItemCode) || 0) + Number(item.QuantityOnStock || 0));
+    });
+    const count = await withTransaction(async client => {
+      if (process.env.NODE_ENV !== 'test') {
+        await client.query('SELECT pg_advisory_xact_lock(72702, 20261022)');
+        const invalidTransfer = await client.query(`
+          SELECT 1 FROM dw_sap_traslados
+          WHERE stocktransferlines IS NOT NULL
+            AND btrim(stocktransferlines::text) <> ''
+            AND jsonb_typeof(stocktransferlines::jsonb) <> 'array'
+          LIMIT 1
+        `);
+        if (invalidTransfer.rowCount > 0) {
+          throw new Error('Las partidas de un traslado no están completas.');
+        }
+        const stockCodes = [];
+        const stockValues = [];
+        for (const [code, qty] of stockMap.entries()) {
+          stockCodes.push(String(code));
+          stockValues.push(Number(qty || 0));
+        }
+        await client.query('DELETE FROM dw_sap_kardex');
+        const insertRes = await client.query(`
+          WITH stock_map AS (
+            SELECT * FROM UNNEST($1::text[], $2::numeric[]) AS s(codigo, existencias)
+          )
+          INSERT INTO dw_sap_kardex (
+            codigo, descripcion, almacenorigen, almacendestino, documentoref,
+            existencias, fecha, servicio, usuario, movimiento, valoracumulado, lastsync
+          )
+          SELECT
+            'ENTRADA',
+            'Entrada Factura ' || COALESCE(e.numerofactura, '') || ' - ' || COALESCE(e.nombreproveedor, ''),
+            'Proveedor: ' || COALESCE(NULLIF(e.nombreproveedor, ''), 'Externo'),
+            'Almacén General (01)',
+            'Factura ' || COALESCE(NULLIF(e.numerofactura, ''), NULLIF(e.numeroentrada, ''), 'S/N'),
+            0,
+            e.fecha,
+            'Almacén General',
+            COALESCE(NULLIF(e.nombreproveedor, ''), 'Sistema SAP'),
+            COALESCE(e.cantidadarticulos, 0),
+            COALESCE(e.importefactura, 0),
+            CURRENT_TIMESTAMP
+          FROM dw_sap_entradas e
+          UNION ALL
+          SELECT
+            COALESCE(NULLIF(line->>'ItemCode', ''), 'TRASLADO'),
+            'Traslado: ' || COALESCE(NULLIF(line->>'ItemDescription', ''), 'Insumo Médico'),
+            COALESCE(NULLIF(t.fromwarehouse, ''), 'Almacén General (01)'),
+            COALESCE(NULLIF(t.towarehouse, ''), 'Farmacia Quirófano (02)'),
+            'Solicitud Traslado #' || COALESCE(NULLIF(t.docnum::text, ''), t.docentry::text, ''),
+            COALESCE(sm.existencias, 0),
+            t.docdate,
+            COALESCE(NULLIF(t.towarehouse, ''), 'Farmacia / Servicio'),
+            COALESCE(NULLIF(t.requestername, ''), 'Sistema'),
+            COALESCE((line->>'Quantity')::numeric, 0),
+            0,
+            CURRENT_TIMESTAMP
+          FROM dw_sap_traslados t
+          CROSS JOIN LATERAL jsonb_array_elements(
+            CASE
+              WHEN t.stocktransferlines IS NULL OR btrim(t.stocktransferlines::text) = '' THEN '[]'::jsonb
+              ELSE t.stocktransferlines::jsonb
+            END
+          ) AS line
+          LEFT JOIN stock_map sm ON sm.codigo = COALESCE(line->>'ItemCode', '')
+          UNION ALL
+          SELECT
+            COALESCE(c.codigo, ''),
+            COALESCE(c.insumo, ''),
+            CASE WHEN c.habitacion IS NOT NULL AND c.habitacion <> '' THEN 'Farmacia / ' || c.habitacion ELSE 'Almacén Sub-Farmacia' END,
+            CASE WHEN c.paciente IS NOT NULL AND c.paciente <> '' THEN 'Paciente: ' || c.paciente ELSE 'Servicio Hospitalario' END,
+            'Cuenta #' || COALESCE(c.cuentahospitalaria, ''),
+            COALESCE(sm.existencias, 0),
+            c.fechacargo,
+            COALESCE(NULLIF(c.habitacion, ''), 'Farmacia / Servicio'),
+            COALESCE(NULLIF(c.usuariocargo, ''), 'Vertical'),
+            -ABS(COALESCE(c.cantidad, 0)),
+            CASE WHEN COALESCE(c.montocobrado, 0) <> 0 THEN c.montocobrado ELSE COALESCE(c.cantidad, 0) * COALESCE(c.preciounitario, 0) END,
+            CURRENT_TIMESTAMP
+          FROM dw_cirrus_consumo c
+          LEFT JOIN stock_map sm ON sm.codigo = c.codigo
+          WHERE c.fechacargo IS NOT NULL
+        `, [stockCodes, stockValues]);
+        return insertRes.rowCount || 0;
+      }
+      await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      const entradas = (await client.query('SELECT * FROM dw_sap_entradas')).rows;
+      const traslados = (await client.query('SELECT * FROM dw_sap_traslados')).rows;
+      const consumos = (await client.query('SELECT * FROM dw_cirrus_consumo WHERE fechacargo IS NOT NULL')).rows;
+      const rows = [];
+      for (const e of entradas) {
+        rows.push([
+          'ENTRADA', `Entrada Factura ${e.numerofactura || ''} - ${e.nombreproveedor || ''}`,
+          `Proveedor: ${e.nombreproveedor || 'Externo'}`, 'Almacén General (01)',
+          `Factura ${e.numerofactura || e.numeroentrada || 'S/N'}`, 0, e.fecha,
+          'Almacén General', e.nombreproveedor || 'Sistema SAP',
+          Number(e.cantidadarticulos || 0), Number(e.importefactura || 0)
+        ]);
+      }
+      for (const t of traslados) {
+        const lines = typeof t.stocktransferlines === 'string'
+          ? JSON.parse(t.stocktransferlines) : (t.stocktransferlines || []);
+        if (!Array.isArray(lines)) throw new Error('Las partidas de un traslado no están completas.');
         for (const line of lines) {
           const itemCode = line.ItemCode || '';
-          const currentStock = stockMap.get(itemCode) || 0;
-          await pool.query(`
-            INSERT INTO dw_sap_kardex (
-              codigo, descripcion, almacenorigen, almacendestino, documentoref, existencias, fecha, servicio, usuario, movimiento, valoracumulado, lastsync
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP
-            )
-          `, [
-            String(itemCode || 'TRASLADO'),
-            `Traslado: ${line.ItemDescription || 'Insumo Médico'}`,
-            String(t.fromwarehouse || 'Almacén General (01)'),
-            String(t.towarehouse || 'Farmacia Quirófano (02)'),
-            `Solicitud Traslado #${t.docnum || t.docentry}`,
-            currentStock,
-            t.docdate,
-            String(t.towarehouse || 'Farmacia / Servicio'),
-            String(t.requestername || 'Sistema'),
-            Number(line.Quantity || 0),
-            0
+          rows.push([
+            String(itemCode || 'TRASLADO'), `Traslado: ${line.ItemDescription || 'Insumo Médico'}`,
+            String(t.fromwarehouse || 'Almacén General (01)'), String(t.towarehouse || 'Farmacia Quirófano (02)'),
+            `Solicitud Traslado #${t.docnum || t.docentry}`, stockMap.get(itemCode) || 0,
+            t.docdate, String(t.towarehouse || 'Farmacia / Servicio'), String(t.requestername || 'Sistema'),
+            Number(line.Quantity || 0), 0
           ]);
         }
       }
-    } catch(e) {
-      console.log('[Sync Kardex] dw_sap_traslados no contiene datos aun:', e.message);
-    }
-
-    // 3. Insertar Consumos (Salidas a Paciente/Servicio)
-    const consumosRes = await pool.query(`SELECT * FROM dw_cirrus_consumo WHERE fechacargo IS NOT NULL`);
-    for (const c of consumosRes.rows) {
-      const currentStock = stockMap.get(c.codigo) || 0;
-      const totalValue = Number(c.montocobrado || (Number(c.cantidad || 0) * Number(c.preciounitario || 0)));
-      await pool.query(`
-        INSERT INTO dw_sap_kardex (
-          codigo, descripcion, almacenorigen, almacendestino, documentoref, existencias, fecha, servicio, usuario, movimiento, valoracumulado, lastsync
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP
-        )
-      `, [
-        String(c.codigo || ''),
-        String(c.insumo || ''),
-        String(c.habitacion ? `Farmacia / ${c.habitacion}` : 'Almacén Sub-Farmacia'),
-        String(c.paciente ? `Paciente: ${c.paciente}` : 'Servicio Hospitalario'),
-        `Cuenta #${c.cuentahospitalaria || ''}`,
-        currentStock,
-        c.fechacargo,
-        String(c.habitacion || 'Farmacia / Servicio'),
-        String(c.usuariocargo || 'Vertical'),
-        -Math.abs(Number(c.cantidad || 0)),
-        totalValue
-      ]);
-    }
-
-    const countRes = await pool.query(`SELECT count(*) as total FROM dw_sap_kardex`);
-    const count = parseInt(countRes.rows[0].total, 10);
+      for (const c of consumos) {
+        rows.push([
+          String(c.codigo || ''), String(c.insumo || ''),
+          String(c.habitacion ? `Farmacia / ${c.habitacion}` : 'Almacén Sub-Farmacia'),
+          String(c.paciente ? `Paciente: ${c.paciente}` : 'Servicio Hospitalario'),
+          `Cuenta #${c.cuentahospitalaria || ''}`, stockMap.get(c.codigo) || 0, c.fechacargo,
+          String(c.habitacion || 'Farmacia / Servicio'), String(c.usuariocargo || 'Vertical'),
+          -Math.abs(Number(c.cantidad || 0)),
+          Number(c.montocobrado || (Number(c.cantidad || 0) * Number(c.preciounitario || 0)))
+        ]);
+      }
+      const kardexColumns = [
+        'codigo', 'descripcion', 'almacenorigen', 'almacendestino', 'documentoref',
+        'existencias', 'fecha', 'servicio', 'usuario', 'movimiento', 'valoracumulado'
+      ];
+      await client.query('DELETE FROM dw_sap_kardex');
+      await executeBatchInsert(client, 'dw_sap_kardex', kardexColumns, rows, 250);
+      return rows.length;
+    });
     console.log(`[Sync] Kardex unificado generado exitosamente con ${count} movimientos y trazabilidad.`);
     return count;
   } catch (err) {
     console.error('[Sync] Error al generar Kardex:', err);
-    return 0;
+    throw err;
   }
 }
 
-/**
- * Sincroniza Pedidos (PO) y Solicitudes (PR) abiertas de SAP Service Layer a PostgreSQL
- */
 async function syncPedidosSAP() {
   try {
-    const sapService = require('../services/sap.service');
     console.log('[Sync] Consultando Pedidos y Requisiciones abiertas en SAP Service Layer...');
 
-    // Mapear usuarios SAP (con paginación completa: SL devuelve solo ~20 por página)
     let usersMap = {};
     try {
-      const users = await sapService.fetchAllPages('/Users?$select=InternalKey,UserCode,UserName');
+      const users = await sapService.fetchAllPages('/Users?$select=InternalKey,UserCode,UserName', {}, {
+        ...SAP_READ_OPTIONS, timeoutMs: 15000, queueTimeoutMs: 30000, totalTimeoutMs: 30000
+      });
       users.forEach(u => {
         usersMap[u.InternalKey] = u.UserName || u.UserCode;
       });
@@ -351,10 +471,10 @@ async function syncPedidosSAP() {
     }
 
     let totalSynced = 0;
+    const sourceErrors = [];
 
-    // 1. Fetch Purchase Orders (PO) — con paginación completa
     try {
-      const poList = await sapService.fetchAllPages("/PurchaseOrders?$orderby=DocDate desc&$filter=DocumentStatus eq 'bost_Open'");
+      const poList = await sapService.fetchAllPages("/PurchaseOrders?$orderby=DocDate desc&$filter=DocumentStatus eq 'bost_Open'", {}, SAP_READ_OPTIONS);
       for (const po of poList) {
         const userName = po.RequesterName || usersMap[po.UserSign] || `Usuario #${po.UserSign}`;
         const lineItems = (po.DocumentLines || []).map(l => ({
@@ -399,11 +519,11 @@ async function syncPedidosSAP() {
       }
     } catch(e) {
       console.error('[Sync Pedidos PO Error]', e.message);
+      sourceErrors.push(e);
     }
 
-    // 2. Fetch Purchase Requests (PR) — con paginación completa
     try {
-      const prList = await sapService.fetchAllPages("/PurchaseRequests?$orderby=DocDate desc&$filter=DocumentStatus eq 'bost_Open'");
+      const prList = await sapService.fetchAllPages("/PurchaseRequests?$orderby=DocDate desc&$filter=DocumentStatus eq 'bost_Open'", {}, SAP_READ_OPTIONS);
       for (const pr of prList) {
         const userName = pr.RequesterName || usersMap[pr.UserSign] || `Usuario #${pr.UserSign}`;
         const lineItems = (pr.DocumentLines || []).map(l => ({
@@ -448,9 +568,10 @@ async function syncPedidosSAP() {
       }
     } catch(e) {
       console.error('[Sync Pedidos PR Error]', e.message);
+      sourceErrors.push(e);
     }
 
-    // 3. Auto-reparación: registros históricos que quedaron como 'Usuario #N'
+    // Auto-reparación: registros históricos que quedaron como 'Usuario #N'
     if (Object.keys(usersMap).length > 0) {
       try {
         const repairRes = await pool.query(`
@@ -470,36 +591,68 @@ async function syncPedidosSAP() {
       }
     }
 
+    if (sourceErrors.length) throw new AggregateError(sourceErrors, 'Sincronización de pedidos SAP incompleta.');
     console.log(`[Sync] Pedidos SAP sincronizados exitosamente en PostgreSQL: ${totalSynced} documentos.`);
     return totalSynced;
   } catch (err) {
     console.error('[Sync] Error al sincronizar Pedidos SAP:', err);
-    return 0;
+    throw err;
   }
 }
 
 let almacenSyncPromise = null;
 
-function runAlmacenSync() {
+function runAlmacenSync({ skipInventoryDownload = false } = {}) {
   if (almacenSyncPromise) {
     console.log('[Sync] Ya hay una sincronización de almacén en curso; se reutiliza esa ejecución.');
     return almacenSyncPromise;
   }
 
   almacenSyncPromise = (async () => {
-    await syncCenso();
-    await syncConsumo();
-    await syncEntradas();
-    await syncKardex();
-    await syncPedidosSAP();
-
-    try {
-      console.log('[Sync] Sincronizando Dataset Analítico para Machine Learning...');
-      const { syncMLDataset } = require('./mlDataset.service');
-      await syncMLDataset();
-    } catch (mlErr) {
-      console.error('[Sync] Error al sincronizar el Dataset Analítico de ML:', mlErr.message);
+    const errors = [];
+    const inventoryService = require('./sapInventory.service');
+    let inventoryAvailable = true;
+    if (skipInventoryDownload && (inventoryService.hasInventorySnapshot() || await inventoryService.loadInventoryFromDB())) {
+      console.log('[Sync] Inventario vigente en PostgreSQL; se omite su descarga desde SAP en este arranque.');
+    } else {
+      try {
+        await inventoryService.syncInventoryCache();
+      } catch (error) {
+        errors.push(error);
+        inventoryAvailable = inventoryService.hasInventorySnapshot() || inventoryService.getInventoryCache().length > 0 || await inventoryService.loadInventoryFromDB();
+      }
     }
+    const steps = [
+      ['censo', syncCenso],
+      ['consumo', inventoryAvailable ? syncConsumo : null],
+      ['entradas', syncEntradas],
+      ['kardex', inventoryAvailable ? syncKardex : null],
+      ['pedidos', syncPedidosSAP]
+    ];
+    const failedSteps = new Set();
+    for (const [name, work] of steps) {
+      if (!work) continue;
+      if (name === 'kardex' && (failedSteps.has('consumo') || failedSteps.has('entradas'))) continue;
+      try {
+        await work();
+      } catch (error) {
+        console.error(`[Sync] Etapa ${name} incompleta:`, error.message);
+        failedSteps.add(name);
+        errors.push(error);
+      }
+    }
+
+    if (!errors.length) {
+      try {
+        console.log('[Sync] Sincronizando Dataset Analítico para Machine Learning...');
+        const { syncMLDataset } = require('./mlDataset.service');
+        await syncMLDataset();
+      } catch (mlErr) {
+        console.error('[Sync] Error al sincronizar el Dataset Analítico de ML:', mlErr.message);
+        errors.push(mlErr);
+      }
+    }
+    if (errors.length) throw new AggregateError(errors, 'Sincronización de almacén incompleta; se conserva la última copia válida de las etapas fallidas.');
   })().finally(() => {
     almacenSyncPromise = null;
   });
@@ -513,5 +666,5 @@ module.exports = {
   syncEntradas,
   syncKardex,
   syncPedidosSAP,
-  runAlmacenSync
+  runAlmacenSync, waitForAlmacenSync: () => (almacenSyncPromise || Promise.resolve()).catch(() => {})
 };

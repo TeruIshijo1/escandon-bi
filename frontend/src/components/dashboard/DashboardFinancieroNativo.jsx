@@ -57,7 +57,7 @@ export default function DashboardFinancieroNativo({ globalFilters, globalTrigger
     try {
       setLoadingDetails(true);
       setDetailsError(null);
-      setAccountDetails({ pcNum, data: [] }); // Set initially to show modal immediately
+      setAccountDetails({ pcNum, data: [] });  
       
       const token = sessionStorage.getItem('escandon_token');
       const url = `${API_BASE}/dashboard/financiero-nativo/cuenta/${pcNum}`;
@@ -110,7 +110,6 @@ export default function DashboardFinancieroNativo({ globalFilters, globalTrigger
 
   return (
     <div className="dashboard-view" id="dashboard-financiero" style={{ padding: '2rem 0', fontFamily: "'Inter', sans-serif", background: 'white' }}>
-      {/* KPIs Cards */}
 
       <div className="fin-kpi-grid dashboard-metric-grid" style={{ marginBottom: '2rem' }}>
         <KPICard title="Ingresos Facturados" value={formatCurrency(kpis.ingresosAcumulados)} color="#005FA9" subtitle="Total facturado de cuentas cerradas" icon={
@@ -228,7 +227,6 @@ export default function DashboardFinancieroNativo({ globalFilters, globalTrigger
             </div>
           </div>
         </div>
-
 
         </>
       )}

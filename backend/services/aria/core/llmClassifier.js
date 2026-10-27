@@ -1,21 +1,8 @@
 'use strict';
 
-/**
- * Clasificación de intención con LLM (Gemini / DeepSeek / OpenAI).
- * Capa de respaldo: cuando los patrones regex y la coincidencia difusa
- * no aciertan, el LLM mapea la pregunta en lenguaje natural al intent
- * correcto, dándole a MAR-IA vocabulario prácticamente ilimitado.
- */
-
-const { providerConfig } = require('../../../utils/reportAiProviders');
+const { providerConfig, configuredGeminiBackups } = require('../../../utils/reportAiProviders');
 const { failureDiagnostic } = require('../../../utils/reportAiDiagnostics');
 
-/**
- * Clasifica una consulta en una de las intenciones registradas.
- * @param {string} query - Consulta del usuario (normalizada o cruda)
- * @param {Array} intents - INTENT_REGISTRY (id + patterns)
- * @returns {Promise<string|null>} id del intent o null si no clasifica / no hay LLM
- */
 async function classifyWithLLM(query, intents, { onDiagnostic, fetchImpl = global.fetch } = {}) {
   const config = providerConfig();
   if (!config.key || !Array.isArray(intents) || !intents.length) return null;
@@ -41,26 +28,32 @@ ${intentList}`;
     if (typeof onDiagnostic === 'function') onDiagnostic(diagnostic);
   };
   try {
-
-    const res = await fetchImpl(`${config.base.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.key}`,
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: query },
-        ],
-        max_tokens: 128,
-        temperature: 0,
-      }),
-      signal: controller.signal,
-    });
+    const models = [config.model, ...configuredGeminiBackups(config)].slice(0, 3);
+    let res;
+    let activeModel = config.model;
+    for (let index = 0; index < models.length; index += 1) {
+      activeModel = models[index];
+      res = await fetchImpl(`${config.base.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.key}`,
+        },
+        body: JSON.stringify({
+          model: activeModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: query },
+          ],
+          max_tokens: 128,
+          temperature: 0,
+        }),
+        signal: controller.signal,
+      });
+      if (res.ok || ![404, 429, 502, 503, 504].includes(res.status)) break;
+    }
     if (!res.ok) {
-      diagnose(null, { stage: 'http', httpStatus: res.status });
+      diagnose(null, { stage: 'http', httpStatus: res.status, activeModel });
       return null;
     }
 

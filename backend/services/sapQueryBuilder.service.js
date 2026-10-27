@@ -1,11 +1,10 @@
-/**
- * sapQueryBuilder.service.js
- * Servicio Constructor de Consultas SAP Business One (Service Layer & SQL Engine)
- * Hospital Escandón BI Platform v4.0
- */
+
+
 'use strict';
 
 const sapService = require('./sap.service');
+const sapConfig = require('../config/sap.config');
+const { ensureSapQuery, withSapQuery } = require('./sapQueryRegistration.service');
 const sapInventoryService = require('./sapInventory.service');
 const { pool } = require('../config/pg-db');
 const sapReportCatalog = require('./sapReportCatalog.service');
@@ -14,11 +13,9 @@ const assistantComposition = require('./assistantReportComposition.service');
 const savedReportAccess = require('./savedReportAccess.service');
 const reportAnalysis = require('./reportAnalysis.service');
 
-/* ══════════════════════════════════════════════════════════════
-   DICCIONARIO DE ENTIDADES Y CAMPOS (LENGUAJE HOSPITALARIO)
-══════════════════════════════════════════════════════════════ */
+/* DICCIONARIO DE ENTIDADES Y CAMPOS (LENGUAJE HOSPITALARIO) */
 const ENTITY_CATALOG = {
-  // ── INVENTARIOS Y STOCK ──
+  // INVENTARIOS Y STOCK
   inventory: {
     id: 'inventory',
     title: "Inventario por almacén",
@@ -68,7 +65,7 @@ const ENTITY_CATALOG = {
     ]
   },
 
-  // ── COMPRAS Y PROVEEDORES ──
+  // COMPRAS Y PROVEEDORES
   purchase_invoices: {
     id: 'purchase_invoices',
     title: 'Facturas de Proveedores (Compras)',
@@ -173,7 +170,7 @@ const ENTITY_CATALOG = {
     ]
   },
 
-  // ── MOVIMIENTOS Y ALMACENES ──
+  // MOVIMIENTOS Y ALMACENES
   stock_transfers: {
     id: 'stock_transfers',
     title: 'Traslados entre Almacenes Realizados',
@@ -286,7 +283,7 @@ const ENTITY_CATALOG = {
     ]
   },
 
-  // ── FACTURACIÓN Y CLIENTES ──
+  // FACTURACIÓN Y CLIENTES
   sales_invoices: {
     id: 'sales_invoices',
     title: 'Facturación e Ingresos Hospitalarios',
@@ -339,7 +336,7 @@ const ENTITY_CATALOG = {
     ]
   },
 
-  // ── CATÁLOGOS MAESTROS ──
+  // CATÁLOGOS MAESTROS
   business_partners: {
     id: 'business_partners',
     title: 'Directorio de Proveedores y Socios',
@@ -411,7 +408,7 @@ const ENTITY_CATALOG = {
   }
 };
 
-// Conserva los identificadores existentes para las plantillas y permisos.
+// Conserva los identificadores existentes para las plantillas y permisos
 for (const definition of Object.values(ENTITY_CATALOG)) {
   definition.source = 'SAP';
   definition.grain = definition.id === 'inventory' ? 'Una fila por artículo y almacén.'
@@ -458,9 +455,6 @@ function formatSapDateStr(val) {
   }
 }
 
-/* ══════════════════════════════════════════════════════════════
-   DEFINICIÓN DE CONSULTAS SQL PARAMETRIZADAS ESTÁTICAS (SAP SL v5)
-══════════════════════════════════════════════════════════════ */
 const STATIC_SQL_QUERIES = {
   sq_v6_batches: `SELECT TOP 5000 T0.ItemCode, T2.ItemName, T1.WhsCode, T0.DistNumber AS Batch, T0.InDate AS AdmissionDate, T0.ExpDate AS ExpirationDate, T1.Quantity FROM OBTN T0 INNER JOIN OBTQ T1 ON T0.ItemCode = T1.ItemCode AND T0.SysNumber = T1.SysNumber LEFT JOIN OITM T2 ON T0.ItemCode = T2.ItemCode WHERE T1.Quantity > 0 AND T0.ExpDate >= :startDate AND T0.ExpDate <= :endDate`,
   
@@ -481,42 +475,9 @@ const STATIC_SQL_QUERIES = {
   sq_v6_bp: `SELECT TOP 5000 T0.CardCode, T0.CardName, T0.CardType, T0.LicTradNum, T0.Phone1, T0.E_Mail, T0.Balance, T0.CreateDate FROM OCRD T0 WHERE T0.CardType IN ('S', 'C') ORDER BY T0.CardName ASC`
 };
 
-const registeredQueriesCache = new Set();
 const queryResultsCache = new Map();
-const QUERY_CACHE_TTL_MS = 60 * 1000; // 60 segundos de caché en memoria
+const QUERY_CACHE_TTL_MS = 60 * 1000;  
 
-/**
- * Asegura la creación de una SQLQuery en SAP Service Layer una sola vez.
- */
-async function ensureSapQuery(sqlCode, sqlText) {
-  if (registeredQueriesCache.has(sqlCode)) {
-    return;
-  }
-  try {
-    await sapService.post('/SQLQueries', {
-      SqlCode: sqlCode,
-      SqlName: sqlCode,
-      SqlText: sqlText
-    });
-    registeredQueriesCache.add(sqlCode);
-  } catch (e) {
-    try {
-      await sapService._request(`/SQLQueries('${sqlCode}')`, 'DELETE', null, { 'Cookie': sapService.sessionCookie });
-      await sapService.post('/SQLQueries', {
-        SqlCode: sqlCode,
-        SqlName: sqlCode,
-        SqlText: sqlText
-      });
-      registeredQueriesCache.add(sqlCode);
-    } catch (err) {
-      registeredQueriesCache.add(sqlCode);
-    }
-  }
-}
-
-/**
- * Registra todas las SQLQueries estáticas en segundo plano al iniciar
- */
 async function initSapQueryBuilderQueries() {
   try {
     await sapService._ensureSession();
@@ -529,20 +490,8 @@ async function initSapQueryBuilderQueries() {
   }
 }
 
-// Ejecutar inicialización no bloqueante
-if (process.env.NODE_ENV !== 'test') {
-  setTimeout(initSapQueryBuilderQueries, 6000);
-}
-
-/**
- * Ejecuta una consulta estática en SAP Service Layer pasando parámetros de fecha.
- * Si SAP devuelve 404 / -2028 (0 registros encontrados), retorna [] de forma silenciosa y segura.
- */
 async function executeSapSqlList(sqlCode, queryParams = {}) {
   const sqlText = STATIC_SQL_QUERIES[sqlCode];
-  if (sqlText) {
-    await ensureSapQuery(sqlCode, sqlText);
-  }
 
   let paramStr = '';
   const entries = Object.entries(queryParams);
@@ -550,55 +499,46 @@ async function executeSapSqlList(sqlCode, queryParams = {}) {
     paramStr = '?' + entries.map(([k, v]) => `${k}='${encodeURIComponent(v)}'`).join('&');
   }
 
-  try {
+  const read = async () => {
     const res = await sapService.get(`/SQLQueries('${sqlCode}')/List${paramStr}`, { 'Prefer': 'odata.maxpagesize=5000' });
-    const rows = res.data?.value || [];
+    const rows = res.data?.value;
+    if (!Array.isArray(rows) || rows.some(row => !row || typeof row !== 'object' || Array.isArray(row))) {
+      throw Object.assign(new Error('SAP no confirmó una colección válida para el reporte.'), { status: 502, code: 'SAP_PAGE_INVALID' });
+    }
     rows.truncated = rows.length >= 5000 || Boolean(res.data?.['@odata.nextLink'] || res.data?.['odata.nextLink']);
     return rows;
-  } catch (err) {
-    const errMsg = (err.message || '').toLowerCase();
-    const isNoRecords = err.status === 404 || String(err.code) === '-2028' || errMsg.includes('no matching records') || errMsg.includes('-2028');
-    if (isNoRecords) {
-      return [];
-    }
-    throw err;
-  }
+  };
+  return sqlText ? withSapQuery(sqlCode, sqlText, read) : read();
 }
 
-/**
- * Recupera documentos OData paginados de SAP Service Layer siguiendo @odata.nextLink
- * y utilizando Prefer: odata.maxpagesize=500 para máximo rendimiento y volumen completo
- */
 async function fetchAllODataDocs(endpoint, filterStr, selectFields = '', maxDocs = 1500) {
-  let allDocs = [];
+  const allDocs = [], visited = new Set();
+  const base = new URL(sapConfig.baseUrl), apiPath = base.pathname.replace(/\/$/, '');
   const selectParam = selectFields ? `&$select=${selectFields}` : '';
-  let nextUrl = `${endpoint}?$filter=${filterStr}${selectParam}&$orderby=DocDate desc`;
-  
+  let nextUrl = new URL(`${apiPath}${endpoint}?$filter=${filterStr}${selectParam}&$orderby=DocDate desc`, base.origin);
+  const collection = nextUrl.pathname.replace(/^\/b1s\/v[12]/, ''), deadline = Date.now() + 300000;
+  let excess = false;
   while (nextUrl && allDocs.length < maxDocs) {
-    const cleanUrl = nextUrl.startsWith('/') ? nextUrl : '/' + nextUrl.replace(/^.*\/b1s\/v1\//, '');
-    try {
-      const res = await sapService.get(cleanUrl, { 'Prefer': 'odata.maxpagesize=500' });
-      const batch = res.data?.value || [];
-      allDocs.push(...batch);
-      nextUrl = res.data['@odata.nextLink'] || res.data['odata.nextLink'];
-      if (!nextUrl || batch.length === 0) break;
-      // Pausa cooperativa de 35ms para no saturar el Service Layer de otros usuarios concurrentes
-      await new Promise(r => setTimeout(r, 35));
-    } catch (err) {
-      const errMsg = (err.message || '').toLowerCase();
-      if (err.status === 404 || errMsg.includes('not found') || errMsg.includes('-2028')) {
-        break;
-      }
-      throw err;
-    }
+    const identity = new URL(nextUrl); identity.searchParams.sort();
+    if (visited.has(identity.href) || visited.size >= 100 || Date.now() >= deadline) throw Object.assign(new Error('SAP no completó una paginación verificable.'), { status: 502, code: 'SAP_PAGE_LIMIT' });
+    visited.add(identity.href);
+    const res = await sapService.get(nextUrl.pathname + nextUrl.search, { Prefer: 'odata.maxpagesize=500' }, { timeoutMs: Math.min(30000, deadline - Date.now()), allowMissing: false });
+    const batch = res.data?.value;
+    if (!Array.isArray(batch) || batch.some(row => !row || typeof row !== 'object' || Array.isArray(row))) throw Object.assign(new Error('SAP no confirmó una colección válida para el reporte.'), { status: 502, code: 'SAP_PAGE_INVALID' });
+    for (const row of batch) { if (allDocs.length < maxDocs) allDocs.push(row); else excess = true; }
+    const first = res.data['@odata.nextLink'], second = res.data['odata.nextLink'];
+    if ([first, second].some(link => link != null && typeof link !== 'string') || (first && second && first !== second)) throw Object.assign(new Error('SAP devolvió una continuación inválida.'), { status: 502, code: 'SAP_PAGE_INVALID' });
+    const link = first || second;
+    if (!link) { nextUrl = null; continue; }
+    const resolved = link.startsWith('/') && !link.startsWith('//') && !/^\/b1s\/v[12](?:\/|$)/.test(link)
+      ? new URL(apiPath + link, base.origin) : new URL(link, nextUrl);
+    if (resolved.origin !== base.origin || resolved.username || resolved.password || resolved.hash || !/^\/b1s\/v[12]\//.test(resolved.pathname) || resolved.pathname.replace(/^\/b1s\/v[12]/, '') !== collection) throw Object.assign(new Error('La paginación debe permanecer en la misma colección SAP.'), { status: 502, code: 'SAP_PAGE_INVALID' });
+    nextUrl = resolved;
   }
-  allDocs.truncated = Boolean(nextUrl);
+  allDocs.truncated = Boolean(nextUrl) || excess;
   return allDocs;
 }
 
-/**
- * Ejecuta una consulta dinámica en Service Layer validando filtros obligatorios
- */
 async function executeQuery(options = {}) {
   const publicOptions = { ...options };
   delete publicOptions.pointLookup;
@@ -661,7 +601,7 @@ async function executeDetailedQuery({
   if ((fechaDesde && !isCalendarDate(fechaDesde)) || (fechaHasta && !isCalendarDate(fechaHasta))) {
     throw new Error('El formato de fechas es inválido. Use YYYY-MM-DD y fechas existentes.');
   }
-  // 1. Validar filtro obligatorio de fechas
+  // Validar filtro obligatorio de fechas
   if (entityDef.requiresDateFilter && (!pointLookup || fechaDesde || fechaHasta)) {
     if (!fechaDesde || !fechaHasta) {
       throw new Error(`Para evitar sobrecarga en SAP Service Layer, el módulo '${entityDef.title}' requiere obligatoriamente un rango de fechas (Fecha Desde y Fecha Hasta).`);
@@ -676,14 +616,12 @@ async function executeDetailedQuery({
       throw new Error('La Fecha Desde no puede ser posterior a la Fecha Hasta.');
     }
 
-    // Limitar rango máximo a 366 días para proteger el servidor
     const diffDays = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
     if (diffDays > 366) {
       throw new Error('El rango de fechas no puede exceder 366 días consecutivos por consulta.');
     }
   }
 
-  // Clave de caché para evitar consultas idénticas concurrentes a SAP
   const fieldsKey = JSON.stringify([...new Set(selectedFields)]);
   const searchFieldsKey = searchFields == null ? null : JSON.stringify([...new Set(searchFields)]);
   const searchKey = (busqueda || '').trim().toLowerCase();
@@ -708,7 +646,7 @@ async function executeDetailedQuery({
   let rawRows = [];
   let sourceTruncated = false;
 
-  // 2. Ejecutar según el módulo seleccionado
+  // Ejecutar según el módulo seleccionado
   switch (entity) {
     case 'inventory':
     {
@@ -1019,7 +957,6 @@ async function executeDetailedQuery({
     }
   }
 
-  // 3. Aplicar filtros en memoria de forma segura (sin descartar entidades que no tienen el campo)
   const hasWhsField = rawRows.length > 0 && ('WhsCode' in rawRows[0] || 'FillerCode' in rawRows[0] || 'Filler' in rawRows[0] || 'ToWhsCode' in rawRows[0]);
   if (almacen && almacen !== 'ALL' && hasWhsField && entityDef.filters.includes('almacen')) {
     rawRows = rawRows.filter(r => (
@@ -1077,7 +1014,7 @@ async function executeDetailedQuery({
 
   const truncated = Boolean(sourceTruncated || rawRows.length > effectiveLimit);
   rawRows = rawRows.slice(0, effectiveLimit);
-  // Los indicadores corresponden a las filas entregadas y a su granularidad.
+   
   let totalImporte = 0;
   let totalPiezas = 0;
   let docAbiertosCount = 0;
@@ -1143,12 +1080,11 @@ async function executeDetailedQuery({
     });
   }
 
-  // 5. Definición de columnas activas según selección (o default)
+  // Definición de columnas activas según selección (o default)
   const validSelected = [...new Set(selectedFields.filter(key => entityDef.fields.some(field => field.key === key)))];
   const activeFields = validSelected.length ? validSelected : entityDef.defaultFields;
   const activeColsDef = activeFields.map(key => entityDef.fields.find(field => field.key === key));
 
-  // Preservar todos los campos del registro para que el frontend pueda activar/desactivar columnas al instante
   const projectedData = rawRows.slice(0, effectiveLimit).map(row => {
     return Object.fromEntries(entityDef.fields.map(field => [field.key, row[field.key] ?? null]));
   });
@@ -1185,15 +1121,13 @@ async function executeDetailedQuery({
       columnas: activeColsDef
     }
   });
-  // Evita crecimiento indefinido con periodos y filtros distintos.
+  // Evita crecimiento indefinido con periodos y filtros distintos
   while (queryResultsCache.size > 100) queryResultsCache.delete(queryResultsCache.keys().next().value);
 
   return finalResult;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   GESTIÓN DE CONSULTAS GUARDADAS (PLANTILLAS DE USUARIO)
-══════════════════════════════════════════════════════════════ */
+/* GESTIÓN DE CONSULTAS GUARDADAS (PLANTILLAS DE USUARIO) */
 
 function getEntityDefinition(id) {
   const definition = typeof id === 'string' && Object.hasOwn(ENTITY_CATALOG, id) ? ENTITY_CATALOG[id]

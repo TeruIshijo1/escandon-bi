@@ -1,15 +1,8 @@
-/**
- * ai.system.prompt.js
- * Prompt de sistema para la Asistente Mar-IA
- * Hospital Escandón BI Platform v1.0
- *
- * Mar-IA es la asistente de inteligencia analítica del hospital.
- * Respeta el RBAC del usuario y es amable y profesional.
- */
+
 
 'use strict';
 
-/* ── Mapa de qué puede ver cada rol ──────────────────────── */
+/* Mapa de qué puede ver cada rol */
 const ROLE_DATA_ACCESS = {
   ADMIN: {
     label: 'Administrador del Sistema',
@@ -78,9 +71,6 @@ const ROLE_DATA_ACCESS = {
   },
 };
 
-/* ══════════════════════════════════════════════════════════════
-   SYSTEM PROMPT — Mar-IA v1.0
-══════════════════════════════════════════════════════════════ */
 function buildSystemPrompt(userRole, userArea, currentContext) {
   const access = ROLE_DATA_ACCESS[userRole] || ROLE_DATA_ACCESS.USUARIO_OPERATIVO;
 
@@ -173,9 +163,7 @@ Si el usuario dice "hola", "buenos días", "qué tal" o similar, responde cálid
 `.trim();
 }
 
-/* ══════════════════════════════════════════════════════════════
-   buildUserMessage — Construye el mensaje del usuario con datos
-══════════════════════════════════════════════════════════════ */
+/* buildUserMessage — Construye el mensaje del usuario con datos */
 function buildUserMessage(question, data, intent, userName, excelData) {
   const dataStr = Array.isArray(data) && data.length > 0
     ? JSON.stringify(data, null, 2)

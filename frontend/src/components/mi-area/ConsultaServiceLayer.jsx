@@ -65,7 +65,6 @@ const ColumnFilter = ({ columnKey, data, colFilters, setColFilters, label, align
   const val = colFilters[columnKey] || '';
   const isActive = val !== '';
 
-  // Determinar si la columna tiene pocos valores discretos (<= 25). Si tiene muchos, usar input de búsqueda directo para evitar saturar el DOM.
   const isDiscreteSelect = useMemo(() => {
     if (!data || data.length === 0) return false;
     const sample = new Set();
@@ -218,7 +217,6 @@ export default function ConsultaServiceLayer() {
   const [analysisSummary, setAnalysisSummary] = useState(null);
   const [manualTopicRequired, setManualTopicRequired] = useState(false);
 
-  // Helpers de fecha
   const getTodayStr = () => new Date().toLocaleDateString('en-CA');
   const getDaysAgoStr = (days) => {
     const d = new Date();
@@ -250,7 +248,6 @@ export default function ConsultaServiceLayer() {
   const [error, setError] = useState(null);
   const [executionFailed, setExecutionFailed] = useState(false);
 
-  // Plantillas guardadas
   const [savedQueries, setSavedQueries] = useState([]);
   const [savedLoading, setSavedLoading] = useState(false);
   const [savedError, setSavedError] = useState('');
@@ -367,7 +364,6 @@ export default function ConsultaServiceLayer() {
     if (!categories.includes(activeCategory)) setActiveCategory('ALL');
   }, [categories, activeCategory]);
 
-  // Si cambia la lista de módulos permitidos, asegurar que selectedEntityId sea válido
   useEffect(() => {
     if (activeSavedReport?.entity === selectedEntityId) return;
     if (userAllowedAssistantCatalog.length > 0 && !userAllowedAssistantCatalog.some(c => c.id === selectedEntityId)) {
@@ -382,7 +378,6 @@ export default function ConsultaServiceLayer() {
     }
   }, [activeSavedReport, userAllowedAssistantCatalog, userAllowedCatalog, selectedEntityId, manualTopicRequired]);
 
-  // Al cambiar de entidad, preseleccionar sus campos default y limpiar filtros no aplicables
   const handleSelectEntity = (entId) => {
     const def = userAllowedAssistantCatalog.find(c => c.id === entId);
     if (!def) return;
@@ -400,15 +395,15 @@ export default function ConsultaServiceLayer() {
     setError(null);
     queryRequestRef.current += 1;
     setLoading(false);
-    // Limpiar estatus si la nueva entidad no lo maneja
+     
     if (!supportsFilter(def, 'estatusDoc') || !(def.statusOptions?.map(option => option.value) || ['ALL', 'OPEN', 'CLOSED']).includes(estatusDoc)) {
       setEstatusDoc('ALL');
     }
-    // Limpiar clasificación médica si la nueva entidad no la maneja
+     
     if (!supportsFilter(def, 'clasificacionMedica')) {
       setClasificacionMedica('ALL');
     }
-    // Si la entidad no tiene almacén, resetear almacén
+     
     if (!supportsFilter(def, 'almacen')) {
       setAlmacen('ALL');
     }
@@ -417,7 +412,7 @@ export default function ConsultaServiceLayer() {
   const toggleField = (fieldKey) => {
     setSelectedFields(prev => {
       if (prev.includes(fieldKey)) {
-        if (prev.length === 1) return prev; // Mantener al menos 1
+        if (prev.length === 1) return prev;  
         return prev.filter(k => k !== fieldKey);
       }
       return [...prev, fieldKey];
@@ -659,7 +654,7 @@ export default function ConsultaServiceLayer() {
       if (draft) setError('El tema o las columnas cambiaron. Elige un tema disponible para continuar.');
       return;
     }
-    // Only fill the form. The user completes it and explicitly starts the query.
+     
     handleSelectEntity(definition.id);
     setSelectedFields([...new Set(draft.selectedFields)]);
     setAnalysis(draft.analysis || filters.analysis || null); setAnalysisSummary(draft.analysisSummary || null);
@@ -719,7 +714,6 @@ export default function ConsultaServiceLayer() {
     }
   };
 
-  // Cargar una plantilla guardada
   const handleLoadSavedQuery = (sq) => {
     if (sq.isAssigned && !sq.isOwner) { handleOpenSavedReport(sq); return; }
     const entity = userAllowedAssistantCatalog.find(def => def.id === sq.entity);
@@ -748,7 +742,6 @@ export default function ConsultaServiceLayer() {
     setShowSavedModal(false);
   };
 
-  // Eliminar plantilla guardada
   const handleDeleteSavedQuery = async (sqId, e) => {
     e.stopPropagation();
     if (!confirm('¿Eliminar este reporte guardado? Las personas asignadas dejarán de verlo.')) return;
@@ -777,7 +770,6 @@ export default function ConsultaServiceLayer() {
     setReportMode(mode);
   };
 
-  // Sincronizar scroll superior e inferior
   useEffect(() => {
     const tableContainer = tableScrollRef.current;
     if (!tableContainer) return;
@@ -811,7 +803,6 @@ export default function ConsultaServiceLayer() {
     && queryResult && estatusDoc !== queryResult.requestedFilters?.estatusDoc);
   const exportBlocked = loading || executionFailed || needsSourceRefresh;
 
-  // Columnas dinámicas activas según los checkboxes seleccionados por el usuario
   const columns = useMemo(() => {
     if (hasReportAnalysis(queryResult?.analysis) && Array.isArray(queryResult.columnas)) return queryResult.columnas;
     if (!currentEntityDef) return queryResult?.columnas || [];
@@ -825,14 +816,13 @@ export default function ConsultaServiceLayer() {
     return activeDefs.length > 0 ? activeDefs : (queryResult?.columnas || currentEntityDef.fields);
   }, [currentEntityDef, selectedFields, queryResult]);
 
-  // Filtrado reactivo en tiempo real (Búsqueda general, almacén, estatus, clasificación sanitaria y filtros de columna)
   const filteredRows = useMemo(() => {
     const rawList = queryResult?.data || [];
     if (!rawList || rawList.length === 0) return [];
 
     return rawList.filter(row => {
       if (hasReportAnalysis(queryResult.analysis)) return Object.entries(colFilters).every(([key, value]) => !value?.trim() || String(row[key] ?? '').toLowerCase().includes(value.trim().toLowerCase()));
-      // 1. Filtro de búsqueda general de texto (en todas las propiedades del objeto)
+       
       if (busqueda && busqueda.trim() && busqueda !== queryResult.requestedFilters?.busqueda) {
         const q = busqueda.trim().toLowerCase();
         const matchesSearch = Object.values(row).some(val => 
@@ -841,7 +831,7 @@ export default function ConsultaServiceLayer() {
         if (!matchesSearch) return false;
       }
 
-      // 2. Filtro de almacén
+      // Filtro de almacén
       if (hasWhsField && almacen && almacen !== 'ALL' && almacen !== queryResult.requestedFilters?.almacen && (row.WhsCode != null || row.FillerCode != null || row.ToWhsCodeRaw != null || row.WhsName != null || row.Filler != null || row.ToWhsCode != null)) {
         const alm = almacen.trim().toUpperCase();
         const rowWhs = String(row.WhsCode || row.FillerCode || row.ToWhsCodeRaw || '').toUpperCase();
@@ -850,7 +840,6 @@ export default function ConsultaServiceLayer() {
         if (!matchesWhs) return false;
       }
 
-      // 3. Filtro de estatus de documento (solo si la fila realmente contiene estatus)
       if (hasStatusField && estatusDoc && estatusDoc !== 'ALL' && estatusDoc !== queryResult.requestedFilters?.estatusDoc) {
         const hasStatus = row.DocStatus != null || row.Status != null || row[currentEntityDef?.statusField] != null;
         if (hasStatus) {
@@ -868,7 +857,6 @@ export default function ConsultaServiceLayer() {
         if (estatusDoc === 'NO_MEDICAL_DISCHARGE' && discharge != null && discharge !== 'No') return false;
       }
 
-      // 4. Filtro de clasificación sanitaria (solo si la fila la contiene)
       if (hasMedClassField && clasificacionMedica && clasificacionMedica !== 'ALL' && clasificacionMedica !== queryResult.requestedFilters?.clasificacionMedica) {
         if ('MedicalClassification' in row || 'SecondaryClassification' in row) {
           const c = `${row.MedicalClassification || ''} ${row.SecondaryClassification || ''}`.toUpperCase();
@@ -878,7 +866,6 @@ export default function ConsultaServiceLayer() {
         }
       }
 
-      // 5. Filtros por encabezado de columna individual (búsqueda parcial insensible a mayúsculas)
       return Object.entries(colFilters).every(([key, val]) => {
         if (!val || !val.trim()) return true;
         const needle = val.trim().toLowerCase();
@@ -983,7 +970,7 @@ export default function ConsultaServiceLayer() {
   return (
     <div className="report-builder">
       
-      {/* ── Encabezado Principal ── */}
+      {/* Encabezado Principal */}
       <header className="report-builder__header">
         <div className="report-builder__intro">
           <span className="report-builder__hero-icon"><ReportBuilderIcon /></span>
@@ -1033,7 +1020,7 @@ export default function ConsultaServiceLayer() {
         <ReportAssistant assistantCatalog={userAllowedAssistantCatalog} catalogLoading={catalogLoading} catalogError={catalogError} onGenerate={handleAssistantGenerate} onViewReport={showResults} onManual={handleAssistantManual} onReset={resetAssistantReport} />
       </div>
 
-      {/* ── Selector de módulos y temas de SAP / Vertical ── */}
+      {/* Selector de módulos y temas de SAP / Vertical */}
       <section hidden={onlySavedReports || reportMode !== 'manual'} className="report-catalog" aria-label="Módulos y temas disponibles" aria-busy={catalogLoading}>
         <div className="report-catalog__heading">
           <div className="report-builder__section-title">
@@ -1156,7 +1143,7 @@ export default function ConsultaServiceLayer() {
         </div>}
       </section>
 
-      {/* ── Panel de Configuración de Filtros y Columnas ── */}
+      {/* Panel de Configuración de Filtros y Columnas */}
       {currentEntityDef && (
         <div hidden={reportMode !== 'manual'} className="report-builder__configuration-panel">
           <div className="report-builder__configuration-heading">
@@ -1366,7 +1353,7 @@ export default function ConsultaServiceLayer() {
         </div>
       )}
 
-      {/* ── Mensajes de Alerta / Error ── */}
+      {/* Mensajes de Alerta / Error */}
       {error && (
         <div role="alert" style={{
           background: '#FEE2E2', border: '1px solid #F87171', color: '#991B1B',
@@ -1378,7 +1365,7 @@ export default function ConsultaServiceLayer() {
         </div>
       )}
 
-      {/* ── Panel de Resultados ── */}
+      {/* Panel de Resultados */}
       {queryResult && (
         <div ref={resultsRef} tabIndex={-1} aria-label="Reporte generado" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 8px -2px rgba(0,0,0,0.05)', scrollMarginTop: '100px' }}>
           
@@ -1475,8 +1462,7 @@ export default function ConsultaServiceLayer() {
               ))}
             </div>
           )}
-          
-          {/* Scrollbar Superior Sincronizada */}
+
           <div
             ref={topScrollRef}
             onScroll={() => {
@@ -1608,7 +1594,6 @@ export default function ConsultaServiceLayer() {
             </div>
           )}
 
-          {/* Paginador */}
           {!loading && filteredRows.length > PER_PAGE && (
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',

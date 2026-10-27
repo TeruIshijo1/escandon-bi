@@ -25,20 +25,48 @@ function fields(itemCode, groupName, description) {
   return { code: itemCode, group: groupName, name: description };
 }
 
+function hasHonorariosReference(row) {
+  if (!row || typeof row !== 'object') return false;
+  const references = row.referencePrices || row.reference_prices || row.PrecioReferenciaVertical;
+  return (Array.isArray(references) && references.length > 0)
+    || [row.SourceHonorariosReference, row.PasaCatalogoHonorarios, row.Pasa_UT_Honorarios].some(value => value === true || value === 1)
+    || Number(row.TariffCount) > 0;
+}
+
+function isImagingConcept(row, groupName, description) {
+  const { code, group, name } = fields(row, groupName, description);
+  return normalize(group) === 'IMAGENOLOGIA' || ['SER0647', 'SER0649'].includes(normalize(code))
+    || imaging.test(normalize(name));
+}
+
 function isExcludedHonorariosService(itemCode, groupName, description) {
   const { code, group, name } = fields(itemCode, groupName, description);
-  return isExcludedHonorariosGroup(group) || /^(A-|PQX\d)/.test(normalize(code))
-    || ['SER0647', 'SER0649'].includes(normalize(code)) || imaging.test(normalize(name)) || hospitalCharge.test(normalize(name));
+  const groupExcluded = isExcludedHonorariosGroup(group) && normalize(group) !== 'IMAGENOLOGIA';
+  const isPackage = itemCode && typeof itemCode === 'object'
+    && [itemCode.IsAssembly, itemCode.EsPaquete].some(value => value === true || value === 1);
+  const isArticle = itemCode && typeof itemCode === 'object'
+    && [itemCode.ItemType, itemCode.itemType, itemCode.sourceMetadata?.itemType, itemCode.source_metadata?.itemType]
+      .some(value => normalize(value) === 'I');
+  return groupExcluded || /^(A-|PQX\d)/.test(normalize(code)) || hospitalCharge.test(normalize(name)) || Boolean(isPackage || isArticle)
+    || (isImagingConcept(itemCode, groupName, description) && !hasHonorariosReference(itemCode));
+}
+
+function isHonorariosScopeExcluded(row) {
+  const storedExcluded = row?.scopeExcluded || row?.scope_excluded || row?.ScopeExcluded;
+
+  return isExcludedHonorariosService(row)
+    || Boolean(storedExcluded && !(isImagingConcept(row) && hasHonorariosReference(row)));
 }
 
 function classifyProfessionalCandidate(row) {
   if (isExcludedHonorariosService(row)) return { professionalCandidate: false, scopeReason: 'Cargo de hospital, artículo, paquete o área excluida; no es un honorario profesional.' };
   const { code, group, name } = fields(row);
-  const known = ['SER1467', 'SER1470', 'SER1471', 'SER1259', 'SER1260', 'SER1261', 'SER1262'].includes(normalize(code))
-    || professionalAct.test(normalize(name)) || clinicalGroups.has(normalize(group)) || row.referencePrices?.length > 0;
+  const known = /^CXQ/.test(normalize(code)) || ['SER1467', 'SER1470', 'SER1471', 'SER1259', 'SER1260', 'SER1261', 'SER1262'].includes(normalize(code))
+    || professionalAct.test(normalize(name)) || clinicalGroups.has(normalize(group)) || hasHonorariosReference(row);
   return { professionalCandidate: Boolean(known), scopeReason: known
-    ? 'Antes de preparar el pago, incluye este servicio y registra su tarifa autorizada.'
+    ? "Antes de preparar el pago, incluye este servicio y registra su tarifa autorizada."
     : 'Confirmar si este concepto corresponde a un servicio profesional antes de incluirlo para pago.' };
 }
 
-export { isExcludedHonorariosGroup, isExcludedHonorariosService, classifyProfessionalCandidate };
+export { isExcludedHonorariosGroup, isExcludedHonorariosService, isHonorariosScopeExcluded,
+  hasHonorariosReference, classifyProfessionalCandidate };
